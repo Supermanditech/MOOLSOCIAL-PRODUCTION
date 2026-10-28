@@ -2,9 +2,9 @@ import type {AccountPlansService, PlansReadback} from "../account/plans_service.
 import type {AccountProfileActor} from "../account/profile_service.js";
 import type {WorkspaceCatalogueService, StoreSkuRecord} from "../workspace/workspace_catalogue_service.js";
 import type {PreparationContextSource} from "./model_service.js";
-import {AssistantModelError, canonical, digest, fail, object,
+import {AssistantModelError, canonical, digest, fail, id, object,
   catalogueListingSelection, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
-import {catalogueProductActions, catalogueSearchActions, nativePreferenceActions, storeProductActions, storeProductOwnerActions, searchSuggestion} from "./domain_context_contract.js";
+import {catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions, searchSuggestion} from "./domain_context_contract.js";
 
 const paidRevision = (p: PlansReadback) => canonical([p.owner, p.scope, p.catalogueRevision, p.subscriptionRevision]);
 const searchSchema = {type: "object", properties: {query: {type: "string"}},
@@ -57,12 +57,20 @@ function filterTool(revision: string, brands: string[], prices: number[], packs:
     }};
 }
 
+async function approvedWorkspacePreparationAuthority(source:PreparationContextSource,actor:AccountProfileActor,
+  input:PreparationRequest,now:number){
+  const value=await source.read(actor,{...input,actionId:null,entityId:null});
+  if(value.modelContext?.audience!=='workspace'||object(value.modelContext.current).id!==input.scope.storeId||
+      !value.tools.some(tool=>tool.actionId==='AI-ACT-317'&&tool.entityId===input.scope.storeId)||
+      !Number.isFinite(Date.parse(value.validUntil))||Date.parse(value.validUntil)<=now)return fail('workspace_access_unavailable');
+  return value;
+}
 /** Exact original catalogue reader. No client catalogue, fixture or local master. */
 export class OriginalCataloguePreparationContext implements PreparationContextSource {
   constructor(private readonly deps: {projectId: string;
     plans: Pick<AccountPlansService, "read">;
     catalogue: Pick<WorkspaceCatalogueService, "publicDiscovery"> & Partial<Pick<WorkspaceCatalogueService, "publicVariantFamilies">>;
-    now?: () => Date}) {}
+    workspaceAuthority?:PreparationContextSource;now?: () => Date}) {}
   private now() {return (this.deps.now?.() ?? new Date()).getTime();}
   private async paid(actor: AccountProfileActor, input: PreparationRequest) {
     if (actor.projectId !== this.deps.projectId || !actor.uid || actor.tenantId !== undefined) return fail("account_scope_mismatch", 403);
@@ -180,7 +188,39 @@ export class OriginalCataloguePreparationContext implements PreparationContextSo
     return ids.flatMap(value => found.has(value) ? [found.get(value)!] : []);
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
+    if(input.scope.audience==='workspace')return this.readRestock(actor,input);
     return this.readOriginal(actor, input);
+  }
+  private async readRestock(actor:AccountProfileActor,input:PreparationRequest):Promise<PreparationContext>{
+    if(!this.deps.workspaceAuthority||input.scope.audience!=='workspace'||!input.scope.storeId||input.entityId!==null||
+        input.catalogueListingIds!==undefined||input.actionId!==null&&!storeRestockOwnerActions.has(input.actionId))return fail('context_unavailable');
+    const started=this.now(),before=await this.paid(actor,input);
+    const authority=await approvedWorkspacePreparationAuthority(this.deps.workspaceAuthority,actor,input,this.now());
+    const original=await this.catalogueSnapshot('wholesale'),fresh=await this.catalogueSnapshot('wholesale');
+    const current=await approvedWorkspacePreparationAuthority(this.deps.workspaceAuthority,actor,input,this.now()),after=await this.paid(actor,input);
+    if(canonical(original)!==canonical(fresh)||authority.revision!==current.revision||paidRevision(before)!==paidRevision(after))return fail('stale_preparation',409);
+    const until=Math.min(started+60000,Date.parse(authority.validUntil),Date.parse(current.validUntil),Date.parse(before.validUntil),Date.parse(after.validUntil));
+    if(until<=this.now())return fail('stale_preparation',409);
+    const sourceRevision='store-restock-source:'+digest([actor.projectId,actor.uid,input.scope.storeId,current.revision,original]);
+    const validate=(fields:Readonly<Record<string,unknown>>)=>
+      Object.keys(fields).every(key=>['channel','query'].includes(key))&&['wholesale','bulk'].includes(String(fields.channel))&&
+      typeof fields.channel==='string'&&(!Object.hasOwn(fields,'query')||typeof fields.query==='string'&&fields.query.length<=80&&
+        !/[\u0000-\u001f\u007f]/u.test(fields.query)&&Buffer.from(fields.query,'utf8').toString('utf8')===fields.query);
+    const tool:PreparationTool={name:'store_prepare_restock_search',actionId:'AI-ACT-234',entityId:null,sourceRevision,
+      description:'Prepare the explicitly requested Wholesale or Bulk channel and product search for the current approved Store. Use supplied search text; ask when the channel is unclear. The original Restock controller checks supplier eligibility and loads current products/pack/terms. No supplier, product, price, credit eligibility, quote, quantity, order or payment is selected or confirmed by this tool.',
+      parameters:{type:'object',properties:{channel:{type:'string',enum:['wholesale','bulk']},query:{type:['string','null']}},
+        required:['channel','query'],additionalProperties:false},validate,
+      resolveTarget:args=>{
+        if(Object.keys(args).length!==2||!Object.hasOwn(args,'channel')||!Object.hasOwn(args,'query'))return fail('invalid_model_result');
+        const fields=Object.fromEntries(Object.entries(args).filter(([,value])=>value!==null));
+        if(!validate(fields))return fail('invalid_model_result');
+        return {entityId:null,sourceRevision,fields,title:'Review Restock search',
+          summary:'Check your Store, buying channel and product search before continuing.'};
+      }};
+    return {revision:sourceRevision,validUntil:new Date(until).toISOString(),tools:[tool],modelContext:{
+      audience:'workspace',storeId:input.scope.storeId,sourceKind:'original-store-restock-search-v1',
+      source:{snapshotId:original.snapshotId,verifiedPublicCount:original.count},
+      purpose:'Read-only verified public supplier directory witness. Current Store eligibility, product selection, pack, quantity, terms, quotes and final order remain with the original native procurement journey. No source product has been selected.'}};
   }
   private async family(product: OriginalPublicProduct): Promise<OriginalPublicFamily | null> {
     const read = this.deps.catalogue.publicVariantFamilies?.bind(this.deps.catalogue);
@@ -254,6 +294,10 @@ export class OriginalCataloguePreparationContext implements PreparationContextSo
   }
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
     proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
+    if(storeRestockOwnerActions.has(proposal.actionId)){
+      if(proposal.actionId!==input.actionId||proposal.entityId!==null||input.entityId!==null)return fail('stale_preparation',409);
+      return this.readRestock(actor,input);
+    }
     if (proposal.actionId !== input.actionId || proposal.entityId !== input.entityId) return fail("stale_preparation", 409);
     return this.readOriginal(actor, input, proposal.fields);
   }
@@ -385,6 +429,10 @@ export class OriginalCataloguePreparationContext implements PreparationContextSo
     // No saved flag, URL, phone action or communication is written here.
     for (const [actionId, name, description] of [
       ["AI-ACT-009", "buy_prepare_saved_product", "Review saving or removing a product"],
+      ["AI-ACT-014", "buy_prepare_cart_product", "Review adding whole packs to Cart"],
+      ["AI-ACT-017", "buy_prepare_product_purchase", "Review buying this product"],
+      ["AI-ACT-018", "buy_prepare_cart_quantity", "Review the new whole-pack quantity in Cart"],
+      ["AI-ACT-019", "buy_prepare_cart_removal", "Review removing this product from Cart"],
       ["AI-ACT-336", "buy_review_product_link", "Review copying the original product link"],
       ["AI-ACT-337", "buy_review_product_sharing", "Review sharing the original product"],
       ["AI-ACT-338", "buy_prepare_store_search", "Review a search within the original supplier Store"],
@@ -393,13 +441,25 @@ export class OriginalCataloguePreparationContext implements PreparationContextSo
       const candidates = products.filter(product => actionId !== "AI-ACT-339" || product.contactAvailable);
       if (!candidates.length) continue;
       const properties: Record<string, object> = actionId === "AI-ACT-009" ? {saved: {type: "boolean"}}
+        : actionId === "AI-ACT-014" || actionId === "AI-ACT-017" || actionId === "AI-ACT-018" ? {quantity: {type: actionId === 'AI-ACT-018' ? 'integer' : ["integer", "null"], minimum: 1,
+          description: actionId === 'AI-ACT-018' ? 'The new whole-pack total explicitly supplied by the user, not an increment. Ask if missing. The original native Cart must contain this exact listing and independently validates current quantity, price, eligibility and pack steps before confirmation.' :
+            'Only the whole-pack count explicitly supplied by the user; null when unspecified. This prepares the original native review, not availability, pricing, an order or payment confirmation.'}}
         : actionId === "AI-ACT-338" ? {query: {type: "string"}} : {};
       const validate = (fields: Readonly<Record<string, unknown>>) => {
         if (actionId === "AI-ACT-009") return Object.keys(fields).length === 1 && typeof fields.saved === "boolean";
+        if (actionId === 'AI-ACT-018') return Object.keys(fields).length === 1 && Number.isSafeInteger(fields.quantity) && (fields.quantity as number) >= 1;
+        if (actionId === "AI-ACT-014" || actionId === "AI-ACT-017") return Object.keys(fields).every(key => key === 'quantity') &&
+          (!Object.hasOwn(fields, 'quantity') || Number.isSafeInteger(fields.quantity) && (fields.quantity as number) >= 1);
         if (actionId === "AI-ACT-338") {try {searchSuggestion(fields); return true;} catch {return false;}}
         return Object.keys(fields).length === 0;
       };
-      const decodeFields = actionId === "AI-ACT-338" ? searchSuggestion : undefined;
+      const decodeFields = actionId === "AI-ACT-338" ? searchSuggestion :
+        actionId === "AI-ACT-014" || actionId === "AI-ACT-017" || actionId === 'AI-ACT-018' ? (args: Readonly<Record<string, unknown>>) => {
+          if (Object.keys(args).length !== 1 || !Object.hasOwn(args, 'quantity')) return fail('invalid_model_result');
+          const fields = args.quantity === null ? {} : {quantity: args.quantity};
+          if (!validate(fields)) return fail('invalid_model_result');
+          return fields;
+        } : undefined;
       const fixed = input.entityId !== null ? candidates.find(product => product.listingId === input.entityId) : undefined;
       const dynamic = input.entityId === null;
       if (!dynamic && !fixed) continue;
@@ -410,7 +470,7 @@ export class OriginalCataloguePreparationContext implements PreparationContextSo
         ...(dynamic ? {targetSelector: "listingId", resolveTarget: (args: Readonly<Record<string, unknown>>) => {
           const {listingId, ...fields} = args;
           const product = candidates.find(value => value.listingId === listingId);
-          if (!product || !validate(fields)) return fail("invalid_model_result");
+          if (!product || !(decodeFields ? validate(decodeFields(fields)) : validate(fields))) return fail("invalid_model_result");
           return {entityId: product.listingId, sourceRevision: product.revision,
             fields: decodeFields ? decodeFields(fields) : fields,
             title: description, summary: [product.title, product.variant, product.pack].filter(Boolean).join(" · ")};
@@ -453,6 +513,7 @@ export const storeProductNativeTextFields = [
 ] as const;
 const storeSalePriceFields = ["sellingPrice", "wholesalePrice", "wholesaleTiers", "priceChangesFrequently", "priceValidityMinutes"];
 const storeReferenceFields = ["sourceCanonicalId", "sourceSku", "sourcePack", "sourceRetailEnabled", "sourceWholesaleEnabled"];
+export const storeVariantNativeKinds=['colour','size','storage','pack','other'] as const;
 // Exact descriptive controls from the existing native warranty guide. These
 // strings do not establish a warranty entitlement or decide claim eligibility.
 export const storeWarrantyNativeLabels = ["Warranty issuer", "Warranty duration", "Warranty start basis", "Warranty coverage",
@@ -466,11 +527,7 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
     catalogue: Pick<WorkspaceCatalogueService, "listSkus">; now?: () => Date}) {}
   private now() {return (this.deps.now?.() ?? new Date()).getTime();}
   private async authority(actor: AccountProfileActor, input: PreparationRequest) {
-    const value = await this.deps.authority.read(actor, {...input, actionId: null, entityId: null});
-    if (value.modelContext?.audience !== "workspace" || object(value.modelContext.current).id !== input.scope.storeId ||
-        !value.tools.some(tool => tool.actionId === "AI-ACT-317" && tool.entityId === input.scope.storeId) ||
-        !Number.isFinite(Date.parse(value.validUntil)) || Date.parse(value.validUntil) <= this.now()) return fail("workspace_access_unavailable");
-    return value;
+    return approvedWorkspacePreparationAuthority(this.deps.authority,actor,input,this.now());
   }
   private async snapshot(actor: AccountProfileActor, storeId: string, skuId: string | null, ownerOnly = false) {
     const records: StoreSkuRecord[] = [], seen = new Set<string>();
@@ -535,7 +592,128 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
       }
       return true;
     };
+    const authoringFields = new Set<string>(storeProductNativeTextFields);
+    const validateAuthoring = (fields: Readonly<Record<string, unknown>>) => Object.keys(fields).length > 0 &&
+      Object.entries(fields).every(([key, value]) => authoringFields.has(key) && typeof value === 'string' &&
+        value.length <= 2000 && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value) &&
+        Buffer.from(value, 'utf8').toString('utf8') === value);
+    const authoringRevision=`store-product-authoring-owner:${realm}:`+digest([actor.projectId,actor.uid,input.scope.storeId,authority.revision,realm]);
+    const familyRevision=`store-product-family-owner:${realm}:`+digest([actor.projectId,actor.uid,input.scope.storeId,authority.revision,realm]);
+    const variantRevision=`store-product-variants-owner:${realm}:`+digest([actor.projectId,actor.uid,input.scope.storeId,authority.revision,realm]);
+    const submissionRevision=`store-product-submission-owner:${realm}:`+digest([actor.projectId,actor.uid,input.scope.storeId,authority.revision,realm]);
+    const validateVariantChanges=(fields:Readonly<Record<string,unknown>>)=>{
+      if(Object.keys(fields).length!==1||!Object.hasOwn(fields,'changes')||!Array.isArray(fields.changes)||
+          !fields.changes.length||fields.changes.length>128)return false;
+      return fields.changes.every(raw=>{
+        if(raw===null||typeof raw!=='object'||Array.isArray(raw))return false;
+        const row=raw as Record<string,unknown>;
+        if(Object.keys(row).length!==4||Object.keys(row).some(key=>!['operation','label','kind','options'].includes(key))||
+            typeof row.operation!=='string'||!['add','edit'].includes(row.operation)||typeof row.kind!=='string'||
+            !(storeVariantNativeKinds as readonly string[]).includes(row.kind))return false;
+        return ['label','options'].every(key=>typeof row[key]==='string'&&(row[key] as string).trim().length>0&&
+          (row[key] as string).length<=2000&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(row[key] as string)&&
+          Buffer.from(row[key] as string,'utf8').toString('utf8')===row[key]);
+      });
+    };
+    const decodeAuthoring=(args:Readonly<Record<string,unknown>>)=>{
+      if(Object.keys(args).length!==1||!Array.isArray(args.changes)||!args.changes.length||
+          args.changes.length>storeProductNativeTextFields.length)return fail('invalid_model_result');
+      const fields:Record<string,unknown>={};
+      for(const raw of args.changes){
+        const value=object(raw);
+        if(Object.keys(value).length!==2||typeof value.field!=='string'||
+            !authoringFields.has(value.field)||Object.hasOwn(fields,value.field))return fail('invalid_model_result');
+        fields[value.field]=value.value;
+      }
+      if(!validateAuthoring(fields))return fail('invalid_model_result');
+      return fields;
+    };
     const tools: PreparationTool[] = [
+      ...(realm===null||input.entityId!==null?[]:[...storeStockOwnerActions].map(actionId=>{
+        const adjustment=actionId==='AI-ACT-233',history=actionId==='AI-ACT-232';
+        const keys=adjustment?['quantity','reason']:history?['from','until']:[];
+        const validate=(fields:Readonly<Record<string,unknown>>)=>
+          Object.keys(fields).every(key=>keys.includes(key))&&(!adjustment||keys.every(key=>Object.hasOwn(fields,key)))&&
+          Object.values(fields).every(value=>typeof value==='string'&&value.length<=2000&&
+            !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value)&&Buffer.from(value,'utf8').toString('utf8')===value)&&
+          (!history||Object.values(fields).every(value=>/(Z|[+-]00:00)$/iu.test(value as string)&&Number.isFinite(Date.parse(value as string)))&&
+            (!fields.from||!fields.until||Date.parse(fields.from as string)<Date.parse(fields.until as string)));
+        const sourceRevision=`store-stock-owner:${realm}:`+digest([actor.projectId,actor.uid,input.scope.storeId,authority.revision,realm,actionId]);
+        const title=adjustment?'Review Stock adjustment':history?'Review Stock movements':actionId==='AI-ACT-231'?'View Stock':
+          actionId==='AI-ACT-407'?'Review Stock print options':'Review Stock download options';
+        return {name:`store_review_stock_${actionId.slice(-3)}`,actionId,entityId:null,sourceRevision,
+          description:'Prepare the existing account/Store-owned native Stock controls only. Current quantity, product identity, inventory revision and local movements are read by the native saved-inventory owner, not this catalogue reader. Select any product natively. No Stock balance, full history, adjustment, print or download is claimed or performed here.'+
+            (adjustment?' Preserve only the user-supplied new on-hand total and reason. Ask for missing inputs; never invent a reason, infer a balance or convert an increment into a total.':''),
+          parameters:{type:'object',properties:Object.fromEntries(keys.map(key=>[key,{type:history?['string','null']:'string'}])),
+            required:keys,additionalProperties:false},validate,
+          resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
+            if(Object.keys(args).length!==keys.length||!keys.every(key=>Object.hasOwn(args,key)))return fail('invalid_model_result');
+            const fields=Object.fromEntries(Object.entries(args).filter(([,value])=>value!==null));
+            if(!validate(fields))return fail('invalid_model_result');
+            return {entityId:null,sourceRevision,fields,title,
+              summary:adjustment?'Choose a product and review the new on-hand total and reason.':
+                history?'Choose a product to view its recorded Stock movements.':actionId==='AI-ACT-231'?'View your saved Stock list.':
+                  actionId==='AI-ACT-407'?'Check the Stock statement before printing.':'Check the Stock statement before downloading.'};
+          }};
+      })),
+      ...(realm===null||input.entityId!==null?[]:[{name:'store_review_saved_private_product',actionId:'AI-ACT-223',entityId:null,
+        sourceRevision:submissionRevision,
+        description:'Review an actual saved native product selected by its Store owner. A public catalogue mirror is not required. No product or submission status has been selected or read here. Only the original native final Submit can send saved details for review; approval/publication is not performed.',
+        parameters:{type:'object',properties:{},required:[],additionalProperties:false},
+        validate:(fields:Readonly<Record<string,unknown>>)=>Object.keys(fields).length===0,
+        resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
+          if(Object.keys(args).length)return fail('invalid_model_result');
+          return {entityId:null,sourceRevision:submissionRevision,fields:{},title:'Review saved product',
+            summary:'Choose a saved product and check its details before submitting for review.'};
+        }}]),
+      ...(realm===null?[]:[{name:'store_prepare_variant_changes',actionId:'AI-ACT-215',entityId:null,sourceRevision:variantRevision,
+        description:'Prepare supplied add/edit dimension text for the existing native variant editor. The user selects the saved product and each existing dimension to edit. Never invent SKU/family/dimension/option IDs, match an edit by label, or turn an edit into an addition. Final native Apply/Save and member assignments remain required.',
+        parameters:{type:'object',properties:{changes:{type:'array',items:{type:'object',properties:{
+          operation:{type:'string',enum:['add','edit']},label:{type:'string'},kind:{type:'string',enum:storeVariantNativeKinds},
+          options:{type:'string'}},required:['operation','label','kind','options'],additionalProperties:false}}},
+          required:['changes'],additionalProperties:false},validate:validateVariantChanges,
+        resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
+          if(!validateVariantChanges(args))return fail('invalid_model_result');
+          return {entityId:null,sourceRevision:variantRevision,fields:args,title:'Review product variants',
+            summary:'Choose the product and any option groups to edit, then review your changes before saving.'};
+        }}]),
+      ...(realm === null ? [] : [{name:'store_review_saved_product_group',actionId:'AI-ACT-224',entityId:null,
+        sourceRevision:familyRevision,
+        description:'Review an actual saved product group selected in the original native Store form. This preparation has not selected a group or confirmed its submission status. Only the native final Submit can send its saved members for review; no approval or publication is performed here.',
+        parameters:{type:'object',properties:{},required:[],additionalProperties:false},
+        validate:(fields:Readonly<Record<string,unknown>>)=>Object.keys(fields).length===0,
+        resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
+          if(Object.keys(args).length)return fail('invalid_model_result');
+          return {entityId:null,sourceRevision:familyRevision,fields:{},title:'Review product group',
+            summary:'Choose a saved product group and check its details before submitting for review.'};
+        }}]),
+      ...(realm === null ? [] : [{name: 'store_prepare_new_product', actionId: 'AI-ACT-213', entityId: null,
+        sourceRevision:authoringRevision,
+        description: 'Prepare only user-supplied text in the original blank manual product editor. No master-catalogue identity, Stock, tax, approval or publication is inferred. The native final Save is required.',
+        parameters: {type: 'object', properties: {changes: {type: 'array', items: {type: 'object',
+          properties: {field: {type: 'string', enum: storeProductNativeTextFields}, value: {type: 'string'}},
+          required: ['field', 'value'], additionalProperties: false}}}, required: ['changes'], additionalProperties: false},
+        validate: validateAuthoring,
+        decodeFields:decodeAuthoring,
+        resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
+          return {entityId:null,sourceRevision:authoringRevision,fields:decodeAuthoring(args),title:'Review new product',
+            summary:'Check the product details and save when ready.'};
+        }}]),
+      ...([['AI-ACT-225', 'store_review_original_listing_request'],
+        ['AI-ACT-374', 'store_review_original_family_request']] as const).filter(() => realm !== null).map(([actionId, name]) => {
+        const capture = input.nativeOriginalCaptures?.find(value => value.actionId === actionId)?.digest;
+        const sourceRevision = `store-product-original-owner:${realm}:` + digest([actor.projectId, actor.uid, input.scope.storeId, authority.revision, realm, actionId]);
+        return {name, actionId, entityId: null, sourceRevision,
+        description: 'Review the current Store-owned native retained original request. This preparation has not read its contents or status. The native journal must identify the complete frozen original; only the original native Check can reconcile it. No resend, publication or cleanup is performed here.',
+        parameters: {type: 'object', properties: {}, required: [], additionalProperties: false},
+        validate: (fields: Readonly<Record<string, unknown>>) => capture !== undefined && Object.keys(fields).length === 1 && fields.originalCapture === capture,
+        resolveTarget: (fields: Readonly<Record<string, unknown>>) => {
+          if (!capture || Object.keys(fields).length !== 0) return fail('invalid_model_result');
+          return {entityId: null, sourceRevision, fields: {originalCapture: capture},
+            title: actionId === 'AI-ACT-225' ? 'Review original listing request' : 'Review original product-group request',
+            summary: 'Check the retained original in its existing form. Its status has not been confirmed.'};
+        },
+      };}),
       {name: "store_review_price_attention", actionId: "AI-ACT-372", entityId: null,
         sourceRevision: "store-price-attention-owner:" + digest([actor.projectId, actor.uid, input.scope.storeId, authority.revision, realm]),
         description: "Read the original native supplier price-attention list. This preparation has not read or inferred price status.",
@@ -561,15 +739,23 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
     proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
     if (proposal.actionId !== input.actionId || proposal.entityId !== input.entityId) return fail("stale_preparation", 409);
+    if (proposal.actionId === 'AI-ACT-225' || proposal.actionId === 'AI-ACT-374') {
+      if (proposal.entityId !== null || Object.keys(proposal.fields).length !== 1 ||
+          typeof proposal.fields.originalCapture !== 'string' || !/^[a-f0-9]{64}$/u.test(proposal.fields.originalCapture)) return fail('stale_preparation', 409);
+      // Status reconstructs only the stored server-echoed capture, never a newer
+      // private native journal. The native Review independently matches it.
+      return this.read(actor, {...input, nativeOriginalCaptures: [{actionId: proposal.actionId, digest: proposal.fields.originalCapture}]});
+    }
     return this.read(actor, input);
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (actor.projectId !== this.deps.projectId || !actor.uid || actor.tenantId !== undefined) return fail("account_scope_mismatch", 403);
     if (input.scope.audience !== "workspace" || !input.scope.storeId ||
-        input.actionId !== null && !storeProductActions.has(input.actionId) && !storeProductOwnerActions.has(input.actionId) ||
+        input.actionId !== null && !storeProductActions.has(input.actionId) && !storeProductOwnerActions.has(input.actionId)&&!storeStockOwnerActions.has(input.actionId) ||
         input.entityId !== null && !storeProductActions.has(input.actionId ?? "") || input.catalogueListingIds?.length) return fail("context_unavailable");
     const started = this.now(), before = await this.authority(actor, input);
-    const ownerOnly = input.actionId !== null && storeProductOwnerActions.has(input.actionId);
+    const ownerOnly = input.actionId !== null && (storeProductOwnerActions.has(input.actionId)||storeStockOwnerActions.has(input.actionId)||
+      input.actionId==='AI-ACT-223'&&input.entityId===null);
     const first = await this.snapshot(actor, input.scope.storeId, input.entityId, ownerOnly);
     const second = await this.snapshot(actor, input.scope.storeId, input.entityId, ownerOnly);
     const after = await this.authority(actor, input);
@@ -584,6 +770,67 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
     const tools: PreparationTool[] = [];
     for (const actionId of storeProductActions) {
       if (input.actionId !== null && input.actionId !== actionId || !second.records.length) continue;
+      // Root223 explicitly chooses an original saved native SKU. Fixed-entity
+      // requests retain the earlier mirrored contract for saved preparations.
+      if(actionId==='AI-ACT-223'&&input.entityId===null)continue;
+      if (["AI-ACT-222", "AI-ACT-223", "AI-ACT-226", "AI-ACT-227", "AI-ACT-371"].includes(actionId)) {
+        const records = second.records, fixed = input.entityId !== null ? records.find(record => record.skuId === input.entityId) : undefined;
+        if (input.entityId !== null && !fixed) continue;
+        const visibility = actionId === "AI-ACT-222" || actionId === "AI-ACT-371";
+        const title = actionId === "AI-ACT-223" ? "Review saved product for submission" : actionId === "AI-ACT-222" ? "Review public listing" : actionId === "AI-ACT-371"
+          ? "Review public quantity visibility" : actionId === "AI-ACT-226" ? "Review pausing Counter sale" : "Review resuming Counter sale";
+        const valid = (record: StoreSkuRecord, fields: Readonly<Record<string, unknown>>) =>
+          Object.keys(fields).length === storeReferenceFields.length + (visibility ? 1 : 0) &&
+          storeReferenceFields.every(key => fields[key] === this.references(record)[key]) &&
+          (!visibility || typeof fields.visible === "boolean");
+        tools.push({name: actionId === "AI-ACT-223" ? "store_review_product_submission" : actionId === "AI-ACT-222" ? "store_prepare_listing_visibility" : actionId === "AI-ACT-371"
+          ? "store_prepare_quantity_visibility" : actionId === "AI-ACT-226" ? "store_prepare_counter_pause" : "store_prepare_counter_resume",
+          actionId, entityId: input.entityId, sourceRevision: fixed ? proof(fixed) : "store-owned-selection:" + digest(records),
+          ...(fixed ? {} : {targetSelector: "skuId"}),
+          description: actionId === "AI-ACT-223" ? "Review this saved product for submission. Submission status is not read or claimed here. The original native controller must read current status before review; only its final Submit can send the saved details."
+            : actionId === "AI-ACT-222" ? "Review the explicitly requested public listing preference. The original native journal and final confirmation own publication; no result is claimed here."
+            : actionId === "AI-ACT-371" ? "Review the explicitly requested public quantity disclosure. This owner read has not read current visibility or Stock; the original native readback and final switch own the result."
+            : "Review the requested Counter-sale pause or resume only. Stock and public listing are unchanged; the original native confirmation owns the change.",
+          parameters: {type: "object", properties: {...(fixed ? {} : {skuId: {type: "string", enum: records.map(record => record.skuId)}}),
+            ...(visibility ? {visible: {type: "boolean"}} : {})},
+            required: [...(fixed ? [] : ["skuId"]), ...(visibility ? ["visible"] : [])], additionalProperties: false},
+          validate: fields => (fixed ? [fixed] : records).some(record => valid(record, fields)),
+          resolveTarget: args => {
+            if (Object.keys(args).length !== (fixed ? 0 : 1) + (visibility ? 1 : 0)) return fail("invalid_model_result");
+            const record = fixed ?? records.find(value => value.skuId === args.skuId);
+            if (!record) return fail("invalid_model_result");
+            const fields = {...this.references(record), ...(visibility ? {visible: args.visible} : {})};
+            if (!valid(record, fields)) return fail("invalid_model_result");
+            return {entityId: record.skuId, sourceRevision: proof(record), fields, title,
+              summary: [record.content.title, record.content.variant, record.pack.label].filter(Boolean).join(" · ")};
+          }});
+        continue;
+      }
+      if (actionId === "AI-ACT-230") {
+        const records = second.records, fixed = input.entityId !== null ? records.find(record => record.skuId === input.entityId) : undefined;
+        if (input.entityId !== null && !fixed) continue;
+        const valid = (record: StoreSkuRecord, fields: Readonly<Record<string, unknown>>) =>
+          Object.keys(fields).length === storeReferenceFields.length + 1 &&
+          storeReferenceFields.every(key => fields[key] === this.references(record)[key]) &&
+          record.channels.some(channel => channel.kind === fields.channel);
+        tools.push({name: "store_review_public_product", actionId, entityId: input.entityId,
+          sourceRevision: fixed ? proof(fixed) : "store-owned-selection:" + digest(records), ...(fixed ? {} : {targetSelector: "skuId"}),
+          description: "Review the original public product in an existing selling channel. The native authenticated reader must independently confirm publication; this owner read does not claim that the product is published or available.",
+          parameters: {type: "object", properties: {...(fixed ? {} : {skuId: {type: "string", enum: records.map(record => record.skuId)}}),
+            channel: {type: "string", enum: [...new Set(records.flatMap(record => record.channels.map(channel => channel.kind)))]}},
+            required: [...(fixed ? [] : ["skuId"]), "channel"], additionalProperties: false},
+          validate: fields => (fixed ? [fixed] : records).some(record => valid(record, fields)),
+          resolveTarget: args => {
+            if (Object.keys(args).length !== (fixed ? 1 : 2) || !Object.hasOwn(args, "channel")) return fail("invalid_model_result");
+            const record = fixed ?? records.find(value => value.skuId === args.skuId);
+            if (!record) return fail("invalid_model_result");
+            const fields = {...this.references(record), channel: args.channel};
+            if (!valid(record, fields)) return fail("invalid_model_result");
+            return {entityId: record.skuId, sourceRevision: proof(record), fields, title: "Review public product",
+              summary: [record.content.title, record.content.variant, record.pack.label, args.channel].filter(Boolean).join(" · ")};
+          }});
+        continue;
+      }
       if (actionId === "AI-ACT-220") {
         const records = eligible(actionId), fixed = input.entityId !== null ? records.find(record => record.skuId === input.entityId) : undefined;
         if (!records.length || input.entityId !== null && !fixed) continue;
@@ -692,12 +939,15 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
     return {revision: "store-owned-products:" + digest([actor.projectId, actor.uid, input.scope.storeId, after.revision, second]),
       validUntil: new Date(until).toISOString(), tools,
       nativeTargets: [
-        ...tools.filter(tool => storeProductActions.has(tool.actionId)).flatMap(tool => eligible(tool.actionId).map(record => ({actionId: tool.actionId, entityId: record.skuId, sourceRevision: proof(record)}))),
-        ...tools.filter(tool => storeProductOwnerActions.has(tool.actionId)).map(tool => ({actionId: tool.actionId, entityId: null, sourceRevision: tool.sourceRevision})),
+        ...tools.filter(tool => storeProductActions.has(tool.actionId)&&tool.name!=='store_review_saved_private_product').flatMap(tool => eligible(tool.actionId).map(record => ({actionId: tool.actionId, entityId: record.skuId, sourceRevision: proof(record)}))),
+        ...(input.entityId===null&&(input.actionId===null||input.actionId==='AI-ACT-223')?second.records.map(record=>({actionId:'AI-ACT-223',entityId:record.skuId,sourceRevision:proof(record)})):[]),
+        ...tools.filter(tool=>tool.name==='store_review_saved_private_product').map(tool=>({actionId:tool.actionId,entityId:null,sourceRevision:tool.sourceRevision})),
+        ...tools.filter(tool => storeProductOwnerActions.has(tool.actionId)||storeStockOwnerActions.has(tool.actionId)).map(tool => ({actionId: tool.actionId, entityId: null, sourceRevision: tool.sourceRevision})),
       ],
-      modelContext: {audience: "workspace", storeId: input.scope.storeId,
+      modelContext: {audience: "workspace", storeId: input.scope.storeId, sourceKind: 'original-store-owned-skus-v1',
         priceAttentionSource: "Original native commodity-price reads and final confirmation remain native. This preparation has not read attention status or confirmed a price.",
         defaultsSource: "Existing account/Store-owned native preferences only. Their current values have not been read here; native snapshot and confirmation own them. Requesting a customer listing never confirms publication.",
+        originalRequestSource: "Retained listing/family originals are native-owned, not inferred from the current catalogue. No pending identity, receipt, submission or publication status has been read here. Native review must bind the exact frozen original and preserve it.",
         purpose: "Prepare only supplied replacement text for the existing native editor. Preserve omitted fields. Owner catalogue channel prices are INR minor units, not a live trade quote, Stock balance or accepted order. Never infer purchase cost, Stock or missing tax.",
         products: second.records.map(record => ({skuId: record.skuId, sku: record.sku, canonicalId: record.canonicalProductId,
           title: record.content.title, brand: record.content.brand, variant: record.content.variant, pack: record.pack,
@@ -709,7 +959,45 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
 export class CompositePreparationContext implements PreparationContextSource {
   constructor(private readonly deps: {original?: PreparationContextSource;
     catalogue?: OriginalCataloguePreparationContext; storeProducts?: OriginalStoreProductPreparationContext;
-    nativePreferencesEnabled?: boolean}) {}
+    nativePreferencesEnabled?: boolean; nativeBuyerFormsEnabled?: boolean}) {}
+  private deliveryAddresses(input: PreparationRequest, original: PreparationContext): PreparationContext {
+    if (!this.deps.nativeBuyerFormsEnabled || input.scope.audience !== 'personal' ||
+        original.modelContext?.audience !== 'personal' || !Array.isArray(original.modelContext.deliveryChoices)) return fail('context_unavailable');
+    const seen = new Set<string>();
+    const choices = original.modelContext.deliveryChoices.map(raw => {
+      const row = object(raw, ['id', 'label', 'area']), addressId = id(row.id);
+      if (seen.has(addressId) || typeof row.label !== 'string' || typeof row.area !== 'string' ||
+          !original.tools.some(tool => tool.actionId === 'AI-ACT-026' && tool.entityId === addressId && tool.sourceRevision === original.revision)) return fail('context_unavailable');
+      seen.add(addressId); return {id: addressId, label: row.label, area: row.area};
+    }).filter(row => input.entityId === null || row.id === input.entityId);
+    const tools: PreparationTool[] = [];
+    if (choices.length) for (const actionId of personalDeliveryAddressActions) {
+      if (input.actionId !== null && input.actionId !== actionId) continue;
+      const dynamic = input.entityId === null;
+      tools.push({name: actionId === 'AI-ACT-024' ? 'buy_review_delivery_address' : 'buy_review_address_removal', actionId,
+        entityId: input.entityId, sourceRevision: original.revision,
+        description: actionId === 'AI-ACT-024' ? 'Review choosing my saved delivery address' : 'Review removing my saved delivery address',
+        parameters: {type: 'object', properties: dynamic ? {addressId: {type: 'string', enum: choices.map(row => row.id)}} : {},
+          required: dynamic ? ['addressId'] : [], additionalProperties: false},
+        validate: fields => Object.keys(fields).length === 0,
+        ...(dynamic ? {targetSelector: 'addressId', resolveTarget: (args: Readonly<Record<string, unknown>>) => {
+          if (Object.keys(args).length !== 1) return fail('invalid_model_result');
+          const choice = choices.find(row => row.id === args.addressId); if (!choice) return fail('invalid_model_result');
+          return {entityId: choice.id, sourceRevision: original.revision, fields: {},
+            title: actionId === 'AI-ACT-024' ? 'Review delivery address' : 'Review address removal', summary: [choice.label, choice.area].filter(Boolean).join(' · ')};
+        }} : {})});
+    }
+    if (input.actionId !== null && !tools.length) return fail('context_unavailable');
+    return {revision: 'buy-profile-addresses:' + digest([original.revision, choices]), validUntil: original.validUntil, tools,
+      modelContext: {audience: 'personal', sourceKind: 'original-profile-delivery-choices-v1', deliveryChoices: choices,
+        purpose: 'Account-owned saved address choices only. No street, phone, delivery availability or price is inferred. Original native review and removal confirmation own any change.'},
+      nativeTargets: tools.flatMap(tool => choices.map(row => ({actionId: tool.actionId, entityId: row.id, sourceRevision: original.revision})))};
+  }
+  private async readDeliveryAddresses(actor: AccountProfileActor, input: PreparationRequest) {
+    if (!this.deps.original || !this.deps.nativeBuyerFormsEnabled || input.scope.audience !== 'personal') return fail('context_unavailable');
+    const original = await this.deps.original.read(actor, {...input, actionId: null, entityId: null});
+    return this.deliveryAddresses(input, original);
+  }
   private preferences(actor: AccountProfileActor, input: PreparationRequest, original: PreparationContext): PreparationContext {
     if (!this.deps.nativePreferencesEnabled || input.scope.audience !== "personal" || input.entityId !== null ||
         original.modelContext?.audience !== "personal") return fail("context_unavailable");
@@ -739,7 +1027,15 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
     proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
-    if (storeProductActions.has(proposal.actionId) || storeProductOwnerActions.has(proposal.actionId)) {
+    if (personalDeliveryAddressActions.has(proposal.actionId)) {
+      if (input.actionId !== proposal.actionId || input.entityId !== proposal.entityId || Object.keys(proposal.fields).length !== 0) return fail('stale_preparation', 409);
+      return this.readDeliveryAddresses(actor, input);
+    }
+    if(storeRestockOwnerActions.has(proposal.actionId)){
+      if(!this.deps.catalogue)return fail('context_unavailable');
+      return this.deps.catalogue.readPrepared(actor,input,proposal);
+    }
+    if (storeProductActions.has(proposal.actionId) || storeProductOwnerActions.has(proposal.actionId)||storeStockOwnerActions.has(proposal.actionId)) {
       if (!this.deps.storeProducts) return fail("context_unavailable");
       return this.deps.storeProducts.readPrepared(actor, input, proposal);
     }
@@ -757,7 +1053,12 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (input.actionId !== null) {
-      if (storeProductActions.has(input.actionId) || storeProductOwnerActions.has(input.actionId)) {
+      if (personalDeliveryAddressActions.has(input.actionId)) return this.readDeliveryAddresses(actor, input);
+      if(storeRestockOwnerActions.has(input.actionId)){
+        if(!this.deps.catalogue)return fail('context_unavailable');
+        return this.deps.catalogue.read(actor,input);
+      }
+      if (storeProductActions.has(input.actionId) || storeProductOwnerActions.has(input.actionId)||storeStockOwnerActions.has(input.actionId)) {
         if (!this.deps.storeProducts) return fail("context_unavailable");
         return this.deps.storeProducts.read(actor, input);
       }
@@ -773,9 +1074,10 @@ export class CompositePreparationContext implements PreparationContextSource {
     if (this.deps.original) {
       const original = await this.deps.original.read(actor, input);
       values.push(original);
+      if (this.deps.nativeBuyerFormsEnabled && input.scope.audience === 'personal') values.push(this.deliveryAddresses(input, original));
       if (this.deps.nativePreferencesEnabled && input.scope.audience === "personal") values.push(this.preferences(actor, input, original));
     }
-    if (this.deps.catalogue && input.scope.audience === "personal") {
+    if (this.deps.catalogue) {
       try {values.push(await this.deps.catalogue.read(actor, input));}
       catch (error) {
         // A missing optional catalogue must not remove established Profile
@@ -793,7 +1095,7 @@ export class CompositePreparationContext implements PreparationContextSource {
     if (values.length === 1) return values[0]!;
     return {revision: "composite:" + digest(values.map(v => v.revision)),
       validUntil: new Date(Math.min(...values.map(v => Date.parse(v.validUntil)))).toISOString(),
-      tools: values.flatMap(v => v.tools), modelContext: {sources: values.map(v => v.modelContext ?? null)},
+      tools: values.flatMap(v => v.tools), modelContext: {sourceKind: 'composite-original-context-v1', sources: values.map(v => v.modelContext ?? null)},
       ...(values.some(v => v.nativeTargets !== undefined) ? {nativeTargets: values.flatMap(v => v.nativeTargets ??
         v.tools.map(t => ({actionId: t.actionId, entityId: t.entityId, sourceRevision: t.sourceRevision})))} : {})};
   }

@@ -9,6 +9,7 @@ import '../../features/buy/buy_v2_session.dart';
 import '../../features/buy/buy_v2_models.dart' show BuyV2View;
 import '../../features/journey01/journey_session.dart';
 import '../../features/work/work_session.dart';
+import '../../features/work/work_catalogue_gateway.dart' show WorkspaceCatalogueOwnerGateway;
 import '../buy/buy_v2_views.dart';
 import '../profile/global_personal_profile_v2.dart';
 
@@ -81,7 +82,8 @@ class AssistantOriginalContextReader {
       try {
         final selected = buy?.selectedProduct;
         final candidates = buy != null && buy!.view == BuyV2View.product && selected != null
-          ? [selected] : buy?.visibleProducts;
+          ? [selected] : buy != null && const {BuyV2View.cart, BuyV2View.checkout}.contains(buy!.view)
+          ? buy!.cartLines.map((line) => line.product) : buy?.visibleProducts;
         final selection = !context.inWorkspace && buy != null && !buy!.isStoreProcurement
           ? candidates!.where((product) => product.publicListingIdentity != null &&
               product.hasValidPublicListingIdentity && !product.requiresPrescription &&
@@ -103,7 +105,7 @@ class AssistantOriginalContextReader {
             }
           }
         final productProofs = <String, String>{};
-        for (final entry in domain.revisions.entries.where((entry) => assistantStoreProductContextActions.contains(entry.key.$1))) {
+        for (final entry in domain.revisions.entries.where((entry) => assistantStoreProductContextActions.contains(entry.key.$1)&&entry.key.$2!=null)) {
           final id = entry.key.$2!;
           if (productProofs.containsKey(id) && productProofs[id] != entry.value) throw const AssistantModelFailure('stale_preparation');
           productProofs[id] = entry.value;
@@ -111,7 +113,24 @@ class AssistantOriginalContextReader {
         final acknowledged = work.workspaceAssistantAcknowledgedProducts(productProofs, current: alive);
         if (!alive()) throw const AssistantModelFailure('stale_preparation');
         for (final entry in domain.revisions.entries) {
-          if (assistantStoreProductContextActions.contains(entry.key.$1) && !acknowledged.contains(entry.key.$2)) continue;
+          // These server choices are authentic, but the native address cache
+          // has a separate private revision. Do not anchor an old same-ID
+          // address to a fresh Profile proof. The original Buy session needs
+          // its read-only coherence contract before these handoffs can qualify;
+          // refreshAccountProfileAddresses can persist state and reprice Cart.
+          if (assistantDomainAddressContextActions.contains(entry.key.$1)) continue;
+          if(assistantStoreRestockOwnerContextActions.contains(entry.key.$1)&&
+              !RegExp(r'^store-restock-source:[a-f0-9]{64}$').hasMatch(entry.value))continue;
+          final submissionRoot=entry.key.$1=='AI-ACT-223'&&entry.key.$2==null;
+          final stockRoot=assistantStoreStockOwnerContextActions.contains(entry.key.$1);
+          if (stockRoot||submissionRoot||const {'AI-ACT-213','AI-ACT-215','AI-ACT-224','AI-ACT-225','AI-ACT-374'}.contains(entry.key.$1)) {
+            final gateway=work.catalogueGateway;
+            final prefix=stockRoot?'store-stock-owner':switch(entry.key.$1){'AI-ACT-213'=>'store-product-authoring-owner',
+              'AI-ACT-215'=>'store-product-variants-owner','AI-ACT-223'=>'store-product-submission-owner','AI-ACT-224'=>'store-product-family-owner',_=>'store-product-original-owner'};
+            final realm=RegExp('^$prefix:(evaluation|production):[a-f0-9]{64}\$').firstMatch(entry.value)?.group(1);
+            if(gateway is! WorkspaceCatalogueOwnerGateway || realm==null || (gateway as WorkspaceCatalogueOwnerGateway).realm!=realm)continue;
+          }
+          if (assistantStoreProductContextActions.contains(entry.key.$1) && !submissionRoot && !acknowledged.contains(entry.key.$2)) continue;
           ready[entry.key] = entry.value;
         }
         revisions.addAll(ready);

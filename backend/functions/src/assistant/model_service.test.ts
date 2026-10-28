@@ -4,10 +4,28 @@ import {AccountPlansService, type PlansRepositorySnapshot} from "../account/plan
 import {AssistantPreparationService, type PreparationContextSource, type PreparationRequestStore, type PreparationState} from "./model_service.js";
 import type {PreparationContext, PreparationRequest} from "./model_contract.js";
 import type {ModelPreparation} from "./responses_transport.js";
+import {ResponsesPreparationModel} from "./responses_transport.js";
 import {InMemoryWorkspaceProfileRepository,WorkspaceProfileService,type WorkspaceProfileRecord} from "../workspace/workspace_profile_service.js";
 const actor = {uid: "fixture-owner", projectId: "fixture-project"};
 const request: PreparationRequest = {scope: {audience: "personal", storeId: null}, requestId: "fixture-request", requestRevision: 4,
   message: "ચોખા શોધો / chawal dhoondo", language: "Auto", expectedEntitlementRevision: "personal:null:1:1", history: [], actionId: null, entityId: null};
+test('Original frozen native captures never enter the actual model transport body or tool arguments', async () => {
+  let wire = '';
+  const model = new ResponsesPreparationModel({model: 'host-model', key: async () => 'host-only-key', fetch: async (_url, init) => {
+    wire = String(init?.body);
+    return new Response(JSON.stringify({status: 'completed', output: [{type: 'function_call', status: 'completed',
+      name: 'store_review_original_listing_request', arguments: '{}'}]}), {status: 200, headers: {'content-type': 'application/json'}});
+  }});
+  const capture = 'a'.repeat(64);
+  const reply = await model.prepare({...request, scope: {audience: 'workspace', storeId: 'store-one'},
+    actionId: 'AI-ACT-225', nativeOriginalCaptures: [{actionId: 'AI-ACT-225', digest: capture}]},
+    [{name: 'store_review_original_listing_request', actionId: 'AI-ACT-225', entityId: null, sourceRevision: 'host-owner',
+      description: 'Review the original native request', parameters: {type: 'object', properties: {}, required: [], additionalProperties: false},
+      validate: fields => Object.keys(fields).length === 0}], new AbortController().signal, {audience: 'workspace'});
+  assert.deepEqual(reply, {kind: 'tool', name: 'store_review_original_listing_request', arguments: {}});
+  assert.ok(!wire.includes(capture)); assert.ok(!wire.includes('nativeOriginalCaptures'));
+  const body = JSON.parse(wire); assert.deepEqual(body.tools[0].parameters.properties, {});
+});
 /** Host fixture only. Runtime has no in-memory fallback. */
 class FixtureRequests implements PreparationRequestStore {
   rows = new Map<string, {fingerprint: string; lease: string; result: PreparationState}>();

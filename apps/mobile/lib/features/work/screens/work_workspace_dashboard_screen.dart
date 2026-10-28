@@ -70,6 +70,9 @@ class _StoreRestockNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter
     if(fields.keys.any((key)=>!allowedFields.contains(key)) ||
       !const {'wholesale','bulk'}.contains(fields['channel']) ||
       fields.containsKey('query') && fields['query'] is! String)return 'Choose Wholesale or Bulk and check the product search.';
+    final query=fields['query'] as String?;
+    if(query!=null&&(query.length>80||RegExp(r'[\x00-\x1f\x7f]').hasMatch(query)||
+        utf8.decode(utf8.encode(query))!=query))return 'Use a short product name or search.';
     return null;
   }
   @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)async=>read(context,entityId);
@@ -907,6 +910,78 @@ WorkspaceCatalogueItem? _assistantProductTarget(WorkSession session, bool adding
     entityId == null ? null : (adding ? session.referenceCatalogue : session.workspaceCatalogueItems)
       .where((item) => item.id == entityId).singleOrNull;
 
+WorkspaceCatalogueItem _newManualWorkspaceProduct({required String id,required String sku,
+    required WorkspaceProductDefaults defaults,String barcode=''}) => WorkspaceCatalogueItem(
+  id:id,canonicalId:id,categoryId:'other',brand:'',title:'',variant:'',pack:'',sku:sku,barcode:barcode,
+  purchasePrice:0,sellingPrice:0,unitPrice:'',stock:0,deliveryPromise:'',origin:'',
+  visualLabel:'Product image pending',visualKind:'catalogue-packshot',available:false,
+  publicListing:defaults.customerListingRequested,stockMode:defaults.stockMode,lowStockThreshold:defaults.lowStockThreshold);
+
+String? _manualProductInputError(Map<String,Object?> fields) {
+  if(fields.isEmpty||!fields.keys.every(StoreProductInitialData.editableFields.contains))return 'Use the product fields in the existing editor.';
+  for(final value in fields.values) {
+    if(value is! String||value.length>2000||RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]').hasMatch(value)||
+        utf8.decode(utf8.encode(value))!=value)return 'Product inputs must be text.';
+  }
+  return null;
+}
+class _StoreManualProductAssistantAdapter implements MoolAssistantNativeAdapter {
+  const _StoreManualProductAssistantAdapter({required this.read,required this.open});
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function()) open;
+  @override String get actionId=>'AI-ACT-213';
+  @override Set<String> get allowedFields=>StoreProductInitialData.editableFields;
+  @override String? validateFields(Map<String,Object?> fields)=>_manualProductInputError(fields);
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)=>read(context,entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,bool Function() current)=>
+    proposal.entityId!=null||validateFields(proposal.fields)!=null?Future.value(MoolAssistantReviewResult.stale):open(proposal,current);
+}
+class _StoreSavedFamilyAssistantAdapter implements MoolAssistantNativeAdapter {
+  const _StoreSavedFamilyAssistantAdapter({required this.read,required this.open});
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function()) open;
+  @override String get actionId=>'AI-ACT-224';
+  @override Set<String> get allowedFields=>const {};
+  @override String? validateFields(Map<String,Object?> fields)=>fields.isEmpty?null:'Choose the saved product group in its original form.';
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)=>read(context,entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,bool Function() current)=>
+    proposal.entityId!=null||proposal.fields.isNotEmpty?Future.value(MoolAssistantReviewResult.stale):open(proposal,current);
+}
+typedef _VariantChangeIntent=({bool editing,StoreProductVariantInitialDimension value});
+typedef _VariantTargetChoice=({String productId,Map<int,String> editDimensions});
+List<_VariantChangeIntent> _variantChangeIntents(Map<String,Object?> fields) {
+  final raw=fields['changes'];
+  if(fields.length!=1||raw is! List||raw.isEmpty||raw.length>128)throw const FormatException('Include the option changes to review.');
+  final result=<_VariantChangeIntent>[];
+  for(final value in raw) {
+    if(value is! Map||value.length!=4||!value.keys.every(const {'operation','label','kind','options'}.contains)||
+        !const {'add','edit'}.contains(value['operation']))throw const FormatException('Choose add or edit for each option group.');
+    for(final key in ['label','options']) {
+      final text=value[key];
+      if(text is! String||text.trim().isEmpty||text.length>2000||
+          RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]').hasMatch(text)||utf8.decode(utf8.encode(text))!=text) {
+        throw const FormatException('Enter option names and one value per line.');
+      }
+    }
+    final kind=BuyV2VariantDimensionKind.values.where((kind)=>kind.name==value['kind']).singleOrNull;
+    if(kind==null)throw const FormatException('Choose an existing option type.');
+    result.add((editing:value['operation']=='edit',value:StoreProductVariantInitialDimension(
+      label:value['label'] as String,kind:kind,options:value['options'] as String)));
+  }
+  return List.unmodifiable(result);
+}
+class _StoreVariantChangesAssistantAdapter implements MoolAssistantNativeAdapter {
+  const _StoreVariantChangesAssistantAdapter({required this.read,required this.open});
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext,String?) read;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function()) open;
+  @override String get actionId=>'AI-ACT-215';
+  @override Set<String> get allowedFields=>const {'changes'};
+  @override String? validateFields(Map<String,Object?> fields){try{_variantChangeIntents(fields);return null;}on FormatException catch(e){return e.message;}}
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)=>read(context,entityId);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,bool Function() current)=>
+    proposal.entityId!=null||validateFields(proposal.fields)!=null?Future.value(MoolAssistantReviewResult.stale):open(proposal,current);
+}
+
 String _assistantProductSharedSignature(WorkSession session) => assistant_hash.sha256.convert(utf8.encode(jsonEncode([
   'native-product-v2', session.workspaceProductDefaults.toJson(),
   [for (final family in session.workspaceVariantFamilies) family.toJson()],
@@ -920,6 +995,17 @@ String _assistantProductSharedSignature(WorkSession session) => assistant_hash.s
 String _assistantProductSignature(WorkSession session, WorkspaceCatalogueItem product, {String? sharedSignature}) =>
   assistant_hash.sha256.convert(utf8.encode(jsonEncode(['native-product-v2', product.toInventoryJson(),
     sharedSignature ?? _assistantProductSharedSignature(session)]))).toString();
+// Receipt lookup sets its own listing busy flag. It must still fence immutable
+// inputs and recovery readiness, rather than treating that progress as an edit.
+String _assistantOriginalProductReviewSignature(WorkSession session, WorkspaceCatalogueItem product) =>
+  assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    'native-original-review:v1',product.toInventoryJson(),session.workspaceProductDefaults.toJson(),
+    [for(final family in session.workspaceVariantFamilies)family.toJson()],
+    [for(final item in session.workspaceCatalogueItems)item.toInventoryJson()],
+    session.workspaceInventoryLoaded,session.workspaceInventoryError,
+    session.workspaceGoodsReceiptBusy,session.workspaceGoodsReceiptRecoveryPending,
+    session.workspaceAccountRecoveryPending,session.workspaceAccountRecoveryFailed,
+  ]))).toString();
 
 /// Opens the original editor; only its final Save can mutate/persist a product.
 Future<MoolAssistantReviewResult> showStoreProductInitialReview(
@@ -1979,8 +2065,10 @@ class StoreStockAdjustmentInitialData {
 }
 
 String? _assistantStockSignature(WorkSession session, String actionId, String? entityId) {
+  if(!session.workspaceInventoryLoaded||session.workspaceInventoryError!=null||session.workspaceGoodsReceiptBusy||
+      session.workspaceGoodsReceiptRecoveryPending||session.workspaceAccountRecoveryPending||session.workspaceAccountRecoveryFailed)return null;
   final product = entityId == null ? null : session.workspaceCatalogueItems.where((p) => p.id == entityId).singleOrNull;
-  if (entityId != null && product == null || actionId == 'AI-ACT-233' &&
+  if (entityId != null && product == null || actionId == 'AI-ACT-233' && entityId!=null&&
       (product == null || product.stockMode != WorkspaceStockMode.exactQuantity ||
         session.localInventoryEnabled && !session.workspaceInventoryLoaded || session.workspaceInventoryError != null ||
         session.workspaceGoodsReceiptBusy || session.workspaceGoodsReceiptRecoveryPending) ||
@@ -2069,7 +2157,10 @@ class _StoreStockAssistantAdapter implements MoolAssistantNativeAdapter {
     : actionId == 'AI-ACT-232' ? StoreStockHistoryInitialData.allowedFields : const {};
   @override String? validateFields(Map<String, Object?> fields) {
     try {
-      if (actionId == 'AI-ACT-233') { StoreStockAdjustmentInitialData.fromFields(fields); }
+      if (actionId == 'AI-ACT-233') {
+        if(fields.length==2&&fields.keys.every(const {'quantity','reason'}.contains)&&fields.values.every((v)=>v is String))return null;
+        StoreStockAdjustmentInitialData.fromFields(fields);
+      }
       else if (actionId == 'AI-ACT-232') { StoreStockHistoryInitialData.fromFields(fields); }
       else if (fields.isNotEmpty) { return 'Use the original Stock controls.'; }
       return null;
@@ -3131,7 +3222,7 @@ class _WorkWorkspaceDashboardScreenState
   String? _purchaseAssistantDigest;
   int _purchaseAssistantVersion = 0;
   Object? _stockAssistantOwner;
-  String? _stockAssistantDigest;
+  final _stockAssistantVersions=<(String,String?),(String,int)>{};
   int _stockAssistantVersion = 0;
   Object? _supplierAdjustmentRecoveryOwner;
   String? _supplierAdjustmentRecoveryDigest;
@@ -6370,13 +6461,17 @@ String _nativeProductSignature(WorkSession source, String action, String? entity
       for (final item in source.workspaceCatalogueItems) item.toInventoryJson()],
     if (action == 'AI-ACT-369' || action == 'AI-ACT-228') [
       for (final item in source.referenceCatalogue) item.toInventoryJson()],
-    if (familyId != null) [for (final item in source.workspaceCatalogueItems)
-      if (item.variantMembership?.familyId == familyId) item.toInventoryJson()],
-    submission?.pending?.fingerprint, submission?.head?.fingerprint, submission?.headLoaded,
+    // The shared product signature already binds all native products/families.
+    submission?.pending?.fingerprint,
+    if (action != 'AI-ACT-223') ...[submission?.head?.fingerprint, submission?.headLoaded],
     media?.original?.fingerprint, media?.result?.state, media?.fresh,
     family?.pending?.fingerprint, family?.headLoaded,
     source.workspaceCatalogueListingPendingSkuId, source.workspaceCatalogueListingPendingRequestId,
-    visibility?.head?.toJson(), visibility?.pending?.serverFingerprint,
+    if (action == 'AI-ACT-225') _productListingOriginalFingerprint(source.workspaceCatalogueListingPendingOriginal),
+    // Requested visibility is not a claim about a head read during preparation.
+    // The original controller reads the selected head before native Review and
+    // retains its own expected-revision check at the final switch.
+    visibility?.pending?.serverFingerprint, visibility?.pending?.closing,
     if (action == 'AI-ACT-372') [
       source.workspaceCommodityPriceAttentionError,
       for (final item in source.workspaceCommodityPriceAttentionProducts) item.id],
@@ -6395,7 +6490,14 @@ String _nativeProductRevision(WorkSession source, String action, MoolAssistantCo
   if (_nativeProductVersions[key]?.$1 != signature) {
     _nativeProductVersions[key] = (signature, ++_nativeProductVersion);
   }
-  return 'native-product:v2:$action:${_nativeProductVersions[key]!.$2}';
+  return 'native-product:v4:$action:${_nativeProductVersions[key]!.$2}';
+}
+// A capture anchor promises a review capability, never current submission
+// status. Only the selected snapshot below reads that status and permits review.
+bool _productSubmissionCaptureReady(WorkSession source, WorkspaceCatalogueItem product) {
+  final submission = source.workspaceProductSubmission(product.id);
+  return submission != null && submission.active && submission.gateway.productSubmissionSupported &&
+    submission.pending == null && !source.workspaceSavedProductAlreadySubmitted(product.id);
 }
 bool _nativeProductReady(WorkSession source, String action, String? entity, {WorkspaceCatalogueItem? capturedProduct}) {
   if (StoreProductNativeInitial.catalogueActions.contains(action)) {
@@ -6421,7 +6523,8 @@ bool _nativeProductReady(WorkSession source, String action, String? entity, {Wor
     'AI-ACT-226' => product.counterSaleAllowed,
     'AI-ACT-227' => !product.counterSaleAllowed,
     'AI-ACT-370' => product.categoryId == 'other',
-    'AI-ACT-371' => source.workspaceStockVisibility(product.id)?.supported == true,
+    'AI-ACT-371' => source.workspaceStockVisibility(product.id)?.supported == true &&
+      source.workspaceStockVisibility(product.id)?.busy == false,
     'AI-ACT-373' => media?.active == true && media?.original != null,
     'AI-ACT-374' => family?.active == true && family?.pending != null,
     _ => false,
@@ -6483,6 +6586,8 @@ Iterable<MoolAssistantNativeAdapter> _productNativeAdapters(BuildContext hostCon
   yield _StorePublishedProductAssistantAdapter(
     nativeRoute: ModalRoute.of(hostContext), navigator: Navigator.of(hostContext, rootNavigator: true),
     readSnapshot: (ctx, entity) => _publishedProductSnapshot(hostContext, source, ctx, entity, routeCurrent),
+    readNativeIdentity: (proposal, current) => _productAssistantNativeIdentity(hostContext, source, proposal, current),
+    readSnapshots: (ctx, entities) => _productAssistantNativeBatch(hostContext, source, 'AI-ACT-230', ctx, entities, routeCurrent: routeCurrent),
     open: (proposal, current, changes) => _openPublishedProduct(hostContext, source, proposal, current, changes, routeCurrent));
   for (final action in StoreProductNativeInitial.actions) {
     final read = (MoolAssistantContext ctx, String? entity) =>
@@ -6490,11 +6595,33 @@ Iterable<MoolAssistantNativeAdapter> _productNativeAdapters(BuildContext hostCon
     Future<MoolAssistantReviewResult> open(StoreProductNativeInitial initial, MoolAssistantProposal proposal,
       bool Function() current, MoolAssistantSelectedDocument? selected) =>
       _openProductNative(hostContext, source, initial, proposal, current, selected, routeCurrent);
-    if (action == 'AI-ACT-228') {
+    if(action=='AI-ACT-215') {
+      yield _StoreVariantChangesAssistantAdapter(
+        read:(ctx,entity)=>_variantAuthoringSnapshot(hostContext,source,ctx,entity,routeCurrent),
+        open:(proposal,current)=>_openVariantAuthoring(hostContext,source,proposal,current,routeCurrent));
+    } else if(action=='AI-ACT-223') {
+      yield _StoreSavedProductAssistantAdapter(readContext:()=>_financeAssistantContext(hostContext),readSnapshot:read,open:open,
+        readNativeIdentity:(proposal,current)=>_productAssistantNativeIdentity(hostContext,source,proposal,current),
+        readSnapshots:(ctx,entities)=>_productAssistantNativeBatch(hostContext,source,action,ctx,entities,routeCurrent:routeCurrent),
+        rootRead:(ctx,entity)=>_savedProductAssistantSnapshot(hostContext,source,ctx,entity,routeCurrent),
+        rootRevision:(ctx)=>routeCurrent()&&_manualProductAssistantReady(hostContext,source,ctx)?_savedProductAssistantRevision(source,ctx):null,
+        rootOpen:(proposal,current)=>_openSavedProductAssistant(hostContext,source,proposal,current,routeCurrent));
+    } else if(action=='AI-ACT-224') {
+      yield _StoreSavedFamilyAssistantAdapter(
+        read:(ctx,entity)=>_savedFamilyAssistantSnapshot(hostContext,source,ctx,entity,routeCurrent),
+        open:(proposal,current)=>_openSavedFamilyAssistant(hostContext,source,proposal,current,routeCurrent));
+    } else if (action == 'AI-ACT-225' || action == 'AI-ACT-374') {
+      yield _StoreProductOriginalAdapter(actionId: action,
+        read: (ctx, entity) => _productOriginalSnapshot(hostContext, source, action, ctx, entity, routeCurrent),
+        readRevision:(ctx)=>mounted&&hostContext.mounted&&identical(source,session)&&routeCurrent()&&
+          _financePermitted(ctx)&&_financeAssistantContext(hostContext)?.binding==ctx.binding
+          ?_productOriginalRevision(source,action,ctx):null,
+        open: (proposal, current) => _openProductOriginal(hostContext, source, proposal, current, routeCurrent));
+    } else if (action == 'AI-ACT-228') {
       yield _StoreProductSelectedImportAdapter(readContext: () => _financeAssistantContext(hostContext), readSnapshot: read, open: open);
     } else if (action == 'AI-ACT-216') {
       yield _StoreProductSelectedPhotoAdapter(readContext: () => _financeAssistantContext(hostContext), readSnapshot: read, open: open);
-    } else if (const {'AI-ACT-220', 'AI-ACT-370'}.contains(action)) {
+    } else if (const {'AI-ACT-220', 'AI-ACT-370', 'AI-ACT-222', 'AI-ACT-223', 'AI-ACT-226', 'AI-ACT-227', 'AI-ACT-371'}.contains(action)) {
       yield _StoreCanonicalProductNativeAdapter(actionId: action, readContext: () => _financeAssistantContext(hostContext), readSnapshot: read, open: open,
         readNativeIdentity: (proposal, current) => _productAssistantNativeIdentity(hostContext, source, proposal, current),
         readSnapshots: (ctx, entities) => _productAssistantNativeBatch(hostContext, source, action, ctx, entities, routeCurrent: routeCurrent));
@@ -6503,20 +6630,406 @@ Iterable<MoolAssistantNativeAdapter> _productNativeAdapters(BuildContext hostCon
     }
   }
 }
+Object? _productOriginalOwner;
+int _productOriginalVersion = 0;
+List<WorkspaceCatalogueItem>? _variantAuthoringTargets(WorkSession source) {
+  final all=source.workspaceCatalogueItems;
+  if(all.map((p)=>p.id).toSet().length!=all.length)return null;
+  try{WorkspaceVariantFamily.validateInventory(source.workspaceVariantFamilies,all);}on FormatException{return null;}
+  return List.unmodifiable(all.where((p)=>p.stockEntry?.valid==true&&p.stockEntry?.productId==p.id));
+}
+String? _variantAuthoringRevision(WorkSession source,MoolAssistantContext ctx) {
+  if(_variantAuthoringTargets(source)?.isNotEmpty!=true)return null;
+  return 'native-variant-authoring:v1:${assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    ctx.binding.toString(),source.workspaceInventoryRevision,
+    for(final family in source.workspaceVariantFamilies)family.toJson(),
+    for(final product in source.workspaceCatalogueItems)product.toInventoryJson(),
+  ])))}';
+}
+Future<MoolAssistantNativeSnapshot?> _variantAuthoringSnapshot(BuildContext host,WorkSession source,
+    MoolAssistantContext ctx,String? entity,bool Function() routeCurrent)async{
+  if(entity!=null||!routeCurrent()||!_manualProductAssistantReady(host,source,ctx)||
+      source.catalogueGateway is! WorkspaceCatalogueOwnerGateway)return null;
+  final revision=_variantAuthoringRevision(source,ctx);
+  return revision==null?null:MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:null,permitted:true,sourceRevision:revision);
+}
+Future<MoolAssistantReviewResult> _openVariantAuthoring(BuildContext host,WorkSession source,
+    MoolAssistantProposal proposal,bool Function() requestCurrent,bool Function() routeCurrent)async{
+  final ctx=_financeAssistantContext(host);
+  if(ctx==null||proposal.entityId!=null||!requestCurrent()||!routeCurrent()||
+      !_manualProductAssistantReady(host,source,ctx)||proposal.binding!=ctx.binding||
+      proposal.sourceRevision!=_variantAuthoringRevision(source,ctx))return MoolAssistantReviewResult.stale;
+  final intents=_variantChangeIntents(proposal.fields),allTargets=_variantAuthoringTargets(source)!;
+  final editCount=intents.where((intent)=>intent.editing).length;
+  final targets=List<WorkspaceCatalogueItem>.unmodifiable(allTargets.where((product)=>editCount==0||
+    source.workspaceVariantFamilies.any((family)=>family.id==product.variantMembership?.familyId&&family.dimensionIds.length>=editCount)));
+  if(targets.isEmpty)return MoolAssistantReviewResult.unavailable;
+  final frame=proposal.sourceRevision;
+  var retired=false;
+  bool current(){
+    if(!mounted||!host.mounted||!identical(source,session)||!routeCurrent()||!requestCurrent()||
+        !_financePermitted(ctx)||_financeAssistantContext(host)?.binding!=ctx.binding||
+        frame!=_variantAuthoringRevision(source,ctx))retired=true;
+    return !retired;
+  }
+  final changes=Listenable.merge([source,routerDelegateOf(host),
+    ?host.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+  final families=Map<String,WorkspaceVariantFamily>.unmodifiable({for(final family in source.workspaceVariantFamilies)family.id:family});
+  final edits=[for(var i=0;i<intents.length;i++)if(intents[i].editing)i];
+  final associations=<int,String>{},used=<String>{};
+  WorkspaceCatalogueItem? chosen;
+  var cursor=0,stageGeneration=0;
+  // Selection is explicit even for one SKU. A recovered outer proposal carries
+  // editing intent only; it never silently restores an earlier selected target.
+  final navigator=Navigator.of(host,rootNavigator:true);
+  late MaterialPageRoute<_VariantTargetChoice> route;
+  route=MaterialPageRoute<_VariantTargetChoice>(builder:(page)=>_StoreProductOwnerSurface(
+    current:current,changes:changes,child:StatefulBuilder(builder:(selection,setSelection){
+      final generation=stageGeneration,selectedProduct=chosen;
+      bool active()=>page.mounted&&current()&&stageGeneration==generation&&ModalRoute.of(page)?.isCurrent==true;
+      void finish(WorkspaceCatalogueItem product){
+        if(!page.mounted||!current()||ModalRoute.of(page)?.isCurrent!=true)return;
+        navigator.pop<_VariantTargetChoice>((productId:product.id,editDimensions:Map<int,String>.unmodifiable(associations)));
+      }
+      if(selectedProduct==null)return Scaffold(appBar:AppBar(title:const Text('Choose product to update')),
+        body:SafeArea(child:StoreAddProductSheet(embedded:true,stockOnly:true,catalogue:const [],ownedProducts:targets,
+          isStoreCurrent:current,createProduct:(_)=>throw StateError('Select an existing saved product.'),
+          scanBarcode:()=>active()?showStoreProductScanner(page,ownerCurrent:current,ownerChanges:changes):Future.value(null),
+          onSelected:(product){
+            if(!active()||chosen!=null||!targets.any((p)=>p.id==product.id))return;
+            if(edits.isEmpty){finish(product);return;}
+            setSelection((){chosen=product;cursor=0;associations.clear();used.clear();stageGeneration++;});
+          },
+        )));
+      final family=families[selectedProduct.variantMembership?.familyId];
+      if(family==null||cursor>=edits.length)return const SizedBox.shrink();
+      final operation=edits[cursor],intent=intents[operation];
+      return Scaffold(appBar:AppBar(title:const Text('Choose option group to edit')),
+        body:SafeArea(child:ListView(children:[
+          Padding(padding:const EdgeInsets.fromLTRB(16,12,16,4),child:Text(selectedProduct.title)),
+          Padding(padding:const EdgeInsets.symmetric(horizontal:16),child:Text('Edit ${cursor+1} of ${edits.length}: ${intent.value.label}')),
+          for(final id in family.dimensionIds.where((id)=>!used.contains(id)))ListTile(
+            key:ValueKey('assistant-variant-dimension-$id'),
+            title:Text('${family.dimensionIds.toList().indexOf(id)+1}. ${family.options.firstWhere((a)=>a.dimensionId==id).dimensionLabel}'),
+            subtitle:Text(family.options.where((a)=>a.dimensionId==id).map((a)=>a.optionLabel).join(' · ')),
+            onTap:(){
+              if(!active()||chosen?.id!=selectedProduct.id||chosen?.variantMembership?.familyId!=family.id||
+                  cursor>=edits.length||edits[cursor]!=operation||used.contains(id)||!family.dimensionIds.contains(id))return;
+              setSelection((){associations[operation]=id;used.add(id);cursor++;stageGeneration++;});
+              if(cursor==edits.length)finish(selectedProduct);
+            }),
+        ])));
+    })));
+  void changed(){if(!current()&&route.isActive)navigator.removeRoute(route);}
+  changes.addListener(changed);
+  _VariantTargetChoice? selected;
+  try{selected=await navigator.push<_VariantTargetChoice>(route);}finally{changes.removeListener(changed);}
+  if(!current())return MoolAssistantReviewResult.stale;
+  if(selected==null)return MoolAssistantReviewResult.cancelled;
+  final product=targets.where((p)=>p.id==selected!.productId).singleOrNull;
+  if(product==null)return MoolAssistantReviewResult.stale;
+  final family=families[product.variantMembership?.familyId];
+  if(selected.editDimensions.length!=edits.length||selected.editDimensions.keys.any((key)=>!edits.contains(key))||
+      selected.editDimensions.values.toSet().length!=edits.length||
+      selected.editDimensions.values.any((id)=>family?.dimensionIds.contains(id)!=true))return MoolAssistantReviewResult.stale;
+  final dimensions=<Map<String,Object?>>[];
+  for(var index=0;index<intents.length;index++) {
+    final intent=intents[index],id=selected.editDimensions[index];
+    dimensions.add({if(id!=null)'dimensionId':id,'label':intent.value.label,'kind':intent.value.kind.name,'options':intent.value.options});
+  }
+  if(!current())return MoolAssistantReviewResult.stale;
+  final snapshot=await _productNativeSnapshot(host,source,'AI-ACT-215',ctx,product.id,routeCurrent);
+  if(!current())return MoolAssistantReviewResult.stale;
+  if(snapshot==null)return MoolAssistantReviewResult.unavailable;
+  final fields={...StoreProductInitialData.referenceFields(product),'dimensions':dimensions};
+  final inner=MoolAssistantProposal(id:proposal.id,actionId:proposal.actionId,binding:proposal.binding,
+    requestRevision:proposal.requestRevision,entitlementRevision:proposal.entitlementRevision,sourceRevision:snapshot.sourceRevision,
+    entityId:product.id,validUntil:proposal.validUntil,title:proposal.title,summary:proposal.summary,fields:fields,
+    recovered:proposal.recovered,preparationRequestId:proposal.preparationRequestId,preparationSourceRevision:proposal.preparationSourceRevision);
+  return _openProductNative(host,source,StoreProductNativeInitial.fromFields('AI-ACT-215',fields),inner,current,null,routeCurrent);
+}
+List<WorkspaceCatalogueItem> _savedProductAssistantTargets(WorkSession source) {
+  final products=source.workspaceCatalogueItems;
+  if(products.map((p)=>p.id).toSet().length!=products.length)return const [];
+  return List.unmodifiable(products.where((product)=>product.stockEntry?.valid==true&&
+    product.stockEntry?.productId==product.id&&_productSubmissionCaptureReady(source,product)));
+}
+String? _savedProductAssistantRevision(WorkSession source,MoolAssistantContext ctx) {
+  final products=_savedProductAssistantTargets(source);
+  if(products.isEmpty)return null;
+  return 'native-saved-submission:v1:${assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    ctx.binding.toString(),source.workspaceInventoryRevision,
+    for(final family in source.workspaceVariantFamilies)family.toJson(),
+    for(final product in products)product.toInventoryJson(),
+  ])))}';
+}
+Future<MoolAssistantNativeSnapshot?> _savedProductAssistantSnapshot(BuildContext host,WorkSession source,
+    MoolAssistantContext ctx,String? entity,bool Function() routeCurrent)async{
+  if(entity!=null||!routeCurrent()||!_manualProductAssistantReady(host,source,ctx))return null;
+  final revision=_savedProductAssistantRevision(source,ctx);
+  return revision==null?null:MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:null,permitted:true,sourceRevision:revision);
+}
+Future<MoolAssistantReviewResult> _openSavedProductAssistant(BuildContext host,WorkSession source,
+    MoolAssistantProposal proposal,bool Function() requestCurrent,bool Function() routeCurrent)async{
+  final ctx=_financeAssistantContext(host);
+  if(ctx==null||proposal.entityId!=null||proposal.fields.isNotEmpty||!requestCurrent()||!routeCurrent()||
+      !_manualProductAssistantReady(host,source,ctx)||proposal.binding!=ctx.binding||
+      proposal.sourceRevision!=_savedProductAssistantRevision(source,ctx))return MoolAssistantReviewResult.stale;
+  final frame=proposal.sourceRevision,targets=_savedProductAssistantTargets(source);
+  var retired=false;
+  bool current(){
+    if(!mounted||!host.mounted||!identical(source,session)||!routeCurrent()||!requestCurrent()||
+        !_financePermitted(ctx)||_financeAssistantContext(host)?.binding!=ctx.binding||
+        frame!=_savedProductAssistantRevision(source,ctx))retired=true;
+    return !retired;
+  }
+  final changes=Listenable.merge([source,routerDelegateOf(host),?host.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+  final navigator=Navigator.of(host,rootNavigator:true);
+  var selectionMade=false;
+  late MaterialPageRoute<String> route;
+  route=MaterialPageRoute<String>(builder:(page)=>_StoreProductOwnerSurface(current:current,changes:changes,
+    child:Scaffold(appBar:AppBar(title:const Text('Choose saved product')),
+      body:SafeArea(child:StoreAddProductSheet(embedded:true,stockOnly:true,catalogue:const [],ownedProducts:targets,
+        isStoreCurrent:current,createProduct:(_)=>throw StateError('Select an existing saved product.'),
+        scanBarcode:()=>page.mounted&&!selectionMade&&current()&&ModalRoute.of(page)?.isCurrent==true
+          ?showStoreProductScanner(page,ownerCurrent:current,ownerChanges:changes):Future.value(null),
+        onSelected:(product){
+          if(!page.mounted||selectionMade||!current()||ModalRoute.of(page)?.isCurrent!=true||!targets.any((p)=>p.id==product.id))return;
+          selectionMade=true;navigator.pop(product.id);
+        },
+      )))));
+  void changed(){if(!current()&&route.isActive)navigator.removeRoute(route);}
+  changes.addListener(changed);
+  String? selected;
+  try{selected=await navigator.push<String>(route);}finally{changes.removeListener(changed);}
+  if(!current())return MoolAssistantReviewResult.stale;
+  if(selected==null)return MoolAssistantReviewResult.cancelled;
+  final target=targets.where((p)=>p.id==selected).singleOrNull;
+  if(target==null)return MoolAssistantReviewResult.stale;
+  final snapshot=await _productNativeSnapshot(host,source,'AI-ACT-223',ctx,target.id,routeCurrent);
+  if(!current())return MoolAssistantReviewResult.stale;
+  if(snapshot==null)return MoolAssistantReviewResult.unavailable;
+  final fields=StoreProductInitialData.referenceFields(target);
+  final inner=MoolAssistantProposal(id:proposal.id,actionId:proposal.actionId,binding:proposal.binding,
+    requestRevision:proposal.requestRevision,entitlementRevision:proposal.entitlementRevision,
+    sourceRevision:snapshot.sourceRevision,entityId:target.id,validUntil:proposal.validUntil,
+    title:proposal.title,summary:proposal.summary,fields:fields,recovered:proposal.recovered,
+    preparationRequestId:proposal.preparationRequestId,preparationSourceRevision:proposal.preparationSourceRevision);
+  return _openProductNative(host,source,StoreProductNativeInitial.fromFields('AI-ACT-223',fields),inner,current,null,routeCurrent);
+}
+List<WorkspaceCatalogueItem>? _savedFamilyAssistantTargets(WorkSession source) {
+  final gateway=source.catalogueGateway;
+  if(gateway is! WorkspaceVariantFamilyOwnerGateway||!(gateway as WorkspaceVariantFamilyOwnerGateway).variantFamilySubmissionSupported)return null;
+  final products=source.workspaceCatalogueItems,families=source.workspaceVariantFamilies;
+  if(products.map((p)=>p.id).toSet().length!=products.length)return null;
+  try {WorkspaceVariantFamily.validateInventory(families,products);}on FormatException{return null;}
+  final targets=<WorkspaceCatalogueItem>[];
+  for(final family in families) {
+    final members=products.where((p)=>p.variantMembership?.familyId==family.id).toList()..sort((a,b)=>a.id.compareTo(b.id));
+    if(members.isNotEmpty)targets.add(members.first);
+  }
+  targets.sort((a,b)=>a.variantMembership!.familyId.compareTo(b.variantMembership!.familyId));
+  return List.unmodifiable(targets);
+}
+String? _savedFamilyAssistantRevision(WorkSession source,MoolAssistantContext ctx) {
+  if(_savedFamilyAssistantTargets(source)?.isNotEmpty!=true)return null;
+  return 'native-saved-family:v1:${assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    ctx.binding.toString(),source.workspaceInventoryRevision,
+    for(final family in source.workspaceVariantFamilies)family.toJson(),
+    for(final item in source.workspaceCatalogueItems.where((p)=>p.variantMembership!=null))item.toInventoryJson(),
+  ])))}';
+}
+Future<MoolAssistantNativeSnapshot?> _savedFamilyAssistantSnapshot(BuildContext host,WorkSession source,
+    MoolAssistantContext ctx,String? entity,bool Function() routeCurrent)async{
+  if(entity!=null||!routeCurrent()||!_manualProductAssistantReady(host,source,ctx))return null;
+  final revision=_savedFamilyAssistantRevision(source,ctx);
+  return revision==null?null:MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:null,permitted:true,sourceRevision:revision);
+}
+Future<MoolAssistantReviewResult> _openSavedFamilyAssistant(BuildContext host,WorkSession source,
+    MoolAssistantProposal proposal,bool Function() requestCurrent,bool Function() routeCurrent)async{
+  final ctx=_financeAssistantContext(host);
+  if(ctx==null||proposal.entityId!=null||proposal.fields.isNotEmpty||!requestCurrent()||
+      !routeCurrent()||!_manualProductAssistantReady(host,source,ctx)||proposal.binding!=ctx.binding||
+      proposal.sourceRevision!=_savedFamilyAssistantRevision(source,ctx))return MoolAssistantReviewResult.stale;
+  final frame=proposal.sourceRevision,targets=_savedFamilyAssistantTargets(source)!;
+  var retired=false;
+  bool current(){
+    if(!mounted||!host.mounted||!identical(source,session)||!routeCurrent()||!requestCurrent()||
+        !_financePermitted(ctx)||_financeAssistantContext(host)?.binding!=ctx.binding||
+        frame!=_savedFamilyAssistantRevision(source,ctx))retired=true;
+    return !retired;
+  }
+  var target=targets.singleOrNull;
+  if(target==null) {
+    final selected=await Navigator.of(host,rootNavigator:true).push<String>(MaterialPageRoute(builder:(page)=>
+      _StoreProductOwnerSurface(current:current,changes:Listenable.merge([source,
+        ?host.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]),child:Scaffold(
+        appBar:AppBar(title:const Text('Choose saved product group')),
+        body:SafeArea(child:StoreAddProductSheet(embedded:true,stockOnly:true,catalogue:const [],ownedProducts:targets,
+          isStoreCurrent:current,createProduct:(_)=>throw StateError('Select an existing saved group.'),
+          scanBarcode:()=>page.mounted&&current()&&ModalRoute.of(page)?.isCurrent==true
+            ?showStoreProductScanner(page,ownerCurrent:current,ownerChanges:source):Future.value(null),
+          onSelected:(product){if(page.mounted&&current()&&ModalRoute.of(page)?.isCurrent==true)Navigator.of(page).pop(product.id);},
+        )),
+      ))));
+    if(!current())return MoolAssistantReviewResult.stale;
+    if(selected==null)return MoolAssistantReviewResult.cancelled;
+    target=targets.where((p)=>p.id==selected).singleOrNull;
+  }
+  if(target==null||!current())return MoolAssistantReviewResult.stale;
+  // Read status only after choosing the real saved family. Capture did not
+  // perform per-SKU server reads or claim a candidate/review state.
+  final snapshot=await _productNativeSnapshot(host,source,'AI-ACT-224',ctx,target.id,routeCurrent);
+  if(!current())return MoolAssistantReviewResult.stale;
+  if(snapshot==null)return MoolAssistantReviewResult.unavailable;
+  final fields=StoreProductInitialData.referenceFields(target);
+  final inner=MoolAssistantProposal(id:proposal.id,actionId:proposal.actionId,binding:proposal.binding,
+    requestRevision:proposal.requestRevision,entitlementRevision:proposal.entitlementRevision,
+    sourceRevision:snapshot.sourceRevision,entityId:target.id,validUntil:proposal.validUntil,
+    title:proposal.title,summary:proposal.summary,fields:fields,recovered:proposal.recovered,
+    preparationRequestId:proposal.preparationRequestId,preparationSourceRevision:proposal.preparationSourceRevision);
+  return _openProductNative(host,source,StoreProductNativeInitial.fromFields('AI-ACT-224',fields),inner,current,null,routeCurrent);
+}
+String? _productListingOriginalFingerprint(WorkspaceCatalogueBindingIntent? original) => original == null ? null :
+  assistant_hash.sha256.convert(utf8.encode(jsonEncode(original.toJson()))).toString();
+List<_ProductOriginalTarget>? _productOriginalTargets(WorkSession source, String action, MoolAssistantContext ctx) {
+  final gateway = source.catalogueGateway, account = widget.accountIdentity?.firebasePrincipal?.userId;
+  final store = source.activeWorkspace?.id;
+  if (gateway is! WorkspaceCatalogueOwnerGateway || account == null || store == null || !ctx.inWorkspace) return null;
+  final realm = (gateway as WorkspaceCatalogueOwnerGateway).realm;
+  final products = {for(final p in source.workspaceCatalogueItems) p.id:p};
+  if(products.length != source.workspaceCatalogueItems.length) return null;
+  if(action == 'AI-ACT-225') {
+    if(!source.workspaceCatalogueListingReady) return null;
+    final original = source.workspaceCatalogueListingPendingOriginal;
+    if(original == null || original.isPriceConfirmation) return const [];
+    final product = products[original.skuId];
+    if(original.accountId != account || original.storeId != store || original.realm != realm || product == null) return null;
+    return [_ProductOriginalTarget(product: product, requestId: original.idempotencyKey, fingerprint: _productListingOriginalFingerprint(original)!)];
+  }
+  if(action != 'AI-ACT-374') return null;
+  final families = {for(final family in source.workspaceVariantFamilies) family.id:family};
+  if(families.length != source.workspaceVariantFamilies.length) return null;
+  final result = <_ProductOriginalTarget>[];
+  for(final family in families.values) {
+    final controller = source.workspaceVariantFamilyPublisher(family.id);
+    if(controller == null) continue;
+    if(!controller.active || !controller.ready) return null;
+    final original = controller.pending;
+    if(original == null) continue;
+    if(original.scope.account != account || original.scope.store != store || original.scope.realm != realm ||
+        original.scope.family != family.id || original.input.familyId != family.id) return null;
+    final input = original.input.toJson();
+    if(input['localRevision'] != family.revision) return null;
+    final members = <WorkspaceCatalogueItem>[];
+    for(final raw in input['members'] as List) {
+      final row = raw as Map, product = products[row['skuId']];
+      if(product == null || product.variantMembership?.familyId != family.id ||
+          !mapEquals(product.variantMembership!.selections, Map<String,String>.from(row['selections'] as Map))) return null;
+      members.add(product);
+    }
+    if(members.isEmpty) return null;
+    members.sort((a,b)=>a.id.compareTo(b.id));
+    result.add(_ProductOriginalTarget(product:members.first, requestId:original.idempotencyKey,
+      fingerprint:original.fingerprint, familyId:family.id));
+  }
+  result.sort((a,b)=>(a.familyId ?? a.product.id).compareTo(b.familyId ?? b.product.id));
+  return List.unmodifiable(result);
+}
+String? _productOriginalRevision(WorkSession source, String action, MoolAssistantContext ctx) {
+  final targets = _productOriginalTargets(source,action,ctx);
+  if(targets == null || targets.isEmpty) return null;
+  final owner=(source,source.catalogueGateway,widget.accountIdentity,widget.accountAuthenticated,ctx.binding,
+    source.publicationPreferencesContext,source.navigationScopeRevision);
+  if(_productOriginalOwner != owner){_productOriginalOwner=owner;_productOriginalVersion++;}
+  final capture=_productOriginalCapture(source,action,ctx);
+  return capture==null?null:'native-product-original:v1:$_productOriginalVersion:$capture';
+}
+String? _productOriginalCapture(WorkSession source,String action,MoolAssistantContext ctx) {
+  final targets=_productOriginalTargets(source,action,ctx);
+  if(targets==null||targets.isEmpty)return null;
+  if(ctx.accountScope case (environment:final String environment,projectId:final String projectId,
+      tenantId:final String? tenantId,userId:final String userId)) {
+    return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+      'native-original-capture:v1',environment,projectId,tenantId,userId,source.activeWorkspace?.id,action,
+      for(final target in targets)[target.product.id,target.familyId,target.requestId,target.fingerprint,target.product.toInventoryJson()],
+    ]))).toString();
+  }
+  return null;
+}
+Future<MoolAssistantNativeSnapshot?> _productOriginalSnapshot(BuildContext host,WorkSession source,String action,
+    MoolAssistantContext ctx,String? entity,bool Function() routeCurrent)async{
+  bool current()=>mounted&&host.mounted&&identical(source,session)&&routeCurrent()&&_financePermitted(ctx)&&
+    _financeAssistantContext(host)?.binding==ctx.binding&&!_financeSheetOpen&&!_couponsSheetOpen&&!_productEditorOpen(source)&&
+    source.workspaceInventoryLoaded&&source.workspaceInventoryError==null&&!source.workspaceGoodsReceiptRecoveryPending;
+  if(entity!=null||!current())return null;
+  if(action=='AI-ACT-225') {
+    if(source.workspaceCatalogueListingBusy||!await source.restoreWorkspaceCatalogueListing()||!current()||source.workspaceCatalogueListingBusy)return null;
+  }else if(action=='AI-ACT-374') {
+    // One original journal per actual saved family, never one read per SKU.
+    for(final id in source.workspaceVariantFamilies.map((f)=>f.id).toSet().toList()..sort()) {
+      final controller=source.workspaceVariantFamilyPublisher(id);
+      if(controller!=null&&(controller.busy||!await controller.restore()||!current()||controller.busy))return null;
+    }
+  }else{return null;}
+  final revision=_productOriginalRevision(source,action,ctx);
+  return !current()||revision==null?null:MoolAssistantNativeSnapshot(binding:ctx.binding,sourceRevision:revision,
+    entityId:null,permitted:true,originalRequestCapture:_productOriginalCapture(source,action,ctx));
+}
+Future<MoolAssistantReviewResult> _openProductOriginal(BuildContext host,WorkSession source,
+    MoolAssistantProposal proposal,bool Function() requestCurrent,bool Function() routeCurrent)async{
+  final ctx=_financeAssistantContext(host),action=proposal.actionId;
+  bool owner()=>ctx!=null&&mounted&&host.mounted&&identical(source,session)&&routeCurrent()&&_financePermitted(ctx)&&
+    _financeAssistantContext(host)?.binding==ctx.binding&&proposal.binding==ctx.binding;
+  if(!owner()||!requestCurrent()||proposal.entityId!=null||proposal.fields.length!=1||
+      proposal.fields['originalCapture']!=_productOriginalCapture(source,action,ctx!)||
+      proposal.sourceRevision!=_productOriginalRevision(source,action,ctx))return MoolAssistantReviewResult.stale;
+  final targets=_productOriginalTargets(source,action,ctx)!;
+  bool originalCurrent()=>owner()&&requestCurrent()&&proposal.sourceRevision==_productOriginalRevision(source,action,ctx)&&
+    proposal.fields['originalCapture']==_productOriginalCapture(source,action,ctx);
+  var target=targets.singleOrNull;
+  if(target==null) {
+    final selected=await Navigator.of(host,rootNavigator:true).push<String>(MaterialPageRoute(builder:(page)=>
+      _StoreProductOwnerSurface(current:originalCurrent,changes:source,child:Scaffold(
+        appBar:AppBar(title:const Text('Choose pending product group')),
+        body:SafeArea(child:StoreAddProductSheet(embedded:true,stockOnly:true,catalogue:const [],
+          ownedProducts:List.unmodifiable(targets.map((t)=>t.product)),isStoreCurrent:originalCurrent,
+          createProduct:(_)=>throw StateError('An original request view cannot create products.'),
+          scanBarcode:()=>originalCurrent()?showStoreProductScanner(page,ownerCurrent:originalCurrent,ownerChanges:source):Future.value(null),
+          onSelected:(product){if(originalCurrent()&&ModalRoute.of(page)?.isCurrent==true)Navigator.of(page).pop(product.id);},
+        )),
+      ))));
+    if(!originalCurrent())return MoolAssistantReviewResult.stale;
+    if(selected==null)return MoolAssistantReviewResult.cancelled;
+    target=targets.where((t)=>t.product.id==selected).singleOrNull;
+  }
+  if(target==null||!originalCurrent())return MoolAssistantReviewResult.stale;
+  final fields={...StoreProductInitialData.referenceFields(target.product),'originalRequestId':target.requestId};
+  final inner=MoolAssistantProposal(id:proposal.id,actionId:action,binding:proposal.binding,
+    requestRevision:proposal.requestRevision,entitlementRevision:proposal.entitlementRevision,
+    sourceRevision:_nativeProductRevision(source,action,ctx,target.product.id),entityId:target.product.id,
+    validUntil:proposal.validUntil,title:proposal.title,summary:proposal.summary,fields:fields,
+    preparationRequestId:proposal.preparationRequestId,recovered:proposal.recovered,
+    preparationSourceRevision:proposal.preparationSourceRevision);
+  // Only this typed native handoff knows the private original identity. The
+  // canonical proposal/history keeps only its frozen digest. Check is still a native tap.
+  return _openProductNative(host,source,StoreProductNativeInitial.fromFields(action,fields),inner,originalCurrent,null,routeCurrent);
+}
 // ACT230 reads the authentic published listing. Unpublished drafts have no
 // accepted preview service and must never use SavedStoreProductCustomerPreview.
 bool _publishedProductAssistantOpen = false;
 Future<MoolAssistantNativeSnapshot?> _publishedProductSnapshot(BuildContext host, WorkSession source,
-    MoolAssistantContext ctx, String? entity, bool Function() routeCurrent) async {
+    MoolAssistantContext ctx, String? entity, bool Function() routeCurrent,
+    {WorkspaceCatalogueItem? capturedProduct, String? sharedSignature}) async {
   final gateway = source.catalogueGateway;
   if (!routeCurrent() || !identical(source, session) || !_financePermitted(ctx) ||
       _financeAssistantContext(host)?.binding != ctx.binding || entity == null ||
       gateway is! AuthenticatedWorkspaceCatalogueGateway || source.gateway is ReviewWorkGateway ||
       _productEditorOpen(source) || _financeSheetOpen || _couponsSheetOpen) return null;
-  final product = _assistantProductTarget(source, false, entity);
+  final product = capturedProduct ?? _assistantProductTarget(source, false, entity);
   if (product == null) return null;
   return MoolAssistantNativeSnapshot(binding: ctx.binding,
-    sourceRevision: _nativeProductRevision(source, 'AI-ACT-230', ctx, entity),
+    sourceRevision: _nativeProductRevision(source, 'AI-ACT-230', ctx, entity, capturedProduct: product, sharedSignature: sharedSignature),
     entityId: entity, permitted: true);
 }
 Future<MoolAssistantReviewResult> _openPublishedProduct(BuildContext host, WorkSession source,
@@ -6591,7 +7104,7 @@ Future<MoolAssistantReviewResult> _openPublishedProduct(BuildContext host, WorkS
 
 Future<MoolAssistantNativeSnapshot?> _productNativeSnapshot(BuildContext hostContext, WorkSession source,
   String action, MoolAssistantContext ctx, String? entity, bool Function() routeCurrent,
-  {WorkspaceCatalogueItem? capturedProduct, String? sharedSignature}) async {
+  {WorkspaceCatalogueItem? capturedProduct, String? sharedSignature, bool captureOnly = false}) async {
   bool current() => routeCurrent() && _financePermitted(ctx) &&
     _financeAssistantContext(hostContext)?.binding == ctx.binding && !_financeSheetOpen && !_couponsSheetOpen && !_productEditorOpen(source);
   if (!current() || !StoreProductNativeInitial.actions.contains(action) ||
@@ -6599,13 +7112,18 @@ Future<MoolAssistantNativeSnapshot?> _productNativeSnapshot(BuildContext hostCon
   // Native Load/Recover can enqueue a durable Stock report. Review does not run it.
   if (source.localInventoryEnabled && (!source.workspaceInventoryLoaded || source.workspaceInventoryError != null ||
       source.workspaceGoodsReceiptBusy || source.workspaceGoodsReceiptRecoveryPending)) return null;
+  // The original editor restores this journal on entry. Complete that local
+  // read before freezing a selected family review, so its own hydration cannot
+  // invalidate the otherwise unchanged saved members. Never reconcile here.
+  if(const {'AI-ACT-215','AI-ACT-223','AI-ACT-224'}.contains(action)&&(source.workspaceCatalogueListingBusy||
+      !await source.restoreWorkspaceCatalogueListing()||!current()||source.workspaceCatalogueListingBusy))return null;
   final product = capturedProduct ?? _assistantProductTarget(source, false, entity);
   if (!StoreProductNativeInitial.catalogueActions.contains(action) && product == null) return null;
   if (product != null) {
     final submission = source.workspaceProductSubmission(product.id), media = source.workspaceProductMedia(product.id);
     final familyId = product.variantMembership?.familyId;
     final family = familyId == null ? null : source.workspaceVariantFamilyPublisher(familyId);
-    if (const {'AI-ACT-217','AI-ACT-223','AI-ACT-373'}.contains(action)) {
+    if (const {'AI-ACT-217','AI-ACT-223','AI-ACT-373'}.contains(action) && !(captureOnly && action == 'AI-ACT-223')) {
       if (submission == null || !await submission.restore() || !current()) return null;
       if (const {'AI-ACT-217','AI-ACT-223'}.contains(action) && submission.pending == null &&
           (!await submission.refresh(current: current) || !current())) return null;
@@ -6615,10 +7133,10 @@ Future<MoolAssistantNativeSnapshot?> _productNativeSnapshot(BuildContext hostCon
       if (family == null || !await family.restore() || !current()) return null;
       if (action == 'AI-ACT-224' && family.pending == null && (!await family.refresh(current: current) || !current())) return null;
     }
-    if (action == 'AI-ACT-222' || action == 'AI-ACT-225') {
+    if ((action == 'AI-ACT-222' && !captureOnly) || action == 'AI-ACT-225') {
       if (!await source.restoreWorkspaceCatalogueListing() || !current()) return null;
     }
-    if (action == 'AI-ACT-371') {
+    if (action == 'AI-ACT-371' && !captureOnly) {
       final visibility = source.workspaceStockVisibility(product.id);
       if (visibility == null || !await visibility.readOnlyForReview(current: current) || !current()) return null;
     }
@@ -6628,7 +7146,9 @@ Future<MoolAssistantNativeSnapshot?> _productNativeSnapshot(BuildContext hostCon
     await source.loadWorkspaceCommodityPriceAttention();
     if (!current()) return null;
   }
-  if (!current() || !_nativeProductReady(source, action, entity, capturedProduct: product)) return null;
+  if (!current() || !(captureOnly && action == 'AI-ACT-223'
+      ? product != null && _productSubmissionCaptureReady(source, product)
+      : _nativeProductReady(source, action, entity, capturedProduct: product))) return null;
   return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: _nativeProductRevision(source, action, ctx, entity,
     capturedProduct: product, sharedSignature: sharedSignature),
     permitted: true, entityId: entity);
@@ -6678,13 +7198,18 @@ Future<MoolAssistantReviewResult> _openProductNative(BuildContext hostContext, W
     return MoolAssistantReviewResult.stale;
   }
   if (action == 'AI-ACT-216' && selected == null) return MoolAssistantReviewResult.unavailable;
+  final listingOriginal = action == 'AI-ACT-225' ? _productListingOriginalFingerprint(source.workspaceCatalogueListingPendingOriginal) : null;
+  final familyOriginal = action == 'AI-ACT-374' && family != null ? source.workspaceVariantFamilyPublisher(family.id)?.pending?.fingerprint : null;
   return showStoreProductNativeReview(context, source, product: product, initial: initial, selected: selected,
     prefillCurrent: () => owner() && reviewCurrent(), ownerCurrent: owner, ownerChanges: changes,
     originalCurrent: () => switch (action) {
       'AI-ACT-225' => source.workspaceCatalogueListingPendingRequestId == initial.originalRequestId &&
-        source.workspaceCatalogueListingPendingSkuId == product.id,
+        source.workspaceCatalogueListingPendingSkuId == product.id && listingOriginal != null &&
+        _productListingOriginalFingerprint(source.workspaceCatalogueListingPendingOriginal) == listingOriginal,
       'AI-ACT-373' => source.workspaceProductMedia(product.id)?.original?.idempotencyKey == initial.originalRequestId,
-      'AI-ACT-374' => family != null && source.workspaceVariantFamilyPublisher(family.id)?.pending?.idempotencyKey == initial.originalRequestId,
+      'AI-ACT-374' => family != null && familyOriginal != null &&
+        source.workspaceVariantFamilyPublisher(family.id)?.pending?.idempotencyKey == initial.originalRequestId &&
+        source.workspaceVariantFamilyPublisher(family.id)?.pending?.fingerprint == familyOriginal,
       _ => true,
     });
 }
@@ -7186,6 +7711,9 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
   }
 
   MoolAssistantNativeAdapter _makeProductAssistantAdapter(BuildContext hostContext, WorkSession source, String action) {
+    if(action=='AI-ACT-213')return _StoreManualProductAssistantAdapter(
+      read:(ctx,entity)=>_manualProductAssistantSnapshot(hostContext,source,ctx,entity),
+      open:(proposal,current)=>_openManualProductAssistant(hostContext,source,proposal,current));
     MoolAssistantContext? readContext() => _financeAssistantContext(hostContext);
     Future<MoolAssistantNativeSnapshot?> read(MoolAssistantContext ctx, String? entity) =>
       _productAssistantSnapshot(hostContext, source, action, ctx, entity);
@@ -7193,11 +7721,65 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       _productAssistantNativeIdentity(hostContext, source, proposal, current);
     Future<MoolAssistantReviewResult> open(StoreProductInitialData initial, MoolAssistantProposal proposal, bool Function() current) =>
       _showProductAssistantInitial(hostContext, source, initial, proposal, current);
-    if (action == 'AI-ACT-213') return _StoreProductInitialAdapter(actionId: action, readContext: readContext,
-      readSnapshot: read, readNativeIdentity: identity, open: open);
     return _StoreBatchedProductInitialAdapter(actionId: action, readContext: readContext,
       readSnapshot: read, readNativeIdentity: identity, open: open,
       readSnapshots: (ctx, entities) => _productAssistantNativeBatch(hostContext, source, action, ctx, entities));
+  }
+
+  bool _manualProductAssistantReady(BuildContext host,WorkSession source,MoolAssistantContext ctx) =>
+    mounted&&host.mounted&&identical(source,session)&&ctx.inWorkspace&&_financePermitted(ctx)&&
+    _financeAssistantContext(host)?.binding==ctx.binding&&!_financeSheetOpen&&!_couponsSheetOpen&&!_productEditorOpen(source)&&
+    source.workspaceInventoryLoaded&&source.workspaceInventoryError==null&&!source.workspaceGoodsReceiptBusy&&
+    !source.workspaceGoodsReceiptRecoveryPending&&!source.workspaceAccountRecoveryPending&&!source.workspaceAccountRecoveryFailed;
+  String _manualProductAssistantRevision(WorkSession source,MoolAssistantContext ctx)=>'native-product-authoring:v1:${assistant_hash.sha256.convert(
+    utf8.encode(jsonEncode([ctx.binding.toString(),source.publicationPreferencesContext.toString(),
+      source.workspaceProductDefaults.toJson(),for(final item in source.workspaceCatalogueItems)item.toInventoryJson()]))) }';
+  Future<MoolAssistantNativeSnapshot?> _manualProductAssistantSnapshot(BuildContext host,WorkSession source,
+      MoolAssistantContext ctx,String? entity)async{
+    if(entity!=null||!_manualProductAssistantReady(host,source,ctx))return null;
+    final store=source.activeWorkspace!.id;
+    if(!await source.loadWorkspaceProductDefaults(expectedStoreId:store)||!_manualProductAssistantReady(host,source,ctx))return null;
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:null,permitted:true,
+      sourceRevision:_manualProductAssistantRevision(source,ctx));
+  }
+  Future<MoolAssistantReviewResult> _openManualProductAssistant(BuildContext host,WorkSession source,
+      MoolAssistantProposal proposal,bool Function() requestCurrent)async{
+    final ctx=_financeAssistantContext(host),request=proposal.preparationRequestId;
+    if(ctx==null||request==null||request.isEmpty||proposal.entityId!=null||_manualProductInputError(proposal.fields)!=null||
+        proposal.binding!=ctx.binding||!requestCurrent()||!_manualProductAssistantReady(host,source,ctx))return MoolAssistantReviewResult.stale;
+    if(ctx.accountScope case (environment:final String environment,projectId:final String projectId,
+        tenantId:final String? tenantId,userId:final String userId)) {
+      final gateway=source.catalogueGateway;
+      if(gateway is! WorkspaceCatalogueOwnerGateway)return MoolAssistantReviewResult.unavailable;
+      final digest=assistant_hash.sha256.convert(utf8.encode(jsonEncode(['manual-product-preparation:v1',
+        environment,projectId,tenantId,userId,(gateway as WorkspaceCatalogueOwnerGateway).realm,ctx.workspaceId,request]))).toString();
+      final product=_newManualWorkspaceProduct(id:'custom-ai-$digest',sku:'SKU-${digest.substring(0,24).toUpperCase()}',
+        defaults:source.workspaceProductDefaults);
+      bool absent()=>!source.workspaceCatalogueItems.any((p)=>p.id==product.id||p.sku.toLowerCase()==product.sku.toLowerCase());
+      if(!absent())return MoolAssistantReviewResult.stale;
+      // This is the real blank manual draft, not a catalogue reference. Keep
+      // the existing strict referenced-product decoder unchanged for edits.
+      final initial=StoreProductInitialData._(product.canonicalId,product.sku,product.pack,
+        product.retailEnabled,product.wholesaleOffer?.enabled==true,Map<String,String>.from(proposal.fields));
+      final signature=_manualProductAssistantRevision(source,ctx),publication=source.publicationPreferencesContext;
+      bool owner()=>mounted&&host.mounted&&identical(source,session)&&_financePermitted(ctx)&&
+        _financeAssistantContext(host)?.binding==ctx.binding&&source.publicationPreferencesContext==publication;
+      bool unchanged()=>owner()&&absent()&&_manualProductAssistantRevision(source,ctx)==signature;
+      final changes=Listenable.merge([source,?host.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+      await Navigator.of(host,rootNavigator:true).push<void>(MaterialPageRoute(builder:(page)=>_StoreProductOwnerSurface(
+        current:owner,changes:changes,child:Scaffold(
+        appBar:AppBar(title:const Text('Review product')),
+        body:SafeArea(child:_CatalogueProductEditor(session:source,product:product,embeddedPage:true,
+          initialData:initial,initialField:initial.inputs.keys.first,ownerCurrent:owner,sourceCurrent:unchanged,
+          prefillCurrent:()=>owner()&&requestCurrent(),stockEntryMethod:WorkspaceStockEntryMethod.manual,
+          onDone:()=>Navigator.of(page).pop(),onSaved:()=>Navigator.of(page).pop(),
+          reviewChanges:changes),
+        ),
+      ),
+    )));
+      return owner()?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }
+    return MoolAssistantReviewResult.unavailable;
   }
 
   Future<MoolAssistantNativeBatchSnapshot> _productAssistantNativeBatch(BuildContext hostContext, WorkSession source,
@@ -7207,26 +7789,53 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       routeCurrent?.call() != false && !_financeSheetOpen && !_couponsSheetOpen && !_productEditorOpen(source) &&
       source.workspaceInventoryLoaded && source.workspaceInventoryError == null && !source.workspaceGoodsReceiptBusy &&
       !source.workspaceGoodsReceiptRecoveryPending && !source.workspaceAccountRecoveryPending && !source.workspaceAccountRecoveryFailed;
-    if (!actor() || !const {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-220', 'AI-ACT-370'}.contains(action)) {
+    if (!actor() || !const {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-220', 'AI-ACT-370', 'AI-ACT-230', 'AI-ACT-222', 'AI-ACT-223', 'AI-ACT-226', 'AI-ACT-227', 'AI-ACT-371'}.contains(action)) {
       return MoolAssistantNativeBatchSnapshot(owner: source, sourceRevision: 'unavailable:v2', entries: const {}, current: () => false);
+    }
+    if (action == 'AI-ACT-222' && (!await source.restoreWorkspaceCatalogueListing() || !actor())) {
+      return MoolAssistantNativeBatchSnapshot(owner: source, sourceRevision: 'unavailable:v3', entries: const {}, current: () => false);
     }
     final shared = _assistantProductSharedSignature(source);
     final products = {for (final product in source.workspaceCatalogueItems) product.id: product};
-    bool current() {
-      try {return actor() && products.length == source.workspaceCatalogueItems.length && _assistantProductSharedSignature(source) == shared;}
-      on Object {return false;}
-    }
     final result = <String?, MoolAssistantNativeSnapshot?>{};
+    var retired = false;
+    bool current() {
+      if (retired) return false;
+      try {
+        if (!actor() || products.length != source.workspaceCatalogueItems.length || _assistantProductSharedSignature(source) != shared) {
+          retired = true; return false;
+        }
+        // Recheck per-target native pending/readiness state against this same
+        // shared inventory hash; never rehash the full inventory for each SKU.
+        for (final entry in result.entries) {
+          final product = products[entry.key];
+          final ready = product != null && (const {'AI-ACT-214', 'AI-ACT-221'}.contains(action) ||
+            (action == 'AI-ACT-230' ? source.catalogueGateway is AuthenticatedWorkspaceCatalogueGateway && source.gateway is! ReviewWorkGateway
+              : action == 'AI-ACT-223' ? _productSubmissionCaptureReady(source, product)
+              : _nativeProductReady(source, action, entry.key, capturedProduct: product)));
+          if ((entry.value?.permitted == true) != ready) {retired = true; return false;}
+          if (!ready) continue;
+          final revision = const {'AI-ACT-214', 'AI-ACT-221'}.contains(action)
+            ? _productAssistantSourceRevision(source, action, ctx, entry.key, capturedProduct: product, sharedSignature: shared)
+            : _nativeProductRevision(source, action, ctx, entry.key, capturedProduct: product, sharedSignature: shared);
+          if (revision != entry.value!.sourceRevision) {retired = true; return false;}
+        }
+        return true;
+      } on Object {retired = true; return false;}
+    }
     for (final entity in entities) {
       final product = products[entity];
       if (entity == null || product == null || !actor()) {result[entity] = null; continue;}
-      final snapshot = const {'AI-ACT-214', 'AI-ACT-221'}.contains(action)
+      final snapshot = action == 'AI-ACT-230'
+        ? await _publishedProductSnapshot(hostContext, source, ctx, entity, routeCurrent ?? () => true,
+            capturedProduct: product, sharedSignature: shared)
+        : const {'AI-ACT-214', 'AI-ACT-221'}.contains(action)
         ? await _productAssistantSnapshot(hostContext, source, action, ctx, entity, capturedProduct: product, sharedSignature: shared)
         : await _productNativeSnapshot(hostContext, source, action, ctx, entity, routeCurrent ?? () => true,
-            capturedProduct: product, sharedSignature: shared);
+            capturedProduct: product, sharedSignature: shared, captureOnly: true);
       result[entity] = snapshot;
     }
-    return MoolAssistantNativeBatchSnapshot(owner: source, sourceRevision: 'store-native-batch:v2:$shared', entries: result, current: current);
+    return MoolAssistantNativeBatchSnapshot(owner: source, sourceRevision: 'store-native-batch:v4:$shared', entries: result, current: current);
   }
 
   void _refreshProductAssistantVersionOwner() {
@@ -7257,7 +7866,7 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
   Future<String?> _productAssistantNativeIdentity(BuildContext hostContext, WorkSession source,
       MoolAssistantProposal proposal, bool Function() current) async {
     final ctx = _financeAssistantContext(hostContext), entity = proposal.entityId;
-    if (ctx == null || entity == null || !const {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-370', 'AI-ACT-220'}.contains(proposal.actionId)) return null;
+    if (ctx == null || entity == null || !const {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-370', 'AI-ACT-220', 'AI-ACT-230', 'AI-ACT-222', 'AI-ACT-223', 'AI-ACT-226', 'AI-ACT-227', 'AI-ACT-371'}.contains(proposal.actionId)) return null;
     bool owner() => current() && mounted && hostContext.mounted && identical(source, session) &&
       _financeAssistantContext(hostContext)?.binding == ctx.binding && ctx.binding == proposal.binding && _financePermitted(ctx) &&
       !_productEditorOpen(source) && !_financeSheetOpen && !_couponsSheetOpen;
@@ -7922,12 +8531,12 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
   String? _stockAssistantRevision(WorkSession source, String actionId, MoolAssistantContext ctx, String? entityId) {
     final signature = _assistantStockSignature(source, actionId, entityId);
     if (signature == null) return null;
-    final owner = (source, actionId, entityId, ctx.binding, source.publicationPreferencesContext,
+    final owner = (source, ctx.binding, source.publicationPreferencesContext,
       source.tradingPreferencesContext);
-    if (_stockAssistantOwner != owner || _stockAssistantDigest != signature) {
-      _stockAssistantOwner = owner; _stockAssistantDigest = signature; _stockAssistantVersion++;
-    }
-    return 'native-stock:$_stockAssistantVersion';
+    if(_stockAssistantOwner!=owner){_stockAssistantOwner=owner;_stockAssistantVersions.clear();}
+    final key=(actionId,entityId);
+    if(_stockAssistantVersions[key]?.$1!=signature)_stockAssistantVersions[key]=(signature,++_stockAssistantVersion);
+    return 'native-stock:${_stockAssistantVersions[key]!.$2}';
   }
   Future<MoolAssistantNativeSnapshot?> _stockAssistantSnapshot(BuildContext hostContext, WorkSession source,
     String actionId, MoolAssistantContext ctx, String? entityId) async {
@@ -7935,6 +8544,9 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) && _stockAssistantNavigationReady;
     if (!current()) return null;
     // Opening Stock/export controls never refreshes or publishes a Stock report.
+    if(!await source.workspaceInventorySaved||!current())return null;
+    if(entityId==null&&const {'AI-ACT-232','AI-ACT-233'}.contains(actionId)&&
+        !source.workspaceCatalogueItems.any((p)=>actionId!='AI-ACT-233'||p.stockMode==WorkspaceStockMode.exactQuantity))return null;
     final revision = _stockAssistantRevision(source, actionId, ctx, entityId);
     return revision == null ? null : MoolAssistantNativeSnapshot(binding: ctx.binding, entityId: entityId,
       sourceRevision: revision, permitted: true);
@@ -7949,6 +8561,50 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
     }
     bool owner() => mounted && hostContext.mounted && identical(widget.session, source) &&
       _financeAssistantContext(hostContext)?.binding == trusted.binding && _financePermitted(trusted);
+    if(proposal.entityId==null&&const {'AI-ACT-232','AI-ACT-233'}.contains(proposal.actionId)) {
+      final adjustment=proposal.actionId=='AI-ACT-233',frame=proposal.sourceRevision;
+      if(adjustment&&(proposal.fields.length!=2||!proposal.fields.keys.every(const {'quantity','reason'}.contains)||
+          !proposal.fields.values.every((value)=>value is String)))return MoolAssistantReviewResult.unavailable;
+      if(!adjustment)StoreStockHistoryInitialData.fromFields(proposal.fields);
+      final targets=List<WorkspaceCatalogueItem>.unmodifiable(source.workspaceCatalogueItems.where((p)=>
+        !adjustment||p.stockMode==WorkspaceStockMode.exactQuantity));
+      if(targets.isEmpty||targets.map((p)=>p.id).toSet().length!=targets.length)return MoolAssistantReviewResult.unavailable;
+      var retired=false,selectedOnce=false;
+      bool current(){
+        if(!owner()||!reviewCurrent()||frame!=_stockAssistantRevision(source,proposal.actionId,trusted,null))retired=true;
+        return !retired;
+      }
+      final changes=Listenable.merge([source,routerDelegateOf(hostContext),?hostContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges]);
+      final navigator=Navigator.of(hostContext,rootNavigator:true);
+      late MaterialPageRoute<String> route;
+      route=MaterialPageRoute<String>(builder:(page)=>_StoreProductOwnerSurface(current:current,changes:changes,
+        child:Scaffold(appBar:AppBar(title:Text(adjustment?'Choose product to adjust':'Choose product movements')),
+          body:SafeArea(child:StoreAddProductSheet(embedded:true,stockOnly:true,catalogue:const [],ownedProducts:targets,
+            createProduct:(_)=>throw StateError('Choose an existing saved product.'),isStoreCurrent:current,
+            scanBarcode:()=>page.mounted&&!selectedOnce&&current()&&ModalRoute.of(page)?.isCurrent==true
+              ?showStoreProductScanner(page,ownerCurrent:current,ownerChanges:changes):Future.value(null),
+            onSelected:(p){if(!page.mounted||selectedOnce||!current()||ModalRoute.of(page)?.isCurrent!=true||!targets.any((x)=>x.id==p.id))return;
+              selectedOnce=true;navigator.pop(p.id);},
+          )))));
+      void changed(){if(!current()&&route.isActive)navigator.removeRoute(route);}
+      changes.addListener(changed);String? selected;
+      try{selected=await navigator.push<String>(route);}finally{changes.removeListener(changed);}
+      if(!current())return MoolAssistantReviewResult.stale;
+      if(selected==null)return MoolAssistantReviewResult.cancelled;
+      final product=targets.where((p)=>p.id==selected).singleOrNull;
+      if(product==null)return MoolAssistantReviewResult.stale;
+      final selectedRevision=_stockAssistantRevision(source,proposal.actionId,trusted,selected);
+      if(selectedRevision==null)return MoolAssistantReviewResult.stale;
+      final fields=<String,Object?>{if(adjustment)...{
+        'inventoryRevision':source.workspaceInventoryRevision,'sourceCanonicalId':product.canonicalId,
+        'sourceSku':product.sku,'sourcePack':product.pack,'sourceStock':product.stock,
+      },...proposal.fields};
+      final inner=MoolAssistantProposal(id:proposal.id,actionId:proposal.actionId,binding:proposal.binding,
+        requestRevision:proposal.requestRevision,entitlementRevision:proposal.entitlementRevision,sourceRevision:selectedRevision,
+        entityId:selected,validUntil:proposal.validUntil,title:proposal.title,summary:proposal.summary,fields:fields,
+        recovered:proposal.recovered,preparationRequestId:proposal.preparationRequestId,preparationSourceRevision:proposal.preparationSourceRevision);
+      return _showStockAssistant(hostContext,source,inner,current);
+    }
     if (proposal.actionId == 'AI-ACT-233') {
       if (proposal.entityId == null) return MoolAssistantReviewResult.stale;
       return showStoreStockAdjustmentReview(hostContext, source, entityId: proposal.entityId!,
@@ -31298,32 +31954,8 @@ class _WorkspaceCatalogueSurfaceState
 
   WorkspaceCatalogueItem _blankProduct({String barcode = '', WorkspaceProductDefaults? defaults}) {
     final stamp = DateTime.now().microsecondsSinceEpoch;
-    final appliedDefaults = defaults ?? widget.session.workspaceProductDefaults;
-    return WorkspaceCatalogueItem(
-      id: 'custom-$stamp',
-      canonicalId: 'custom-$stamp',
-      categoryId: 'other',
-      brand: '',
-      title: '',
-      variant: '',
-      pack: '',
-      sku: 'SKU-$stamp',
-      barcode: barcode,
-      purchasePrice: 0,
-      sellingPrice: 0,
-      unitPrice: '',
-      stock: 0,
-      deliveryPromise: '',
-      origin: '',
-      visualLabel: 'Product image pending',
-      visualKind: 'catalogue-packshot',
-      available: false,
-      publicListing:
-          appliedDefaults.customerListingRequested,
-      stockMode: appliedDefaults.stockMode,
-      lowStockThreshold:
-          appliedDefaults.lowStockThreshold,
-    );
+    return _newManualWorkspaceProduct(id:'custom-$stamp',sku:'SKU-$stamp',barcode:barcode,
+      defaults:defaults??widget.session.workspaceProductDefaults);
   }
 
   Widget _addProductEntry() {
@@ -34984,8 +35616,14 @@ class StoreProductNativeInitial {
   bool matches(WorkspaceCatalogueItem product) => mapEquals(references, StoreProductInitialData.referenceFields(product));
 }
 
-class _StorePublishedProductAssistantAdapter implements MoolAssistantOwnerAwareNativeAdapter, MoolAssistantRouteBoundNativeAdapter {
-  _StorePublishedProductAssistantAdapter({required this.readSnapshot, required this.open, required this.nativeRoute, required this.navigator});
+class _StorePublishedProductAssistantAdapter implements MoolAssistantOwnerAwareNativeAdapter, MoolAssistantRouteBoundNativeAdapter,
+    MoolAssistantCanonicalProductIdentityAdapter, MoolAssistantBatchNativeAdapter {
+  _StorePublishedProductAssistantAdapter({required this.readSnapshot, required this.open, required this.nativeRoute, required this.navigator,
+    required this.readNativeIdentity, required this.readSnapshots});
+  final Future<String?> Function(MoolAssistantProposal, bool Function()) readNativeIdentity;
+  final Future<MoolAssistantNativeBatchSnapshot> Function(MoolAssistantContext, List<String?>) readSnapshots;
+  @override Future<String?> nativeProductIdentity(MoolAssistantProposal proposal, bool Function() current) => readNativeIdentity(proposal, current);
+  @override Future<MoolAssistantNativeBatchSnapshot> snapshots(MoolAssistantContext context, List<String?> entities) => readSnapshots(context, entities);
   final ModalRoute<dynamic>? nativeRoute;
   final NavigatorState navigator;
   Route<void>? _assistantRoute;
@@ -35025,6 +35663,35 @@ class _StorePublishedProductAssistantAdapter implements MoolAssistantOwnerAwareN
   }
 }
 
+class _ProductOriginalTarget {
+  const _ProductOriginalTarget({required this.product,required this.requestId,required this.fingerprint,this.familyId});
+  final WorkspaceCatalogueItem product;
+  final String requestId,fingerprint;
+  final String? familyId;
+}
+class _StoreProductOriginalAdapter implements MoolAssistantNativeAdapter,MoolAssistantBatchNativeAdapter {
+  const _StoreProductOriginalAdapter({required this.actionId,required this.read,required this.readRevision,required this.open});
+  @override final String actionId;
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext,String?) read;
+  final String? Function(MoolAssistantContext) readRevision;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function()) open;
+  @override Set<String> get allowedFields=>const {'originalCapture'};
+  @override String? validateFields(Map<String,Object?> fields)=>fields.length==1&&fields['originalCapture'] is String&&
+    RegExp(r'^[a-f0-9]{64}$').hasMatch(fields['originalCapture'] as String)?null:'Keep the captured original request unchanged.';
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entity)=>read(context,entity);
+  @override Future<MoolAssistantNativeBatchSnapshot> snapshots(MoolAssistantContext context,List<String?> entities)async{
+    final native=entities.length==1&&entities.single==null?await read(context,null):null;
+    var retired=false;
+    return MoolAssistantNativeBatchSnapshot(owner:this,sourceRevision:native?.sourceRevision??'no-native-original:v1',
+      entries:{null:native},current:(){
+        if(retired)return false;
+        try{if(readRevision(context)!=native?.sourceRevision)retired=true;}on Object{retired=true;}
+        return !retired;
+      });
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>
+    p.actionId!=actionId||p.entityId!=null||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,current);
+}
 class _StoreProductNativeAdapter implements MoolAssistantNativeAdapter {
   const _StoreProductNativeAdapter({required this.actionId, required this.readContext,
     required this.readSnapshot, required this.open});
@@ -35054,6 +35721,29 @@ class _StoreCanonicalProductNativeAdapter extends _StoreProductNativeAdapter imp
   final Future<MoolAssistantNativeBatchSnapshot> Function(MoolAssistantContext, List<String?>) readSnapshots;
   @override Future<MoolAssistantNativeBatchSnapshot> snapshots(MoolAssistantContext context, List<String?> entityIds) => readSnapshots(context, entityIds);
   @override Future<String?> nativeProductIdentity(MoolAssistantProposal proposal, bool Function() current) => readNativeIdentity(proposal, current);
+}
+class _StoreSavedProductAssistantAdapter extends _StoreCanonicalProductNativeAdapter implements MoolAssistantNativeProductRootReviewAdapter {
+  const _StoreSavedProductAssistantAdapter({required super.readContext,required super.readSnapshot,required super.open,
+    required super.readNativeIdentity,required super.readSnapshots,required this.rootRead,required this.rootRevision,required this.rootOpen})
+    :super(actionId:'AI-ACT-223');
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext,String?) rootRead;
+  final String? Function(MoolAssistantContext) rootRevision;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function()) rootOpen;
+  @override String? validateFields(Map<String,Object?> fields)=>fields.isEmpty?null:super.validateFields(fields);
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entity)=>
+    entity==null?rootRead(context,null):super.snapshot(context,entity);
+  @override Future<MoolAssistantNativeBatchSnapshot> snapshots(MoolAssistantContext context,List<String?> entities)async{
+    final ids=entities.whereType<String>().toList(),hasRoot=entities.contains(null);
+    final legacy=ids.isEmpty?null:await super.snapshots(context,ids);
+    final root=hasRoot?await rootRead(context,null):null;
+    return MoolAssistantNativeBatchSnapshot(owner:this,
+      sourceRevision:assistant_hash.sha256.convert(utf8.encode(jsonEncode([legacy?.sourceRevision,root?.sourceRevision]))).toString(),
+      entries:{...?legacy?.entries,if(hasRoot)null:root},
+      current:()=> (legacy?.current()??true)&&(!hasRoot||rootRevision(context)==root?.sourceRevision));
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,bool Function() current)=>
+    proposal.entityId==null?(proposal.fields.isEmpty?rootOpen(proposal,current):Future.value(MoolAssistantReviewResult.unavailable)):
+      super.openReview(proposal,current);
 }
 // ACT228 resolves only a controller-minted reference to actual selected bytes.
 class _StoreProductSelectedImportAdapter extends _StoreProductNativeAdapter implements MoolAssistantSelectedDocumentAdapter {
@@ -35118,10 +35808,14 @@ Future<MoolAssistantReviewResult> showStoreProductNativeReview(BuildContext cont
   if (!context.mounted || !ownerCurrent() || !prefillCurrent() || _productEditorOpen(session) || !initial.matches(product)) {
     return MoolAssistantReviewResult.stale;
   }
-  final signature = _assistantProductSignature(session, product);
+  final originalReview=const {'AI-ACT-225','AI-ACT-374'}.contains(initial.actionId);
+  if(originalReview&&originalCurrent==null)return MoolAssistantReviewResult.unavailable;
+  String signatureOf(WorkspaceCatalogueItem item)=>originalReview
+    ?_assistantOriginalProductReviewSignature(session,item):_assistantProductSignature(session,item);
+  final signature = signatureOf(product);
   bool sourceCurrent() {
     final latest = _assistantProductTarget(session, false, product.id);
-    return latest != null && _assistantProductSignature(session, latest) == signature && originalCurrent?.call() != false;
+    return latest != null && signatureOf(latest) == signature && originalCurrent?.call() != false;
   }
   await Navigator.of(context, rootNavigator: true).push<void>(MaterialPageRoute<void>(builder: (_) =>
     _StoreProductNativeReviewPage(session: session, product: product, initial: initial, selected: selected,
@@ -35696,7 +36390,7 @@ void _startNativeReview() {
       });
     }
     _startNativeReview();
-    if (_listingRecoveryRequired) {
+    if (_listingRecoveryRequired && !widget.session.workspaceCatalogueListingReady) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_restoreListing());
       });
@@ -36565,6 +37259,9 @@ void _startNativeReview() {
     if (quantity == null || quantity < 0) {
       _reject('Enter the available stock.', field: 'stock'); return;
     }
+    if(quantity>(1<<31)){
+      _reject('Enter a quantity between 0 and 2,147,483,648.',field:'stock');return;
+    }
     if (_stockAdjustmentReason.text.trim().isEmpty) {
       _reject('Choose why the quantity changed.', field: 'stockAdjustmentReason'); return;
     }
@@ -36603,7 +37300,7 @@ void _startNativeReview() {
   }
 
   Future<void> _save() async {
-    if (_saved || _savingInventory || _choosingPhoto) return;
+    if (!mounted || _saved || _savingInventory || _choosingPhoto) return;
     if (widget.stockAdjustmentInitial != null) { await _saveStockAdjustment(); return; }
     if (!_assistantInputCurrent) {
       _reject('Product details changed. Close and reopen this product before saving.');
@@ -37005,6 +37702,7 @@ void _startNativeReview() {
     bool percentage = false,
     int lines = 1,
     String? hint,
+    String? helper,
   }) {
     final large = MediaQuery.textScalerOf(context).scale(1) > 1.2;
     final error = _errorField == id ? _error : null;
@@ -37062,6 +37760,8 @@ void _startNativeReview() {
               labelText: large ? null : label,
               floatingLabelBehavior: FloatingLabelBehavior.always,
               hintText: hint,
+              helperText: helper,
+              helperMaxLines: 3,
               prefixText: money ? '₹ ' : null,
               suffixText: percentage ? '%' : null,
               error: error == null
@@ -37541,9 +38241,11 @@ void _startNativeReview() {
                                 _field(
                                   'stock',
                                   'work-product-stock',
-                                  'Stock quantity',
+                                  widget.stockAdjustmentInitial==null?'Stock quantity':'New on-hand total',
                                   _stock,
                                   numeric: true,
+                                  helper:widget.stockAdjustmentInitial==null?null:
+                                    'Current: ${widget.stockAdjustmentInitial!.sourceStock}. Enter the counted total.',
                                 ),
                               if (widget.stockAdjustmentInitial != null)
                                 _field('stockAdjustmentReason', 'work-stock-adjustment-reason',

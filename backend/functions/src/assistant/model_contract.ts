@@ -38,14 +38,31 @@ export interface PreparationRequest {
   readonly nativeTargets?: readonly PreparationTargetHint[];
   /** Compact readiness hints only; positions bind exact original source proofs. */
   readonly nativeTargetMask?: PreparationTargetMask;
+  /** Opaque frozen-native-intent bindings, never model-authored identities. */
+  readonly nativeOriginalCaptures?: readonly PreparationOriginalCapture[];
+}
+export const nativeOriginalRequestActions = new Set(['AI-ACT-225', 'AI-ACT-374']);
+export interface PreparationOriginalCapture {readonly actionId: string; readonly digest: string;}
+export function nativeOriginalCaptureSelection(value: unknown): readonly PreparationOriginalCapture[] {
+  if (!Array.isArray(value) || value.length > 2) return fail('invalid_request', 400);
+  const seen = new Set<string>();
+  return Object.freeze(value.map(raw => {
+    const row = object(raw, ['actionId', 'digest']);
+    if (typeof row.actionId !== 'string' || !nativeOriginalRequestActions.has(row.actionId) || seen.has(row.actionId) ||
+        typeof row.digest !== 'string' || !/^[a-f0-9]{64}$/u.test(row.digest)) return fail('invalid_request', 400);
+    seen.add(row.actionId); return Object.freeze({actionId: row.actionId, digest: row.digest});
+  }).sort((a, b) => a.actionId.localeCompare(b.actionId)));
 }
 export interface PreparationTargetMask {readonly version: 1; readonly fingerprint: string; readonly bits: string;}
+export const preparationNativeTargetLimit = 30000;
+export const preparationNativeMaskMaxBytes = Math.ceil(preparationNativeTargetLimit / 8);
+const preparationNativeMaskMaxCharacters = Math.ceil(preparationNativeMaskMaxBytes * 4 / 3);
 export function nativeTargetMaskSelection(value: unknown): PreparationTargetMask {
   const row = object(value, ["version", "fingerprint", "bits"]);
   if (row.version !== 1 || typeof row.fingerprint !== "string" || !/^[a-f0-9]{64}$/u.test(row.fingerprint) ||
-      typeof row.bits !== "string" || row.bits.length > 2500 || !/^[A-Za-z0-9_-]*$/u.test(row.bits)) return fail("invalid_request", 400);
+      typeof row.bits !== "string" || row.bits.length > preparationNativeMaskMaxCharacters || !/^[A-Za-z0-9_-]*$/u.test(row.bits)) return fail("invalid_request", 400);
   const bytes = Buffer.from(row.bits, "base64url");
-  if (bytes.length > 1875 || bytes.toString("base64url") !== row.bits) return fail("invalid_request", 400);
+  if (bytes.length > preparationNativeMaskMaxBytes || bytes.toString("base64url") !== row.bits) return fail("invalid_request", 400);
   return Object.freeze({version: 1, fingerprint: row.fingerprint, bits: row.bits});
 }
 export interface PreparationTargetHint {readonly actionId: string; readonly entityId: string | null;}
@@ -79,10 +96,12 @@ export function command(value: unknown): AssistantCommand {
   const p = object(payload, prepare ? ["scope", "requestId", "requestRevision", "message", "language", "actionId", "entityId", "history", "expectedEntitlementRevision",
     ...(Object.hasOwn(payload, "catalogueListingIds") ? ["catalogueListingIds"] : []),
     ...(Object.hasOwn(payload, "nativeTargets") ? ["nativeTargets"] : []),
-    ...(Object.hasOwn(payload, "nativeTargetMask") ? ["nativeTargetMask"] : [])] : ["scope", "requestId"]);
+    ...(Object.hasOwn(payload, "nativeTargetMask") ? ["nativeTargetMask"] : []),
+    ...(Object.hasOwn(payload, "nativeOriginalCaptures") ? ["nativeOriginalCaptures"] : [])] : ["scope", "requestId"]);
   const scope = decodePlansScope(p.scope), requestId = id(p.requestId);
   if (!prepare) return {operation: row.operation as "status" | "cancel", payload: {scope, requestId}};
   if (Object.hasOwn(p, "nativeTargetMask") && scope.audience !== "workspace") return fail("invalid_request", 400);
+  if (Object.hasOwn(p, 'nativeOriginalCaptures') && scope.audience !== 'workspace') return fail('invalid_request', 400);
   if (!Number.isSafeInteger(p.requestRevision) || (p.requestRevision as number) < 0) return fail("invalid_request", 400);
   if (typeof p.language !== "string" || !preparationLanguages.has(p.language)) return fail("invalid_request", 400);
   if (!Array.isArray(p.history) || p.history.length > 20) return fail("invalid_request", 400);
@@ -93,7 +112,8 @@ export function command(value: unknown): AssistantCommand {
     message: text(p.message, 8000), language: text(p.language, 80), actionId: p.actionId === null ? null : id(p.actionId), entityId: p.entityId === null ? null : id(p.entityId),
     ...(Object.hasOwn(p, "catalogueListingIds") ? {catalogueListingIds: catalogueListingSelection(p.catalogueListingIds)} : {}),
     ...(Object.hasOwn(p, "nativeTargets") ? {nativeTargets: nativeTargetSelection(p.nativeTargets)} : {}),
-    ...(Object.hasOwn(p, "nativeTargetMask") ? {nativeTargetMask: nativeTargetMaskSelection(p.nativeTargetMask)} : {})}};
+    ...(Object.hasOwn(p, "nativeTargetMask") ? {nativeTargetMask: nativeTargetMaskSelection(p.nativeTargetMask)} : {}),
+    ...(Object.hasOwn(p, 'nativeOriginalCaptures') ? {nativeOriginalCaptures: nativeOriginalCaptureSelection(p.nativeOriginalCaptures)} : {})}};
 }
 export interface PreparationNativeTarget {
   readonly actionId: string; readonly entityId: string | null; readonly sourceRevision: string;

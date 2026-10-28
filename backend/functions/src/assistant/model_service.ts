@@ -1,8 +1,8 @@
 import {randomUUID} from "node:crypto";
 import type {AccountProfileActor} from "../account/profile_service.js";
 import type {AccountPlansService, PlansScope} from "../account/plans_service.js";
-import {assertStrictSchema, canonical, digest, fail, id, text, object, nativeTargetSelection, clarificationToolName, type AssistantCommand, type PreparationContext, type PreparationReply, type PreparationRequest} from "./model_contract.js";
-import {maskedNativeHints} from "./domain_context_contract.js";
+import {assertStrictSchema, canonical, digest, fail, id, text, object, nativeTargetSelection, nativeOriginalRequestActions, clarificationToolName, type AssistantCommand, type PreparationContext, type PreparationReply, type PreparationRequest} from "./model_contract.js";
+import {maskedNativeHints, storeProductActions} from "./domain_context_contract.js";
 import type {PreparationModel} from "./responses_transport.js";
 
 export type PreparationState = {state: "pending" | "uncertain" | "cancelled" | "failed"} | {state: "ready"; reply: PreparationReply};
@@ -43,11 +43,45 @@ function contextBinding(c: PreparationContext): string {
     ...(t.targetSelector === undefined ? {} : {targetSelector: t.targetSelector})})), modelContext: c.modelContext ?? null,
     ...(c.nativeTargets === undefined ? {} : {nativeTargets: c.nativeTargets})});
 }
+function selectedNativeModelReference(context: PreparationContext, tools: PreparationContext['tools'],
+  targets: readonly {actionId: string; entityId: string | null}[]): PreparationContext['modelContext'] {
+  const skus = new Set<string>();
+  for(const tool of tools){
+    if(!storeProductActions.has(tool.actionId))continue;
+    const selected=new Set(targets.filter(target=>target.actionId===tool.actionId&&target.entityId!==null).map(target=>target.entityId!));
+    if(tool.entityId!==null){if(selected.has(tool.entityId))skus.add(tool.entityId);continue;}
+    // Native root reviews select their saved product later. Legacy proof rows
+    // may still be captured for recovery, but are not model reference inputs.
+    if(tool.targetSelector===undefined)continue;
+    const selector=object(object(tool.parameters.properties)[tool.targetSelector]);
+    if(!Array.isArray(selector.enum)||selector.enum.some(value=>typeof value!=='string'))return fail('context_unavailable');
+    for(const value of selector.enum)if(selected.has(value as string))skus.add(value as string);
+  }
+  function project(value: PreparationContext['modelContext']): PreparationContext['modelContext'] {
+    if (value === undefined) return value;
+    if (value.sourceKind === 'original-store-owned-skus-v1') {
+      if (!Array.isArray(value.products)) return fail('context_unavailable');
+      return {...value, products: value.products.filter(row => {
+        const sku = object(row).skuId; if (typeof sku !== 'string') return fail('context_unavailable');
+        return skus.has(sku);
+      })};
+    }
+    if (value.sourceKind === 'composite-original-context-v1') {
+      if (!Array.isArray(value.sources)) return fail('context_unavailable');
+      return {...value, sources: value.sources.map(source => source === null ? null : project(object(source)))};
+    }
+    return value;
+  }
+  return project(context.modelContext);
+}
 /** Intersect native readiness hints with original registered source targets.
  * No caller-authored tool, field, permission or source revision is admitted. */
 function nativeContext(actor: AccountProfileActor, context: PreparationContext, request: PreparationRequest,
   maskContext: PreparationContext = context): PreparationContext {
-  if (request.nativeTargets === undefined && request.nativeTargetMask === undefined) return context;
+  const originals = new Set((request.nativeOriginalCaptures ?? []).map(value => value.actionId));
+  context = {...context, tools: context.tools.filter(tool => !nativeOriginalRequestActions.has(tool.actionId) || originals.has(tool.actionId))};
+  if (request.nativeTargets === undefined && request.nativeTargetMask === undefined) return {...context,
+    ...(context.modelContext === undefined ? {} : {modelContext: selectedNativeModelReference(context, context.tools, context.nativeTargets ?? context.tools)!})};
   if (request.nativeTargetMask !== undefined && maskContext !== context) {
     const proofs = new Map((maskContext.nativeTargets ?? maskContext.tools).map(target => [canonical([target.actionId, target.entityId]), target.sourceRevision]));
     if ((context.nativeTargets ?? context.tools).some(target => proofs.get(canonical([target.actionId, target.entityId])) !== target.sourceRevision)) {
@@ -70,7 +104,8 @@ function nativeContext(actor: AccountProfileActor, context: PreparationContext, 
     return [{...tool, parameters: {...tool.parameters, properties: {...properties,
       [tool.targetSelector]: {...selector, enum: values}}}}];
   });
-  return {...context, tools, nativeTargets};
+  return {...context, tools, nativeTargets,
+    ...(context.modelContext === undefined ? {} : {modelContext: selectedNativeModelReference(context, tools, nativeTargets)!})};
 }
 export class AssistantPreparationService {
   private readonly cancellations = new Map<string, AbortController>();

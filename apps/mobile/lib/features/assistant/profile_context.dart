@@ -28,7 +28,7 @@ class AssistantProfileNamePrefill {
 /// Canonical revisions only. No private Profile fields are copied into chat.
 class AssistantCanonicalNativeSelection {
   factory AssistantCanonicalNativeSelection({required String fingerprint, required Map<AssistantContextKey, String> proofs}) {
-    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(fingerprint) || proofs.length > 15000) throw const AssistantModelFailure('context_unavailable');
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(fingerprint) || proofs.length > assistantNativeTargetLimit) throw const AssistantModelFailure('context_unavailable');
     final entries = proofs.entries.toList()..sort((a, b) {
       final action = a.key.$1.compareTo(b.key.$1);
       if (action != 0 || a.key.$2 == b.key.$2) return action;
@@ -65,7 +65,7 @@ class _NativeAnchor {
 
 /// Binds original local snapshots BEFORE inference. A later fresh native token
 /// can never be substituted to make an older server preparation look current.
-class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, MoolAssistantRecoveredReviewGuard, MoolAssistantNativeSelectionGuard, MoolAssistantCompactNativeSelectionGuard {
+class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, MoolAssistantRecoveredReviewGuard, MoolAssistantNativeSelectionGuard, MoolAssistantCompactNativeSelectionGuard, MoolAssistantOriginalRequestSelectionGuard {
   AssistantProfileContextGuard({required this.readCanonical,
     required this.readContext, required this.ownerChanges,
     required Iterable<MoolAssistantNativeAdapter> nativeAdapters,
@@ -90,6 +90,7 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
   late final List<MoolAssistantNativeAdapter> _original;
   late final List<MoolAssistantNativeAdapter> adapters;
   Map<AssistantContextKey, _NativeAnchor> _anchors = const {};
+  List<bool Function()> _originalRequestChecks = const [];
   AssistantCanonicalContextSnapshot? _canonical;
   int _generation = 0;
   late Object _observedBinding;
@@ -98,6 +99,10 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
   @override List<AssistantNativeTargetHint>? get nativeTargets => current
     ? assistantNativeTargetSelection([for (final key in _anchors.keys.where((key) => _canonicalActions.contains(key.$1) && _canonical?.nativeSelection?.proofs.containsKey(key) != true))
         (actionId: key.$1, entityId: key.$2)]) : null;
+  @override List<AssistantNativeOriginalCapture>? get nativeOriginalCaptures => !current ? null :
+    assistantNativeOriginalCaptureSelection([for(final entry in _anchors.entries)
+      if(const {'AI-ACT-225','AI-ACT-374'}.contains(entry.key.$1)&&entry.key.$2==null&&entry.value.native.originalRequestCapture!=null)
+        (actionId:entry.key.$1,digest:entry.value.native.originalRequestCapture!)]);
   @override Set<String> get nativeMaskedActionIds => !current ? const <String>{} : Set.unmodifiable([
     for (final key in _canonical?.nativeSelection?.keys ?? const <AssistantContextKey>[])
       if (_canonicalActions.contains(key.$1) && _anchors[key]?.canonical == _canonical!.nativeSelection!.proofs[key]) key.$1,
@@ -115,18 +120,20 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
   void _ownerChanged() {
     final binding = readContext().binding;
     if (binding != _observedBinding) { _observedBinding = binding; retire(); }
+    else if(_canonical!=null&&!_originalRequestsCurrent()) {retire();}
   }
+  bool _originalRequestsCurrent(){try{return _originalRequestChecks.every((check)=>check());}on Object{return false;}}
   void dispose() {
     if (_disposed) return;
     _disposed = true; ownerChanges.removeListener(_ownerChanged); retire();
   }
 
   @override bool get current => switch (_canonical) {
-    final value? when !_disposed && value.binding == readContext().binding && value.validUntil.isAfter(_clock()) => true,
+    final value? when !_disposed && value.binding == readContext().binding && value.validUntil.isAfter(_clock()) && _originalRequestsCurrent() => true,
     _ => false,
   };
   @override void retire() {
-    _generation++; _anchors = const {}; _canonical = null;
+    _generation++; _anchors = const {}; _canonical = null; _originalRequestChecks=const [];
   }
   @override Future<void> captureRecoveredReview(MoolAssistantContext context,
       MoolAssistantProposal proposal, bool Function() valid) async {
@@ -143,6 +150,8 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
     await capture(context,valid);
     if(!valid() || _canonical?.revisions[(proposal.actionId,proposal.entityId)]!=proposal.sourceRevision ||
        !_anchors.containsKey((proposal.actionId,proposal.entityId))) throw const AssistantModelFailure('stale_preparation');
+    final retainedCapture=_anchors[(proposal.actionId,proposal.entityId)]?.native.originalRequestCapture;
+    if(retainedCapture!=null&&proposal.fields['originalCapture']!=retainedCapture)throw const AssistantModelFailure('stale_preparation');
   }
   @override Future<void> capture(MoolAssistantContext context, bool Function() valid) async {
     retire(); final generation = _generation;
@@ -152,7 +161,7 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
     if (!alive() || source.binding != context.binding || !source.validUntil.isAfter(_clock()) || source.nativeSelection != null && !context.inWorkspace) {
       throw const AssistantModelFailure('stale_preparation');
     }
-    final anchors = <AssistantContextKey, _NativeAnchor>{};
+    final anchors = <AssistantContextKey, _NativeAnchor>{}, originalChecks=<bool Function()>[];
     final batches = <MoolAssistantNativeBatchSnapshot>[], batchRevisions = <Object, String>{};
     for (final adapter in _original) {
       final entries = source.revisions.entries.where((entry) => entry.key.$1 == adapter.actionId).toList(growable: false);
@@ -173,6 +182,11 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
         if (batch != null && native != null && (native.binding != context.binding || native.entityId != entry.key.$2)) throw const AssistantModelFailure('context_unavailable');
         if (native == null || !native.permitted || native.binding != context.binding ||
             native.entityId != entry.key.$2 || native.sourceRevision.isEmpty) continue;
+        if(native.originalRequestCapture!=null) {
+          if(batch==null||!const {'AI-ACT-225','AI-ACT-374'}.contains(entry.key.$1)||entry.key.$2!=null||
+              !RegExp(r'^[a-f0-9]{64}$').hasMatch(native.originalRequestCapture!))throw const AssistantModelFailure('context_unavailable');
+          originalChecks.add(batch.current);
+        }
         anchors[entry.key] = _NativeAnchor(entry.value, native);
       }
     }
@@ -190,6 +204,7 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
       nativeSelection: fresh.nativeSelection,
       validUntil: source.validUntil.isBefore(fresh.validUntil) ? source.validUntil : fresh.validUntil);
     _anchors = Map.unmodifiable(anchors);
+    _originalRequestChecks=List.unmodifiable(originalChecks);
   }
 
   Future<_NativeAnchor?> _verify(MoolAssistantNativeAdapter adapter,
@@ -205,7 +220,8 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
     final native = await adapter.snapshot(context, entity);
     if (!alive() || native == null) return null;
     if (!native.permitted || native.entityId != entity ||
-        native.binding != anchor.native.binding || native.sourceRevision != anchor.native.sourceRevision) {onStale?.call(); return null;}
+        native.binding != anchor.native.binding || native.sourceRevision != anchor.native.sourceRevision ||
+        native.originalRequestCapture != anchor.native.originalRequestCapture) {onStale?.call(); return null;}
     return anchor;
   }
 }
@@ -224,7 +240,7 @@ class _CanonicalNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
     if (anchor == null) return stale ? MoolAssistantNativeSnapshot(binding: context.binding,
       sourceRevision: 'retired-profile-context', permitted: false, entityId: entityId) : null;
     return MoolAssistantNativeSnapshot(binding: context.binding,
-      sourceRevision: anchor.canonical, permitted: true, entityId: entityId);
+      sourceRevision: anchor.canonical, permitted: true, entityId: entityId, originalRequestCapture:anchor.native.originalRequestCapture);
   }
   @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,
       bool Function() isCurrent) => openOwnedReview(proposal,
@@ -237,9 +253,14 @@ class _CanonicalNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
     final anchor = await guard._verify(original, guard.readContext(), proposal.entityId);
     if (!isCurrent() || anchor == null || anchor.canonical != proposal.sourceRevision ||
         anchor.native.binding != proposal.binding) return MoolAssistantReviewResult.stale;
+    if(anchor.native.originalRequestCapture!=null&&proposal.fields['originalCapture']!=anchor.native.originalRequestCapture) {
+      return MoolAssistantReviewResult.stale;
+    }
     bool current() => isCurrent() && guard.current;
     var fields = proposal.fields;
-    if (original case final MoolAssistantCanonicalProductIdentityAdapter identity) {
+    final nativeProductRoot=original is MoolAssistantNativeProductRootReviewAdapter&&proposal.entityId==null;
+    if(nativeProductRoot&&proposal.fields.isNotEmpty)return MoolAssistantReviewResult.unavailable;
+    if (original case final MoolAssistantCanonicalProductIdentityAdapter identity when !nativeProductRoot) {
       if (fields['sourceCanonicalId'] is! String) return MoolAssistantReviewResult.unavailable;
       String? nativeId;
       try {nativeId = await identity.nativeProductIdentity(proposal, current);}

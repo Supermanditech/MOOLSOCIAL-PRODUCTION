@@ -1,16 +1,19 @@
 import {decodePlansScope, type PlansScope} from "../account/plans_service.js";
 import type {AccountProfileActor} from "../account/profile_service.js";
-import {catalogueListingSelection, digest, fail, id, object, text, nativeTargetMaskSelection, type PreparationContext, type PreparationRequest, type PreparationNativeTarget} from "./model_contract.js";
+import {catalogueListingSelection, digest, fail, id, object, text, nativeTargetMaskSelection, preparationNativeTargetLimit, type PreparationContext, type PreparationRequest, type PreparationNativeTarget} from "./model_contract.js";
 
 // Register a domain only after its original reader and native fields have been
 // qualified. Neither a client's action list nor model text registers a tool.
-export const catalogueProductActions = new Set(["AI-ACT-006", "AI-ACT-007", "AI-ACT-009", "AI-ACT-336", "AI-ACT-337", "AI-ACT-338", "AI-ACT-339"]);
+export const catalogueProductActions = new Set(["AI-ACT-006", "AI-ACT-007", "AI-ACT-009", "AI-ACT-014", "AI-ACT-017", "AI-ACT-018", "AI-ACT-019", "AI-ACT-336", "AI-ACT-337", "AI-ACT-338", "AI-ACT-339"]);
 export const nativePreferenceActions = new Set(["AI-ACT-010", "AI-ACT-011", "AI-ACT-012", "AI-ACT-013"]);
-export const storeProductActions = new Set(["AI-ACT-214", "AI-ACT-221", "AI-ACT-370", "AI-ACT-220"]);
+export const personalDeliveryAddressActions = new Set(['AI-ACT-024', 'AI-ACT-027']);
+export const storeProductActions = new Set(["AI-ACT-214", "AI-ACT-221", "AI-ACT-370", "AI-ACT-220", "AI-ACT-230", "AI-ACT-222", "AI-ACT-223", "AI-ACT-226", "AI-ACT-227", "AI-ACT-371"]);
 export const storeProductDefaultActions = new Set(["AI-ACT-218", "AI-ACT-219"]);
-export const storeProductOwnerReadActions = new Set(["AI-ACT-372"]);
+export const storeProductOwnerReadActions = new Set(["AI-ACT-213", "AI-ACT-215", "AI-ACT-224", "AI-ACT-372", "AI-ACT-225", "AI-ACT-374"]);
 export const storeProductOwnerActions = new Set([...storeProductDefaultActions, ...storeProductOwnerReadActions]);
-export const storeNativeMaskActions = new Set([...storeProductActions, ...storeProductOwnerActions]);
+export const storeStockOwnerActions=new Set(['AI-ACT-231','AI-ACT-232','AI-ACT-233','AI-ACT-407','AI-ACT-408']);
+export const storeRestockOwnerActions=new Set(['AI-ACT-234']);
+export const storeNativeMaskActions = new Set([...storeProductActions, ...storeProductOwnerActions,...storeStockOwnerActions,...storeRestockOwnerActions]);
 export const catalogueSearchActions = new Set(["AI-ACT-001", "AI-ACT-002", "AI-ACT-003", "AI-ACT-004", "AI-ACT-005", ...catalogueProductActions]);
 export function canonicalContextRequest(value: unknown): {scope: PlansScope; catalogueListingIds?: readonly string[]; nativeSelectionVersion?: 1} {
   const request = object(value, ["operation", "payload"]);
@@ -52,7 +55,7 @@ function checkedTargets(context: PreparationContext, limit: number): Preparation
 /** Stable ASCII action/entity ordering; null sorts before a non-null entity. */
 export function storeNativeSelection(actor: AccountProfileActor, scope: PlansScope, context: PreparationContext) {
   if (scope.audience !== "workspace") return fail("invalid_request", 400);
-  const targets = checkedTargets(context, 15000).filter(target => storeNativeMaskActions.has(target.actionId));
+  const targets = checkedTargets(context, preparationNativeTargetLimit).filter(target => storeNativeMaskActions.has(target.actionId));
   targets.sort((a, b) => a.actionId < b.actionId ? -1 : a.actionId > b.actionId ? 1 :
     a.entityId === b.entityId ? 0 : a.entityId === null ? -1 : b.entityId === null ? 1 : a.entityId < b.entityId ? -1 : 1);
   return {targets, fingerprint: digest([canonicalContextOwner(actor, scope), scope, targets])};
@@ -69,7 +72,7 @@ export function maskedNativeHints(actor: AccountProfileActor, context: Preparati
 }
 export function canonicalContextProjection(actor: AccountProfileActor, scope: PlansScope,
   context: PreparationContext, nativeSelectionVersion?: 1) {
-  const revisions = checkedTargets(context, nativeSelectionVersion === 1 ? 15000 : 5000);
+  const revisions = checkedTargets(context, nativeSelectionVersion === 1 ? preparationNativeTargetLimit : 5000);
   if (nativeSelectionVersion === 1) {
     const selection = storeNativeSelection(actor, scope, context), groups = new Map<string,
       {entityId: string | null; sourceRevision: string; actionIds: string[]}>();

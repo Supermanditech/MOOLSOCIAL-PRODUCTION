@@ -1684,6 +1684,12 @@ class WorkSession extends ChangeNotifier {
   }
   String? get workspaceCatalogueListingPendingSkuId => _catalogueListingController?.pending?.skuId;
   String? get workspaceCatalogueListingPendingRequestId => _catalogueListingController?.pending?.idempotencyKey;
+  /// Immutable original for native read-only recovery capture; never replay it
+  /// or adopt a result merely to prepare an assistant proposal.
+  WorkspaceCatalogueBindingIntent? get workspaceCatalogueListingPendingOriginal {
+    final controller = _catalogueListingController;
+    return controller?.ready == true ? controller!.pending : null;
+  }
   bool get workspaceCatalogueListingPendingIsPriceConfirmation => _catalogueListingController?.pending?.isPriceConfirmation ?? false;
   bool get workspaceCatalogueListingPending => _catalogueListingController?.pending != null;
   bool get workspaceCatalogueListingConnectionConfigured => _catalogueListingController != null;

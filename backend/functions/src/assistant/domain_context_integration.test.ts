@@ -105,6 +105,48 @@ class HostRequests implements PreparationRequestStore {
     if (row.result.state !== "ready") row.result = {state: "cancelled"}; return row.result;
   }
 }
+
+for (const actionId of ['AI-ACT-024', 'AI-ACT-027']) test(`Domain original Profile address ${actionId} prepares only an owned choice and recovers without a write`, async () => {
+  const f = fixture(); let writes = 0, revision = 3, changes = false;
+  const profile = new AccountProfileService({async readAccount() {if (changes) revision++;
+    return {uid: actor.uid, status: 'ACTIVE', profile: {ownerUid: actor.uid, revision, updatedAt: '2026-10-27T00:00:00.000Z',
+      displayName: 'HOST owner', selectedAddressId: 'address-one', invoiceProfiles: [], addresses: [
+        {id: 'address-one', label: 'Home', kind: 'home', recipient: 'Private recipient', phone: '9999999999',
+          line: 'Private street', area: 'Jodhpur', pinCode: '342001', landmark: ''},
+        {id: 'address-two', label: 'Office', kind: 'work', recipient: 'Private other', phone: '9999999999',
+          line: 'Private other street', area: 'Jaipur', pinCode: '302001', landmark: ''}]}};
+  }, async readReceipt() {return undefined;}, async commit() {writes++; throw Error('No preparation writes');}}, actor.projectId, () => at);
+  const original = new ProfileWorkspacePreparationContext({profile, plans: f.plans, workspaces: async () => [], now: () => at});
+  const source = new CompositePreparationContext({original, nativeBuyerFormsEnabled: true});
+  const input = {scope: {audience: 'personal' as const, storeId: null}, requestId: `HOST-address-${actionId}`, requestRevision: 1,
+    message: 'Use my Home address', language: 'English', history: [], expectedEntitlementRevision: 'personal:null:1:1', actionId, entityId: null};
+  const context = await source.read(actor, input), tool = context.tools[0]!;
+  assert.equal(context.tools.length, 1); assert.equal(tool.targetSelector, 'addressId');
+  assert.deepEqual(tool.resolveTarget!({addressId: 'address-one'}), {entityId: 'address-one', sourceRevision: 'profile:3', fields: {},
+    title: actionId === 'AI-ACT-024' ? 'Review delivery address' : 'Review address removal', summary: 'Home · Jodhpur'});
+  for (const args of [{addressId: 'foreign'}, {addressId: 'address-one', phone: 'invented'}, {addressId: 'address-one', approved: true}]) assert.throws(() => tool.resolveTarget!(args));
+  for (const privateText of ['Private street', 'Private recipient', '9999999999', '342001']) assert.ok(!JSON.stringify(context.modelContext).includes(privateText));
+  const requests = new HostRequests(); let models = 0;
+  const service = () => new AssistantPreparationService({projectId: actor.projectId, plans: f.plans, context: source, requests, now: () => at,
+    usage: {async reserve() {return {id: 'HOST-address-permit', validUntil: '2026-10-28T08:01:00.000Z'};}, async settle() {}},
+    model: {async prepare(_input, tools) {models++; return {kind: 'tool', name: tools[0]!.name, arguments: {addressId: 'address-one'}};}}});
+  const payload = {...input, nativeTargets: [{actionId, entityId: 'address-one'}]};
+  const prepared = await service().handle(actor, {operation: 'prepare', payload});
+  assert.equal(prepared.state, 'ready');
+  if (prepared.state === 'ready' && prepared.reply.outcome.kind === 'proposal') {
+    assert.equal(prepared.reply.outcome.entityId, 'address-one'); assert.deepEqual(prepared.reply.outcome.fields, {});
+  } else assert.fail('Expected exact saved address proposal');
+  assert.deepEqual(await service().handle(actor, {operation: 'prepare', payload}), prepared);
+  assert.deepEqual(await service().handle(actor, {operation: 'status', payload: {scope: input.scope, requestId: input.requestId}}), prepared);
+  assert.equal(models, 1); assert.equal(writes, 0);
+  await assert.rejects(source.read(actor, {...input, entityId: 'foreign'}));
+  await assert.rejects(source.read({...actor, uid: 'foreign-user'}, input));
+  await assert.rejects(source.read(actor, {...input, scope: {audience: 'workspace', storeId: 'foreign'}}));
+  revision++;
+  await assert.rejects(service().handle(actor, {operation: 'status', payload: {scope: input.scope, requestId: input.requestId}}));
+  changes = true; await assert.rejects(source.read(actor, input), /stale_preparation/u); changes = false;
+  f.deny(); await assert.rejects(source.read(actor, input), /ai_access_required/u); assert.equal(writes, 0);
+});
 test("Domain original preparation service accepts only the source-bound native search and reconciles duplicate request", async () => {
   const f = fixture(); let models = 0; const settled: string[] = [];
   const service = new AssistantPreparationService({projectId: actor.projectId, plans: f.plans,

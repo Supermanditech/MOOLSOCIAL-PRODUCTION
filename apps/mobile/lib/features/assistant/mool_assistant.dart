@@ -1965,11 +1965,13 @@ class MoolAssistantNativeSnapshot {
     required this.sourceRevision,
     required this.permitted,
     this.entityId,
+    this.originalRequestCapture,
   });
   final Object binding;
   final String sourceRevision;
   final bool permitted;
   final String? entityId;
+  final String? originalRequestCapture;
 }
 
 /// These are presentation outcomes, not order/payment/publication outcomes.
@@ -2005,6 +2007,10 @@ abstract interface class MoolAssistantCanonicalProductIdentityAdapter implements
   Future<String?> nativeProductIdentity(MoolAssistantProposal canonicalProposal,
     bool Function() current);
 }
+/// A registered product adapter may also accept an owner-authorised empty root
+/// review. The actual product and strict references are selected natively;
+/// this does not acknowledge or relabel a canonical product identity.
+abstract interface class MoolAssistantNativeProductRootReviewAdapter implements MoolAssistantNativeAdapter {}
 /// One consistent read of existing native state; grants no source permission.
 /// Single-target snapshots still revalidate the original Review boundary.
 abstract interface class MoolAssistantBatchNativeAdapter implements MoolAssistantNativeAdapter {
@@ -2042,6 +2048,9 @@ abstract interface class MoolAssistantNativeSelectionGuard {
 abstract interface class MoolAssistantCompactNativeSelectionGuard {
   AssistantNativeTargetMask? get nativeTargetMask;
   Set<String> get nativeMaskedActionIds;
+}
+abstract interface class MoolAssistantOriginalRequestSelectionGuard {
+  List<AssistantNativeOriginalCapture>? get nativeOriginalCaptures;
 }
 
 /// Additive FE-HANDOFF01 signal. Notification rechecks authority; it grants none.
@@ -2240,7 +2249,10 @@ class MoolAssistantController extends ChangeNotifier {
               !targets.any((target) => target.actionId == input.actionId) && !maskedActions.contains(input.actionId))) {
             unsent(); return false;
           }
-          input = input.withCatalogueListingIds(selection.catalogueListingIds).withNativeTargets(targets).withNativeTargetMask(compact?.nativeTargetMask);
+          final originals=guard is MoolAssistantOriginalRequestSelectionGuard
+            ? (guard as MoolAssistantOriginalRequestSelectionGuard).nativeOriginalCaptures:null;
+          input = input.withCatalogueListingIds(selection.catalogueListingIds).withNativeTargets(targets).withNativeTargetMask(compact?.nativeTargetMask)
+            .withNativeOriginalCaptures(originals==null||originals.isEmpty?null:originals);
           _modelInput = input;
         }
       }

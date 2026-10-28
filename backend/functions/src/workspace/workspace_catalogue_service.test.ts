@@ -35,11 +35,12 @@ import {createCatalogueAggregate, type CatalogueAggregate} from "../commerce/cat
 import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
   type SupplyParticipantWorkspace} from "../commerce/supply_participant_contract.js";
 import {AccountPlansService} from "../account/plans_service.js";
-import {OriginalCataloguePreparationContext, OriginalStoreProductPreparationContext, CompositePreparationContext, storeProductNativeTextFields, storeWarrantyNativeLabels} from "../assistant/domain_context.js";
+import {OriginalCataloguePreparationContext, OriginalStoreProductPreparationContext, CompositePreparationContext, storeProductNativeTextFields, storeWarrantyNativeLabels, storeVariantNativeKinds} from "../assistant/domain_context.js";
 import {ProfileWorkspacePreparationContext} from "../assistant/profile_context.js";
 import {AccountProfileService} from "../account/profile_service.js";
 import {assertStrictSchema, type PreparationRequest} from "../assistant/model_contract.js";
 import {AssistantPreparationService, type PreparationRequestStore, type PreparationState} from "../assistant/model_service.js";
+import {ResponsesPreparationModel} from "../assistant/responses_transport.js";
 import {storeNativeSelection} from "../assistant/domain_context_contract.js";
 import {handleAssistantCanonicalContextRequest} from "../assistant/domain_context_http.js";
 import {handleAssistantModelRequest} from "../assistant/model_http.js";
@@ -3892,6 +3893,52 @@ for (const channel of ['retail', 'wholesale', 'bulk'] as const) {
     assert.deepEqual(preparedProduct.supplierTax, originalTerms.supplierTax);
     assert.equal((preparedProduct.supplier as {id: string; name: string}).id, 'store-one');
     assert.equal((preparedProduct.supplier as {id: string; name: string}).name, profile.name);
+    for (const actionId of ['AI-ACT-014', 'AI-ACT-017', 'AI-ACT-018']) {
+      const base = {scope, requestId: `HOST-cart-${actionId}`, requestRevision: 1,
+        expectedEntitlementRevision: 'personal:null:1:1', message: 'Prepare three whole packs', language: 'English', history: [], actionId};
+      const dynamic = await context.read(actor, {...base, entityId: null, catalogueListingIds: [listing.listingId]});
+      const tool = dynamic.tools[0]!; assert.equal(dynamic.tools.length, 1); assertStrictSchema(tool.parameters);
+      const selected = tool.resolveTarget!({listingId: listing.listingId, quantity: 3});
+      assert.equal(selected.entityId, listing.listingId); assert.deepEqual(selected.fields, {quantity: 3});
+      if (actionId === 'AI-ACT-018') assert.throws(() => tool.resolveTarget!({listingId: listing.listingId, quantity: null}));
+      else assert.deepEqual(tool.resolveTarget!({listingId: listing.listingId, quantity: null}).fields, {});
+      for (const quantity of [0, -1, 1.5, '3', Number.MAX_SAFE_INTEGER + 1]) {
+        assert.throws(() => tool.resolveTarget!({listingId: listing.listingId, quantity}));
+      }
+      assert.throws(() => tool.resolveTarget!({listingId: listing.listingId, quantity: 3, price: 1}));
+      assert.throws(() => tool.resolveTarget!({listingId: value.skuId, quantity: 3}));
+      const fixed = await context.read(actor, {...base, entityId: listing.listingId});
+      assert.equal(fixed.tools[0]!.entityId, listing.listingId);
+      assert.deepEqual(fixed.tools[0]!.decodeFields!({quantity: 3}), {quantity: 3});
+      assert.equal(fixed.tools[0]!.sourceRevision, selected.sourceRevision);
+      assert.ok(dynamic.nativeTargets!.some(target => target.actionId === actionId && target.entityId === listing.listingId));
+      const rows = new Map<string, {fingerprint: string; state: PreparationState}>(); let models = 0;
+      const requests: PreparationRequestStore = {
+        async claim(key, fingerprint) {const old = rows.get(key); if (old) return old.fingerprint === fingerprint ? old.state : {state: 'conflict'};
+          rows.set(key, {fingerprint, state: {state: 'pending'}}); return {state: 'claimed', lease: key};},
+        async read(key) {return rows.get(key)?.state;}, async finish(key, _lease, state) {rows.get(key)!.state = state; return state;},
+        async cancel() {return undefined;}};
+      const service = () => new AssistantPreparationService({projectId: actor.projectId, plans, context, requests, now: () => new Date(at),
+        usage: {async reserve() {return {id: 'HOST-cart-permit', validUntil: '2026-10-16T12:01:00.000Z'};}, async settle() {}},
+        model: {async prepare(_input, tools) {models++; assert.equal(tools.length, 1);
+          return {kind: 'tool', name: tools[0]!.name, arguments: {quantity: 3}};}}});
+      const payload = {...base, entityId: listing.listingId, nativeTargets: [{actionId, entityId: listing.listingId}]};
+      const prepared = await service().handle(actor, {operation: 'prepare', payload});
+      assert.equal(prepared.state, 'ready');
+      if (prepared.state === 'ready' && prepared.reply.outcome.kind === 'proposal') {
+        assert.equal(prepared.reply.outcome.entityId, listing.listingId);
+        assert.deepEqual(prepared.reply.outcome.fields, {quantity: 3});
+      } else assert.fail('Expected only a typed original-product proposal');
+      assert.deepEqual(await service().handle(actor, {operation: 'prepare', payload}), prepared);
+      assert.deepEqual(await service().handle(actor, {operation: 'status', payload: {scope, requestId: base.requestId}}), prepared);
+      assert.equal(models, 1);
+    }
+    const removal = await context.read(actor, {scope, requestId: 'HOST-cart-removal', requestRevision: 1,
+      expectedEntitlementRevision: 'personal:null:1:1', message: 'Remove this exact product from Cart', language: 'English', history: [],
+      actionId: 'AI-ACT-019', entityId: null, catalogueListingIds: [listing.listingId]});
+    assert.deepEqual(removal.tools[0]!.resolveTarget!({listingId: listing.listingId}).fields, {});
+    assert.throws(() => removal.tools[0]!.resolveTarget!({listingId: value.skuId}));
+    assert.throws(() => removal.tools[0]!.resolveTarget!({listingId: listing.listingId, quantity: 0}));
     assert.equal(before, cataloguePayloadHash({records: [...repository.records], catalogue: repository.aggregate, price: repository.price ?? null}));
   });
 }
@@ -3945,6 +3992,71 @@ async function assistantOwnedOriginalFixture(count = 1, channel: 'retail' | 'who
     onRead: (hook: () => void) => {onRead = hook;}, revokeMember: () => {member = false;}, revokePaid: () => {paid = false;}};
 }
 
+for (const channel of ['wholesale', 'bulk'] as const) {
+  test(`AI-DOMAIN owned Store Restock ${channel} search uses the original public source without selecting inventory`, async () => {
+    const f = await assistantOwnedOriginalFixture(0), repository = new AssistantOriginalProviderMemory();
+    const value = input(); value.channels[0]!.kind = 'wholesale';
+    let aggregate: CatalogueAggregate | undefined;
+    for (const original of productionCommands(value)) {
+      const command = original.type === 'create_offer' ? {...original, buyingContext: 'wholesale'} : original;
+      const authority = producerAuthority(['propose_product', 'propose_pack', 'create_offer'].includes(String(command.type)));
+      aggregate = planCatalogueProduction({operatorUserId: authority.userId, identity: catalogueIdentity,
+        input: command, observedAt: at}, authority, aggregate, producerParticipant(), profile).aggregate;
+    }
+    repository.aggregate = aggregate!;
+    const provider = subject(repository); await provider.saveSku('owner-one', save(value));
+    const before = cataloguePayloadHash({records: [...repository.records], catalogue: repository.aggregate});
+    let reads = 0; const originalRead = provider.publicDiscovery.bind(provider);
+    provider.publicDiscovery = async (body, procurement) => {reads++; return originalRead(body, procurement);};
+    const context = new OriginalCataloguePreparationContext({projectId: f.actor.projectId, plans: f.plans,
+      catalogue: provider, workspaceAuthority: f.authority, now: () => new Date(at)});
+    const request = {...f.request, actionId: 'AI-ACT-234', entityId: null};
+    const captured = await context.read(f.actor, request), tool = captured.tools[0]!;
+    assertStrictSchema(tool.parameters); assert.equal(tool.actionId, 'AI-ACT-234'); assert.equal(tool.entityId, null);
+    assert.match(tool.sourceRevision, /^store-restock-source:[a-f0-9]{64}$/u);
+    const fields = {channel, query: 'તેલ 1 L'};
+    assert.deepEqual(tool.resolveTarget!(fields).fields, fields);
+    assert.deepEqual(tool.resolveTarget!({channel, query: null}).fields, {channel});
+    for (const invalid of [{channel: 'retail', query: null}, {channel, query: '\ud800'},
+      {channel, query: 'x'.repeat(81)}, {channel, query: 'x\n'}, {channel},
+      {...fields, skuId: 'invented'}, {...fields, quantity: '1'}, {...fields, price: '10'}]) {
+      assert.throws(() => tool.resolveTarget!(invalid));
+    }
+    assert.equal(captured.modelContext!.sourceKind, 'original-store-restock-search-v1');
+    assert.equal(Object.hasOwn(captured.modelContext!, 'products'), false); assert.ok(reads > 0);
+    await assert.rejects(context.read(f.actor, {...request, entityId: 'sku-one'}));
+    await assert.rejects(context.read(f.actor, {...request, catalogueListingIds: ['invented']}));
+    const rows = new Map<string, {fingerprint: string; state: PreparationState}>();
+    const requests: PreparationRequestStore = {
+      async claim(key, fingerprint) {const row = rows.get(key);
+        if (row) return row.fingerprint === fingerprint ? row.state : {state: 'conflict'};
+        rows.set(key, {fingerprint, state: {state: 'pending'}}); return {state: 'claimed', lease: key};},
+      async read(key) {return rows.get(key)?.state;},
+      async finish(key, _lease, state) {rows.get(key)!.state = state; return state;}, async cancel() {return undefined;}};
+    let models = 0, reserves = 0;
+    const make = () => new AssistantPreparationService({projectId: f.actor.projectId, plans: f.plans,
+      context: new CompositePreparationContext({original: f.authority, catalogue: context}), requests, now: () => new Date(at),
+      usage: {async reserve() {reserves++; return {id: 'HOST-restock-permit', validUntil: '2026-10-16T12:01:00.000Z'};}, async settle() {}},
+      model: {async prepare(_input, tools) {models++; assert.equal(tools.length, 1);
+        return {kind: 'tool', name: tools[0]!.name, arguments: fields};}}});
+    const payload = {...request, requestId: `HOST-restock-${channel}`, nativeTargets: [{actionId: 'AI-ACT-234', entityId: null}]};
+    const prepared = await make().handle(f.actor, {operation: 'prepare', payload});
+    assert.equal(prepared.state, 'ready');
+    if (prepared.state === 'ready') {
+      assert.equal(prepared.reply.outcome.kind, 'proposal');
+      if (prepared.reply.outcome.kind === 'proposal') assert.deepEqual(prepared.reply.outcome.fields, fields);
+    }
+    assert.deepEqual(await make().handle(f.actor, {operation: 'prepare', payload}), prepared);
+    assert.deepEqual(await make().handle(f.actor, {operation: 'status', payload: {scope: request.scope, requestId: payload.requestId}}), prepared);
+    assert.equal(models, 1); assert.equal(reserves, 1);
+    const priorReads = reads; f.revokeMember();
+    await assert.rejects(context.read(f.actor, request)); assert.equal(reads, priorReads);
+    await assert.rejects(make().handle(f.actor, {operation: 'status', payload: {scope: request.scope, requestId: payload.requestId}}));
+    assert.equal(before, cataloguePayloadHash({records: [...repository.records], catalogue: repository.aggregate}));
+    assert.equal(f.repository.records.size, 0);
+  });
+}
+
 test('AI-DOMAIN owned Store product edits use original references, partial native text and no writes', async () => {
   const f = await assistantOwnedOriginalFixture(), before = cataloguePayloadHash([...f.repository.records]);
   const context = await f.context.read(f.actor, f.request), tool = context.tools[0]!;
@@ -3976,6 +4088,60 @@ for (const channel of ['retail', 'wholesale', 'bulk'] as const) {
   });
 }
 
+for (const channel of ['retail', 'wholesale', 'bulk'] as const) {
+  test(`AI-DOMAIN owned Store ${channel} public review prepares only original SKU/channel and never claims publication`, async () => {
+    const f = await assistantOwnedOriginalFixture(2, channel), before = cataloguePayloadHash([...f.repository.records]);
+    const request = {...f.request, actionId: 'AI-ACT-230'};
+    const context = await f.context.read(f.actor, request), tool = context.tools[0]!;
+    assert.equal(context.tools.length, 1); assert.equal(tool.actionId, 'AI-ACT-230');
+    assertStrictSchema(tool.parameters);
+    const result = tool.resolveTarget!({channel});
+    assert.equal(result.entityId, request.entityId); assert.equal(result.fields.channel, channel);
+    assert.equal(result.fields.sourceCanonicalId, 'canonical-one'); assert.equal(result.fields.sourcePack, '1 L');
+    assert.equal(tool.validate(result.fields), true);
+    assert.equal(Object.hasOwn(result.fields, 'published'), false);
+    assert.equal(tool.validate({...result.fields, published: true}), false);
+    assert.equal(tool.validate({...result.fields, sourceCanonicalId: 'foreign'}), false);
+    assert.throws(() => tool.resolveTarget!({channel: channel === 'retail' ? 'bulk' : 'retail'}));
+    assert.throws(() => tool.resolveTarget!({channel, url: 'https://invented.invalid'}));
+    assert.throws(() => tool.resolveTarget!({}));
+    const selection = await f.context.read(f.actor, {...request, entityId: null});
+    const selected = selection.tools[0]!.resolveTarget!({skuId: 'owned-sku-0002', channel});
+    assert.equal(selected.entityId, 'owned-sku-0002'); assert.equal(selected.fields.sourceSku, 'OWNED-2');
+    assert.throws(() => selection.tools[0]!.resolveTarget!({skuId: 'foreign', channel}));
+    assert.equal(before, cataloguePayloadHash([...f.repository.records]));
+    f.revokePaid(); await assert.rejects(f.context.read(f.actor, request));
+  });
+}
+
+for (const action of ['AI-ACT-222', 'AI-ACT-223', 'AI-ACT-226', 'AI-ACT-227', 'AI-ACT-371']) {
+  test(`AI-DOMAIN owned Store ${action} original control preparation has explicit inputs and no effect claim`, async () => {
+    const f = await assistantOwnedOriginalFixture(2), before = cataloguePayloadHash([...f.repository.records]);
+    const visibility = action === 'AI-ACT-222' || action === 'AI-ACT-371';
+    const context = await f.context.read(f.actor, {...f.request, actionId: action}), tool = context.tools[0]!;
+    assert.equal(context.tools.length, 1); assertStrictSchema(tool.parameters);
+    for (const visible of visibility ? [false, true] : [null]) {
+      const result = tool.resolveTarget!(visibility ? {visible} : {});
+      assert.equal(result.entityId, f.request.entityId); assert.equal(tool.validate(result.fields), true);
+      assert.equal(Object.keys(result.fields).length, visibility ? 6 : 5);
+      if (visibility) assert.equal(result.fields.visible, visible);
+      else assert.match(result.title!, action === 'AI-ACT-223' ? /submission/u : /Counter/u);
+      assert.equal(tool.validate({...result.fields, sourceCanonicalId: 'foreign'}), false);
+      assert.equal(tool.validate({...result.fields, published: true}), false);
+    }
+    assert.throws(() => tool.resolveTarget!(visibility ? {} : {visible: false}));
+    if (visibility) for (const invalid of [null, 'false', 0]) assert.throws(() => tool.resolveTarget!({visible: invalid}));
+    assert.throws(() => tool.resolveTarget!({...(visibility ? {visible: true} : {}), deleteProduct: true}));
+    const selection = await f.context.read(f.actor, {...f.request, actionId: action, entityId: null});
+    const selected = selection.tools[0]!.resolveTarget!(action==='AI-ACT-223'?{}:{skuId: 'owned-sku-0002', ...(visibility ? {visible: false} : {})});
+    if(action==='AI-ACT-223'){assert.equal(selected.entityId,null);assert.deepEqual(selected.fields,{});}
+    else assert.equal(selected.fields.sourceSku, 'OWNED-2');
+    assert.throws(() => selection.tools[0]!.resolveTarget!({skuId: 'foreign', ...(visibility ? {visible: true} : {})}));
+    assert.equal(before, cataloguePayloadHash([...f.repository.records]));
+    f.revokeMember(); await assert.rejects(f.context.read(f.actor, {...f.request, actionId: action}));
+  });
+}
+
 test('AI-DOMAIN owned Store compact selector and recovery bind exact original SKU without model-authored references', async () => {
   const f = await assistantOwnedOriginalFixture(2), context = await f.context.read(f.actor, {...f.request, actionId: null, entityId: null});
   const tool = context.tools.find(t => t.actionId === 'AI-ACT-214')!;
@@ -3999,10 +4165,58 @@ test('AI-DOMAIN owned Store compact selector and recovery bind exact original SK
   assert.notEqual(changed.tools[0]!.sourceRevision, prepared.sourceRevision);
 });
 
+for (const actionId of ['AI-ACT-225', 'AI-ACT-374']) {
+  test(`AI-DOMAIN owned Store ${actionId} original recovery works without a published SKU and cannot accept private identities`, async () => {
+    const capture = 'a'.repeat(64);
+    const f = await assistantOwnedOriginalFixture(0), input = {...f.request, actionId, entityId: null,
+      nativeOriginalCaptures: [{actionId, digest: capture}]};
+    const context = await f.context.read(f.actor, input), tool = context.tools[0]!;
+    assert.equal(context.tools.length, 1); assertStrictSchema(tool.parameters);
+    assert.equal(tool.entityId, null); assert.deepEqual(tool.parameters.properties, {});
+    assert.equal(tool.validate({originalCapture: capture}), true); assert.equal(tool.validate({}), false);
+    assert.deepEqual(tool.resolveTarget!({}).fields, {originalCapture: capture});
+    assert.equal(tool.validate({originalCapture: 'b'.repeat(64)}), false);
+    for (const fields of [{originalRequestId: 'invented'}, {skuId: 'invented'}, {familyId: 'invented'},
+      {receipt: 'saved'}, {published: true}, {sourceCanonicalId: 'invented'}]) assert.equal(tool.validate(fields), false);
+    assert.equal(context.nativeTargets!.length, 1); assert.equal(context.nativeTargets![0]!.entityId, null);
+    assert.ok(f.calls.every(body => body.limit === 1 && !Object.hasOwn(body, 'skuId')));
+    const rows = new Map<string, {fingerprint: string; state: PreparationState}>();
+    const requests: PreparationRequestStore = {
+      async claim(key, fingerprint) {const row = rows.get(key); if (row) return row.fingerprint === fingerprint ? row.state : {state: 'conflict'};
+        rows.set(key, {fingerprint, state: {state: 'pending'}}); return {state: 'claimed', lease: key};},
+      async read(key) {return rows.get(key)?.state;},
+      async finish(key, lease, state) {assert.equal(key, lease); rows.get(key)!.state = state; return state;},
+      async cancel(key) {const row = rows.get(key); if (!row) return undefined; row.state = {state: 'cancelled'}; return row.state;},
+    };
+    let models = 0, reserves = 0;
+    const service = new AssistantPreparationService({projectId: f.actor.projectId, plans: f.plans, requests,
+      context: new CompositePreparationContext({original: f.authority, storeProducts: f.context}), now: () => new Date(at),
+      usage: {async reserve() {reserves++; return {id: 'host-original-permit', validUntil: '2026-10-16T12:01:00.000Z'};}, async settle() {}},
+      model: {async prepare(_request, tools) {models++; assert.equal(tools.length, 1); assert.equal(tools[0]!.actionId, actionId);
+        assert.deepEqual(tools[0]!.parameters.properties, {}); return {kind: 'tool', name: tools[0]!.name, arguments: {}};}}});
+    const payload = {...input, requestId: 'host-original-recovery', nativeTargets: [{actionId, entityId: null}]};
+    const {nativeOriginalCaptures: omittedCapture, ...withoutCapture} = payload; assert.ok(omittedCapture);
+    await assert.rejects(service.handle(f.actor, {operation: 'prepare', payload: {...withoutCapture, requestId: 'host-original-missing-capture'}}), /context_unavailable/u);
+    assert.equal(models, 0); assert.equal(reserves, 0);
+    const result = await service.handle(f.actor, {operation: 'prepare', payload});
+    assert.equal(result.state, 'ready'); if (result.state !== 'ready') return;
+    assert.equal(result.reply.outcome.kind, 'proposal'); if (result.reply.outcome.kind !== 'proposal') return;
+    assert.equal(result.reply.outcome.entityId, null); assert.deepEqual(result.reply.outcome.fields, {originalCapture: capture});
+    assert.deepEqual(await service.handle(f.actor, {operation: 'prepare', payload}), result);
+    assert.deepEqual(await service.handle(f.actor, {operation: 'status', payload: {scope: input.scope, requestId: payload.requestId}}), result);
+    const restarted = new AssistantPreparationService({projectId: f.actor.projectId, plans: f.plans, requests,
+      context: new CompositePreparationContext({original: f.authority, storeProducts: f.context}), now: () => new Date(at)});
+    assert.deepEqual(await restarted.handle(f.actor, {operation: 'status', payload: {scope: input.scope, requestId: payload.requestId}}), result);
+    await assert.rejects(service.handle(f.actor, {operation: 'prepare', payload: {...payload,
+      nativeOriginalCaptures: [{actionId, digest: 'b'.repeat(64)}]}}), /conflict/u);
+    assert.equal(models, 1); assert.equal(reserves, 1); assert.equal(f.repository.records.size, 0);
+    f.revokeMember(); await assert.rejects(service.handle(f.actor, {operation: 'status', payload: {scope: input.scope, requestId: payload.requestId}}));
+  });
+}
 test('AI-DOMAIN owned Store original paged source handles 201 records without a second product master', async () => {
   const f = await assistantOwnedOriginalFixture(201), before = cataloguePayloadHash([...f.repository.records]);
   const context = await f.context.read(f.actor, {...f.request, actionId: null, entityId: null});
-  assert.equal(context.tools.length, 5); assert.equal(context.nativeTargets!.length, 405);
+  assert.equal(context.tools.length, 21); assert.equal(context.nativeTargets!.length, 1622);
   assert.equal(f.calls.length, 10); assert.ok(f.calls.every(body => body.limit === 50));
   const result = context.tools[0]!.resolveTarget!({skuId: 'owned-sku-0201', changes: [{field: 'title', value: 'Last original product'}]});
   assert.equal(result.entityId, 'owned-sku-0201'); assert.equal(result.fields.sourceSku, 'OWNED-201');
@@ -4064,6 +4278,223 @@ test('AI-DOMAIN owned Store native defaults keep current private values native a
   await assert.rejects(f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-219', entityId: 'store-one'}), /context_unavailable/u);
 });
 
+for(const actionId of ['AI-ACT-231','AI-ACT-232','AI-ACT-233','AI-ACT-407','AI-ACT-408'])
+test(`AI-DOMAIN owned Store Stock root ${actionId} preserves native ownership and performs no balance read or effect`,async()=>{
+  const f=await assistantOwnedOriginalFixture(0),input={...f.request,actionId,entityId:null};
+  const context=await f.context.read(f.actor,input),tool=context.tools[0]!;
+  assert.equal(context.tools.length,1);assertStrictSchema(tool.parameters);assert.equal(tool.entityId,null);
+  assert.match(tool.sourceRevision,/^store-stock-owner:evaluation:[a-f0-9]{64}$/u);
+  const args=actionId==='AI-ACT-233'?{quantity:'0006',reason:'મૂળ ગણતરી'}:
+    actionId==='AI-ACT-232'?{from:'2026-10-01T00:00:00Z',until:null}:{};
+  const expected=actionId==='AI-ACT-233'?args:actionId==='AI-ACT-232'?{from:'2026-10-01T00:00:00Z'}:{};
+  assert.deepEqual(tool.resolveTarget!(args).fields,expected);assert.equal(tool.validate(expected),true);
+  for(const key of ['sourceStock','inventoryRevision','sourceCanonicalId','skuId','balance','ledger','published']){
+    assert.throws(()=>tool.resolveTarget!({...args,[key]:'invented'}));assert.equal(tool.validate({...expected,[key]:'invented'}),false);
+  }
+  if(actionId==='AI-ACT-232')for(const invalid of [{from:'2026-10-01',until:null},
+    {from:'2026-10-02T00:00:00Z',until:'2026-10-01T00:00:00Z'}])assert.throws(()=>tool.resolveTarget!(invalid));
+  if(actionId==='AI-ACT-233')for(const invalid of [{quantity:6,reason:'counted'},{quantity:'6'},
+    {quantity:'6',reason:'\ud800'}])assert.throws(()=>tool.resolveTarget!(invalid));
+  const rows=new Map<string,{fingerprint:string;state:PreparationState}>();let models=0,reserves=0;
+  const requests:PreparationRequestStore={
+    async claim(key,fingerprint){const row=rows.get(key);if(row)return row.fingerprint===fingerprint?row.state:{state:'conflict'};
+      rows.set(key,{fingerprint,state:{state:'pending'}});return {state:'claimed',lease:key};},
+    async read(key){return rows.get(key)?.state;},async finish(key,_lease,state){rows.get(key)!.state=state;return state;},async cancel(){return undefined;}};
+  const make=()=>new AssistantPreparationService({projectId:f.actor.projectId,plans:f.plans,
+    context:new CompositePreparationContext({original:f.authority,storeProducts:f.context}),requests,now:()=>new Date(at),
+    usage:{async reserve(){reserves++;return {id:'HOST-stock-permit',validUntil:'2026-10-16T12:01:00.000Z'};},async settle(){}},
+    model:{async prepare(_input,tools,_signal,reference){models++;assert.equal(tools.length,1);
+      assert.deepEqual(reference!.products,[]);return {kind:'tool',name:tools[0]!.name,arguments:args};}}});
+  const payload={...input,requestId:'HOST-native-stock-root',nativeTargets:[{actionId,entityId:null}]};
+  const result=await make().handle(f.actor,{operation:'prepare',payload});
+  assert.equal(result.state,'ready');if(result.state!=='ready'||result.reply.outcome.kind!=='proposal')return;
+  assert.deepEqual(result.reply.outcome.fields,expected);assert.equal(result.reply.outcome.entityId,null);
+  assert.deepEqual(await make().handle(f.actor,{operation:'prepare',payload}),result);
+  assert.deepEqual(await make().handle(f.actor,{operation:'status',payload:{scope:payload.scope,requestId:payload.requestId}}),result);
+  assert.equal(models,1);assert.equal(reserves,1);assert.equal(f.repository.records.size,0);assert.ok(f.calls.every(body=>body.limit===1));
+  f.revokeMember();await assert.rejects(make().handle(f.actor,{operation:'status',payload:{scope:payload.scope,requestId:payload.requestId}}));
+});
+
+test('AI-DOMAIN owned Store variant changes keep add and edit explicit without inventing target IDs',async()=>{
+  const f=await assistantOwnedOriginalFixture(0),input={...f.request,actionId:'AI-ACT-215',entityId:null};
+  const context=await f.context.read(f.actor,input),tool=context.tools[0]!;
+  const fields={changes:[{operation:'add',label:'Colour',kind:'colour',options:'Blue\nGreen'},
+    {operation:'edit',label:'मूल आकार',kind:'size',options:'One\nTwo'}]};
+  assert.equal(tool.entityId,null);assert.equal(tool.actionId,'AI-ACT-215');
+  assert.match(tool.sourceRevision,/^store-product-variants-owner:evaluation:[a-f0-9]{64}$/u);
+  assert.equal(tool.validate(fields),true);assert.deepEqual(tool.resolveTarget!(fields).fields,fields);
+  for(const invalid of [{changes:[]},{changes:[{...fields.changes[0],dimensionId:'invented'}]},
+    {changes:[{...fields.changes[0],operation:['add']}]},{changes:[{...fields.changes[0],operation:'replace'}]},
+    {changes:[{...fields.changes[0],kind:'invented'}]},{changes:[{...fields.changes[0],options:[]}]},
+    {changes:[{...fields.changes[0],label:'\ud800'}]},{changes:[{...fields.changes[0],options:'\u0000'}]},
+    {...fields,familyId:'invented'}]){assert.equal(tool.validate(invalid),false);assert.throws(()=>tool.resolveTarget!(invalid));}
+  let models=0,reserves=0;const rows=new Map<string,{fingerprint:string;state:PreparationState}>();
+  const requests:PreparationRequestStore={
+    async claim(key,fingerprint){const row=rows.get(key);if(row)return row.fingerprint===fingerprint?row.state:{state:'conflict'};
+      rows.set(key,{fingerprint,state:{state:'pending'}});return {state:'claimed',lease:key};},
+    async read(key){return rows.get(key)?.state;},
+    async finish(key,lease,state){assert.equal(key,lease);rows.get(key)!.state=state;return state;},
+    async cancel(key){const row=rows.get(key);if(!row)return undefined;row.state={state:'cancelled'};return row.state;}};
+  const make=()=>new AssistantPreparationService({projectId:f.actor.projectId,plans:f.plans,
+    context:new CompositePreparationContext({original:f.authority,storeProducts:f.context}),requests,now:()=>new Date(at),
+    usage:{async reserve(){reserves++;return {id:'host-variant-permit',validUntil:'2026-10-16T12:01:00.000Z'};},async settle(){}},
+    model:{async prepare(_request,tools){models++;assert.equal(tools.length,1);return {kind:'tool',name:tools[0]!.name,arguments:fields};}}});
+  const payload={...input,requestId:'HOST-variant-intent',nativeTargets:[{actionId:'AI-ACT-215',entityId:null}]};
+  const service=make(),result=await service.handle(f.actor,{operation:'prepare',payload});
+  assert.equal(result.state,'ready');if(result.state!=='ready')return;
+  assert.equal(result.reply.outcome.kind,'proposal');if(result.reply.outcome.kind!=='proposal')return;
+  assert.equal(result.reply.outcome.entityId,null);assert.deepEqual(result.reply.outcome.fields,fields);
+  assert.equal(result.reply.outcome.title,'Review product variants');
+  assert.deepEqual(await service.handle(f.actor,{operation:'prepare',payload}),result);
+  assert.deepEqual(await make().handle(f.actor,{operation:'status',payload:{scope:payload.scope,requestId:payload.requestId}}),result);
+  assert.equal(models,1);assert.equal(reserves,1);assert.equal(f.repository.records.size,0);
+  assert.ok(f.calls.every(body=>body.limit===1));
+  f.revokeMember();await assert.rejects(make().handle(f.actor,{operation:'status',payload:{scope:payload.scope,requestId:payload.requestId}}));
+});
+
+test('AI-DOMAIN owned Store private product submission root needs no mirror and preserves legacy fixed SKU recovery',async()=>{
+  const f=await assistantOwnedOriginalFixture(0),input={...f.request,actionId:'AI-ACT-223',entityId:null};
+  const context=await f.context.read(f.actor,input),tool=context.tools[0]!;
+  assert.equal(context.tools.length,1);assertStrictSchema(tool.parameters);
+  assert.match(tool.sourceRevision,/^store-product-submission-owner:evaluation:[a-f0-9]{64}$/u);
+  assert.deepEqual(tool.resolveTarget!({}).fields,{});assert.equal(tool.resolveTarget!({}).entityId,null);
+  for(const fields of [{skuId:'invented'},{sourceCanonicalId:'invented'},{published:true},{originalRequestId:'invented'}]){
+    assert.equal(tool.validate(fields),false);assert.throws(()=>tool.resolveTarget!(fields));
+  }
+  let models=0,reserves=0;const rows=new Map<string,{fingerprint:string;state:PreparationState}>();
+  const requests:PreparationRequestStore={
+    async claim(key,fingerprint){const row=rows.get(key);if(row)return row.fingerprint===fingerprint?row.state:{state:'conflict'};
+      rows.set(key,{fingerprint,state:{state:'pending'}});return {state:'claimed',lease:key};},
+    async read(key){return rows.get(key)?.state;},
+    async finish(key,lease,state){assert.equal(key,lease);rows.get(key)!.state=state;return state;},
+    async cancel(key){const row=rows.get(key);if(!row)return undefined;row.state={state:'cancelled'};return row.state;}};
+  const make=()=>new AssistantPreparationService({projectId:f.actor.projectId,plans:f.plans,
+    context:new CompositePreparationContext({original:f.authority,storeProducts:f.context}),requests,now:()=>new Date(at),
+    usage:{async reserve(){reserves++;return {id:'host-private-product-permit',validUntil:'2026-10-16T12:01:00.000Z'};},async settle(){}},
+    model:{async prepare(_request,tools){models++;assert.equal(tools.length,1);return {kind:'tool',name:tools[0]!.name,arguments:{}};}}});
+  const payload={...input,requestId:'HOST-private-product-intent',nativeTargets:[{actionId:'AI-ACT-223',entityId:null}]};
+  const result=await make().handle(f.actor,{operation:'prepare',payload});
+  assert.equal(result.state,'ready');if(result.state!=='ready')return;
+  assert.equal(result.reply.outcome.kind,'proposal');if(result.reply.outcome.kind!=='proposal')return;
+  assert.equal(result.reply.outcome.entityId,null);assert.deepEqual(result.reply.outcome.fields,{});
+  assert.deepEqual(await make().handle(f.actor,{operation:'prepare',payload}),result);
+  assert.deepEqual(await make().handle(f.actor,{operation:'status',payload:{scope:payload.scope,requestId:payload.requestId}}),result);
+  assert.equal(models,1);assert.equal(reserves,1);assert.equal(f.repository.records.size,0);assert.ok(f.calls.every(body=>body.limit===1));
+  const owned=await assistantOwnedOriginalFixture(2),broad=await owned.context.read(owned.actor,{...owned.request,actionId:null,entityId:null});
+  assert.equal(broad.tools.filter(t=>t.actionId==='AI-ACT-223').length,1);
+  assert.equal(new Set(broad.nativeTargets!.map(t=>JSON.stringify([t.actionId,t.entityId]))).size,broad.nativeTargets!.length);
+  assert.ok(broad.nativeTargets!.some(t=>t.actionId==='AI-ACT-223'&&t.entityId===null));
+  const legacy=await owned.context.read(owned.actor,{...owned.request,actionId:'AI-ACT-223'}),old=legacy.tools[0]!.resolveTarget!({});
+  assert.ok(broad.nativeTargets!.some(t=>t.actionId==='AI-ACT-223'&&t.entityId===owned.request.entityId&&t.sourceRevision===old.sourceRevision));
+  const recovered=await owned.context.readPrepared(owned.actor,{...owned.request,actionId:'AI-ACT-223'},
+    {kind:'proposal',id:'HOST-legacy-fixed',actionId:'AI-ACT-223',...old,title:'Legacy',summary:'Legacy'});
+  assert.equal(recovered.tools[0]!.validate(old.fields),true);
+  f.revokeMember();await assert.rejects(make().handle(f.actor,{operation:'status',payload:{scope:payload.scope,requestId:payload.requestId}}));
+});
+
+for(const fixed of [false,true])test(`AI-DOMAIN owned Store root submission model reference ${fixed} follows tool routing not retained recovery proofs`,async()=>{
+  const f=await assistantOwnedOriginalFixture(2),context=new CompositePreparationContext({original:f.authority,storeProducts:f.context});
+  const rows=new Map<string,{fingerprint:string;state:PreparationState}>();
+  const requests:PreparationRequestStore={
+    async claim(key,fingerprint){const row=rows.get(key);if(row)return row.fingerprint===fingerprint?row.state:{state:'conflict'};
+      rows.set(key,{fingerprint,state:{state:'pending'}});return {state:'claimed',lease:key};},
+    async read(key){return rows.get(key)?.state;},
+    async finish(key,_lease,state){rows.get(key)!.state=state;return state;},async cancel(){return undefined;}};
+  let wire='';
+  const service=new AssistantPreparationService({projectId:f.actor.projectId,plans:f.plans,context,requests,now:()=>new Date(at),
+    usage:{async reserve(){return {id:'HOST-reference-permit',validUntil:'2026-10-16T12:01:00.000Z'};},async settle(){}},
+    model:{async prepare(input,tools,signal,reference){
+      assert.equal(tools.length,1);assert.equal(tools[0]!.actionId,'AI-ACT-223');
+      assert.equal(tools[0]!.entityId,fixed?'owned-sku-0002':null);
+      const sources=(reference!.sourceKind==='composite-original-context-v1'?reference!.sources:[reference]) as (Record<string,unknown>|null)[];
+      const products=sources.find(source=>source?.sourceKind==='original-store-owned-skus-v1')!.products as {skuId:string}[];
+      assert.deepEqual(products.map(product=>product.skuId),fixed?['owned-sku-0002']:[]);
+      const model=new ResponsesPreparationModel({model:'host-model',key:async()=>'host-only-key',fetch:async(_url,init)=>{
+        wire=String(init?.body);return new Response(JSON.stringify({status:'completed',output:[{type:'function_call',status:'completed',
+          name:tools[0]!.name,arguments:'{}'}]}),{status:200,headers:{'content-type':'application/json'}});
+      }});
+      return model.prepare(input,tools,signal,reference);
+    }}});
+  const result=await service.handle(f.actor,{operation:'prepare',payload:{...f.request,requestId:'HOST-routing-reference',
+    actionId:fixed?'AI-ACT-223':null,entityId:fixed?'owned-sku-0002':null,nativeTargets:[
+      {actionId:'AI-ACT-223',entityId:null},{actionId:'AI-ACT-223',entityId:'owned-sku-0001'},
+      {actionId:'AI-ACT-223',entityId:'owned-sku-0002'}]}});
+  assert.equal(result.state,'ready');assert.ok(wire);assert.ok(!wire.includes('owned-sku-0001'));
+  assert.equal(wire.includes('owned-sku-0002'),fixed);
+});
+
+test('AI-DOMAIN owned Store family review prepares only an owner capability and recovers without selecting or writing a family',async()=>{
+  const f=await assistantOwnedOriginalFixture(0),input={...f.request,actionId:'AI-ACT-224',entityId:null};
+  const context=await f.context.read(f.actor,input),tool=context.tools[0]!;
+  assert.equal(tool.entityId,null);assert.equal(tool.actionId,'AI-ACT-224');
+  assert.match(tool.sourceRevision,/^store-product-family-owner:evaluation:[a-f0-9]{64}$/u);
+  assert.deepEqual(tool.parameters,{type:'object',properties:{},required:[],additionalProperties:false});
+  assert.equal(tool.validate({}),true);
+  for(const fields of [{familyId:'invented'},{approved:true},{members:[]},{revision:1}])assert.equal(tool.validate(fields),false);
+  let models=0,reserves=0;const rows=new Map<string,{fingerprint:string;state:PreparationState}>();
+  const requests:PreparationRequestStore={
+    async claim(key,fingerprint){const row=rows.get(key);if(row)return row.fingerprint===fingerprint?row.state:{state:'conflict'};
+      rows.set(key,{fingerprint,state:{state:'pending'}});return {state:'claimed',lease:key};},
+    async read(key){return rows.get(key)?.state;},
+    async finish(key,lease,state){assert.equal(key,lease);rows.get(key)!.state=state;return state;},
+    async cancel(key){const row=rows.get(key);if(!row)return undefined;row.state={state:'cancelled'};return row.state;}};
+  const make=()=>new AssistantPreparationService({projectId:f.actor.projectId,plans:f.plans,
+    context:new CompositePreparationContext({original:f.authority,storeProducts:f.context}),requests,now:()=>new Date(at),
+    usage:{async reserve(){reserves++;return {id:'host-family-permit',validUntil:'2026-10-16T12:01:00.000Z'};},async settle(){}},
+    model:{async prepare(_request,tools){models++;assert.equal(tools.length,1);assert.equal(tools[0]!.actionId,'AI-ACT-224');
+      return {kind:'tool',name:tools[0]!.name,arguments:{}};}}});
+  const payload={...input,requestId:'HOST-saved-family-review',nativeTargets:[{actionId:'AI-ACT-224',entityId:null}]};
+  const service=make(),result=await service.handle(f.actor,{operation:'prepare',payload});
+  assert.equal(result.state,'ready');if(result.state!=='ready')return;
+  assert.equal(result.reply.outcome.kind,'proposal');if(result.reply.outcome.kind!=='proposal')return;
+  assert.equal(result.reply.outcome.entityId,null);assert.deepEqual(result.reply.outcome.fields,{});
+  assert.equal(result.reply.outcome.title,'Review product group');
+  assert.equal(result.reply.outcome.summary,'Choose a saved product group and check its details before submitting for review.');
+  assert.deepEqual(await service.handle(f.actor,{operation:'prepare',payload}),result);
+  assert.deepEqual(await make().handle(f.actor,{operation:'status',payload:{scope:payload.scope,requestId:payload.requestId}}),result);
+  assert.equal(models,1);assert.equal(reserves,1);assert.equal(f.repository.records.size,0);
+  assert.ok(f.calls.every(body=>body.limit===1));
+  f.revokeMember();await assert.rejects(make().handle(f.actor,{operation:'status',payload:{scope:payload.scope,requestId:payload.requestId}}));
+});
+
+test('AI-DOMAIN owned Store manual authoring prepares supplied fields without catalogue identity or domain writes', async () => {
+  const f=await assistantOwnedOriginalFixture(0),input={...f.request,actionId:'AI-ACT-213',entityId:null};
+  const context=await f.context.read(f.actor,input),tool=context.tools[0]!;
+  assert.equal(tool.actionId,'AI-ACT-213');assert.equal(tool.entityId,null);
+  assert.match(tool.sourceRevision,/^store-product-authoring-owner:evaluation:[a-f0-9]{64}$/u);
+  assert.ok(f.calls.every(body=>body.limit===1));
+  const fields={title:'मूल उत्पाद',pack:'1 kg',sellingPrice:'0100.25',stock:'not yet counted'};
+  const changes=Object.entries(fields).map(([field,value])=>({field,value}));
+  assert.deepEqual(tool.decodeFields!({changes}),fields);assert.equal(tool.validate(fields),true);
+  for(const args of [{changes:[]},{changes:[{field:'sourceCanonicalId',value:'invented'}]},
+    {changes:[{field:'title',value:'one'},{field:'title',value:'two'}]},
+    {changes:[{field:'title',value:'\ud800'}]},{changes:[{field:'title',value:12}]},
+    {changes:[{field:'title',value:'\u0000'}]},{changes,publish:true}])assert.throws(()=>tool.decodeFields!(args));
+  let models=0,reserves=0;const rows=new Map<string,{fingerprint:string;state:PreparationState}>();
+  const requests:PreparationRequestStore={
+    async claim(key,fingerprint){const row=rows.get(key);if(row)return row.fingerprint===fingerprint?row.state:{state:'conflict'};
+      rows.set(key,{fingerprint,state:{state:'pending'}});return {state:'claimed',lease:key};},
+    async read(key){return rows.get(key)?.state;},
+    async finish(key,lease,state){assert.equal(key,lease);rows.get(key)!.state=state;return state;},
+    async cancel(key){const row=rows.get(key);if(!row)return undefined;row.state={state:'cancelled'};return row.state;}};
+  const make=()=>new AssistantPreparationService({projectId:f.actor.projectId,plans:f.plans,
+    context:new CompositePreparationContext({original:f.authority,storeProducts:f.context}),requests,now:()=>new Date(at),
+    usage:{async reserve(){reserves++;return {id:'host-manual-permit',validUntil:'2026-10-16T12:01:00.000Z'};},async settle(){}},
+    model:{async prepare(_request,tools){models++;assert.equal(tools.length,1);assert.equal(tools[0]!.actionId,'AI-ACT-213');
+      return {kind:'tool',name:tools[0]!.name,arguments:{changes}};}}});
+  const payload={...input,requestId:'HOST-native-manual-draft',nativeTargets:[{actionId:'AI-ACT-213',entityId:null}]};
+  const service=make(),result=await service.handle(f.actor,{operation:'prepare',payload});
+  assert.equal(result.state,'ready');if(result.state!=='ready')return;
+  assert.equal(result.reply.outcome.kind,'proposal');if(result.reply.outcome.kind!=='proposal')return;
+  assert.equal(result.reply.outcome.entityId,null);assert.deepEqual(result.reply.outcome.fields,fields);
+  assert.equal(result.reply.outcome.title,'Review new product');
+  assert.equal(result.reply.outcome.summary,'Check the product details and save when ready.');
+  assert.deepEqual(await service.handle(f.actor,{operation:'prepare',payload}),result);
+  assert.deepEqual(await make().handle(f.actor,{operation:'status',payload:{scope:payload.scope,requestId:payload.requestId}}),result);
+  assert.equal(models,1);assert.equal(reserves,1);assert.equal(f.repository.records.size,0);
+  f.revokeMember();await assert.rejects(make().handle(f.actor,{operation:'status',payload:{scope:payload.scope,requestId:payload.requestId}}));
+});
+
 test('AI-DOMAIN owned Store empty catalogue still permits original native defaults review without a fabricated product', async () => {
   const f = await assistantOwnedOriginalFixture(0);
   const context = await f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-218', entityId: null});
@@ -4076,7 +4507,8 @@ test('AI-DOMAIN owned Store empty catalogue still permits original native defaul
   await assert.rejects(f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-218', entityId: null}));
 });
 
-test('AI-DOMAIN owned Store actual preparation and status keep original fields native targets and single usage', async () => {
+for (const action of ['AI-ACT-214', 'AI-ACT-230', 'AI-ACT-222', 'AI-ACT-223', 'AI-ACT-226', 'AI-ACT-227', 'AI-ACT-371']) {
+test(`AI-DOMAIN owned Store ${action} actual preparation and status keep original fields native targets and single usage`, async () => {
   const f = await assistantOwnedOriginalFixture(2), rows = new Map<string, {fingerprint: string; state: PreparationState}>();
   // The sealed durable request/usage suites qualify their actual SQL classes.
   // These explicit host seams isolate this source-to-model-to-native contract.
@@ -4099,31 +4531,37 @@ test('AI-DOMAIN owned Store actual preparation and status keep original fields n
     }, model: {async prepare(_request, tools) {
       models++; assert.equal(tools.length, 1);
       const properties = tools[0]!.parameters.properties as {skuId: {enum: string[]}};
-      assert.deepEqual(properties.skuId.enum, ['owned-sku-0002']);
-      return {kind: 'tool', name: tools[0]!.name, arguments: {skuId: 'owned-sku-0002',
-        changes: [{field: 'description', value: 'मूल उत्पाद की जानकारी'}, {field: 'sellingPrice', value: '100.25'}]}};
+      if(action!=='AI-ACT-223')assert.deepEqual(properties.skuId.enum, ['owned-sku-0002']);
+      return {kind: 'tool', name: tools[0]!.name, arguments: {...(action==='AI-ACT-223'?{}:{skuId: 'owned-sku-0002'}),
+        ...(action === 'AI-ACT-230' ? {channel: 'retail'} : action === 'AI-ACT-222' || action === 'AI-ACT-371' ? {visible: false}
+          : action === 'AI-ACT-214' ? {changes: [{field: 'description', value: 'मूल उत्पाद की जानकारी'}, {field: 'sellingPrice', value: '100.25'}]} : {})}};
     }}});
-  const payload = {...f.request, requestId: 'host-owned-native-contract', entityId: null,
-    nativeTargets: [{actionId: 'AI-ACT-214', entityId: 'owned-sku-0002'}]};
+  const payload = {...f.request, actionId: action, requestId: 'host-owned-native-contract', entityId: action==='AI-ACT-223'?'owned-sku-0002':null,
+    nativeTargets: [{actionId: action, entityId: 'owned-sku-0002'}]};
   const before = cataloguePayloadHash([...f.repository.records]);
   const result = await service.handle(f.actor, {operation: 'prepare', payload});
   assert.equal(result.state, 'ready'); if (result.state !== 'ready') return;
   assert.equal(result.reply.outcome.kind, 'proposal'); if (result.reply.outcome.kind !== 'proposal') return;
   const proposal = result.reply.outcome;
   assert.equal(proposal.entityId, 'owned-sku-0002'); assert.equal(proposal.fields.sourceSku, 'OWNED-2');
-  assert.equal(proposal.fields.description, 'मूल उत्पाद की जानकारी'); assert.equal(proposal.fields.sellingPrice, '100.25');
+  if (action === 'AI-ACT-230') {
+    assert.equal(proposal.fields.channel, 'retail'); assert.equal(Object.hasOwn(proposal.fields, 'published'), false);
+  } else if (action === 'AI-ACT-214') {assert.equal(proposal.fields.description, 'मूल उत्पाद की जानकारी'); assert.equal(proposal.fields.sellingPrice, '100.25');}
+  else if (action === 'AI-ACT-222' || action === 'AI-ACT-371') {assert.equal(proposal.fields.visible, false);}
+  else {assert.equal(Object.keys(proposal.fields).length, 5);}
   assert.equal(Object.hasOwn(proposal.fields, 'stock'), false);
   assert.deepEqual(await service.handle(f.actor, {operation: 'prepare', payload}), result);
   assert.deepEqual(await service.handle(f.actor, {operation: 'status', payload: {scope: payload.scope, requestId: payload.requestId}}), result);
   assert.equal(models, 1); assert.equal(reserves, 1); assert.deepEqual(settlements, ['completed']);
   assert.equal(before, cataloguePayloadHash([...f.repository.records]));
   const exportPath = process.env.MOOLSOCIAL_ASSISTANT_STORE_NATIVE_EXPORT;
-  if (exportPath !== undefined) {
-    assert.equal(resolve(exportPath), resolve('C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/ai-domain-batch-20261028-v1/scope02-original-proposal-contract.json'));
+  if (exportPath !== undefined && action === 'AI-ACT-214') {
+    assert.ok(['scope02-original-proposal-contract.json', 'scope03-original-proposal-contract.json', 'scope03-controls-original-proposal-contract.json', 'scope03-submission-original-proposal-contract.json', 'scope03-recovery-original-proposal-contract.json', 'scope03-authoring-original-proposal-contract.json', 'scope03-family224-original-proposal-contract.json', 'scope03-variants215-original-proposal-contract.json','scope03-private223-original-proposal-contract.json','scope04-stock-original-proposal-contract.json'].some(name =>
+      resolve(exportPath) === resolve('C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/ai-domain-batch-20261028-v1/' + name)));
     const defaults = await f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-219', entityId: null});
     const defaultsInput = defaults.tools[0]!.decodeFields!({stockMode: null, lowStockThreshold: '0005', customerListingRequested: false});
     writeFileSync(exportPath, JSON.stringify({schemaVersion: 1, hostOnly: true, nativeTextFields: storeProductNativeTextFields,
-      nativeDefaultFields: Object.keys(defaults.tools[0]!.parameters.properties as object), defaultsInput,
+      nativeDefaultFields: Object.keys(defaults.tools[0]!.parameters.properties as object), defaultsInput,nativeVariantKinds:storeVariantNativeKinds,
       reply: result.reply, noDomainWrites: before === cataloguePayloadHash([...f.repository.records])}, null, 2) + '\n', 'utf8');
   }
   const original = f.repository.records.get('store-one/owned-sku-0002')!;
@@ -4131,6 +4569,7 @@ test('AI-DOMAIN owned Store actual preparation and status keep original fields n
   await assert.rejects(service.handle(f.actor, {operation: 'status', payload: {scope: payload.scope, requestId: payload.requestId}}), /stale_preparation/u);
   assert.equal(models, 1); assert.equal(reserves, 1);
 });
+}
 
 test('AI-DOMAIN owned Store descriptive warranty uses original allowed category and exact native guide labels', async () => {
   const f = await assistantOwnedOriginalFixture(1, 'retail', 'other'), before = cataloguePayloadHash([...f.repository.records]);
@@ -4212,8 +4651,8 @@ for (const channel of ['wholesale', 'bulk'] as const) {
     f.revokeMember(); await assert.rejects(f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-220'}));
   });
 }
-test('AI-DOMAIN owned Store1250 actual metadata and preparation preserve5003 targets within original HTTP byte caps', async () => {
-  const f = await assistantOwnedOriginalFixture(1250, 'wholesale', 'other');
+test('AI-DOMAIN owned Store2500 actual metadata and preparation preserve25014 targets within original HTTP byte caps', async () => {
+  const f = await assistantOwnedOriginalFixture(2500, 'wholesale', 'other');
   const context = new CompositePreparationContext({original: f.authority, storeProducts: f.context});
   const headers = {authorization: 'Bearer host-only-token', 'x-firebase-appcheck': 'host-only-proof'};
   const auth = {projectId: f.actor.projectId, enabled: true,
@@ -4225,8 +4664,8 @@ test('AI-DOMAIN owned Store1250 actual metadata and preparation preserve5003 tar
   assert.ok(Buffer.byteLength(JSON.stringify(metadata.body)) < 2 * 1024 * 1024);
   const original = await context.read(f.actor, {...f.request, actionId: null, entityId: null});
   const selection = storeNativeSelection(f.actor, f.request.scope, original);
-  assert.equal(selection.targets.length, 5003);
-  const index = selection.targets.findIndex(target => target.actionId === 'AI-ACT-214' && target.entityId === 'owned-sku-1250');
+  assert.equal(selection.targets.length, 25014);
+  const index = selection.targets.findIndex(target => target.actionId === 'AI-ACT-214' && target.entityId === 'owned-sku-2500');
   assert.ok(index >= 0); const bytes = Buffer.alloc(Math.ceil(selection.targets.length / 8));
   bytes[index >> 3] = (bytes[index >> 3] ?? 0) | (1 << (index % 8));
   const rows = new Map<string, {fingerprint: string; state: PreparationState}>();
@@ -4239,11 +4678,17 @@ test('AI-DOMAIN owned Store1250 actual metadata and preparation preserve5003 tar
   let models = 0, reserves = 0;
   const service = new AssistantPreparationService({projectId: f.actor.projectId, plans: f.plans, context, requests,
     now: () => new Date(at), usage: {async reserve() {reserves++; return {id: 'host-capacity-permit', validUntil: '2026-10-16T12:01:00.000Z'};}, async settle() {}},
-    model: {async prepare(_input, tools) {models++; assert.equal(tools.length, 1);
+    model: {async prepare(_input, tools, signal, reference) {models++; assert.equal(tools.length, 1);
+      assert.ok(!JSON.stringify(reference).includes('owned-sku-0001'));
+      assert.ok(JSON.stringify(reference).includes('owned-sku-2500'));
       const properties = tools[0]!.parameters.properties as {skuId?: {enum: string[]}};
-      if (properties.skuId) assert.deepEqual(properties.skuId.enum, ['owned-sku-1250']);
-      else assert.equal(tools[0]!.entityId, 'owned-sku-1250');
-      return {kind: 'tool', name: tools[0]!.name, arguments: {...(properties.skuId ? {skuId: 'owned-sku-1250'} : {}), changes: [{field: 'title', value: 'मूल उत्पाद'}]}};}}});
+      if (properties.skuId) assert.deepEqual(properties.skuId.enum, ['owned-sku-2500']);
+      else assert.equal(tools[0]!.entityId, 'owned-sku-2500');
+      const argumentsValue={...(properties.skuId ? {skuId: 'owned-sku-2500'} : {}), changes: [{field: 'title', value: 'मूल उत्पाद'}]};
+      const transport=new ResponsesPreparationModel({model:'host-model',key:async()=>'host-only-key',fetch:async()=>
+        new Response(JSON.stringify({status:'completed',output:[{type:'function_call',status:'completed',name:tools[0]!.name,
+          arguments:JSON.stringify(argumentsValue)}]}),{status:200,headers:{'content-type':'application/json'}})});
+      return transport.prepare(_input,tools,signal,reference);}}});
   const body = {operation: 'prepare', payload: {...f.request, requestId: 'host-capacity-request', entityId: null,
     nativeTargets: [{actionId: 'AI-ACT-317', entityId: 'store-one'}],
     nativeTargetMask: {version: 1, fingerprint: selection.fingerprint, bits: bytes.toString('base64url')}}};
@@ -4255,7 +4700,7 @@ test('AI-DOMAIN owned Store1250 actual metadata and preparation preserve5003 tar
   if (!result.body.ok || result.body.data.state !== 'ready') return;
   assert.equal(result.body.data.reply.outcome.kind, 'proposal');
   assert.deepEqual(await call(body), result); assert.equal(models, 1); assert.equal(reserves, 1);
-  const fixed = await call({...body, payload: {...body.payload, requestId: 'host-capacity-fixed', entityId: 'owned-sku-1250'}});
+  const fixed = await call({...body, payload: {...body.payload, requestId: 'host-capacity-fixed', entityId: 'owned-sku-2500'}});
   assert.equal(fixed.status, 200); assert.equal(models, 2); assert.equal(reserves, 2);
   const conflict = await call({...body, payload: {...body.payload,
     nativeTargetMask: {...body.payload.nativeTargetMask, bits: Buffer.alloc(bytes.length).toString('base64url')}}});

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
+import 'package:crypto/crypto.dart' as crypto;
+import 'package:moolsocial/features/assistant/domain_context_gateway.dart';
 import 'package:moolsocial/features/journey01/account_plans_gateway.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +25,26 @@ import 'account_profile_gateway_test.dart' show Rig, profile, receipt, receiptFo
 const _localContextPort = int.fromEnvironment('THIN_B07_LOCAL_PORT',defaultValue:int.fromEnvironment('THIN_B03_LOCAL_PORT'));
 const _clientPhase=String.fromEnvironment('THIN_B07_CLIENT_PHASE');
 const _clientStorage=String.fromEnvironment('THIN_B07_CLIENT_STORAGE');
+// Isolated metadata transport; never supplies authority or records to a phone.
+class _AddressChoiceMetadata implements SocialContentTransport {
+  _AddressChoiceMetadata(this.owner);
+  final AccountProfileOwner owner;int reads=0;
+  @override Future<SocialContentResponse> postJson(Uri endpoint,{required Map<String,String> headers,required Map<String,Object?> body})async{
+    reads++;
+    return SocialContentResponse(statusCode:200,body:jsonEncode({'ok':true,'data':{
+      'ownerKey':crypto.sha256.convert(utf8.encode(jsonEncode([owner.projectId,owner.userId,'personal',null]))).toString(),
+      'scope':{'audience':'personal','storeId':null},'validUntil':DateTime.now().toUtc().add(const Duration(minutes:1)).toIso8601String(),
+      'revisions':[for(final action in assistantDomainAddressContextActions){'actionId':action,'entityId':'address-one','sourceRevision':'profile:1'}]}}));
+  }
+}
+class _AddressChoiceIdentity extends ProfileIdentity implements AssistantDomainContextGatewaySource {
+  _AddressChoiceIdentity(super.rig);
+  _AddressChoiceMetadata? metadata;
+  @override AssistantDomainContextGateway assistantDomainContextGateway(AccountProfileOwner owner,bool Function() current){
+    metadata=_AddressChoiceMetadata(owner);
+    return AssistantDomainContextGateway(owner:owner,isCurrent:current,credentials:Credentials(),transport:metadata!);
+  }
+}
 // External host-only storage seams for independently launched client processes.
 class _DiskProfileJournal extends Journal {
  _DiskProfileJournal(this.file){if(file.existsSync())values.addAll(Map<String,String>.from(jsonDecode(file.readAsStringSync()) as Map));}
@@ -226,6 +248,35 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
   });
+  for(final changedAddress in [false,true]) {
+    test('Domain saved address capture withholds stale native cache, address changed $changedAddress, without refreshing or saving',()async{
+      final rig=Rig();
+      // Keep every Profile read on the same explicit host source.
+      final source=_AddressChoiceIdentity(rig),session=sessionFixture(source);await session.start();
+      final store=CustomerStore(session.accountProfileGateway!.ownerScope),core=BuySession();
+      final buy=BuyV2Session(core:core,reviewDataEnabled:false,customerStateStore:store);
+      buy.synchronizeAccountProfile(session.accountProfileGateway);
+      final work=WorkSession(gateway:ReviewWorkGateway());
+      Map<String,Object?> saved(int revision,String line)=>{...profile(revision:revision),
+        'selectedAddressId':'address-one','addresses':[{'id':'address-one','kind':'home','label':'Home',
+          'recipient':'HOST recipient','phone':'9999999999','line':line,'area':'Jodhpur','pinCode':'342001','landmark':''}]};
+      try{
+        rig.transport.responses.add(saved(0,'HOST original street'));
+        expect(await buy.refreshAccountProfileAddresses(preparationOnly:true),isTrue);
+        final cache=store.saved,address=buy.addresses.single;
+        rig.transport.responses.add(saved(1,changedAddress?'HOST changed street':'HOST original street'));
+        final context=MoolAssistantContext(accountScope:session.authenticatedBuyPersistenceIdentity,
+          authenticationRevision:session.navigationAuthenticationGeneration);
+        final reader=AssistantOriginalContextReader(session:session,work:work,buy:buy,rootCurrent:()=>true);
+        final captured=await reader.read(context,()=>true);
+        expect(source.metadata!.reads,1);expect(session.accountProfileGateway!.snapshot!.revision,1);
+        expect(captured.revisions.keys.where((key)=>assistantDomainAddressContextActions.contains(key.$1)),isEmpty);
+        expect(identical(buy.addresses.single,address),isTrue);expect(identical(store.saved,cache),isTrue);
+        expect(buy.addresses.single.line,'HOST original street');expect(buy.selectedAddressId,'address-one');
+        expect(rig.transport.calls.every((call)=>call['operation']=='read'),isTrue);expect(rig.journal.values,isEmpty);
+      }finally{buy.dispose();core.dispose();work.dispose();session.dispose();await source.changes.close();}
+    });
+  }
   test('THIN-B03 read-only Profile refresh calls only original read and accepts canonical revision', () async {
     final f = Rig(); f.transport.responses.add(profile());
     final value = await f.gateway.readForPreparation();

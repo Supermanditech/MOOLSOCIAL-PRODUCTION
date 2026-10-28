@@ -1,8 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {command, canonical, digest, assertStrictSchema, catalogueListingSelection, nativeTargetSelection, nativeTargetMaskSelection} from "./model_contract.js";
+import {command, canonical, digest, assertStrictSchema, catalogueListingSelection, nativeTargetSelection, nativeTargetMaskSelection, preparationNativeMaskMaxBytes, nativeOriginalCaptureSelection} from "./model_contract.js";
 const payload = {scope: {audience: "personal", storeId: null}, requestId: "fixture-request", requestRevision: 1,
   message: "મને ચોખા જોઈએ / चावल चाहिए", language: "Auto", expectedEntitlementRevision: "personal:null:1:1", history: [], actionId: null, entityId: null};
+test('Original request captures are closed immutable bounded namespace hints in the request fingerprint', () => {
+  const a = {actionId: 'AI-ACT-225', digest: 'a'.repeat(64)}, b = {actionId: 'AI-ACT-374', digest: 'b'.repeat(64)};
+  const result = nativeOriginalCaptureSelection([b, a]); assert.deepEqual(result, [a, b]);
+  assert.ok(Object.isFrozen(result)); assert.ok(Object.isFrozen(result[0]));
+  for (const invalid of [null, {}, [a, a], [a, b, a], [{...a, requestId: 'private'}],
+    [{...a, actionId: 'AI-ACT-226'}], [{...a, digest: 'A'.repeat(64)}], [{...a, digest: 'a'.repeat(63)}]]) {
+    assert.throws(() => nativeOriginalCaptureSelection(invalid));
+  }
+  assert.throws(() => command({operation: 'prepare', payload: {...payload, nativeOriginalCaptures: [a]}}));
+  const input = {...payload, scope: {audience: 'workspace', storeId: 'store-one'}, nativeOriginalCaptures: [b, a]};
+  const parsed = command({operation: 'prepare', payload: input}); assert.equal(parsed.operation, 'prepare');
+  if (parsed.operation !== 'prepare') return;
+  assert.deepEqual(parsed.payload.nativeOriginalCaptures, [a, b]);
+  assert.notEqual(digest(parsed.payload), digest({...parsed.payload, nativeOriginalCaptures: [{...a, digest: 'c'.repeat(64)}, b]}));
+});
 test("AI-B01 contract preserves original Unicode and stable canonical identity", () => {
   assert.deepEqual(command({operation: "prepare", payload}), {operation: "prepare", payload});
   assert.equal(digest({a: 1, b: "हिन्दी"}), digest({b: "हिन्दी", a: 1}));
@@ -17,7 +32,8 @@ test('Store readiness mask has canonical bounded bytes and belongs in preparatio
   if (parsed.operation === 'prepare') assert.deepEqual(parsed.payload.nativeTargetMask, mask);
   assert.ok(Object.isFrozen(nativeTargetMaskSelection(mask)));
   for (const bad of [{...mask, version: 2}, {...mask, bits: 'AR'}, {...mask, bits: 'AQ=='}, {...mask, bits: 'A'},
-    {...mask, bits: Buffer.alloc(1876).toString('base64url')}, {...mask, grantAccess: true}]) assert.throws(() => nativeTargetMaskSelection(bad));
+    {...mask, bits: Buffer.alloc(preparationNativeMaskMaxBytes + 1).toString('base64url')}, {...mask, grantAccess: true}]) assert.throws(() => nativeTargetMaskSelection(bad));
+  assert.equal(nativeTargetMaskSelection({...mask, bits: Buffer.alloc(preparationNativeMaskMaxBytes).toString('base64url')}).bits.length, 5000);
   assert.throws(() => command({operation: 'prepare', payload: {...payload, nativeTargetMask: mask}}));
   assert.throws(() => command({operation: 'status', payload: {scope: input.scope, requestId: input.requestId, nativeTargetMask: mask}}));
   assert.notEqual(digest(input), digest({...input, nativeTargetMask: {...mask, bits: 'AA'}}));

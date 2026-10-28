@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/assistant/domain_context_gateway.dart';
 import 'package:moolsocial/features/assistant/model_gateway.dart';
 import 'package:moolsocial/features/assistant/mool_assistant.dart';
+import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 
 // Explicit host-only credential and network seams; never phone authority/data.
@@ -41,8 +42,24 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at);
 void main() {
+  for (final action in assistantDomainAddressContextActions) {
+    test('Original saved address $action needs a personal exact address identity', () async {
+      final data = {..._data(), 'revisions': [
+        {'actionId': action, 'entityId': 'address-one', 'sourceRevision': 'profile:3'}]};
+      final result = await _source(_Wire(() => _ok(data))).read(_context, () => true);
+      expect(result.revisions, {(action, 'address-one'): 'profile:3'});
+      final missing = {...data, 'revisions': [
+        {'actionId': action, 'entityId': null, 'sourceRevision': 'profile:3'}]};
+      await expectLater(_source(_Wire(() => _ok(missing))).read(_context, () => true), throwsA(isA<AssistantModelFailure>()));
+      final store = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'HOST Store',
+        profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
+      final wrong = {...data, 'scope': {'audience': 'workspace', 'storeId': 'store-one'},
+        'ownerKey': sha256.convert(utf8.encode(jsonEncode(['fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString()};
+      await expectLater(_source(_Wire(() => _ok(wrong))).read(store, () => true), throwsA(isA<AssistantModelFailure>()));
+    });
+  }
   const capacityExport = String.fromEnvironment('AI_DOMAIN_STORE_NATIVE_EXPORT_PATH');
-  test('Actual original 1250-product metadata crosses the real mobile decoder without trimming', () async {
+  test('Actual original 2500-product metadata crosses the real mobile decoder without trimming', () async {
     final export = jsonDecode(File(capacityExport).readAsStringSync()) as Map<String, dynamic>;
     expect(export['hostOnly'], true);
     final actor = export['capacityActor'] as Map;
@@ -60,9 +77,12 @@ void main() {
     addTearDown(source.dispose);
     final snapshot = await source.read(context, () => true);
     expect(snapshot.nativeSelection!.keys.length, export['capacityTargetCount']);
-    expect(snapshot.nativeSelection!.keys.length, 5003);
-    expect(snapshot.nativeSelection!.keys.where((key) => key.$1 == 'AI-ACT-214').length, 1250);
-    expect(snapshot.nativeSelection!.keys.where((key) => key.$1 == 'AI-ACT-221').length, 1250);
+    expect(snapshot.nativeSelection!.keys.length, 25014);
+    expect(snapshot.nativeSelection!.keys.where((key)=>assistantStoreStockOwnerContextActions.contains(key.$1)).toSet(),
+      {for(final action in assistantStoreStockOwnerContextActions)(action,null)});
+    expect(export['nativeVariantKinds'],BuyV2VariantDimensionKind.values.map((kind)=>kind.name).toList());
+    expect(snapshot.nativeSelection!.keys.where((key) => key.$1 == 'AI-ACT-214').length, 2500);
+    expect(snapshot.nativeSelection!.keys.where((key) => key.$1 == 'AI-ACT-221').length, 2500);
     expect(utf8.encode(jsonEncode(envelope)).length, lessThan(2 * 1024 * 1024));
   }, skip: capacityExport.isEmpty ? 'Requires explicit isolated original-service export' : false);
   test('Opt-in Store metadata keeps original proofs and deterministic compact order', () async {

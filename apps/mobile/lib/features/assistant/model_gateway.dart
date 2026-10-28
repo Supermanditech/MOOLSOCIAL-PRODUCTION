@@ -7,14 +7,27 @@ import '../shared/social_content_gateway.dart';
 
 typedef AssistantModelScope = ({String audience, String? storeId});
 typedef AssistantNativeTargetHint = ({String actionId, String? entityId});
+typedef AssistantNativeOriginalCapture = ({String actionId, String digest});
+List<AssistantNativeOriginalCapture> assistantNativeOriginalCaptureSelection(List<AssistantNativeOriginalCapture> values) {
+  final seen=<String>{};
+  if(values.length>2)throw const AssistantModelFailure('invalid_request');
+  for(final value in values) {
+    if(!const {'AI-ACT-225','AI-ACT-374'}.contains(value.actionId)||!seen.add(value.actionId)||
+        !RegExp(r'^[a-f0-9]{64}$').hasMatch(value.digest))throw const AssistantModelFailure('invalid_request');
+  }
+  return List.unmodifiable(List<AssistantNativeOriginalCapture>.of(values)..sort((a,b)=>a.actionId.compareTo(b.actionId)));
+}
+const assistantNativeTargetLimit = 30000;
+const assistantNativeMaskMaxBytes = (assistantNativeTargetLimit + 7) ~/ 8;
+const assistantNativeMaskMaxCharacters = (assistantNativeMaskMaxBytes * 4 + 2) ~/ 3;
 
 class AssistantNativeTargetMask {
   factory AssistantNativeTargetMask({required String fingerprint, required String bits}) {
-    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(fingerprint) || bits.length > 2500 ||
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(fingerprint) || bits.length > assistantNativeMaskMaxCharacters ||
         !RegExp(r'^[A-Za-z0-9_-]*$').hasMatch(bits)) throw const AssistantModelFailure('invalid_request');
     try {
       final bytes = base64Url.decode(base64Url.normalize(bits));
-      if (bytes.length > 1875 || base64Url.encode(bytes).replaceAll('=', '') != bits) {
+      if (bytes.length > assistantNativeMaskMaxBytes || base64Url.encode(bytes).replaceAll('=', '') != bits) {
         throw const AssistantModelFailure('invalid_request');
       }
     } on FormatException {throw const AssistantModelFailure('invalid_request');}
@@ -61,6 +74,7 @@ class AssistantModelInput {
     this.catalogueListingIds,
     this.nativeTargets,
     this.nativeTargetMask,
+    this.nativeOriginalCaptures,
   });
   final AssistantModelScope scope;
   final String requestId, message, language, expectedEntitlementRevision;
@@ -70,18 +84,28 @@ class AssistantModelInput {
   final List<String>? catalogueListingIds;
   final List<AssistantNativeTargetHint>? nativeTargets;
   final AssistantNativeTargetMask? nativeTargetMask;
+  final List<AssistantNativeOriginalCapture>? nativeOriginalCaptures;
   AssistantModelInput withCatalogueListingIds(List<String>? ids) => AssistantModelInput(
     scope: scope, requestId: requestId, requestRevision: requestRevision, message: message, language: language,
     expectedEntitlementRevision: expectedEntitlementRevision, actionId: actionId, entityId: entityId, history: history,
-    catalogueListingIds: ids == null ? null : assistantCatalogueListingSelection(ids), nativeTargets: nativeTargets, nativeTargetMask: nativeTargetMask);
+    catalogueListingIds: ids == null ? null : assistantCatalogueListingSelection(ids), nativeTargets: nativeTargets, nativeTargetMask: nativeTargetMask,nativeOriginalCaptures:nativeOriginalCaptures);
   AssistantModelInput withNativeTargets(List<AssistantNativeTargetHint>? targets) => AssistantModelInput(
     scope: scope, requestId: requestId, requestRevision: requestRevision, message: message, language: language,
     expectedEntitlementRevision: expectedEntitlementRevision, actionId: actionId, entityId: entityId, history: history,
-    catalogueListingIds: catalogueListingIds, nativeTargets: targets == null ? null : assistantNativeTargetSelection(targets), nativeTargetMask: nativeTargetMask);
+    catalogueListingIds: catalogueListingIds, nativeTargets: targets == null ? null : assistantNativeTargetSelection(targets), nativeTargetMask: nativeTargetMask,nativeOriginalCaptures:nativeOriginalCaptures);
   AssistantModelInput withNativeTargetMask(AssistantNativeTargetMask? mask) => AssistantModelInput(
     scope: scope, requestId: requestId, requestRevision: requestRevision, message: message, language: language,
     expectedEntitlementRevision: expectedEntitlementRevision, actionId: actionId, entityId: entityId, history: history,
-    catalogueListingIds: catalogueListingIds, nativeTargets: nativeTargets, nativeTargetMask: mask);
+    catalogueListingIds: catalogueListingIds, nativeTargets: nativeTargets, nativeTargetMask: mask,nativeOriginalCaptures:nativeOriginalCaptures);
+  AssistantModelInput withNativeOriginalCaptures(List<AssistantNativeOriginalCapture>? captures)=>AssistantModelInput(
+    scope:scope,requestId:requestId,requestRevision:requestRevision,message:message,language:language,
+    expectedEntitlementRevision:expectedEntitlementRevision,actionId:actionId,entityId:entityId,history:history,
+    catalogueListingIds:catalogueListingIds,nativeTargets:nativeTargets,nativeTargetMask:nativeTargetMask,
+    nativeOriginalCaptures:captures==null?null:assistantNativeOriginalCaptureSelection(captures));
+  List<Map<String,String>> _originalCaptureJson() {
+    if(scope.audience!='workspace')throw const AssistantModelFailure('invalid_request');
+    return assistantNativeOriginalCaptureSelection(nativeOriginalCaptures!).map((v)=>{'actionId':v.actionId,'digest':v.digest}).toList(growable:false);
+  }
   Map<String, Object?> _maskJson() {
     if (scope.audience != 'workspace') throw const AssistantModelFailure('invalid_request');
     return nativeTargetMask!.toJson();
@@ -100,6 +124,7 @@ class AssistantModelInput {
     if (nativeTargets != null) 'nativeTargets': assistantNativeTargetSelection(nativeTargets!)
       .map((value) => {'actionId': value.actionId, 'entityId': value.entityId}).toList(growable: false),
     if (nativeTargetMask != null) 'nativeTargetMask': _maskJson(),
+    if (nativeOriginalCaptures != null) 'nativeOriginalCaptures': _originalCaptureJson(),
   };
 }
 
@@ -263,6 +288,7 @@ class AssistantModelGateway implements RecoverableAssistantModelSource {
     _check(current);
     if (input.catalogueListingIds != null) input = input.withCatalogueListingIds(input.catalogueListingIds);
     if (input.nativeTargets != null) input = input.withNativeTargets(input.nativeTargets);
+    if (input.nativeOriginalCaptures != null) input = input.withNativeOriginalCaptures(input.nativeOriginalCaptures);
     if (input.scope.audience != 'personal' &&
             input.scope.audience != 'workspace' ||
         (input.scope.audience == 'personal'

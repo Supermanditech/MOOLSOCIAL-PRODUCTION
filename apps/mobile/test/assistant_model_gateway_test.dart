@@ -95,6 +95,24 @@ SocialContentResponse modelResponse(Map<String, Object?> data) =>
       body: jsonEncode({'ok': true, 'data': data}),
     );
 void main() {
+  test('Frozen original captures survive every input copy and remain closed workspace-only hints', () {
+    final captures=[(actionId:'AI-ACT-374',digest:'b'*64),(actionId:'AI-ACT-225',digest:'a'*64)];
+    final input=AssistantModelInput(scope:(audience:'workspace',storeId:'store-one'),requestId:'host-original',
+      requestRevision:1,message:'Check my retained request',language:'English',expectedEntitlementRevision:'host-paid')
+      .withNativeOriginalCaptures(captures).withCatalogueListingIds(null).withNativeTargets(null).withNativeTargetMask(null);
+    captures.clear();
+    expect(input.toJson()['nativeOriginalCaptures'],[
+      {'actionId':'AI-ACT-225','digest':'a'*64},{'actionId':'AI-ACT-374','digest':'b'*64}]);
+    expect(()=>input.nativeOriginalCaptures!.clear(),throwsUnsupportedError);
+    for(final values in [
+      [(actionId:'AI-ACT-225',digest:'a'*64),(actionId:'AI-ACT-225',digest:'b'*64)],
+      [(actionId:'AI-ACT-226',digest:'a'*64)],[(actionId:'AI-ACT-225',digest:'A'*64)],
+      [(actionId:'AI-ACT-225',digest:'a'*63)]]) {
+      expect(()=>assistantNativeOriginalCaptureSelection(values),throwsA(isA<AssistantModelFailure>()));
+    }
+    expect(()=>modelInput.withNativeOriginalCaptures([(actionId:'AI-ACT-225',digest:'a'*64)]).toJson(),
+      throwsA(isA<AssistantModelFailure>()));
+  });
   test('Compact Store readiness has canonical bounded bytes and survives immutable input copies', () {
     final mask = AssistantNativeTargetMask(fingerprint: 'a' * 64, bits: 'AQ');
     final input = AssistantModelInput(scope: (audience: 'workspace', storeId: 'store-one'), requestId: 'host-mask',
@@ -102,9 +120,11 @@ void main() {
     expect(input.withNativeTargets([]).withCatalogueListingIds(null).toJson()['nativeTargetMask'],
       {'version': 1, 'fingerprint': 'a' * 64, 'bits': 'AQ'});
     expect(() => modelInput.withNativeTargetMask(mask).toJson(), throwsA(isA<AssistantModelFailure>()));
-    for (final invalid in ['AR', 'AQ==', 'A', 'a' * 2501]) {
+    for (final invalid in ['AR', 'AQ==', 'A', 'a' * (assistantNativeMaskMaxCharacters + 1)]) {
       expect(() => AssistantNativeTargetMask(fingerprint: 'a' * 64, bits: invalid), throwsA(isA<AssistantModelFailure>()));
     }
+    expect(AssistantNativeTargetMask(fingerprint: 'a' * 64,
+      bits: base64Url.encode(List.filled(assistantNativeMaskMaxBytes, 0)).replaceAll('=', '')).bits.length, 5000);
   });
   test('Full serialized request exceeding64KiB cannot create a pending record or request credentials', () async {
     FlutterSecureStorage.setMockInitialValues({});

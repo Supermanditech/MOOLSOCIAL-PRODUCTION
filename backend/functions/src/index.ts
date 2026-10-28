@@ -2624,11 +2624,12 @@ function assistantOriginalContextSource(projectId: string) {
     workspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)}) : undefined;
   return new CompositePreparationContext({
     nativePreferencesEnabled: profile && catalogue,
+    nativeBuyerFormsEnabled: profile && catalogue,
     ...(original ? {original} : {}),
     ...(original && catalogue ? {storeProducts: new OriginalStoreProductPreparationContext({
       projectId, authority: original, catalogue: workspaceCatalogueService()})} : {}),
     ...(catalogue ? {catalogue: new OriginalCataloguePreparationContext({projectId,
-      plans: accountPlansRuntimeService, catalogue: workspaceCatalogueService()})} : {}),
+      plans: accountPlansRuntimeService, catalogue: workspaceCatalogueService(),...(original?{workspaceAuthority:original}:{})})} : {}),
   });
 }
 export const moolSocialAssistantContext = onRequest(

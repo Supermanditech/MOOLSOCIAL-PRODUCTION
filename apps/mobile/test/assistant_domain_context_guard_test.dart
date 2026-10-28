@@ -21,6 +21,26 @@ class _SearchNative implements MoolAssistantNativeAdapter {
     opens++; reviewed = p; return MoolAssistantReviewResult.opened;
   }
 }
+class _OriginalCaptureNative extends _SearchNative implements MoolAssistantBatchNativeAdapter {
+  String capture='a'*64;
+  bool lieAboutCurrent=false;
+  @override String get actionId=>'AI-ACT-225';
+  @override Set<String> get allowedFields=>{'originalCapture'};
+  @override String? validateFields(Map<String,Object?> fields)=>fields.length==1&&fields['originalCapture'] is String?null:'Keep capture';
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext c,String? entity)async=>
+    entity!=null?null:MoolAssistantNativeSnapshot(binding:c.binding,sourceRevision:'private-original',permitted:true,
+      originalRequestCapture:capture);
+  @override Future<MoolAssistantNativeBatchSnapshot> snapshots(MoolAssistantContext c,List<String?> entities)async{
+    final captured=capture,native=await snapshot(c,null);var retired=false;
+    return MoolAssistantNativeBatchSnapshot(owner:this,sourceRevision:'private-original',entries:{null:native},current:(){
+      if(!lieAboutCurrent&&capture!=captured)retired=true;return !retired;
+    });
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)async{
+    if(!current()||p.fields['originalCapture']!=capture||p.sourceRevision!='private-original')return MoolAssistantReviewResult.stale;
+    opens++;reviewed=p;return MoolAssistantReviewResult.opened;
+  }
+}
 class _ProductIdentityNative extends _SearchNative implements MoolAssistantCanonicalProductIdentityAdapter {
   @override String get actionId => 'AI-ACT-214';
   String? identity = 'native-product-alias';
@@ -38,6 +58,11 @@ class _ProductIdentityNative extends _SearchNative implements MoolAssistantCanon
     return current() ? identity : null;
   }
 }
+class _OptionalRootProductNative extends _ProductIdentityNative {
+  @override String get actionId=>'AI-ACT-223';
+  @override String? validateFields(Map<String,Object?> fields)=>fields.isEmpty?null:super.validateFields(fields);
+}
+class _RegisteredRootProductNative extends _OptionalRootProductNative implements MoolAssistantNativeProductRootReviewAdapter {}
 class _BatchProductNative extends _ProductIdentityNative implements MoolAssistantBatchNativeAdapter {
   final batchOwner = Object(), batchStarted = Completer<void>();
   Completer<void>? batchWait;
@@ -113,6 +138,74 @@ class _Fixture {
   void dispose() {guard.dispose(); owner.dispose();}
 }
 void main() {
+  for(final mode in ['ordinary-empty','registered-empty','registered-fields','registered-fixed']) {
+    test('Store product root identity exception $mode remains explicitly registered and empty',()async{
+      final native=mode=='ordinary-empty'?_OptionalRootProductNative():_RegisteredRootProductNative();
+      final owner=ValueNotifier(const MoolAssistantContext(accountScope:'host-root-owner',authenticationRevision:1));
+      final now=DateTime.utc(2026,10,28,8),entity=mode=='registered-fixed'?'sku-one':null;
+      const proof='host-root-authority';
+      final guard=AssistantProfileContextGuard(readContext:()=>owner.value,ownerChanges:owner,nativeAdapters:[native],
+        canonicalActions:{'AI-ACT-223'},recoverableActions:{'AI-ACT-223'},clock:()=>now,
+        readCanonical:(context,current)async=>AssistantCanonicalContextSnapshot(binding:context.binding,
+          revisions:{('AI-ACT-223',entity):proof},validUntil:now.add(const Duration(minutes:1))));
+      try{
+        await guard.capture(owner.value,()=>true);
+        final fields=<String,Object?>{if(mode=='registered-fields'||entity!=null)...{
+          'sourceCanonicalId':'catalogue-id','price':'001.50','quantity':'0001'}};
+        final proposal=MoolAssistantProposal(id:'host-root-review',actionId:'AI-ACT-223',binding:owner.value.binding,
+          entityId:entity,requestRevision:1,entitlementRevision:'host-paid',validUntil:now.add(const Duration(minutes:1)),
+          sourceRevision:proof,title:'Host review',summary:'Host only',fields:fields);
+        final result=await guard.adapters.single.openReview(proposal,()=>true);
+        final allowed=mode=='registered-empty'||mode=='registered-fixed';
+        expect(result,allowed?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.unavailable);
+        expect(native.opens,allowed?1:0);
+        if(mode=='registered-empty')expect(native.identityStarted.isCompleted,isFalse);
+        if(mode=='registered-fixed'){
+          expect(native.identityStarted.isCompleted,isTrue);
+          expect(native.reviewed!.fields,{'sourceCanonicalId':'native-product-alias','price':'001.50','quantity':'0001'});
+          expect(proposal.fields['sourceCanonicalId'],'catalogue-id');
+        }
+      }finally{guard.dispose();owner.dispose();}
+    });
+  }
+  for(final mode in ['inflight','restart','snapshot-mismatch']) {
+    test('Frozen original capture $mode cannot rebind a retained proposal to changed payload',()async{
+      const account=(environment:'isolated-host',projectId:'fixture-project',tenantId:null,userId:'host-owner');
+      final context=MoolAssistantContext(accountScope:account,authenticationRevision:1).withWorkspace(
+        const MoolAssistantWorkspace(id:'host-store',name:'Host',profile:'retailer-grocery',revision:1,
+          isStore:true,approved:true,approvalAccountScope:account));
+      final owner=ValueNotifier(context),native=_OriginalCaptureNative(),now=DateTime.utc(2026,10,28,8);
+      const proof='host-original-owner';
+      AssistantProfileContextGuard fresh()=>AssistantProfileContextGuard(readContext:()=>owner.value,ownerChanges:owner,
+        nativeAdapters:[native],canonicalActions:{native.actionId},recoverableActions:{native.actionId},clock:()=>now,
+        readCanonical:(c,current)async=>AssistantCanonicalContextSnapshot(binding:c.binding,
+          revisions:{(native.actionId,null):proof},validUntil:now.add(const Duration(minutes:1))));
+      var guard=fresh();
+      try {
+        await guard.capture(context,()=>true);
+        final fields={'originalCapture':guard.nativeOriginalCaptures!.single.digest};
+        final proposal=MoolAssistantProposal(id:'host-original-proposal',actionId:native.actionId,binding:context.binding,
+          requestRevision:1,entitlementRevision:'host-paid',sourceRevision:proof,validUntil:now.add(const Duration(minutes:1)),
+          title:'Review original',summary:'Host only',fields:fields,recovered:true,preparationRequestId:'host-model-original',preparationSourceRevision:proof);
+        if(mode=='restart') {
+          guard.dispose();guard=fresh();await guard.captureRecoveredReview(context,proposal,()=>true);
+          expect(await guard.adapters.single.openReview(proposal,()=>true),MoolAssistantReviewResult.opened);
+          expect(native.opens,1);
+          guard.dispose();guard=fresh();native.capture='b'*64;
+          await expectLater(guard.captureRecoveredReview(context,proposal,()=>true),throwsA(isA<AssistantModelFailure>()));
+          expect(native.opens,1);
+        }else{
+          native.lieAboutCurrent=mode=='snapshot-mismatch';native.capture='b'*64;
+          if(mode=='inflight') {
+            expect(guard.current,isFalse);native.capture='a'*64;expect(guard.current,isFalse);
+          }
+          expect(await guard.adapters.single.openReview(proposal,()=>true),MoolAssistantReviewResult.stale);
+          expect(native.opens,0);
+        }
+        expect(proposal.fields,fields);
+      }finally{guard.dispose();owner.dispose();}
+    });
+  }
   test('Native batch capture remains read-only and final original single snapshots still protect Review', () async {
     final native = _BatchProductNative();
     final f = _ProductIdentityFixture(adapter: native); addTearDown(f.dispose);

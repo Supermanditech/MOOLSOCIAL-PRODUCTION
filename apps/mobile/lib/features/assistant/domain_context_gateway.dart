@@ -7,15 +7,19 @@ import 'mool_assistant.dart';
 import 'profile_context.dart';
 
 // Match only original readers actually registered in the current backend.
-const assistantDomainProductContextActions = {'AI-ACT-006', 'AI-ACT-007', 'AI-ACT-009',
+const assistantDomainProductContextActions = {'AI-ACT-006', 'AI-ACT-007', 'AI-ACT-009', 'AI-ACT-014', 'AI-ACT-017', 'AI-ACT-018', 'AI-ACT-019',
   'AI-ACT-336', 'AI-ACT-337', 'AI-ACT-338', 'AI-ACT-339'};
 const assistantDomainPreferenceContextActions = {'AI-ACT-010', 'AI-ACT-011', 'AI-ACT-012', 'AI-ACT-013'};
-const assistantStoreProductContextActions = {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-370', 'AI-ACT-220'};
+const assistantDomainAddressContextActions = {'AI-ACT-024', 'AI-ACT-027'};
+const assistantStoreProductContextActions = {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-370', 'AI-ACT-220', 'AI-ACT-230', 'AI-ACT-222', 'AI-ACT-223', 'AI-ACT-226', 'AI-ACT-227', 'AI-ACT-371'};
 const assistantStoreDefaultContextActions = {'AI-ACT-218', 'AI-ACT-219'};
-const assistantStoreOwnerReadContextActions = {'AI-ACT-372'};
-const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions};
+const assistantStoreOwnerReadContextActions = {'AI-ACT-213', 'AI-ACT-215', 'AI-ACT-224', 'AI-ACT-372', 'AI-ACT-225', 'AI-ACT-374'};
+const assistantStoreStockOwnerContextActions={'AI-ACT-231','AI-ACT-232','AI-ACT-233','AI-ACT-407','AI-ACT-408'};
+const assistantStoreRestockOwnerContextActions={'AI-ACT-234'};
+const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions};
 const assistantDomainContextActions = {'AI-ACT-001', 'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
   ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions,
+  ...assistantDomainAddressContextActions,
   ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions};
 
 abstract interface class AssistantDomainContextGatewaySource {
@@ -119,7 +123,7 @@ class AssistantDomainContextGateway {
       for (final raw in selected['groups'] as List) {
         final group = _map(raw, {'actionIds', 'entityId', 'sourceRevision'}), ids = group['actionIds'];
         if (ids is! List || ids.isEmpty || ids.length > maskActions.length || ids.toSet().length != ids.length ||
-            rows.length + ids.length > 15000 || ids.any((action) => !maskActions.contains(action))) _invalid();
+            rows.length + ids.length > assistantNativeTargetLimit || ids.any((action) => !maskActions.contains(action))) _invalid();
         for (final action in ids) {
           rows.add({'actionId': action, 'entityId': group['entityId'], 'sourceRevision': group['sourceRevision']});
         }
@@ -139,7 +143,9 @@ class AssistantDomainContextGateway {
           (entity != null || context.inWorkspace)) _invalid();
       if (assistantDomainProductContextActions.contains(action) && (context.inWorkspace || entity == null ||
           selection == null || !selection.contains(entity))) _invalid();
-      if (assistantStoreProductContextActions.contains(action) && (!context.inWorkspace || entity == null)) _invalid();
+      if (assistantDomainAddressContextActions.contains(action) && (context.inWorkspace || entity == null)) _invalid();
+      if (assistantStoreProductContextActions.contains(action) && (!context.inWorkspace ||
+          entity == null && !(action=='AI-ACT-223'&&RegExp(r'^store-product-submission-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))) _invalid();
       if (assistantStoreOwnerContextActions.contains(action) && (!context.inWorkspace || entity != null)) _invalid();
       if (assistantDomainContextActions.contains(action)) revisions[key] = revision;
       if (compact && maskActions.contains(action)) {
