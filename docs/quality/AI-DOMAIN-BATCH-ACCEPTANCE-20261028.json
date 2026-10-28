@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 13,
+  "localMetadataCommits": 14,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -1861,5 +1861,367 @@
     "backendBranchPushAuthorized": false,
     "productionAcceptance": false,
     "newMasterOrMigration": false
+  },
+  "scope10PrivateStarsCheckpoint": {
+    "sequence": "10-private-stars-source",
+    "baseline": "47a64270dbd603c09ee0c0e8b908616332093187",
+    "manifest": {
+      "scope": 10,
+      "baseline": "47a64270dbd603c09ee0c0e8b908616332093187",
+      "branch": "work/codex-backend/ai-domain-batch-20261028",
+      "changedOwners": [
+        "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "backend/functions/src/assistant/domain_context.test.ts",
+        "backend/functions/src/assistant/domain_context.ts",
+        "backend/functions/src/assistant/domain_context_integration.test.ts",
+        "backend/functions/src/assistant/model_service.test.ts",
+        "backend/functions/src/assistant/model_service.ts",
+        "backend/functions/src/index.ts"
+      ],
+      "owners": [
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.ts",
+          "sha256": "3D9EF6C48B4B94E7D0B5A2A1AF3B1DAA3A4A36054D28277ED3188786859DE031",
+          "bytes": 8050,
+          "gitBlobOid": "80d83e66aa2e8e07d078e228d467e0b4567da7a9"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.test.ts",
+          "sha256": "41456B6D378BA90870D5663823CB4B59463490EA5F8AE6CCC98124FE14F4BB8C",
+          "bytes": 8113,
+          "gitBlobOid": "ee2988638789a76c51b9ee425eae5e1df625c215"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.ts",
+          "sha256": "F42AE3F93F9C9726F3A7DEAB546A103AEAE87FE3E1119B981FC3DC834E53A0EE",
+          "bytes": 117094,
+          "gitBlobOid": "c59d33d6a5771e5b3357355383b4b1fa1ef07cee"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.test.ts",
+          "sha256": "2CF05DCDB12BAA4480E58DABDB7FA35BBDF67710C497BFD5FC48B8271A231DDD",
+          "bytes": 40743,
+          "gitBlobOid": "90e45b924fc67573fc56837e2150a06bce06e02f"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.ts",
+          "sha256": "B87C01F6811E3EBBE86D010AC5D0488626266B00C80920553FAB502D2941936A",
+          "bytes": 3248,
+          "gitBlobOid": "e029fd941d1ed11f8278dc97593f03bc7120572f"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.test.ts",
+          "sha256": "CD77B75EF8E7EE01980DB7CC200233944C5CA60C88A454BF7F4E4B4242A25598",
+          "bytes": 5373,
+          "gitBlobOid": "aaec24000807da73e92fa7563fefa7a897ccfd57"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_integration.test.ts",
+          "sha256": "795BFC878609E4D6BE10207B46C2B6327A463A571DF70521378823A6657BEB5E",
+          "bytes": 32093,
+          "gitBlobOid": "c1b5c3b8e94901acecd95d4ead7f48a43106f642"
+        },
+        {
+          "path": "backend/functions/src/index.ts",
+          "sha256": "EA5795A2474B83E759F5AD2F97953CC9E8A0CBAC424C21DBAC62D31C2D44AF70",
+          "bytes": 151592,
+          "gitBlobOid": "fdbdbd131d60ba627f7b5df85aac6575194a7cbb"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+          "sha256": "4C28984CA1E082026C25B208B96AE5695A53BA80C4829E1EF9D79E8A90425593",
+          "bytes": 10930,
+          "gitBlobOid": "0abf0d6e6208b6a55886402298e0775d4e5ae6dd"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/profile_context.dart",
+          "sha256": "2A2902F853D5FB6AA693D79F3FBA3FD7412B4A49D1D30490EE7F69E0855472A6",
+          "bytes": 18268,
+          "gitBlobOid": "6da659d0791dbe402cae8f083b8fce83fd8be21e"
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+          "sha256": "F8ABB359ADF4714C9DD330AD17D34DAD5D441D6763D2902B9F0A177F5E4DD6A8",
+          "bytes": 91081,
+          "gitBlobOid": "0a1b8f3f814fbf517e8cd43e9b29563acdd99215"
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+          "sha256": "2570BB48BDFA8F9E9EA0D61348A0F1B3CD778105565FB8784C6FE156F5928342",
+          "bytes": 79399,
+          "gitBlobOid": "624089b250cb5cee594dbc7377302ed72ab6ecf3"
+        },
+        {
+          "path": "apps/mobile/lib/app/moolsocial_app.dart",
+          "sha256": "82EEADE801CB2A7C04AF8C95819FA6EC30B138357753F426EB95741EDA101FD6",
+          "bytes": 24302,
+          "gitBlobOid": "48928f20d1f30bfe9c417c037e3a13d334806a7d"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+          "sha256": "92D39C1CB9CDD868CB28904241543B14BB965B4946DC4B18C25EB2FCE9C0F7BE",
+          "bytes": 18777,
+          "gitBlobOid": "156ef881eb680fb273f234d817ebfd9aeac528e9"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "sha256": "9A3D5F14C5DE7BAC9853FCB847B6B41172E9406ED5B51786CB312B7F60C23F47",
+          "bytes": 1286333,
+          "gitBlobOid": "9cc105b977dceccf75b1653744bcd31db33869cc"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+          "sha256": "5D3AAF88764035306EA953C003A3E8FD9CF97AD368C9F759ABB81F81FDEB5C89",
+          "bytes": 208676,
+          "gitBlobOid": "4bcecc4240109fd15eb3792e83a8b42bd44d75f8"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+          "sha256": "80421C1DD56EFACBE7626B32963E4A6AD4B51B3D6D4AB78AA52E3703B4E49096",
+          "bytes": 2927832,
+          "gitBlobOid": "04ee02a2de598b6b5d9dc599df126b1a277b021e"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+          "sha256": "20A36F4DAD08E5829894E62A834ACCCE14E02B04FF4DFA3AB943A1F5FDE1A9D4",
+          "bytes": 21886,
+          "gitBlobOid": "60a789874ee57f6b01ee12af95cd4b220f0c9f07"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_guard_test.dart",
+          "sha256": "07FF247E0BD3D5723684EB9D2D964256FF412E8485563F2E86CC93B08018882A",
+          "bytes": 23093,
+          "gitBlobOid": "ba6eefe5ce1cd7ca1e4a258da52129ccd3cdb0bf"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_integration_test.dart",
+          "sha256": "6111CC00A6A198BD59BE7E1AD7405CF0F3EE44B79DD569D217839866153BC3CC",
+          "bytes": 13480,
+          "gitBlobOid": "9469edfbb72b6c990d2f623ca833d91cec1b43c0"
+        },
+        {
+          "path": "apps/mobile/test/assistant_profile_context_test.dart",
+          "sha256": "1ECF64F5F5616593D77A9F08056780AF1D2A9A4AFDFD1C9A4456E628E843FD8E",
+          "bytes": 42768,
+          "gitBlobOid": "c92a9cfd087af7007bcfdf64330dd2b586ab3f42"
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_flow_test.dart",
+          "sha256": "B28A93CB0D149BDE6D5F9626FB16A1735CAAFA7A92A85FCF54D2D95ED71DD045",
+          "bytes": 21891,
+          "gitBlobOid": "f10032c3246ec403981fa5e08caa9b406de4ba29"
+        },
+        {
+          "path": "apps/mobile/test/mool_assistant_test.dart",
+          "sha256": "0A012D2038E5C0C89F39C0429E1375698952827DD0B478DAFEE0A60435180A44",
+          "bytes": 209720,
+          "gitBlobOid": "fd585e7580eb5d4579014ae37dacb9282a8e4810"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.ts",
+          "sha256": "BB9C8812CC5C082A61F98A5F9F3083D147358A411028E027E14EDE2DE17A2473",
+          "bytes": 12353,
+          "gitBlobOid": "93a2fd5beec230a123d81fbc5348b940847e140c"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.test.ts",
+          "sha256": "9CC5DA02340D57584370E237D16A4C33D0977F8E69BA7BB5B4EA1FC2DAE7EBDF",
+          "bytes": 7425,
+          "gitBlobOid": "de5b8a64e908a1c706f5c71dfb000813ef266c48"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.ts",
+          "sha256": "15F8746559DD8A4835C6A1C21EE4FCFF99230630CF6DA39ED3135A1333444854",
+          "bytes": 21902,
+          "gitBlobOid": "e17274b3bf8b2995ca82a50d6add71800efaa58c"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.test.ts",
+          "sha256": "C6612FD2E840EB01B6F4C50C90127EF4D0C0D5936048B1F90F81F65CE352DA1C",
+          "bytes": 27490,
+          "gitBlobOid": "9a544fb2d2b4df8e9d0ccf594ba485cca7424f3d"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/model_gateway.dart",
+          "sha256": "877B55A27C6C1D8886EC5CA630BFC00AED2F0F1A5E6DD86431A8ABCF11CDB2C5",
+          "bytes": 22299,
+          "gitBlobOid": "ed9e3f1aa2522bd888d2223022d9716996440b25"
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_gateway_test.dart",
+          "sha256": "1ADB4083861EEBEA9334E4949806067ADAA14EA3357AB95DBE02B4AE373EFFFB",
+          "bytes": 15042,
+          "gitBlobOid": "7c237c56100dc191e0d9431ee8bd8660c444a5ec"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+          "sha256": "8D1928EF537F55B9E3645A6D039F2ECDB2F01FC9A6DB4D2416CAF872934C7435",
+          "bytes": 105705,
+          "gitBlobOid": "079662fdd40a32059a0ea01cfe6355dc1ceb4130"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+          "sha256": "8F1EBD0F5F4CBD84CB2B642BAC7E8058234736B012D640F66A74E7DD709968E3",
+          "bytes": 526267,
+          "gitBlobOid": "f8b47e91b94cd80839f81000d4efda85cdd786d6"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_session.dart",
+          "sha256": "24617D91F510CAF8F7422E9C9F2BE907B03D0E89971C8A618B4FB317B18E73CE",
+          "bytes": 806296,
+          "gitBlobOid": "747bcb1e56c1ca4f08e393d80cd575f845f3a324"
+        },
+        {
+          "path": "apps/mobile/test/work_workspace_layout_safety_test.dart",
+          "sha256": "FCF8B0891E6F06061256345E78B5D15F6B3D3C31B4E4E2C533A5CD113BD8B88B",
+          "bytes": 4336149,
+          "gitBlobOid": "b755e5e0d47547d5b1283477b7213cafe44fa047"
+        },
+        {
+          "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "sha256": "C32D344A354299090367EC274C6B84226209CBFE1650A94FFEA087C2511BE261",
+          "bytes": 869945,
+          "gitBlobOid": "138e84520cbffebd3a30bc817081246317c18732"
+        },
+        {
+          "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "sha256": "A8FBA26E9357025C951F6CF5904EA8F671AF5D2C19B8BE16F89DE323C1D90567",
+          "bytes": 950105,
+          "gitBlobOid": "00a2a79d20ba56c4d016af575c53aed838e7ab9d"
+        }
+      ]
+    },
+    "disposition": {
+      "scope": 10,
+      "state": "partial_original_private_purchased_stars_source_and_native_review_host_qualified",
+      "updatedUtc": "2026-10-28T16:00:19.445862+05:30",
+      "baseline": "47a64270dbd603c09ee0c0e8b908616332093187",
+      "actionIds": [
+        "AI-ACT-055"
+      ],
+      "implementation": [
+        "Original authenticated completion index and current saved rating, read twice under paid personal authority; exact purchased-line/listing/completion and saved-rating revisions bind preparation.",
+        "Existing orderId plus lineId/stars contract retained. Native readiness requires every offered line of that order to have a confirmed rating read and no unresolved attempt.",
+        "Actual original reference/order/line opens the existing private-rating sheet without creating a Buy order or requiring a current catalogue product.",
+        "No automatic journal restore, replay, clearing, reconciliation or sending; the existing native final Send and recovery controls remain authoritative.",
+        "Selected native order filtering also narrows lineId choices and model context."
+      ],
+      "defectsFixedDuringImplementation": [
+        "Direct-only original Buy order dependence prevented source-backed private-rating Review.",
+        "Identical repeated canonical reads rotated native anchors; separate read generation and stable source identity now preserve unchanged anchors.",
+        "Source-readiness retirement cancelled an accepted save during its own journal/busy changes; actor ownership and before-save source readiness are now distinct.",
+        "Dynamic lineId tool choices included lines from orders outside native selection; model schema and context now filter both."
+      ],
+      "hostEvidence": [
+        {
+          "path": "scope10-backend-combined-v1-tests.log",
+          "passed": 296,
+          "conditionalSkipped": 0,
+          "sha256": "6FFB49CA9A29BF2ED5058D106C893F3A3DFCA3E0A7BF5BB982090E991347CFEB"
+        },
+        {
+          "path": "scope10-native-combined-v1-tests.log",
+          "passed": 99,
+          "conditionalSkipped": 0,
+          "sha256": "289AC14C2B6A89C4BB9541678BC414297F04A1F5CA5A18468A960B68C235CB04"
+        },
+        {
+          "path": "scope10-native-checkout-v1-tests.log",
+          "passed": 41,
+          "conditionalSkipped": 0,
+          "sha256": "F2538CD0BA5DD0FA4466799DEAF9592E255471E3DB10ACCBAB2FF4469C9B17C2"
+        },
+        {
+          "path": "scope10-mobile-combined-v1-tests.log",
+          "passed": 140,
+          "conditionalSkipped": 10,
+          "sha256": "EFDDBE5FBCDCED69EE9F92EBA8223F75494AEABCE92FA522748FF5486B053EEA"
+        }
+      ],
+      "analysis": {
+        "errors": 0,
+        "warnings": 0,
+        "informational": 139
+      },
+      "actualServiceContract": {
+        "path": "scope10-private-stars-original-service-v2.json",
+        "sha256": "1D88B640C70D2C447860FE19AF610D1E36103DFB523CACC574EE5331527B6611",
+        "source": "Actual loopback SDK original placement/completion/target/rating services and canonical HTTP; explicit host-only source and auth ports, no cloud or device data.",
+        "nativeQualification": "Same serialized14 target records,7 purchase originals and exact backend proofs used by native capture and first/middle/last original-line Review."
+      },
+      "oppo": {
+        "currentSourceOwnersMatched": 13,
+        "inspectionGatePassed": true,
+        "reachableScreens": [
+          "protected Cart recovery hold",
+          "signed-out personal Profile",
+          "Android Back returns to unchanged Cart hold"
+        ],
+        "savedFingerprintsUnchanged": 108,
+        "populatedAgentJourneyQualified": false,
+        "reason": "Retained evaluation session has no authenticated original account/model/private-rating service connection; no fixture data injected."
+      },
+      "remaining": [
+        "Authenticated populated original private-rating AI journey on OPPO after original services are connected.",
+        "Public review054 requires its own verified public-rating authority; private completed-item stars are not a substitute.",
+        "Product report056 retains its original commerce/report receiver and status/recovery dependency.",
+        "Delivery exceptions, returns, replacements, proof disputes and balance payments each require their original current order/eligibility/receiver/status sources; no new services or rules created.",
+        "Complete-index legacy metadata capacity/deadline remains bounded by existing protocol; scalable targeted discovery requires an accepted original contract."
+      ],
+      "wholeScopeClosed": false,
+      "founderApprovalClaimed": false,
+      "productionAcceptance": false,
+      "goalRemainsActive": true,
+      "liveEffect": false,
+      "apkBuiltOrInstalled": false,
+      "sourceCommittedOrPushedYet": false
+    },
+    "evidence": [
+      {
+        "path": "scope10-backend-combined-v1-tests.log",
+        "sha256": "6FFB49CA9A29BF2ED5058D106C893F3A3DFCA3E0A7BF5BB982090E991347CFEB"
+      },
+      {
+        "path": "scope10-native-combined-v1-tests.log",
+        "sha256": "289AC14C2B6A89C4BB9541678BC414297F04A1F5CA5A18468A960B68C235CB04"
+      },
+      {
+        "path": "scope10-native-checkout-v1-tests.log",
+        "sha256": "F2538CD0BA5DD0FA4466799DEAF9592E255471E3DB10ACCBAB2FF4469C9B17C2"
+      },
+      {
+        "path": "scope10-mobile-combined-v1-tests.log",
+        "sha256": "EFDDBE5FBCDCED69EE9F92EBA8223F75494AEABCE92FA522748FF5486B053EEA"
+      },
+      {
+        "path": "scope10-final-analysis-v1.log",
+        "sha256": "6E9F430CE8AC48B015F0F87E98E41860F84AC33E05EBDA91432F8922E7C38BBF"
+      },
+      {
+        "path": "scope10-private-stars-original-service-v2.json",
+        "sha256": "1D88B640C70D2C447860FE19AF610D1E36103DFB523CACC574EE5331527B6611"
+      },
+      {
+        "path": "oppo-scope10-v1/VM-SOURCE-VERIFICATION.json",
+        "sha256": "E6F37CDFB0403CE4331DC848A87A992FDE0EA40556B8370DE95E39A90309D1C3"
+      },
+      {
+        "path": "oppo-scope10-v1/PRESERVATION.json",
+        "sha256": "E163B1C6F7AA4C6E49465E3AB4CC39418EDAF9A158768A27CEB8C5C2E891E667"
+      },
+      {
+        "path": "oppo-scope10-v1/runtime-inspection-gate.log",
+        "sha256": "C14F952554EF7947B02922A9C32C3A2E7723A7F684DFE3A664BF7601F196D59F"
+      }
+    ],
+    "namedBranchPushAuthorized": true,
+    "productionAcceptance": false,
+    "sourceCommit": null,
+    "authority": "Existing standing exact source/evidence checkpoint authority for named batch branch only."
   }
 }

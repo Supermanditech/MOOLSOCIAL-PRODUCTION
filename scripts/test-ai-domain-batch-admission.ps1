@@ -210,4 +210,32 @@ foreach($property in @('sourceFeatureCommitsAuthorized','backendBranchPushAuthor
 }
 $bad=($privateStars|ConvertTo-Json -Depth 20)|ConvertFrom-Json;$bad.newOwners+=@('backend/functions/src/foreign.ts')
 Check (!(Test-AiDomainPrivateStarsTestAdmission $bad)) 'reject unrelated private stars owner'
+$starsSeal=$approval.scope10PrivateStarsCheckpoint
+Check (Test-AiDomainPrivateStarsCheckpoint $starsSeal) 'exact qualified private-rating checkpoint'
+Check (@(Get-AiDomainPrivateStarsSealOwners).Count -eq 3) 'only three existing metadata owners for private-rating seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($starsSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainPrivateStarsCheckpoint $bad)) "reject changed private-rating seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($starsSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainPrivateStarsCheckpoint $bad)) "reject changed private-rating qualified source $property"
+}
+$bad=($starsSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainPrivateStarsCheckpoint $bad)) 'reject private-rating source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($starsSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainPrivateStarsCheckpoint $bad)) "reject expanded private-rating qualification $property"
+}
+$bad=($starsSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAgentJourneyQualified=$true
+Check (!(Test-AiDomainPrivateStarsCheckpoint $bad)) 'reject fabricated private-rating device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($starsSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainPrivateStarsCheckpoint $bad)) "reject changed private-rating evidence $property"
+}
+foreach($row in @(@(0,3),@(1,12),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainPrivateStarsStageOwners $row[0] $starsSeal).Count -eq $row[1]) "private-rating checkpoint exact stage $($row[0]) owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."
