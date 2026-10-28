@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 5,
+  "localMetadataCommits": 6,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -420,5 +420,23 @@
       "remainingScopes": 19,
       "goalStillActive": true
     }
+  },
+  "scope02Admission": {
+    "sequence": 2,
+    "baseline": "785d375a6170e585d575d57c567e17573655e02f",
+    "newOwners": [
+      "apps/mobile/lib/features/work/work_session.dart",
+      "apps/mobile/test/work_workspace_layout_safety_test.dart"
+    ],
+    "contract": "The original backend product revision metadata includes realm and owned record revision. An existing reviewed acknowledgement, its exact account/Store/SKU binding and unchanged original authored-source fingerprint qualify native cache parity. Only registered canonical product identity may map to its native alias after canonical/native guard validation. No other field or source token changes; no write/replay during reads; original final Save controls effects.",
+    "contractSha256": "9B40D98A512DC3AFA7F4CE8000292DEFBDB1FA9650AE9DA4AB3D74BB0053C34D",
+    "authority": "Activated original20 scopes and standing exact necessary admissions; not separately founder-read hash review.",
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "productionAcceptance": false,
+    "newMasterOrMigration": false,
+    "implementationBoundary": "Read the existing acknowledgement and original authored source; registered native product-identity mapping only. Do not overwrite user inputs, mutate saved proposals, replay recovery, add persistence or activate services.",
+    "goalScopeCount": 20,
+    "scope01EvidencePreserved": true
   }
 }

@@ -53,7 +53,9 @@
         "backend/functions/src/assistant/model_service.test.ts",
         "apps/mobile/lib/features/assistant/model_gateway.dart",
         "apps/mobile/test/assistant_model_gateway_test.dart",
-        "apps/mobile/lib/features/assistant/mool_assistant.dart"
+        "apps/mobile/lib/features/assistant/mool_assistant.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
@@ -194,7 +196,9 @@
       "apps/mobile/lib/features/assistant/model_gateway.dart",
       "apps/mobile/test/assistant_model_gateway_test.dart",
       "apps/mobile/lib/features/assistant/mool_assistant.dart",
-      "backend/functions/src/workspace/workspace_catalogue_service.test.ts"
+      "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+      "apps/mobile/lib/features/work/work_session.dart",
+      "apps/mobile/test/work_workspace_layout_safety_test.dart"
     ],
     "acceptedUiCommit": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
     "contractSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382",
@@ -217,6 +221,16 @@
       "path": "docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md",
       "sha256": "A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22",
       "standingAuthority": "Exact necessary test admission within existing scope; no runtime provider or rule change."
+    },
+    "scope02AcknowledgementAdmission": {
+      "baseline": "785d375a6170e585d575d57c567e17573655e02f",
+      "newOwners": [
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart"
+      ],
+      "contractSha256": "9B40D98A512DC3AFA7F4CE8000292DEFBDB1FA9650AE9DA4AB3D74BB0053C34D",
+      "scope": "Existing original reviewed-product acknowledgement and typed canonical-to-native identity mapping only. No new source, master or business effect.",
+      "authority": "Original20-scope EXECUTE and standing exact necessary admissions; not separate founder hash review."
     }
   }
 }

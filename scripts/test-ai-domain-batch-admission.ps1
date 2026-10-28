@@ -6,7 +6,8 @@ $f=@{Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-domain-batch-20261
 Check (Test-AiDomainBatchIdentity $f) 'identity'
 foreach($k in $f.Keys){$b=$f.Clone();$b[$k]='foreign';Check (!(Test-AiDomainBatchIdentity $b)) "foreign $k";$b=$f.Clone();$b.Remove($k);Check (!(Test-AiDomainBatchIdentity $b)) "missing $k"}
 foreach($phase in @('build','deploy','ticket_acceptance','handoff')){$b=$f.Clone();$b.Phase=$phase;Check (!(Test-AiDomainBatchIdentity $b)) "forbidden $phase"}
-Check (@(Get-AiDomainBatchRuntimeOwners).Count -eq 31) '31 exact runtime/test owners';Check (@(Get-AiDomainBatchMetadataOwners).Count -eq 13) 'thirteen exact metadata owners'
+Check (@(Get-AiDomainBatchRuntimeOwners).Count -eq 33) '33 exact runtime/test owners';Check (@(Get-AiDomainBatchMetadataOwners).Count -eq 13) 'thirteen exact metadata owners'
+Check (@(Get-AiDomainScopeOneRuntimeOwners).Count -eq 31) 'the sealed scope01 manifest retains its original31 owners'
 $root=Split-Path -Parent $PSScriptRoot
 Check ($root.Replace('\','/') -ceq $f.Root) 'actual checkout root matches identity'
 Check ((Get-FileHash (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-CONTRACT-20261028.md')).Hash -ceq '9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382') 'contract bytes'
@@ -42,4 +43,17 @@ $bad=($manifest|ConvertTo-Json -Depth 30)|ConvertFrom-Json
 $bad.owners=@($bad.owners)+@($bad.owners[0])
 Check (!(Test-AiDomainScopeOneManifest $bad)) 'reject duplicate or expanded runtime manifest'
 Check (!$approval.sourceFeatureCommits -and !$approval.backendBranchPush -and !$approval.deployment -and !$approval.productionAcceptance) 'no broad source/push/deployment or production authority'
+Check (@(Get-AiDomainScopeTwoAdmissionOwners).Count -eq 5) 'only existing five metadata owners for scope02 admission'
+$scopeTwo=$approval.scope02Admission
+Check (Test-AiDomainScopeTwoAdmission $scopeTwo) 'exact original acknowledgement bridge admission'
+foreach($property in @('baseline','contract')) {
+ $bad=($scopeTwo|ConvertTo-Json -Depth 10)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainScopeTwoAdmission $bad)) "reject scope02 changed $property"
+}
+foreach($property in @('sourceFeatureCommitsAuthorized','backendBranchPushAuthorized','productionAcceptance','newMasterOrMigration')) {
+ $bad=($scopeTwo|ConvertTo-Json -Depth 10)|ConvertFrom-Json;$bad.$property=$true
+ Check (!(Test-AiDomainScopeTwoAdmission $bad)) "reject scope02 expanded $property"
+}
+$bad=($scopeTwo|ConvertTo-Json -Depth 10)|ConvertFrom-Json;$bad.newOwners=@($bad.newOwners)+@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainScopeTwoAdmission $bad)) 'reject scope02 unrelated owner expansion'
 Write-Output "AI domain batch admission checks passed: $n."
