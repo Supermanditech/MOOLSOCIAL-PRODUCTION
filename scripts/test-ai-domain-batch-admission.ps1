@@ -350,4 +350,32 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,14),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainStoreOperationsStageOwners $row[0] $operationalSeal).Count -eq $row[1]) "original-operational checkpoint exact stage $($row[0]) owner count"
 }
+$couponSeal=$approval.scope18StoreCouponsCheckpoint
+Check (Test-AiDomainStoreCouponsCheckpoint $couponSeal) 'exact qualified original-coupon checkpoint'
+Check (@(Get-AiDomainStoreCouponsSealOwners).Count -eq 3) 'only three existing metadata owners for original-coupon seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($couponSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainStoreCouponsCheckpoint $bad)) "reject changed original-coupon seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($couponSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainStoreCouponsCheckpoint $bad)) "reject changed original-coupon qualified source $property"
+}
+$bad=($couponSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainStoreCouponsCheckpoint $bad)) 'reject original-coupon source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($couponSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainStoreCouponsCheckpoint $bad)) "reject expanded original-coupon qualification $property"
+}
+$bad=($couponSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAgentJourneyQualified=$true
+Check (!(Test-AiDomainStoreCouponsCheckpoint $bad)) 'reject fabricated original-coupon device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($couponSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainStoreCouponsCheckpoint $bad)) "reject changed original-coupon evidence $property"
+}
+foreach($row in @(@(0,3),@(1,12),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainStoreCouponsStageOwners $row[0] $couponSeal).Count -eq $row[1]) "original-coupon checkpoint exact stage $($row[0]) owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."
