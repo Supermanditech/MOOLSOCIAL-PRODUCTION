@@ -574,6 +574,34 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,9),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainSelectedRestockStageOwners $row[0] $selectedRestockSeal).Count -eq $row[1]) "selected-restock checkpoint exact stage $($row[0]) owner count"
 }
+$expiredPriceSeal=$approval.aggregate01ExpiredPriceCheckpoint
+Check (Test-AiDomainExpiredPriceCheckpoint $expiredPriceSeal) 'exact qualified expired-price checkpoint'
+Check (@(Get-AiDomainExpiredPriceSealOwners).Count -eq 3) 'only three existing metadata owners for expired-price seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($expiredPriceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainExpiredPriceCheckpoint $bad)) "reject changed expired-price seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($expiredPriceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainExpiredPriceCheckpoint $bad)) "reject changed expired-price qualified source $property"
+}
+$bad=($expiredPriceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainExpiredPriceCheckpoint $bad)) 'reject expired-price source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($expiredPriceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainExpiredPriceCheckpoint $bad)) "reject expanded expired-price qualification $property"
+}
+$bad=($expiredPriceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAuthenticatedPriceRefreshAgentJourneyQualified=$true
+Check (!(Test-AiDomainExpiredPriceCheckpoint $bad)) 'reject fabricated expired-price device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($expiredPriceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainExpiredPriceCheckpoint $bad)) "reject changed expired-price evidence $property"
+}
+foreach($row in @(@(0,3),@(1,6),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainExpiredPriceStageOwners $row[0] $expiredPriceSeal).Count -eq $row[1]) "expired-price checkpoint exact stage $($row[0]) owner count"
+}
 $quoteRecurrence=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).quoteImplementationRecurrence20261029
 Check (Test-AiDomainQuoteRecurrenceAdmission $quoteRecurrence) 'exact registered quote implementation recurrence'
 Check (!(Test-AiDomainQuoteRecurrenceAdmission $null)) 'reject absent quote recurrence'
