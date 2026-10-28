@@ -56,4 +56,19 @@ foreach($property in @('sourceFeatureCommitsAuthorized','backendBranchPushAuthor
 }
 $bad=($scopeTwo|ConvertTo-Json -Depth 10)|ConvertFrom-Json;$bad.newOwners=@($bad.newOwners)+@('backend/functions/src/foreign.ts')
 Check (!(Test-AiDomainScopeTwoAdmission $bad)) 'reject scope02 unrelated owner expansion'
+Check (@(Get-AiDomainScopeTwoSealOwners).Count -eq 3) 'only three existing owners for qualified product seal'
+$productManifest=$approval.scope02Checkpoint.manifest
+Check (Test-AiDomainScopeTwoManifest $productManifest) 'exact qualified product manifest'
+foreach($property in @('scope','baseline','branch')) {
+ $bad=($productManifest|ConvertTo-Json -Depth 40)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'scope'){3}else{'foreign'}
+ Check (!(Test-AiDomainScopeTwoManifest $bad)) "reject changed product manifest $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($productManifest|ConvertTo-Json -Depth 40)|ConvertFrom-Json
+ $bad.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainScopeTwoManifest $bad)) "reject changed product source $property"
+}
+$bad=($productManifest|ConvertTo-Json -Depth 40)|ConvertFrom-Json;$bad.changedOwners[0]='backend/functions/src/foreign.ts'
+Check (!(Test-AiDomainScopeTwoManifest $bad)) 'reject unrelated product source owner'
 Write-Output "AI domain batch admission checks passed: $n."
