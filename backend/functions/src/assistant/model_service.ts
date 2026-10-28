@@ -52,6 +52,7 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
   const privateStarsOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-055'&&target.entityId!==null).map(target=>target.entityId!));
   const coupons=new Set(targets.filter(target=>['AI-ACT-309','AI-ACT-310'].includes(target.actionId)&&target.entityId!==null).map(target=>target.entityId!));
   const couponEditor=tools.some(tool=>tool.actionId==='AI-ACT-309');
+  const restockProducts = new Set(targets.filter(target => target.actionId === 'AI-ACT-234' && target.entityId !== null).map(target => target.entityId!));
   for(const tool of tools){
     if(!storeProductActions.has(tool.actionId))continue;
     const selected=new Set(targets.filter(target=>target.actionId===tool.actionId&&target.entityId!==null).map(target=>target.entityId!));
@@ -71,6 +72,10 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
         const orderId=object(row).orderId;if(typeof orderId!=='string')return fail('context_unavailable');
         return privateStarsOrders.has(orderId);
       })};
+    }
+    if (value.sourceKind === 'original-store-restock-choice-v1') {
+      if (!Array.isArray(value.products)) return fail('context_unavailable');
+      return {...value, products: value.products.filter(row => restockProducts.has(id(object(row).listingId)))};
     }
     if(value.sourceKind==='original-store-coupons-v1'){
       if(!Array.isArray(value.coupons)||!Array.isArray(value.products))return fail('context_unavailable');
@@ -221,8 +226,10 @@ function nativeContext(actor: AccountProfileActor, context: PreparationContext, 
     if (tool.targetSelector === undefined) return hints.has(canonical([tool.actionId, tool.entityId])) ? [tool] : [];
     const properties = object(tool.parameters.properties), selector = object(properties[tool.targetSelector]);
     const couponRoot=tool.actionId==='AI-ACT-309'&&tool.targetSelector==='couponId'&&Array.isArray(selector.type)&&selector.type.includes('null');
-    if (!tool.resolveTarget || !Array.isArray(selector.enum) || selector.enum.some(value => typeof value !== "string"&&!(couponRoot&&value===null))) return fail("context_unavailable");
-    const permitted = new Set(nativeTargets.filter(target => target.actionId === tool.actionId && (target.entityId !== null||couponRoot)).map(target => target.entityId));
+    const restockRoot = tool.actionId === 'AI-ACT-234' && tool.targetSelector === 'listingId' && Array.isArray(selector.type) && selector.type.includes('null');
+    const nullableRoot = couponRoot || restockRoot;
+    if (!tool.resolveTarget || !Array.isArray(selector.enum) || selector.enum.some(value => typeof value !== "string"&&!(nullableRoot&&value===null))) return fail("context_unavailable");
+    const permitted = new Set(nativeTargets.filter(target => target.actionId === tool.actionId && (target.entityId !== null||nullableRoot)).map(target => target.entityId));
     const values = selector.enum.filter(value => permitted.has(value as string|null));
     if (!values.length) return [];
     const privateLines=tool.actionId==='AI-ACT-055'&&tool.targetSelector==='orderId'

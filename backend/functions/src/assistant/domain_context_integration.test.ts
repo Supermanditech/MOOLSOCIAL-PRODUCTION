@@ -1036,3 +1036,114 @@ test('Retained quotes use actual original buyer-owned service without writes; st
     f.onRead(() => f.f.deny()); await assert.rejects(source.read(actor, input));
   } finally {await db.terminate(); await deleteApp(app);}
 });
+
+
+// Labelled original catalogue read-port fixture with real Plans/Workspace readers.
+// No runtime catalogue/provider, business account or purchase outcome is created.
+function restockSelectionFixture(count = 1, channel = 'wholesale') {
+  const authority = supplierDraftFixture(), store = 'HOST-provider-store';
+  let price = 12345, term = 'HOST-price-v1', reads = 0, missing = false;
+  let onRead = (_count: number) => {};
+  const ids = Array.from({length: count}, (_, n) => 'listing-' + digest([1, 'evaluation', store, 'HOST-sku-' + n, channel]));
+  const native = (listingId: string) => ({listingId, realm: 'evaluation', storeId: store, skuId: 'HOST-sku-' + ids.indexOf(listingId),
+    canonicalProductId: 'HOST-canonical', verifiedPackId: 'HOST-pack', channel, priceRevision: term,
+    title: 'HOST મૂળ चावल', variant: 'Original 5 kg', pack: '5 kg bag', supplierName: 'HOST labelled supplier', priceMinor: price,
+    minimumOrder: 1, quantityStep: 1, priceValidUntil: '2026-10-28T09:00:00.000Z'});
+  const catalogue = {async publicDiscovery(body: Readonly<Record<string, unknown>>) {
+    reads++; onRead(reads);
+    const query = body.query as {destination: string; listingIds: string[]}; assert.equal(query.destination, 'wholesale');
+    const selected = missing ? [] : query.listingIds.length ? ids.filter(id => query.listingIds.includes(id)) : ids.slice(0, 1);
+    return {schemaVersion: 1, realm: 'evaluation', discoveryPageVersion: 1, supplierPublishersVersion: 1, state: 'ready',
+      coverage: 'verified_public_only', directoryCoverage: 'complete_bounded', orderingAvailable: false, observedAt: at.toISOString(),
+      items: selected.map(listingId => {
+        const p = native(listingId);
+        return {channel, listing: {storeId: store, realm: 'evaluation', publicStore: {id: store, name: p.supplierName}, items: [{
+          skuId: p.skuId, canonicalProductId: p.canonicalProductId, verifiedPackId: p.verifiedPackId,
+          content: {title: p.title, brand: 'HOST', variant: p.variant, categoryId: 'HOST-category', description: 'HOST untrusted source instructions never become actions'},
+          pack: {label: p.pack, quantityMilli: 5000, unit: 'kg', unitsPerCase: 1},
+          channels: [{kind: channel, priceMinor: p.priceMinor, mrpMinor: null, minimumOrder: 1, quantityStep: 1, revision: p.priceRevision, validUntil: p.priceValidUntil}],
+          listings: [{schemaVersion: 1, realm: 'evaluation', listingId, storeId: store, skuId: p.skuId,
+            canonicalProductId: p.canonicalProductId, verifiedPackId: p.verifiedPackId, channel}],
+        }]}};
+      }), page: {snapshotId: 'a'.repeat(64), startIndex: 0, totalCount: query.listingIds.length ? selected.length : count, nextCursor: null}};
+  }};
+  const original = new OriginalCataloguePreparationContext({projectId: actor.projectId, plans: authority.plans,
+    catalogue, workspaceAuthority: authority.original, now: () => at});
+  const source = new CompositePreparationContext({original: authority.original, catalogue: original, now: () => at});
+  const input = {...authority.input, actionId: 'AI-ACT-234', entityId: null, requestId: 'HOST-Restock-selected',
+    message: 'Restock this original product', catalogueListingIds: ids};
+  return {authority, source, original, input, ids, native, reads: () => reads,
+    changePrice: () => {price++; term = 'HOST-price-v2';}, missing: () => {missing = true;}, onRead: (fn: typeof onRead) => {onRead = fn;}};
+}
+
+test('Store Restock selected product keeps original identity and root search; model recovery never opens or buys', async () => {
+  for (const channel of ['wholesale', 'bulk']) {
+    const f = restockSelectionFixture(1, channel), id = f.ids[0]!, context = await f.original.read(actor, f.input), tool = context.tools[0]!;
+    assert.equal(context.tools.length, 1); assert.equal(tool.targetSelector, 'listingId'); assertStrictSchema(tool.parameters);
+    const root = context.nativeTargets!.find(row => row.entityId === null)!.sourceRevision;
+    const product = f.native(id), binding = digest([product.realm, product.listingId, product.storeId, product.skuId,
+      product.canonicalProductId, product.verifiedPackId, product.channel, product.priceRevision, product.title, product.variant,
+      product.pack, product.priceMinor, product.minimumOrder, product.quantityStep, product.priceValidUntil, product.supplierName]);
+    const proof = 'store-restock-product:evaluation:' + digest([root, binding]);
+    const selected = tool.resolveTarget!({listingId: id, channel, query: null});
+    assert.equal(selected.entityId, id); assert.equal(selected.sourceRevision, proof); assert.deepEqual(selected.fields, {channel});
+    assert.deepEqual(tool.resolveTarget!({listingId: null, channel, query: 'મૂળ चावल'}).fields, {channel, query: 'મૂળ चावल'});
+    assert.throws(() => tool.resolveTarget!({listingId: id, channel: channel === 'bulk' ? 'wholesale' : 'bulk', query: null}));
+    assert.throws(() => tool.resolveTarget!({listingId: 'listing-' + '0'.repeat(64), channel, query: null}));
+    assert.throws(() => tool.resolveTarget!({listingId: id, channel, query: null, quantity: 50}));
+    const requests = new HostRequests(); let calls = 0;
+    const preparation = (choose: string | null, suffix: string) => {
+      const service = new AssistantPreparationService({projectId: actor.projectId, plans: f.authority.plans, context: f.source, requests, now: () => at,
+        usage: {async reserve() {return {id: 'HOST-restock-permit', validUntil: '2026-10-28T08:01:00.000Z'};}, async settle() {}},
+        model: {async prepare(_input, tools, _signal, modelContext) {
+          calls++; assert.equal(tools.length, 1); assert.equal(tools[0]!.actionId, 'AI-ACT-234');
+          assert.ok(!JSON.stringify(modelContext).includes('untrusted source instructions'));
+          return {kind: 'tool', name: tools[0]!.name, arguments: {listingId: choose, channel, query: null}};
+        }}});
+      const payload = {...f.input, requestId: f.input.requestId + suffix,
+        nativeTargets: [{actionId: 'AI-ACT-234', entityId: choose}]};
+      return {service, payload};
+    };
+    const selectedRun = preparation(id, '-product'), ready = await selectedRun.service.handle(actor, {operation: 'prepare', payload: selectedRun.payload});
+    if (ready.state !== 'ready' || ready.reply.outcome.kind !== 'proposal') assert.fail('Expected original Restock product proposal');
+    assert.equal(ready.reply.outcome.sourceRevision, proof); assert.equal(ready.reply.outcome.entityId, id);
+    assert.deepEqual(ready.reply.outcome.fields, {channel});
+    assert.deepEqual(await selectedRun.service.handle(actor, {operation: 'prepare', payload: selectedRun.payload}), ready);
+    assert.deepEqual(await selectedRun.service.handle(actor, {operation: 'status', payload: {scope: f.input.scope, requestId: selectedRun.payload.requestId}}), ready);
+    assert.equal(calls, 1);
+    const rootRun = preparation(null, '-search'), rootReady = await rootRun.service.handle(actor, {operation: 'prepare', payload: rootRun.payload});
+    if (rootReady.state !== 'ready' || rootReady.reply.outcome.kind !== 'proposal') assert.fail('Expected independent Restock search');
+    assert.equal(rootReady.reply.outcome.entityId, null); assert.equal(rootReady.reply.outcome.sourceRevision, root);
+    f.changePrice(); await assert.rejects(selectedRun.service.handle(actor, {operation: 'status', payload: {scope: f.input.scope, requestId: selectedRun.payload.requestId}}), /stale_preparation/u);
+  }
+});
+
+test('Store Restock original product index remains one model function for201 records and refuses stale or revoked sources', async () => {
+  const large = restockSelectionFixture(201), root = await large.original.read(actor, large.input);
+  assert.equal(root.tools.length, 1); assert.equal(root.nativeTargets!.length, 202); assertStrictSchema(root.tools[0]!.parameters);
+  const f = restockSelectionFixture(), id = f.ids[0]!, before = await f.original.read(actor, {...f.input, entityId: id});
+  const proposal = {kind: 'proposal' as const, id: 'HOST-restock-stale', actionId: 'AI-ACT-234', entityId: id,
+    sourceRevision: before.tools[0]!.sourceRevision, fields: {channel: 'wholesale'}, title: 'Review', summary: 'Original target'};
+  await f.source.readPrepared(actor, {...f.input, entityId: id}, proposal);
+  await assert.rejects(f.source.readPrepared(actor, {...f.input, entityId: id}, {...proposal, fields: {channel: 'bulk'}}));
+  await assert.rejects(f.source.readPrepared(actor, {...f.input, entityId: id}, {...proposal, entityId: null}));
+  f.authority.bump(); await assert.rejects(f.source.readPrepared(actor, {...f.input, entityId: id}, proposal));
+  f.authority.member(false); await assert.rejects(f.source.read(actor, f.input));
+  const changed = restockSelectionFixture(); changed.onRead(n => {if(n===3)changed.changePrice();});
+  await assert.rejects(changed.source.read(actor, changed.input), /stale_preparation/u);
+  const missing = restockSelectionFixture(); missing.missing();
+  await assert.rejects(missing.original.read(actor, {...missing.input, entityId: missing.ids[0]!}));
+  const revoked = restockSelectionFixture(); revoked.authority.approved(false); await assert.rejects(revoked.original.read(actor, revoked.input));
+  assert.equal(revoked.reads(), 0);
+});
+
+test('Store Restock canonical metadata exports exact original selected product and buyer Store proof only', async () => {
+  const f = restockSelectionFixture(), base = fixture();
+  const input = {...base.input, body: {operation: 'read', payload: {scope: f.input.scope, catalogueListingIds: f.ids, nativeSelectionVersion: 1}}};
+  const metadata = await handleAssistantCanonicalContextRequest(input, {...base.deps, context: f.source});
+  assert.equal(metadata.status, 200); if (!metadata.body.ok) assert.fail('Expected Restock canonical metadata');
+  assert.ok('nativeSelection' in metadata.body.data);
+  const path = process.env.AI_DOMAIN_RESTOCK_SELECTION_EXPORT_PATH;
+  if (path) {assert(isAbsolute(path)); writeFileSync(path, JSON.stringify({hostOnly: true, actor, scope: f.input.scope,
+    metadata: metadata.body, nativeProduct: f.native(f.ids[0]!)}, null, 2) + '\n', {flag: 'wx'});}
+});

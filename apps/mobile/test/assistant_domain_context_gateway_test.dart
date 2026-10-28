@@ -8,6 +8,7 @@ import 'package:moolsocial/features/assistant/model_gateway.dart';
 import 'package:moolsocial/features/assistant/mool_assistant.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
+import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 
 // Explicit host-only credential and network seams; never phone authority/data.
@@ -43,6 +44,75 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
+  const restockExport = String.fromEnvironment('AI_DOMAIN_RESTOCK_SELECTION_EXPORT_PATH');
+  test('Original selected Restock service and native product bind exact Unicode pack and price', () async {
+    final export = jsonDecode(File(restockExport).readAsStringSync()) as Map<String, dynamic>;
+    expect(export['hostOnly'], true);
+    final actor = export['actor'] as Map<String, dynamic>;
+    final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String,
+      tenantId: null, userId: actor['uid'] as String);
+    final scope = export['scope'] as Map<String, dynamic>;
+    final raw = export['nativeProduct'] as Map<String, dynamic>;
+    final id = raw['listingId'] as String;
+    final channel = BuyV2OfferClass.values.singleWhere((v) => v.name == raw['channel']);
+    final product = BuyV2Product(id: id, canonicalId: raw['canonicalProductId'] as String,
+      destination: BuyV2Destination.wholesale, categoryId: 'host-rice', brand: 'HOST',
+      title: raw['title'] as String, variant: raw['variant'] as String, pack: raw['pack'] as String,
+      priceMinor: raw['priceMinor'] as int, unitPrice: '', badge: '', seller: raw['supplierName'] as String,
+      sellerType: 'HOST labelled supplier', deliveryPromise: '', origin: '', confirmedOn: '',
+      visualLabel: '', visualKind: '', storeId: raw['storeId'] as String, offerClass: channel,
+      minimumOrder: raw['minimumOrder'] as int,
+      publicListingIdentity: BuyV2PublicListingIdentity(listingId: id, realm: raw['realm'] as String,
+        storeId: raw['storeId'] as String, skuId: raw['skuId'] as String,
+        canonicalProductId: raw['canonicalProductId'] as String,
+        verifiedPackId: raw['verifiedPackId'] as String, channel: channel),
+      packTerms: BuyV2PackTerms(skuId: id, revision: raw['priceRevision'] as String,
+        sellUnit: 'bag', sourceLabel: raw['pack'] as String, quantityStep: raw['quantityStep'] as int,
+        pricingStoreId: raw['storeId'] as String, priceObservedAt: _at,
+        priceValidUntil: DateTime.parse(raw['priceValidUntil'] as String)));
+    expect(product.hasValidPublicListingIdentity, true);
+    expect(product.hasValidPackTerms, true);
+    final binding = WorkSession.workspaceAssistantRestockProductBinding(product);
+    expect(binding, isNotNull);
+    final context = MoolAssistantContext(accountScope: owner, authenticationRevision: 1)
+      .withWorkspace(MoolAssistantWorkspace(id: scope['storeId'] as String, name: 'HOST Store',
+        profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+    final gateway = AssistantDomainContextGateway(owner: owner, isCurrent: () => true,
+      credentials: _Credentials(), transport: _CapacityWire(export['metadata'] as Map<String, dynamic>),
+      clock: () => _at, compactStoreSelection: true);
+    final snapshot = await gateway.read(context, () => true, catalogueListingIds: [id]);
+    final root = snapshot.revisions[('AI-ACT-234', null)];
+    expect(root, startsWith('store-restock-source:'));
+    final expected = 'store-restock-product:${binding!.realm}:'
+      '${sha256.convert(utf8.encode(jsonEncode([root, binding.digest])))}';
+    expect(snapshot.revisions[('AI-ACT-234', id)], expected);
+    expect(product.title, contains('મૂળ'));
+  }, skip: restockExport.isEmpty ? 'Requires explicit isolated original-service Restock export' : false);
+  test('Selected Restock metadata rejects absent root, wrong listing and malformed proof', () async {
+    final id = 'listing-${'a' * 64}';
+    final store = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'HOST Store',
+      profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
+    final data = <String, Object?>{..._data(),
+      'ownerKey': sha256.convert(utf8.encode(jsonEncode(['fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString(),
+      'scope': {'audience': 'workspace', 'storeId': 'store-one'},
+      'revisions': [
+        {'actionId': 'AI-ACT-234', 'entityId': null, 'sourceRevision': 'store-restock-source:${'b' * 64}'},
+        {'actionId': 'AI-ACT-234', 'entityId': id, 'sourceRevision': 'store-restock-product:evaluation:${'c' * 64}'}]};
+    expect((await _source(_Wire(() => _ok(data))).read(store, () => true,
+      catalogueListingIds: [id])).revisions.length, 2);
+    for (final fault in ['missing-root', 'wrong-listing', 'proof', 'realm', 'root-proof']) {
+      final changed = jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
+      final rows = changed['revisions'] as List;
+      final selected = rows.last as Map;
+      if (fault == 'missing-root') rows.removeAt(0);
+      if (fault == 'wrong-listing') selected['entityId'] = 'listing-${'d' * 64}';
+      if (fault == 'proof') selected['sourceRevision'] = 'store-restock-product:evaluation:claimed';
+      if (fault == 'realm') selected['sourceRevision'] = 'store-restock-product:unknown:${'c' * 64}';
+      if (fault == 'root-proof') (rows.first as Map)['sourceRevision'] = 'store-restock-source:claimed';
+      await expectLater(_source(_Wire(() => _ok(changed))).read(store, () => true,
+        catalogueListingIds: [id]), throwsA(isA<AssistantModelFailure>()), reason: fault);
+    }
+  });
   const retainedExport = String.fromEnvironment('AI_DOMAIN_RETAINED_QUOTE_EXPORT_PATH');
   test('Original retained quote service metadata and full Unicode record retain the same mobile proof', () async {
     final export = jsonDecode(File(retainedExport).readAsStringSync()) as Map<String, dynamic>;
@@ -367,7 +437,8 @@ void main() {
           ? 'store-purchase-root-owner:${'a' * 64}' : assistantStoreOrderBoardContextActions.contains(action)
           ? 'store-order-board-owner:${'a' * 64}' : assistantStoreReportOwnerContextActions.contains(action)
           ? 'store-report-owner:evaluation:${'a' * 64}' : assistantStorePublicDetailsContextActions.contains(action)
-          ? 'store-public-details:evaluation:${'a' * 64}' : 'native-owned-defaults-owner-proof'},
+          ? 'store-public-details:evaluation:${'a' * 64}' : assistantStoreRestockOwnerContextActions.contains(action)
+          ? 'store-restock-source:${'a' * 64}' : 'native-owned-defaults-owner-proof'},
       ]};
     final value = await _source(_Wire(() => _ok(data))).read(store, () => true);
     expect(value.revisions.keys.single, (action, null));

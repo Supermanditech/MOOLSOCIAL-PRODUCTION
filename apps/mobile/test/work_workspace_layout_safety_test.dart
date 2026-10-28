@@ -8426,6 +8426,62 @@ class _OriginalFacts09Host {
 
 void main() {
 
+  testWidgets('FE-RESTOCK234 read hints retire on reader replacement and cannot cross account or Store', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture();
+    try {
+      await f.ready();
+      final account = f.contact.accountScope, store = f.work.activeWorkspace!.id;
+      final firstOwner = Object(), secondOwner = Object();
+      final id = 'listing-${'a' * 64}';
+      final writes = f.writes;
+      var sourceCurrent = true;
+      WorkspaceAssistantRestockReadHints? read() => WorkspaceAssistantRestockReadHints(
+        accountId: account, storeId: store, listingIds: [id],
+        productBindings: {id: (realm: 'evaluation', digest: 'b' * 64)}, current: () => sourceCurrent);
+      f.work.bindWorkspaceAssistantRestockReader(firstOwner, read);
+      final captured = f.work.workspaceAssistantRestockReadHints(accountId: account, storeId: store)!;
+      expect(captured.current(), true);
+      expect(() => captured.listingIds.add(id), throwsUnsupportedError);
+      expect(() => captured.productBindings.clear(), throwsUnsupportedError);
+      expect(f.work.workspaceAssistantRestockReadHints(accountId: 'foreign-account', storeId: store), isNull);
+      expect(f.work.workspaceAssistantRestockReadHints(accountId: account, storeId: 'foreign-store'), isNull);
+      f.work.bindWorkspaceAssistantRestockReader(secondOwner, read);
+      expect(captured.current(), false);
+      f.work.clearWorkspaceAssistantRestockReader(firstOwner);
+      final replacement = f.work.workspaceAssistantRestockReadHints(accountId: account, storeId: store)!;
+      expect(replacement.current(), true);
+      sourceCurrent = false;
+      expect(replacement.current(), false);
+      expect(f.work.workspaceAssistantRestockReadHints(accountId: account, storeId: store), isNull);
+      sourceCurrent = true;
+      f.work.clearWorkspaceAssistantRestockReader(secondOwner);
+      expect(replacement.current(), false);
+      expect(f.work.workspaceAssistantRestockReadHints(accountId: account, storeId: store), isNull);
+      expect(f.writes, writes);
+    } finally { await f.dispose(); }
+  });
+  testWidgets('FE-RESTOCK234 malformed or inactive native hints never become source authority', (tester) async {
+    final f = _AuthenticatedNativeScopeFixture();
+    try {
+      await f.ready();
+      final account = f.contact.accountScope, store = f.work.activeWorkspace!.id;
+      final owner = Object(), id = 'listing-${'a' * 64}';
+      final writes = f.writes;
+      for (final fault in ['empty', 'duplicate', 'invalid-id', 'missing-binding', 'realm', 'digest', 'inactive', 'account', 'store']) {
+        f.work.bindWorkspaceAssistantRestockReader(owner, () => WorkspaceAssistantRestockReadHints(
+          accountId: fault == 'account' ? 'foreign-account' : account,
+          storeId: fault == 'store' ? 'foreign-store' : store,
+          listingIds: fault == 'empty' ? [] : fault == 'duplicate' ? [id, id] : fault == 'invalid-id' ? ['claimed'] : [id],
+          productBindings: fault == 'missing-binding' ? {} : {id: (
+            realm: fault == 'realm' ? 'claimed' : 'evaluation', digest: fault == 'digest' ? 'claimed' : 'b' * 64)},
+          current: () => fault != 'inactive'));
+        expect(f.work.workspaceAssistantRestockReadHints(accountId: account, storeId: store), isNull, reason: fault);
+      }
+      f.work.clearWorkspaceAssistantRestockReader(owner);
+      expect(f.writes, writes);
+    } finally { await f.dispose(); }
+  });
+
   testWidgets('FE-ORDER274 reference capture follows all pages without writes or full-order reads',(tester)async{
     final h=_OriginalFacts09Host();
     try{
@@ -96490,7 +96546,16 @@ class _SettlementNativeFixture{
 
 final class _Restock234Commerce extends BuyV2UnavailableCommerceAdapter {
   int reads=0;
-  @override Future<BuyV2CommerceSnapshot> refresh(){reads++;return super.refresh();}
+  BuyV2ProcurementContext? hostSourceContext;
+  @override Future<BuyV2CommerceSnapshot> refresh(){
+    reads++;
+    final scope = hostSourceContext;
+    if (scope == null) return super.refresh();
+    return Future.value(BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+      procurementAccessOnly: true, procurementBuyerGrant: BuyV2ProcurementBuyerGrant(
+        accountId: scope.accountId, storeId: scope.storeId, approved: true,
+        validUntil: DateTime.now().add(const Duration(hours: 1)))));
+  }
 }
 class _Restock234Bookmarks extends _StorePurchaseBookmarks {
   Completer<void>? readGate;
@@ -96507,6 +96572,36 @@ class _Restock234Access extends _ReceivingAssistantAccess{
     accountScope:account,access:active?scope_contract.MoolAssistantAccess.active:scope_contract.MoolAssistantAccess.unavailable,
     revision:active?'HOST-restock-active':'HOST-restock-revoked',validUntil:DateTime.now().add(const Duration(hours:1)));
 }
+// Labelled host-only source port: exercises the mounted original procurement owner.
+class _Restock234Catalogue implements BuyV2CataloguePageSource, BuyV2PublicRestockSource, BuyV2ProductContentAdapter {
+  @override BuyV2ProductContentSnapshot snapshotFor(BuyV2Product value) => BuyV2ProductContentSnapshot(
+    productId: value.id, state: BuyV2ProductContentState.unavailable, sourceId: 'HOST-original-port');
+  @override BuyV2ProcurementContext? publicRestockContext;
+  @override bool publicRestockProductCurrent(BuyV2Product value) =>
+    publicRestockContext != null && identical(value, product);
+  final id = 'listing-${'e' * 64}';
+  late final product = BuyV2Product(id: id, canonicalId: 'HOST-original-rice',
+    destination: BuyV2Destination.wholesale, categoryId: 'rice', brand: 'HOST',
+    title: 'HOST મૂળ चावल', variant: '5 kg', pack: '5 kg bag', priceMinor: 12345,
+    unitPrice: '', badge: '', seller: 'HOST supplier', sellerType: 'Wholesaler',
+    deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: '',
+    storeId: 'HOST-supplier', offerClass: BuyV2OfferClass.wholesale,
+    publicListingIdentity: BuyV2PublicListingIdentity(listingId: id, realm: 'evaluation',
+      storeId: 'HOST-supplier', skuId: 'HOST-sku', canonicalProductId: 'HOST-original-rice',
+      verifiedPackId: 'HOST-pack', channel: BuyV2OfferClass.wholesale),
+    packTerms: BuyV2PackTerms(skuId: id, revision: 'HOST-price-v1', sellUnit: 'bag',
+      sourceLabel: '5 kg bag', pricingStoreId: 'HOST-supplier',
+      priceObservedAt: DateTime.now().subtract(const Duration(minutes: 1)),
+      priceValidUntil: DateTime.now().add(const Duration(hours: 1))));
+  @override Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(BuyV2CatalogueQuery query,
+      {String? cursor, required int pageSize}) async => BuyV2CataloguePage(
+        queryKey: query.key, snapshotId: 'HOST-original', items: const [], startIndex: 0, totalCount: 0);
+  @override Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(BuyV2CatalogueQuery query,
+      {String? cursor, required int pageSize}) async => BuyV2CataloguePage(
+        queryKey: query.key, snapshotId: 'HOST-original', items: [product], startIndex: 0, totalCount: 1);
+  @override Future<List<BuyV2Product>> resolveProducts(Set<String> productIds) async =>
+    [if (productIds.contains(id)) product];
+}
 class _Restock234Host {
   final native=_AuthenticatedNativeScopeFixture(),access=_Restock234Access(),bookmarks=_Restock234Bookmarks();
   final cores=<BuySession>[];
@@ -96516,15 +96611,20 @@ class _Restock234Host {
   scope_contract.MoolAssistantController? assistant;
   int creations=0;
   Object get effects=>(native.writes,bookmarks.reads,bookmarks.writes,creations);
-  Future<void> ready(WidgetTester tester,{bool connected=true})async{
+  Future<void> ready(WidgetTester tester,{bool connected=true, BuyV2CataloguePageSource? catalogue})async{
     await native.ready();
     procurement=WorkProcurementController(currentAccountId:()=>native.work.contactDraftStore?.accountScope,
       currentStoreId:()=>native.work.activeWorkspace?.id,currentProfileId:()=>native.work.activeWorkspace?.profileId,
       storeApproved:()=>native.work.activeWorkspace?.verified==true,
       bookmarks:bookmarks,stateStoreFactory:_StorePurchaseState.new,
       sessionFactory:(identity,state){creations++;final core=BuySession();cores.add(core);
+        if (catalogue is _Restock234Catalogue) {
+          catalogue.publicRestockContext = identity.value;
+          commerce.hostSourceContext = identity.value;
+        }
         return BuyV2Session(core:core,procurementIdentity:identity,customerStateStore:state,reviewDataEnabled:false,
-          commerceAdapter:commerce);});
+          commerceAdapter:commerce, cataloguePageSource:catalogue,
+          productContentAdapter: catalogue is _Restock234Catalogue ? catalogue : null);});
     router=GoRouter(initialLocation:'/app/work/workspace/dashboard',routes:[GoRoute(path:'/app/work/workspace/dashboard',builder:(_,_)=>
       MoolAssistantWorkspaceScope(readWorkspace:native.readWorkspace,child:WorkWorkspaceDashboardScreen(session:native.work,
         procurementSession:native.buy,useStoreProcurement:connected,procurementControllerFactory:()=>procurement,
@@ -96554,6 +96654,41 @@ class _Restock234Host {
   }
 }
 void registerRestock234NativeTests(){
+  testWidgets('FE-RESTOCK234 mounted Store product supplies exact hints and retires on navigation', (tester) async {
+    final h = _Restock234Host(), catalogue = _Restock234Catalogue();
+    try {
+      await h.ready(tester, catalogue: catalogue);
+      final context = h.native.readContext();
+      final account = h.native.contact.accountScope, store = h.native.work.activeWorkspace!.id;
+      expect(h.native.work.workspaceAssistantRestockReadHints(accountId: account, storeId: store), isNull);
+      final opened = await h.open(tester, channel: 'wholesale', query: 'HOST');
+      tester.widget<FilledButton>(find.byKey(const Key('work-restock-review-continue'))).onPressed!();
+      await tester.pumpAndSettle();
+      expect(await opened.result, MoolAssistantReviewResult.returnToOwner);
+      final purchase = h.procurement.session!;
+      expect(identical(purchase, h.native.buy), false);
+      expect(purchase.usesPublicRestockCatalogue, true);
+      expect(await purchase.openLinkedProduct(catalogue.id), true);
+      await tester.pumpAndSettle();
+      expect(purchase.selectedProduct, same(catalogue.product));
+      final before = h.effects;
+      final hints = h.native.work.workspaceAssistantRestockReadHints(accountId: account, storeId: store);
+      expect(hints, isNotNull);
+      expect(hints!.listingIds, [catalogue.id]);
+      expect(hints.productBindings[catalogue.id],
+        WorkSession.workspaceAssistantRestockProductBinding(catalogue.product));
+      expect(hints.current(), true);
+      expect(h.native.buy.selectedProduct, isNull);
+      expect(context.binding, h.native.readContext().binding);
+      expect(h.effects, before);
+      purchase.openDestination(BuyV2Destination.wholesale);
+      await tester.pumpAndSettle();
+      expect(hints.current(), false);
+      expect(h.native.work.workspaceAssistantRestockReadHints(accountId: account, storeId: store), isNull);
+      expect(h.effects, before);
+      expect(tester.takeException(), isNull);
+    } finally { await h.dispose(tester); }
+  });
   for(final channel in ['wholesale','bulk']) {
     testWidgets('FE-RESTOCK234 canonical $channel proposal preserves original Store admission and duplicate protection',(tester)async{
       final h=_Restock234Host();assistant_guard.AssistantProfileContextGuard? guard;

@@ -1,5 +1,6 @@
 import '../../features/journey01/account_profile_gateway.dart' show AccountProfileAssistantConsent;
 import 'dart:convert';
+import 'package:crypto/crypto.dart' as assistant_hash;
 import 'package:flutter/material.dart';
 import '../../features/assistant/mool_assistant.dart';
 import '../../features/assistant/model_gateway.dart';
@@ -26,9 +27,11 @@ class AssistantOriginalContextReader {
       bool Function() current) async {
     final owner = session.authenticatedBuyPersistenceIdentity;
     final generation = session.navigationAuthenticationGeneration;
+    WorkspaceAssistantRestockReadHints? restockRead;
     bool alive() => current() && rootCurrent() && session.isAuthenticated && owner != null &&
         session.authenticatedBuyPersistenceIdentity == owner &&
-        session.navigationAuthenticationGeneration == generation && context.accountScope == owner;
+        session.navigationAuthenticationGeneration == generation && context.accountScope == owner &&
+        (restockRead?.current() ?? true);
     if (!alive()) throw const AssistantModelFailure('account_scope_mismatch');
     final revisions = <AssistantContextKey, String>{};
     String? retainedQuoteProfileRevision, retainedQuoteOwnerScope;
@@ -91,6 +94,8 @@ class AssistantOriginalContextReader {
     AssistantCanonicalNativeSelection? nativeSelection;
     if (domainGateway != null) {
       try {
+        restockRead = context.inWorkspace ? work.workspaceAssistantRestockReadHints(
+          accountId: owner!.userId, storeId: context.workspaceId!) : null;
         final selected = buy?.selectedProduct;
         final candidates = buy != null && buy!.view == BuyV2View.product && selected != null
           ? [selected] : buy != null && const {BuyV2View.cart, BuyV2View.checkout}.contains(buy!.view)
@@ -99,7 +104,7 @@ class AssistantOriginalContextReader {
           ? candidates!.where((product) => product.publicListingIdentity != null &&
               product.hasValidPublicListingIdentity && !product.requiresPrescription &&
               product.destination == buy!.destination).map((product) => product.id).toSet().toList()
-          : null;
+          : restockRead?.listingIds.toList();
         selection?.sort();
         final quoteSelection = !context.inWorkspace && buy != null && !buy!.isStoreProcurement && buy!.view == BuyV2View.cart
           ? buy!.selectedSupplierQuotes.map((quote) => quote.quoteId).toSet().toList() : null;
@@ -157,6 +162,11 @@ class AssistantOriginalContextReader {
             validUntil: domain.validUntil);
         if (!alive()) throw const AssistantModelFailure('stale_preparation');
         for (final entry in domain.revisions.entries) {
+          if (assistantStoreRestockOwnerContextActions.contains(entry.key.$1) && entry.key.$2 != null) {
+            final binding = restockRead?.productBindings[entry.key.$2], rootProof = domain.revisions[('AI-ACT-234', null)];
+            if (binding == null || rootProof == null || entry.value != 'store-restock-product:${binding.realm}:'
+                '${assistant_hash.sha256.convert(utf8.encode(jsonEncode([rootProof, binding.digest])))}') continue;
+          }
           if (assistantBuyerRetainedQuoteContextActions.contains(entry.key.$1) &&
               (entry.key.$2 == null || !retainedQuotes.contains((entry.key.$1, entry.key.$2!)))) continue;
           // Accept only an unchanged original native cache. Explicit refresh,

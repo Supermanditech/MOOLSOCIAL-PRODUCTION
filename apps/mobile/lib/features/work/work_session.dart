@@ -6,7 +6,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart' as crypto;
 import '../buy/buy_v2_content_contracts.dart' show BuyV2StoreListing;
-import '../buy/buy_v2_models.dart' show buyV2WholeRupees, buyV2ExactMinorAmount;
+import '../buy/buy_v2_models.dart' show BuyV2Product, buyV2WholeRupees, buyV2ExactMinorAmount;
 
 import 'work_models.dart';
 import 'work_publication.dart';
@@ -589,6 +589,18 @@ class _CounterDraftRecovery {
   ({String orderId, WorkspaceCustomerInvoice? invoice})? completed;
 }
 
+/// Read hints from the currently mounted original Store Restock journey.
+/// This is neither supplier eligibility nor permission to purchase.
+class WorkspaceAssistantRestockReadHints {
+  WorkspaceAssistantRestockReadHints({required this.accountId, required this.storeId,
+    required Iterable<String> listingIds, required Map<String, ({String realm, String digest})> productBindings,
+    required this.current}) : listingIds = List.unmodifiable(listingIds), productBindings = Map.unmodifiable(productBindings);
+  final String accountId, storeId;
+  final List<String> listingIds;
+  final Map<String, ({String realm, String digest})> productBindings;
+  final bool Function() current;
+}
+
 class WorkSession extends ChangeNotifier {
   // New identities must not collide when the device clock repeats or changes.
   // Persisted identities and submission/recovery markers remain authoritative.
@@ -741,6 +753,43 @@ class WorkSession extends ChangeNotifier {
   String originalPurchaseRealm = '';
   AuthenticatedWorkspaceOrderIdentityGateway? get originalPurchaseReader =>
       !_disposed && _originalPurchaseReader?.isCurrent == true ? _originalPurchaseReader : null;
+  static ({String realm, String digest})? workspaceAssistantRestockProductBinding(BuyV2Product product) {
+    final identity = product.publicListingIdentity, terms = product.packTerms;
+    if (identity == null || !product.hasValidPublicListingIdentity || terms == null || !product.hasValidPackTerms ||
+        product.requiresPrescription || !const {'wholesale', 'bulk'}.contains(identity.channel.name)) return null;
+    final binding = [identity.realm, identity.listingId, identity.storeId, identity.skuId, identity.canonicalProductId,
+      identity.verifiedPackId, identity.channel.name, terms.revision, product.title, product.variant, product.pack,
+      product.priceMinor, product.minimumOrder, product.quantityStep, terms.priceValidUntil?.toUtc().toIso8601String(), product.seller];
+    return (realm: identity.realm, digest: crypto.sha256.convert(utf8.encode(jsonEncode(binding))).toString());
+  }
+  Object? _assistantRestockReaderOwner;
+  WorkspaceAssistantRestockReadHints? Function()? _assistantRestockReader;
+  void bindWorkspaceAssistantRestockReader(Object owner, WorkspaceAssistantRestockReadHints? Function() reader) {
+    if (_disposed) return;
+    _assistantRestockReaderOwner = owner; _assistantRestockReader = reader;
+  }
+  void clearWorkspaceAssistantRestockReader(Object owner) {
+    if (!identical(owner, _assistantRestockReaderOwner)) return;
+    _assistantRestockReaderOwner = null; _assistantRestockReader = null;
+  }
+  WorkspaceAssistantRestockReadHints? workspaceAssistantRestockReadHints({required String accountId, required String storeId}) {
+    final owner = _assistantRestockReaderOwner, reader = _assistantRestockReader;
+    bool bindingCurrent() => !_disposed && owner != null && identical(owner, _assistantRestockReaderOwner) &&
+      identical(reader, _assistantRestockReader) && contactDraftStore?.accountScope == accountId &&
+      activeWorkspace?.id == storeId && activeWorkspace?.verified == true;
+    if (reader == null || !bindingCurrent()) return null;
+    try {
+      final read = reader();
+      if (read == null || read.accountId != accountId || read.storeId != storeId || !read.current() ||
+          read.listingIds.isEmpty || read.listingIds.length > 500 || read.listingIds.toSet().length != read.listingIds.length ||
+          read.listingIds.any((id) => !RegExp(r'^listing-[a-f0-9]{64}$').hasMatch(id)) ||
+          read.productBindings.length != read.listingIds.length || read.listingIds.any((id) =>
+            read.productBindings[id] == null || !const {'evaluation', 'production'}.contains(read.productBindings[id]!.realm) ||
+            !RegExp(r'^[a-f0-9]{64}$').hasMatch(read.productBindings[id]!.digest))) return null;
+      return WorkspaceAssistantRestockReadHints(accountId: accountId, storeId: storeId, listingIds: read.listingIds,
+        productBindings: read.productBindings, current: () => bindingCurrent() && read.current());
+    } on Object {return null;}
+  }
   Map<String, WorkspacePurchaseReference> _assistantOriginalReferences = const {};
   bool Function()? _assistantOriginalReferencesCurrent;
   int _assistantOriginalReferencesGeneration = 0;

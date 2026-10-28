@@ -177,7 +177,11 @@ class AssistantDomainContextGateway {
         !RegExp(r'^buyer-product-stars:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))_invalid();
       if (assistantStoreProductContextActions.contains(action) && (!context.inWorkspace ||
           entity == null && !(action=='AI-ACT-223'&&RegExp(r'^store-product-submission-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))) _invalid();
-      if (assistantStoreOwnerContextActions.contains(action) && (!context.inWorkspace || entity != null)) _invalid();
+      if (assistantStoreOwnerContextActions.contains(action) &&
+          (!context.inWorkspace || entity != null && !assistantStoreRestockOwnerContextActions.contains(action))) _invalid();
+      if (assistantStoreRestockOwnerContextActions.contains(action) && (!context.workspaceApproved || !context.storeWorkspace ||
+          (entity == null ? !RegExp(r'^store-restock-source:[a-f0-9]{64}$').hasMatch(revision) :
+            selection == null || !selection.contains(entity) || !RegExp(r'^store-restock-product:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))) _invalid();
       if(assistantStorePublicDetailsContextActions.contains(action)&&(!context.workspaceApproved||!context.storeWorkspace||
         !RegExp(r'^store-public-details:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))_invalid();
       if(assistantStoreReportOwnerContextActions.contains(action)&&(!context.workspaceApproved||!context.storeWorkspace||
@@ -209,6 +213,8 @@ class AssistantDomainContextGateway {
         masked[key] = revision;
       }
     }
+    if (revisions.keys.any((key) => assistantStoreRestockOwnerContextActions.contains(key.$1) && key.$2 != null) &&
+        !revisions.containsKey(('AI-ACT-234', null))) _invalid();
     check();
     return AssistantCanonicalContextSnapshot(binding: context.binding,
       revisions: revisions, validUntil: until, catalogueListingIds: selection,

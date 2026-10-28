@@ -3338,6 +3338,7 @@ class _WorkWorkspaceDashboardScreenState
         if (mounted) unawaited(_restoreProcurement());
       });
     }
+    session.bindWorkspaceAssistantRestockReader(this, _captureAssistantRestockReadHints);
     _searchController = TextEditingController(
       text: session.workspaceSearchQuery,
     );
@@ -3384,6 +3385,7 @@ class _WorkWorkspaceDashboardScreenState
 
   @override
   void dispose() {
+    session.clearWorkspaceAssistantRestockReader(this);
     session.removeListener(_searchScopeChanged);
     session.removeListener(_settlementObserveSource);
     _financeOwner.value++;
@@ -6104,6 +6106,32 @@ class _WorkWorkspaceDashboardScreenState
     for(final line in _storeProcurement?.session?.cartLines??const <BuyV2CartLine>[])...[
       line.product,line.quantity,line.scheduledFulfilment,_storeProcurement?.session?.cartProductSelected(line.product.id)],
   ];
+  WorkspaceAssistantRestockReadHints? _captureAssistantRestockReadHints() {
+    final source = session, controller = _storeProcurement, purchase = _storeProcurement?.session;
+    final context = purchase?.procurementContext;
+    if (!mounted || !widget.accountAuthenticated || _view != _WorkspaceControlView.procurement || _leavingProcurement ||
+        controller == null || purchase == null || context == null || !controller.scopeCurrent || controller.restockChoiceBusy ||
+        context.purpose != BuyV2ProcurementPurpose.restock || !purchase.procurementScopeCurrent ||
+        purchase.view != BuyV2View.product || purchase.selectedProductId == null ||
+        purchase.cartChangesBlocked || purchase.checkoutBusy || purchase.checkoutRequiresResolution || purchase.customerStateRecoveryPending ||
+        source.activeWorkspace?.verified != true || source.activeWorkspace?.id != context.storeId ||
+        source.contactDraftStore?.accountScope != context.accountId || controller.currentAccountId() != context.accountId ||
+        controller.currentStoreId() != context.storeId || controller.currentProfileId?.call() != source.activeWorkspace?.profileId) return null;
+    final product = purchase.selectedProduct;
+    if (product == null || product.id != purchase.selectedProductId || product.destination != BuyV2Destination.wholesale ||
+        !product.hasValidPublicListingIdentity || product.publicListingIdentity == null || product.requiresPrescription) return null;
+    final binding = WorkSession.workspaceAssistantRestockProductBinding(product);
+    if (binding == null) return null;
+    final witness = _restockSource(source, product.id);
+    bool current() => mounted && identical(widget.session, source) && identical(_storeProcurement, controller) &&
+      identical(controller.session, purchase) && controller.scopeCurrent && !controller.restockChoiceBusy && !_leavingProcurement &&
+      widget.accountAuthenticated && _view == _WorkspaceControlView.procurement && purchase.procurementScopeCurrent &&
+      purchase.view == BuyV2View.product && identical(purchase.selectedProduct, product) &&
+      !purchase.cartChangesBlocked && !purchase.checkoutBusy && !purchase.checkoutRequiresResolution && !purchase.customerStateRecoveryPending &&
+      listEquals(_restockSource(source, product.id), witness);
+    return WorkspaceAssistantRestockReadHints(accountId: context.accountId, storeId: context.storeId,
+      listingIds: [product.id], productBindings: {product.id: binding}, current: current);
+  }
   bool _restockOwner(WorkSession source,MoolAssistantContext ctx)=>mounted&&identical(widget.session,source)&&
     _financePermitted(ctx)&&_storeProcurement!=null&&!_leavingProcurement&&
     _storeProcurement!.storeApproved()&&_storeProcurement!.currentAccountId()==source.contactDraftStore?.accountScope&&
@@ -6414,6 +6442,8 @@ class _WorkWorkspaceDashboardScreenState
       _productAssistantVersionOwner = null;
     }
     if (oldWidget.session != widget.session) {
+      oldWidget.session.clearWorkspaceAssistantRestockReader(this);
+      session.bindWorkspaceAssistantRestockReader(this, _captureAssistantRestockReadHints);
       oldWidget.session.removeListener(_procurementIdentityChanged);
       session.addListener(_procurementIdentityChanged);
       oldWidget.session.removeListener(_searchScopeChanged);
