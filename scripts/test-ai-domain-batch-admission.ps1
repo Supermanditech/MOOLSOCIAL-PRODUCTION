@@ -136,4 +136,32 @@ Check (!(Test-AiDomainAddressCacheAdmission $bad)) 'reject unrelated cache owner
 $rejected=$false
 try {Get-AiDomainCurrentRuntimeOwners $bad|Out-Null}catch{$rejected=$true}
 Check $rejected 'current owner getter rejects invalid admission'
+$cacheSeal=$approval.scope07AddressCacheCheckpoint
+Check (Test-AiDomainAddressCacheCheckpoint $cacheSeal) 'exact qualified original address checkpoint'
+Check (@(Get-AiDomainAddressCacheSealOwners).Count -eq 3) 'only three existing metadata owners for address seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($cacheSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainAddressCacheCheckpoint $bad)) "reject changed cache seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($cacheSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainAddressCacheCheckpoint $bad)) "reject changed cache qualified source $property"
+}
+$bad=($cacheSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainAddressCacheCheckpoint $bad)) 'reject cache source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($cacheSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainAddressCacheCheckpoint $bad)) "reject expanded cache qualification $property"
+}
+$bad=($cacheSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAgentJourneyQualified=$true
+Check (!(Test-AiDomainAddressCacheCheckpoint $bad)) 'reject fabricated address device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($cacheSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainAddressCacheCheckpoint $bad)) "reject changed cache evidence $property"
+}
+foreach($row in @(@(0,3),@(1,4),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainAddressCacheStageOwners $row[0] $cacheSeal).Count -eq $row[1]) "cache checkpoint exact stage $($row[0]) owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."
