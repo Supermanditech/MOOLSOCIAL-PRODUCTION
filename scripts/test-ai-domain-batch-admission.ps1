@@ -238,4 +238,32 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,12),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainPrivateStarsStageOwners $row[0] $starsSeal).Count -eq $row[1]) "private-rating checkpoint exact stage $($row[0]) owner count"
 }
+$supplierSeal=$approval.scope11SupplierDraftCheckpoint
+Check (Test-AiDomainSupplierDraftCheckpoint $supplierSeal) 'exact qualified supplier-draft checkpoint'
+Check (@(Get-AiDomainSupplierDraftSealOwners).Count -eq 3) 'only three existing metadata owners for supplier-draft seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($supplierSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainSupplierDraftCheckpoint $bad)) "reject changed supplier-draft seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($supplierSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainSupplierDraftCheckpoint $bad)) "reject changed supplier-draft qualified source $property"
+}
+$bad=($supplierSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainSupplierDraftCheckpoint $bad)) 'reject supplier-draft source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($supplierSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainSupplierDraftCheckpoint $bad)) "reject expanded supplier-draft qualification $property"
+}
+$bad=($supplierSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAgentJourneyQualified=$true
+Check (!(Test-AiDomainSupplierDraftCheckpoint $bad)) 'reject fabricated supplier-draft device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($supplierSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainSupplierDraftCheckpoint $bad)) "reject changed supplier-draft evidence $property"
+}
+foreach($row in @(@(0,3),@(1,7),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainSupplierDraftStageOwners $row[0] $supplierSeal).Count -eq $row[1]) "supplier-draft checkpoint exact stage $($row[0]) owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."
