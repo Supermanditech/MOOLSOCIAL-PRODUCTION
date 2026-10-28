@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/assistant/domain_context_gateway.dart';
@@ -40,6 +41,110 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at);
 void main() {
+  const capacityExport = String.fromEnvironment('AI_DOMAIN_STORE_NATIVE_EXPORT_PATH');
+  test('Actual original 1250-product metadata crosses the real mobile decoder without trimming', () async {
+    final export = jsonDecode(File(capacityExport).readAsStringSync()) as Map<String, dynamic>;
+    expect(export['hostOnly'], true);
+    final actor = export['capacityActor'] as Map;
+    final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String,
+      tenantId: null, userId: actor['uid'] as String);
+    final envelope = export['capacityMetadata'] as Map<String, dynamic>;
+    final data = envelope['data'] as Map<String, dynamic>;
+    final scope = data['scope'] as Map;
+    final context = MoolAssistantContext(accountScope: owner, authenticationRevision: 1).withWorkspace(
+      MoolAssistantWorkspace(id: scope['storeId'] as String, name: 'Isolated original service Store',
+        profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+    final source = AssistantDomainContextGateway(owner: owner, isCurrent: () => true,
+      credentials: _Credentials(), transport: _CapacityWire(envelope), compactStoreSelection: true,
+      clock: () => DateTime.parse(data['validUntil'] as String).subtract(const Duration(seconds: 30)));
+    addTearDown(source.dispose);
+    final snapshot = await source.read(context, () => true);
+    expect(snapshot.nativeSelection!.keys.length, export['capacityTargetCount']);
+    expect(snapshot.nativeSelection!.keys.length, 5003);
+    expect(snapshot.nativeSelection!.keys.where((key) => key.$1 == 'AI-ACT-214').length, 1250);
+    expect(snapshot.nativeSelection!.keys.where((key) => key.$1 == 'AI-ACT-221').length, 1250);
+    expect(utf8.encode(jsonEncode(envelope)).length, lessThan(2 * 1024 * 1024));
+  }, skip: capacityExport.isEmpty ? 'Requires explicit isolated original-service export' : false);
+  test('Opt-in Store metadata keeps original proofs and deterministic compact order', () async {
+    final context = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'Host Store',
+      profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
+    final data = {..._data(), 'ownerKey': sha256.convert(utf8.encode(jsonEncode([
+      'fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString(),
+      'scope': {'audience': 'workspace', 'storeId': 'store-one'}, 'revisions': [],
+      'nativeSelection': {'version': 1, 'fingerprint': 'a' * 64, 'groups': [
+        {'actionIds': ['AI-ACT-214', 'AI-ACT-221'], 'entityId': 'sku-one', 'sourceRevision': 'original-proof'},
+        {'actionIds': ['AI-ACT-218'], 'entityId': null, 'sourceRevision': 'owner-proof'},
+      ]}};
+    final wire = _Wire(() => _ok(data)), source = AssistantDomainContextGateway(owner: _owner, isCurrent: () => true,
+      credentials: _Credentials(), transport: wire, clock: () => _at, compactStoreSelection: true);
+    addTearDown(source.dispose);
+    final value = await source.read(context, () => true);
+    expect(value.nativeSelection!.keys, [('AI-ACT-214', 'sku-one'), ('AI-ACT-218', null), ('AI-ACT-221', 'sku-one')]);
+    expect(value.nativeSelection!.proofs[('AI-ACT-221', 'sku-one')], 'original-proof');
+    expect(() => value.nativeSelection!.proofs.clear(), throwsUnsupportedError);
+    expect((wire.bodies.single['payload'] as Map)['nativeSelectionVersion'], 1);
+    for (final bad in <Object?>[
+      {'version': 2, 'fingerprint': 'a' * 64, 'groups': []},
+      {'version': 1, 'fingerprint': 'bad', 'groups': []},
+      {'version': 1, 'fingerprint': 'a' * 64, 'groups': [{'actionIds': ['AI-ACT-214', 'AI-ACT-214'], 'entityId': 'sku-one', 'sourceRevision': 'original'}]},
+      {'version': 1, 'fingerprint': 'a' * 64, 'groups': [{'actionIds': ['AI-ACT-001'], 'entityId': null, 'sourceRevision': 'original'}]},
+      {'version': 1, 'fingerprint': 'a' * 64, 'groups': [{'actionIds': ['AI-ACT-214'], 'entityId': null, 'sourceRevision': 'original'}]},
+      {'version': 1, 'fingerprint': 'a' * 64, 'groups': [for (var n = 0; n < 2; n++) {'actionIds': ['AI-ACT-214'], 'entityId': 'sku-one', 'sourceRevision': 'original-$n'}]},
+    ]) {
+      data['nativeSelection'] = bad;
+      await expectLater(source.read(context, () => true), throwsA(isA<AssistantModelFailure>()));
+    }
+  });
+  for (final action in assistantStoreOwnerContextActions) {
+  test('Owned Store $action native owner metadata cannot claim a product or personal context', () async {
+    final store = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'Host fixture Store',
+      profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
+    final data = {..._data(), 'ownerKey': sha256.convert(utf8.encode(jsonEncode([
+      'fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString(),
+      'scope': {'audience': 'workspace', 'storeId': 'store-one'}, 'revisions': [
+        {'actionId': action, 'entityId': null, 'sourceRevision': 'native-owned-defaults-owner-proof'},
+      ]};
+    final value = await _source(_Wire(() => _ok(data))).read(store, () => true);
+    expect(value.revisions.keys.single, (action, null));
+    final wrongEntity = {...data, 'revisions': [
+      {'actionId': action, 'entityId': 'owned-sku-one', 'sourceRevision': 'wrong-domain'},
+    ]};
+    await expectLater(_source(_Wire(() => _ok(wrongEntity))).read(store, () => true), throwsA(isA<AssistantModelFailure>()));
+    final personal = {..._data(), 'revisions': data['revisions']};
+    await expectLater(_source(_Wire(() => _ok(personal))).read(_context, () => true), throwsA(isA<AssistantModelFailure>()));
+  });
+  }
+  for (final action in assistantStoreProductContextActions) {
+  test('Owned Store $action metadata stays in the approved Store context and rejects personal or foreign scope', () async {
+    final store = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'Host fixture Store',
+      profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
+    final data = {..._data(), 'ownerKey': sha256.convert(utf8.encode(jsonEncode([
+      'fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString(),
+      'scope': {'audience': 'workspace', 'storeId': 'store-one'}, 'revisions': [
+        {'actionId': 'AI-ACT-317', 'entityId': 'store-one', 'sourceRevision': 'original-workspace-authority'},
+        {'actionId': action, 'entityId': 'owned-sku-one', 'sourceRevision': 'original-owned-product'},
+      ]};
+    final wire = _Wire(() => _ok(data));
+    final result = await _source(wire).read(store, () => true);
+    expect(result.revisions, {(action, 'owned-sku-one'): 'original-owned-product'});
+    expect((wire.bodies.single['payload'] as Map)['scope'], {'audience': 'workspace', 'storeId': 'store-one'});
+    final personal = {..._data(), 'revisions': [
+      {'actionId': action, 'entityId': 'owned-sku-one', 'sourceRevision': 'forged-personal-product'},
+    ]};
+    await expectLater(_source(_Wire(() => _ok(personal))).read(_context, () => true), throwsA(isA<AssistantModelFailure>()));
+    final missing = {...data, 'revisions': [
+      {'actionId': action, 'entityId': null, 'sourceRevision': 'missing-original-SKU'},
+    ]};
+    await expectLater(_source(_Wire(() => _ok(missing))).read(store, () => true), throwsA(isA<AssistantModelFailure>()));
+    final foreign = {...data, 'scope': {'audience': 'workspace', 'storeId': 'foreign-store'}};
+    await expectLater(_source(_Wire(() => _ok(foreign))).read(store, () => true), throwsA(isA<AssistantModelFailure>()));
+    const pending = MoolAssistantContext(accountScope: _owner, authenticationRevision: 1, workspaceId: 'store-one',
+      workspaceRevision: 1, storeWorkspace: true, workspaceApproved: false);
+    final unavailableWire = _Wire(() => _ok(data));
+    await expectLater(_source(unavailableWire).read(pending, () => true), throwsA(isA<AssistantModelFailure>()));
+    expect(unavailableWire.bodies, isEmpty);
+  });
+  }
   for (final action in assistantDomainProductContextActions) {
   test('Domain $action metadata must belong to the immutable original selection sent', () async {
     final id = 'listing-${List.filled(64, 'a').join()}';
@@ -127,4 +232,14 @@ void main() {
     final source = _source(wire, credentials: credentials)..dispose();
     await expectLater(source.read(_context, () => true), throwsA(anything)); expect(credentials.tokens, 0);
   });
+}
+
+class _CapacityWire implements SocialContentTransport {
+  _CapacityWire(this.envelope);
+  final Map<String, dynamic> envelope;
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {required Map<String, String> headers,
+    required Map<String, Object?> body}) async {
+    expect((body['payload'] as Map)['nativeSelectionVersion'], 1);
+    return SocialContentResponse(statusCode: 200, body: jsonEncode(envelope));
+  }
 }

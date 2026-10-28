@@ -14,8 +14,11 @@ import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart' show BuyBrowseNativeAdapter;
 import 'package:moolsocial/features/journey01/journey_services.dart' show AuthenticatedAccountIdentity;
+import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart' show StoreProductInitialData, StoreProductDefaultsInitialData, StoreProductNativeInitial;
+import 'package:moolsocial/features/work/work_publication_data.dart' show WorkspaceProductContent;
 
 const _port = int.fromEnvironment('AI_DOMAIN_TEST_PORT');
+const _storeExport = String.fromEnvironment('AI_DOMAIN_STORE_NATIVE_EXPORT_PATH');
 const _owner = (environment: 'firebase-service', projectId: 'fixture-project', tenantId: null, userId: 'domain-host-a');
 class _RealLoopback extends HttpOverrides {}
 HttpClient _client() => HttpOverrides.runWithHttpOverrides(() => HttpClient(), _RealLoopback());
@@ -95,6 +98,38 @@ class _Rig {
   }
 }
 void main() {
+  test('Domain actual owned-source backend proposal maps to the original Store editor field contract', () async {
+    final data = jsonDecode(await File(_storeExport).readAsString()) as Map<String, dynamic>;
+    expect(data['schemaVersion'], 1); expect(data['hostOnly'], true); expect(data['noDomainWrites'], true);
+    expect((data['nativeTextFields'] as List).toSet(), StoreProductInitialData.editableFields,
+      reason: 'Backend suggestions must use the existing native controllers, without invented or omitted field names.');
+    final reply = data['reply'] as Map<String, dynamic>, proposal = reply['outcome'] as Map<String, dynamic>;
+    expect(reply['scope'], {'audience': 'workspace', 'storeId': 'store-one'});
+    expect(proposal['kind'], 'proposal'); expect(proposal['actionId'], 'AI-ACT-214'); expect(proposal['entityId'], 'owned-sku-0002');
+    final fields = Map<String, Object?>.from(proposal['fields'] as Map);
+    final native = StoreProductInitialData.fromFields(fields);
+    expect(native.sourceCanonicalId, 'canonical-one'); expect(native.sourceSku, 'OWNED-2'); expect(native.sourcePack, '1 L');
+    expect(native.sourceRetailEnabled, true); expect(native.sourceWholesaleEnabled, false);
+    expect(native.inputs, {'description': 'मूल उत्पाद की जानकारी', 'sellingPrice': '100.25'});
+    expect(native.inputs.containsKey('stock'), false); expect(native.inputs.containsKey('purchasePrice'), false);
+    fields['description'] = 'Changed after parsing';
+    expect(native.inputs['description'], 'मूल उत्पाद की जानकारी');
+    expect(() => native.inputs.clear(), throwsUnsupportedError);
+    expect(() => StoreProductInitialData.fromFields({...fields, 'ownerUserId': 'foreign'}), throwsFormatException);
+    expect((data['nativeDefaultFields'] as List).toSet(), StoreProductDefaultsInitialData.allowedFields);
+    final defaults = StoreProductDefaultsInitialData.fromFields(Map<String, Object?>.from(data['defaultsInput'] as Map));
+    expect(defaults.fields, {'lowStockThreshold': '0005', 'customerListingRequested': false});
+    expect(defaults.fields.containsKey('stockMode'), false);
+    expect(() => defaults.fields.clear(), throwsUnsupportedError);
+      expect((data['nativeWarrantyLabels'] as List).toSet(), WorkspaceProductContent.warrantyGuideLabels.toSet());
+      final warranty = StoreProductNativeInitial.fromFields('AI-ACT-370', Map<String, Object?>.from(data['warrantyInput'] as Map));
+      expect(warranty.warranty, {'Warranty issuer': 'मूल निर्माता', 'Warranty duration': '12 महीने', 'Warranty exclusions': ''});
+      expect(() => warranty.warranty.clear(), throwsUnsupportedError);
+      final confirmation = StoreProductNativeInitial.fromFields('AI-ACT-220', Map<String, Object?>.from(data['priceConfirmationInput'] as Map));
+      expect(confirmation.validityMinutes, '00030');
+      expect(confirmation.references['sourceWholesaleEnabled'], true);
+      expect(StoreProductNativeInitial.fromFields('AI-ACT-372', {}).references, isEmpty);
+  }, skip: _storeExport.isEmpty);
   testWidgets('Native saved-products action rejects absent owned persistence instead of showing a false empty list', (tester) async {
     const actorContext = MoolAssistantContext(accountScope: _owner, authenticationRevision: 1);
     final core = BuySession(), scope = ValueNotifier(0), navigator = GlobalKey<NavigatorState>();

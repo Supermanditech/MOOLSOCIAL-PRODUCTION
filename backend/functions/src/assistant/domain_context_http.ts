@@ -39,7 +39,7 @@ export async function handleAssistantCanonicalContextRequest(input: {method: str
       throw new AssistantModelError("stale_preparation", 409);
     }
     return {status: 200, body: {ok: true as const,
-      data: canonicalContextProjection(actor, scope, current)}};
+      data: canonicalContextProjection(actor, scope, current, selection.nativeSelectionVersion)}};
   } catch (error) {
     const known = error instanceof AssistantModelError || error instanceof AccountPlansError;
     const status = known ? error.status : error instanceof SocialContentError ? error.httpStatus : 503;

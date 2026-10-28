@@ -907,12 +907,19 @@ WorkspaceCatalogueItem? _assistantProductTarget(WorkSession session, bool adding
     entityId == null ? null : (adding ? session.referenceCatalogue : session.workspaceCatalogueItems)
       .where((item) => item.id == entityId).singleOrNull;
 
-String _assistantProductSignature(WorkSession session, WorkspaceCatalogueItem product) => assistant_hash.sha256.convert(utf8.encode(jsonEncode([
-  product.toInventoryJson(), session.workspaceProductDefaults.toJson(),
+String _assistantProductSharedSignature(WorkSession session) => assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+  'native-product-v2', session.workspaceProductDefaults.toJson(),
   [for (final family in session.workspaceVariantFamilies) family.toJson()],
-  [for (final item in session.workspaceCatalogueItems)
-    [item.id, item.sku, item.canonicalId, item.variant, item.pack, item.barcode]],
+  [for (final item in session.workspaceCatalogueItems) item.toInventoryJson()],
+  session.workspaceCatalogueListingReady, session.workspaceCatalogueListingBusy,
+  session.workspaceCatalogueListingPendingSkuId, session.workspaceCatalogueListingPendingRequestId,
+  session.workspaceInventoryLoaded, session.workspaceInventoryError,
+  session.workspaceGoodsReceiptBusy, session.workspaceGoodsReceiptRecoveryPending,
+  session.workspaceAccountRecoveryPending, session.workspaceAccountRecoveryFailed,
 ]))).toString();
+String _assistantProductSignature(WorkSession session, WorkspaceCatalogueItem product, {String? sharedSignature}) =>
+  assistant_hash.sha256.convert(utf8.encode(jsonEncode(['native-product-v2', product.toInventoryJson(),
+    sharedSignature ?? _assistantProductSharedSignature(session)]))).toString();
 
 /// Opens the original editor; only its final Save can mutate/persist a product.
 Future<MoolAssistantReviewResult> showStoreProductInitialReview(
@@ -960,12 +967,13 @@ Future<MoolAssistantReviewResult> showStoreProductInitialReview(
   return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
 }
 
-class _StoreProductInitialAdapter implements MoolAssistantNativeAdapter {
+class _StoreProductInitialAdapter implements MoolAssistantCanonicalProductIdentityAdapter {
   const _StoreProductInitialAdapter({required this.actionId, required this.readContext,
-    required this.readSnapshot, required this.open});
+    required this.readSnapshot, required this.open, this.readNativeIdentity});
   @override final String actionId;
   final MoolAssistantContext? Function() readContext;
   final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<String?> Function(MoolAssistantProposal, bool Function())? readNativeIdentity;
   final Future<MoolAssistantReviewResult> Function(
     StoreProductInitialData, MoolAssistantProposal, bool Function(),
   ) open;
@@ -979,6 +987,10 @@ class _StoreProductInitialAdapter implements MoolAssistantNativeAdapter {
   }
   @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entityId) =>
       readSnapshot(ctx, entityId);
+  @override Future<String?> nativeProductIdentity(MoolAssistantProposal proposal, bool Function() current) async {
+    final read = readNativeIdentity;
+    return read == null ? null : await read(proposal, current);
+  }
   @override Future<MoolAssistantReviewResult> openReview(
     MoolAssistantProposal proposal, bool Function() isCurrent,
   ) async {
@@ -989,6 +1001,12 @@ class _StoreProductInitialAdapter implements MoolAssistantNativeAdapter {
     }
     return open(_parse(proposal.fields), proposal, isCurrent);
   }
+}
+class _StoreBatchedProductInitialAdapter extends _StoreProductInitialAdapter implements MoolAssistantBatchNativeAdapter {
+  const _StoreBatchedProductInitialAdapter({required super.actionId, required super.readContext,
+    required super.readSnapshot, required super.open, super.readNativeIdentity, required this.readSnapshots});
+  final Future<MoolAssistantNativeBatchSnapshot> Function(MoolAssistantContext, List<String?>) readSnapshots;
+  @override Future<MoolAssistantNativeBatchSnapshot> snapshots(MoolAssistantContext context, List<String?> entityIds) => readSnapshots(context, entityIds);
 }
 
 /// Proposed text for the original supplier money input, never a payment command.
@@ -3481,13 +3499,7 @@ class _WorkWorkspaceDashboardScreenState
           for (final id in ['AI-ACT-213', 'AI-ACT-214', 'AI-ACT-221'])
             if (trusted != null && _financePermitted(trusted) &&
                 !existing.any((adapter) => adapter.actionId == id))
-              _StoreProductInitialAdapter(actionId: id,
-                readContext: () => _financeAssistantContext(hostContext),
-                readSnapshot: (ctx, entity) =>
-                  _productAssistantSnapshot(hostContext, supplierSource, id, ctx, entity),
-                open: (initial, proposal, current) =>
-                  _showProductAssistantInitial(hostContext, supplierSource, initial, proposal, current),
-              ),
+              _makeProductAssistantAdapter(hostContext, supplierSource, id),
           for (final id in ['AI-ACT-236', 'AI-ACT-237'])
             if (trusted != null && _supplierAssistantPermitted(supplierSource, trusted) &&
                 !existing.any((adapter) => adapter.actionId == id))
@@ -6344,15 +6356,16 @@ class _WorkWorkspaceDashboardScreenState
 final Map<Object, (String, int)> _nativeProductVersions = {};
 Object? _nativeProductVersionOwner;
 int _nativeProductVersion = 0;
-String _nativeProductSignature(WorkSession source, String action, String? entity) {
-  final product = _assistantProductTarget(source, false, entity);
+String _nativeProductSignature(WorkSession source, String action, String? entity,
+    {WorkspaceCatalogueItem? capturedProduct, String? sharedSignature}) {
+  final product = capturedProduct ?? _assistantProductTarget(source, false, entity);
   final familyId = product?.variantMembership?.familyId;
   final submission = product == null ? null : source.workspaceProductSubmission(product.id);
   final media = product == null ? null : source.workspaceProductMedia(product.id);
   final family = familyId == null ? null : source.workspaceVariantFamilyPublisher(familyId);
   final visibility = action == 'AI-ACT-371' && product != null ? source.workspaceStockVisibility(product.id) : null;
   return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
-    if (product != null) _assistantProductSignature(source, product),
+    if (product != null) _assistantProductSignature(source, product, sharedSignature: sharedSignature),
     if (StoreProductNativeInitial.catalogueActions.contains(action)) [
       for (final item in source.workspaceCatalogueItems) item.toInventoryJson()],
     if (action == 'AI-ACT-369' || action == 'AI-ACT-228') [
@@ -6369,7 +6382,8 @@ String _nativeProductSignature(WorkSession source, String action, String? entity
       for (final item in source.workspaceCommodityPriceAttentionProducts) item.id],
   ]))).toString();
 }
-String _nativeProductRevision(WorkSession source, String action, MoolAssistantContext ctx, String? entity) {
+String _nativeProductRevision(WorkSession source, String action, MoolAssistantContext ctx, String? entity,
+    {WorkspaceCatalogueItem? capturedProduct, String? sharedSignature}) {
   final owner = (source, widget.accountIdentity, widget.accountAuthenticated, ctx.binding,
     source.publicationPreferencesContext, source.tradingPreferencesContext, source.navigationScopeRevision);
   if (_nativeProductVersionOwner != owner) {
@@ -6377,17 +6391,17 @@ String _nativeProductRevision(WorkSession source, String action, MoolAssistantCo
   }
   final key = (source, action, ctx.binding, entity, source.publicationPreferencesContext,
     source.tradingPreferencesContext, source.navigationScopeRevision);
-  final signature = _nativeProductSignature(source, action, entity);
+  final signature = _nativeProductSignature(source, action, entity, capturedProduct: capturedProduct, sharedSignature: sharedSignature);
   if (_nativeProductVersions[key]?.$1 != signature) {
     _nativeProductVersions[key] = (signature, ++_nativeProductVersion);
   }
-  return 'native-product:$action:${_nativeProductVersions[key]!.$2}';
+  return 'native-product:v2:$action:${_nativeProductVersions[key]!.$2}';
 }
-bool _nativeProductReady(WorkSession source, String action, String? entity) {
+bool _nativeProductReady(WorkSession source, String action, String? entity, {WorkspaceCatalogueItem? capturedProduct}) {
   if (StoreProductNativeInitial.catalogueActions.contains(action)) {
     return entity == null && (action != 'AI-ACT-372' || source.workspaceCommodityPriceAttentionConfigured);
   }
-  final product = _assistantProductTarget(source, false, entity);
+  final product = capturedProduct ?? _assistantProductTarget(source, false, entity);
   if (product == null) return false;
   final familyId = product.variantMembership?.familyId;
   final submission = source.workspaceProductSubmission(product.id), media = source.workspaceProductMedia(product.id);
@@ -6480,6 +6494,10 @@ Iterable<MoolAssistantNativeAdapter> _productNativeAdapters(BuildContext hostCon
       yield _StoreProductSelectedImportAdapter(readContext: () => _financeAssistantContext(hostContext), readSnapshot: read, open: open);
     } else if (action == 'AI-ACT-216') {
       yield _StoreProductSelectedPhotoAdapter(readContext: () => _financeAssistantContext(hostContext), readSnapshot: read, open: open);
+    } else if (const {'AI-ACT-220', 'AI-ACT-370'}.contains(action)) {
+      yield _StoreCanonicalProductNativeAdapter(actionId: action, readContext: () => _financeAssistantContext(hostContext), readSnapshot: read, open: open,
+        readNativeIdentity: (proposal, current) => _productAssistantNativeIdentity(hostContext, source, proposal, current),
+        readSnapshots: (ctx, entities) => _productAssistantNativeBatch(hostContext, source, action, ctx, entities, routeCurrent: routeCurrent));
     } else {
       yield _StoreProductNativeAdapter(actionId: action, readContext: () => _financeAssistantContext(hostContext), readSnapshot: read, open: open);
     }
@@ -6572,7 +6590,8 @@ Future<MoolAssistantReviewResult> _openPublishedProduct(BuildContext host, WorkS
 }
 
 Future<MoolAssistantNativeSnapshot?> _productNativeSnapshot(BuildContext hostContext, WorkSession source,
-  String action, MoolAssistantContext ctx, String? entity, bool Function() routeCurrent) async {
+  String action, MoolAssistantContext ctx, String? entity, bool Function() routeCurrent,
+  {WorkspaceCatalogueItem? capturedProduct, String? sharedSignature}) async {
   bool current() => routeCurrent() && _financePermitted(ctx) &&
     _financeAssistantContext(hostContext)?.binding == ctx.binding && !_financeSheetOpen && !_couponsSheetOpen && !_productEditorOpen(source);
   if (!current() || !StoreProductNativeInitial.actions.contains(action) ||
@@ -6580,7 +6599,7 @@ Future<MoolAssistantNativeSnapshot?> _productNativeSnapshot(BuildContext hostCon
   // Native Load/Recover can enqueue a durable Stock report. Review does not run it.
   if (source.localInventoryEnabled && (!source.workspaceInventoryLoaded || source.workspaceInventoryError != null ||
       source.workspaceGoodsReceiptBusy || source.workspaceGoodsReceiptRecoveryPending)) return null;
-  final product = _assistantProductTarget(source, false, entity);
+  final product = capturedProduct ?? _assistantProductTarget(source, false, entity);
   if (!StoreProductNativeInitial.catalogueActions.contains(action) && product == null) return null;
   if (product != null) {
     final submission = source.workspaceProductSubmission(product.id), media = source.workspaceProductMedia(product.id);
@@ -6609,8 +6628,9 @@ Future<MoolAssistantNativeSnapshot?> _productNativeSnapshot(BuildContext hostCon
     await source.loadWorkspaceCommodityPriceAttention();
     if (!current()) return null;
   }
-  if (!current() || !_nativeProductReady(source, action, entity)) return null;
-  return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: _nativeProductRevision(source, action, ctx, entity),
+  if (!current() || !_nativeProductReady(source, action, entity, capturedProduct: product)) return null;
+  return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: _nativeProductRevision(source, action, ctx, entity,
+    capturedProduct: product, sharedSignature: sharedSignature),
     permitted: true, entityId: entity);
 }
 Future<MoolAssistantReviewResult> _openProductNative(BuildContext hostContext, WorkSession source,
@@ -7165,6 +7185,50 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       ownerChanges: hostContext.getInheritedWidgetOfExactType<MoolAssistantHost>()?.contextChanges);
   }
 
+  MoolAssistantNativeAdapter _makeProductAssistantAdapter(BuildContext hostContext, WorkSession source, String action) {
+    MoolAssistantContext? readContext() => _financeAssistantContext(hostContext);
+    Future<MoolAssistantNativeSnapshot?> read(MoolAssistantContext ctx, String? entity) =>
+      _productAssistantSnapshot(hostContext, source, action, ctx, entity);
+    Future<String?> identity(MoolAssistantProposal proposal, bool Function() current) =>
+      _productAssistantNativeIdentity(hostContext, source, proposal, current);
+    Future<MoolAssistantReviewResult> open(StoreProductInitialData initial, MoolAssistantProposal proposal, bool Function() current) =>
+      _showProductAssistantInitial(hostContext, source, initial, proposal, current);
+    if (action == 'AI-ACT-213') return _StoreProductInitialAdapter(actionId: action, readContext: readContext,
+      readSnapshot: read, readNativeIdentity: identity, open: open);
+    return _StoreBatchedProductInitialAdapter(actionId: action, readContext: readContext,
+      readSnapshot: read, readNativeIdentity: identity, open: open,
+      readSnapshots: (ctx, entities) => _productAssistantNativeBatch(hostContext, source, action, ctx, entities));
+  }
+
+  Future<MoolAssistantNativeBatchSnapshot> _productAssistantNativeBatch(BuildContext hostContext, WorkSession source,
+      String action, MoolAssistantContext ctx, List<String?> entities, {bool Function()? routeCurrent}) async {
+    bool actor() => mounted && hostContext.mounted && identical(source, session) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) &&
+      routeCurrent?.call() != false && !_financeSheetOpen && !_couponsSheetOpen && !_productEditorOpen(source) &&
+      source.workspaceInventoryLoaded && source.workspaceInventoryError == null && !source.workspaceGoodsReceiptBusy &&
+      !source.workspaceGoodsReceiptRecoveryPending && !source.workspaceAccountRecoveryPending && !source.workspaceAccountRecoveryFailed;
+    if (!actor() || !const {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-220', 'AI-ACT-370'}.contains(action)) {
+      return MoolAssistantNativeBatchSnapshot(owner: source, sourceRevision: 'unavailable:v2', entries: const {}, current: () => false);
+    }
+    final shared = _assistantProductSharedSignature(source);
+    final products = {for (final product in source.workspaceCatalogueItems) product.id: product};
+    bool current() {
+      try {return actor() && products.length == source.workspaceCatalogueItems.length && _assistantProductSharedSignature(source) == shared;}
+      on Object {return false;}
+    }
+    final result = <String?, MoolAssistantNativeSnapshot?>{};
+    for (final entity in entities) {
+      final product = products[entity];
+      if (entity == null || product == null || !actor()) {result[entity] = null; continue;}
+      final snapshot = const {'AI-ACT-214', 'AI-ACT-221'}.contains(action)
+        ? await _productAssistantSnapshot(hostContext, source, action, ctx, entity, capturedProduct: product, sharedSignature: shared)
+        : await _productNativeSnapshot(hostContext, source, action, ctx, entity, routeCurrent ?? () => true,
+            capturedProduct: product, sharedSignature: shared);
+      result[entity] = snapshot;
+    }
+    return MoolAssistantNativeBatchSnapshot(owner: source, sourceRevision: 'store-native-batch:v2:$shared', entries: result, current: current);
+  }
+
   void _refreshProductAssistantVersionOwner() {
     final owner = (session, widget.accountIdentity, widget.accountAuthenticated,
       _financeAssistantContext(context)?.binding,
@@ -7177,22 +7241,41 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
   }
 
   String? _productAssistantSourceRevision(WorkSession source, String actionId,
-    MoolAssistantContext ctx, String? entityId) {
+    MoolAssistantContext ctx, String? entityId, {WorkspaceCatalogueItem? capturedProduct, String? sharedSignature}) {
     _refreshProductAssistantVersionOwner();
-    final product = _assistantProductTarget(source, actionId == 'AI-ACT-213', entityId);
-    if (product == null) return null;
+    final product = capturedProduct ?? _assistantProductTarget(source, actionId == 'AI-ACT-213', entityId);
+    if (product == null || product.id != entityId) return null;
     final key = (source, actionId, entityId, ctx.binding,
       source.publicationPreferencesContext, source.tradingPreferencesContext);
-    final signature = _assistantProductSignature(source, product);
+    final signature = _assistantProductSignature(source, product, sharedSignature: sharedSignature);
     if (_productAssistantVersions[key]?.$1 != signature) {
       _productAssistantVersions[key] = (signature, ++_productAssistantVersion);
     }
-    return 'store-product:${_productAssistantVersions[key]!.$2}';
+    return 'store-product:v2:${_productAssistantVersions[key]!.$2}';
+  }
+
+  Future<String?> _productAssistantNativeIdentity(BuildContext hostContext, WorkSession source,
+      MoolAssistantProposal proposal, bool Function() current) async {
+    final ctx = _financeAssistantContext(hostContext), entity = proposal.entityId;
+    if (ctx == null || entity == null || !const {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-370', 'AI-ACT-220'}.contains(proposal.actionId)) return null;
+    bool owner() => current() && mounted && hostContext.mounted && identical(source, session) &&
+      _financeAssistantContext(hostContext)?.binding == ctx.binding && ctx.binding == proposal.binding && _financePermitted(ctx) &&
+      !_productEditorOpen(source) && !_financeSheetOpen && !_couponsSheetOpen;
+    if (!owner()) return null;
+    final product = _assistantProductTarget(source, false, entity);
+    if (product == null) return null;
+    final acknowledgement = source.workspaceAssistantProductAcknowledgement(entity, proposal.sourceRevision, current: owner);
+    if (acknowledgement == null || !acknowledgement.current()) return null;
+    final expected = {...StoreProductInitialData.referenceFields(product),
+      'sourceCanonicalId': acknowledgement.canonicalProductId};
+    final proposed = {for (final key in StoreProductInitialData.referenceKeys) key: proposal.fields[key]};
+    if (!mapEquals(expected, proposed) || !owner() || !acknowledgement.current()) return null;
+    return product.canonicalId;
   }
 
   Future<MoolAssistantNativeSnapshot?> _productAssistantSnapshot(
     BuildContext hostContext, WorkSession source, String actionId,
-    MoolAssistantContext ctx, String? entityId,
+    MoolAssistantContext ctx, String? entityId, {WorkspaceCatalogueItem? capturedProduct, String? sharedSignature}
   ) async {
     bool current() => mounted && hostContext.mounted && identical(widget.session, source) &&
         _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx) &&
@@ -7209,10 +7292,11 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       if (!ready || !current()) return null;
     }
     final adding = actionId == 'AI-ACT-213';
-    final product = _assistantProductTarget(source, adding, entityId);
+    final product = capturedProduct ?? _assistantProductTarget(source, adding, entityId);
     if (product == null || adding && source.workspaceCatalogueItems.any((item) =>
         item.id == product.id || item.sku.trim().toLowerCase() == product.sku.trim().toLowerCase())) return null;
-    final revision = _productAssistantSourceRevision(source, actionId, ctx, entityId);
+    final revision = _productAssistantSourceRevision(source, actionId, ctx, entityId,
+      capturedProduct: product, sharedSignature: sharedSignature);
     return revision == null ? null : MoolAssistantNativeSnapshot(binding: ctx.binding,
       sourceRevision: revision, entityId: entityId, permitted: true);
   }
@@ -34962,6 +35046,14 @@ class _StoreProductNativeAdapter implements MoolAssistantNativeAdapter {
         validateFields(proposal.fields) != null) return MoolAssistantReviewResult.stale;
     return open(StoreProductNativeInitial.fromFields(actionId, proposal.fields), proposal, isCurrent, null);
   }
+}
+class _StoreCanonicalProductNativeAdapter extends _StoreProductNativeAdapter implements MoolAssistantCanonicalProductIdentityAdapter, MoolAssistantBatchNativeAdapter {
+  const _StoreCanonicalProductNativeAdapter({required super.actionId, required super.readContext,
+    required super.readSnapshot, required super.open, required this.readNativeIdentity, required this.readSnapshots});
+  final Future<String?> Function(MoolAssistantProposal, bool Function()) readNativeIdentity;
+  final Future<MoolAssistantNativeBatchSnapshot> Function(MoolAssistantContext, List<String?>) readSnapshots;
+  @override Future<MoolAssistantNativeBatchSnapshot> snapshots(MoolAssistantContext context, List<String?> entityIds) => readSnapshots(context, entityIds);
+  @override Future<String?> nativeProductIdentity(MoolAssistantProposal proposal, bool Function() current) => readNativeIdentity(proposal, current);
 }
 // ACT228 resolves only a controller-minted reference to actual selected bytes.
 class _StoreProductSelectedImportAdapter extends _StoreProductNativeAdapter implements MoolAssistantSelectedDocumentAdapter {

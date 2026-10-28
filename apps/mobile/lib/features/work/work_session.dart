@@ -1600,6 +1600,88 @@ class WorkSession extends ChangeNotifier {
     }
     return link.canonicalProductId;
   }
+  /// Read-only native projection of an original reviewed acknowledgement.
+  /// The caller must supply freshly authorised backend revision metadata and
+  /// its own actor/request fence. This neither grants access nor restores,
+  /// reconciles, retries or writes a catalogue operation.
+  ({String canonicalProductId, bool Function() current})?
+      workspaceAssistantProductAcknowledgement(String skuId, String backendRevision,
+      {required bool Function() current}) {
+    final account = _contactAccountScope, store = activeWorkspace?.id,
+      source = catalogueGateway, data = _storeData,
+      navigation = navigationScopeRevision, owner = publicationPreferencesContext;
+    if (!current() || _disposed || account == null || account.isEmpty || store == null ||
+        !workspaceStoreAuthoringAvailable || !localInventoryEnabled || !workspaceInventoryLoaded ||
+        workspaceInventoryError != null || workspaceAccountRecoveryPending || workspaceAccountRecoveryFailed ||
+        source is! WorkspaceCatalogueOwnerGateway) return null;
+    final scope = (account: account, store: store, realm: (source as WorkspaceCatalogueOwnerGateway).realm);
+    // Inspect only a journal already loaded by its original native owner.
+    // An unknown pending state is not silently treated as no pending operation.
+    final controller = _catalogueListings[scope];
+    if (controller == null || !controller.ready || controller.busy || controller.pending != null ||
+        _catalogueListingLoads.contains(scope)) return null;
+    final item = workspaceCatalogueItems.where((item) => item.id == skuId).firstOrNull,
+      link = workspaceReviewedCatalogueLink(skuId);
+    final stamp = RegExp(r'^store-owned-product:(evaluation|production):([1-9][0-9]{0,9}):[a-f0-9]{64}$').firstMatch(backendRevision);
+    if (item == null || item.canonicalId.isEmpty || link == null || !link.valid || stamp == null ||
+        link.storeId != store || link.skuId != skuId || link.realm != stamp.group(1) ||
+        link.mirrorRevision != int.tryParse(stamp.group(2)!)) return null;
+    var retired = false;
+    bool alive() {
+      if (retired) return false;
+      try {
+        final valid = current() && !_disposed && _contactAccountScope == account && activeWorkspace?.id == store &&
+          navigationScopeRevision == navigation && publicationPreferencesContext == owner && identical(_storeData, data) &&
+          workspaceStoreAuthoringAvailable && localInventoryEnabled && workspaceInventoryLoaded && workspaceInventoryError == null &&
+          !workspaceGoodsReceiptBusy && !workspaceGoodsReceiptRecoveryPending &&
+          identical(catalogueGateway, source) && controller.ready && !controller.busy && controller.pending == null &&
+          !_catalogueListingLoads.contains(scope) && !workspaceAccountRecoveryPending && !workspaceAccountRecoveryFailed &&
+          identical(workspaceCatalogueItems.where((item) => item.id == skuId).firstOrNull, item) &&
+          identical(workspaceReviewedCatalogueLink(skuId), link) && _savedProductSubmission(skuId)?.authoredSha256 == link.authoredSha256;
+        if (!valid) retired = true;
+        return valid;
+      } on Object {retired = true; return false;}
+    }
+    if (!alive()) return null;
+    return (canonicalProductId: link.canonicalProductId, current: alive);
+  }
+  /// The same immutable acknowledgement checks, indexed once for metadata
+  /// capture. This read never restores a journal, calls a provider or writes.
+  Set<String> workspaceAssistantAcknowledgedProducts(Map<String, String> backendRevisions,
+      {required bool Function() current}) {
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway,
+      data = _storeData, navigation = navigationScopeRevision, owner = publicationPreferencesContext;
+    if (!current() || _disposed || account == null || account.isEmpty || store == null ||
+        !workspaceStoreAuthoringAvailable || !localInventoryEnabled || !workspaceInventoryLoaded ||
+        workspaceInventoryError != null || workspaceAccountRecoveryPending || workspaceAccountRecoveryFailed ||
+        workspaceGoodsReceiptBusy || workspaceGoodsReceiptRecoveryPending || source is! WorkspaceCatalogueOwnerGateway) return const {};
+    final scope = (account: account, store: store, realm: (source as WorkspaceCatalogueOwnerGateway).realm);
+    final controller = _catalogueListings[scope];
+    if (controller == null || !controller.ready || controller.busy || controller.pending != null || _catalogueListingLoads.contains(scope)) return const {};
+    final products = {for (final item in data.workspaceCatalogueItems) item.id: item};
+    final families = {for (final family in data.variantFamilies) family.id: family};
+    final links = <String, WorkspaceReviewedCatalogueLink>{};
+    if (products.length != data.workspaceCatalogueItems.length || families.length != data.variantFamilies.length) return const {};
+    for (final link in data.reviewedCatalogueLinks.where((link) => link.storeId == store && link.realm == scope.realm)) {
+      if (links.containsKey(link.skuId)) return const {};
+      links[link.skuId] = link;
+    }
+    final ready = <String>{}, pattern = RegExp(r'^store-owned-product:(evaluation|production):([1-9][0-9]{0,9}):[a-f0-9]{64}$');
+    for (final entry in backendRevisions.entries) {
+      final item = products[entry.key], link = links[entry.key], stamp = pattern.firstMatch(entry.value);
+      if (item == null || item.canonicalId.isEmpty || link == null || !link.valid || stamp == null ||
+          link.realm != stamp.group(1) || link.mirrorRevision != int.tryParse(stamp.group(2)!)) continue;
+      try {
+        final input = WorkspaceProductSubmissionInput.fromSaved(item, family: families[item.variantMembership?.familyId]);
+        if (input.authoredSha256 == link.authoredSha256) ready.add(entry.key);
+      } on Object {continue;}
+    }
+    if (!current() || _disposed || _contactAccountScope != account || activeWorkspace?.id != store ||
+        navigationScopeRevision != navigation || publicationPreferencesContext != owner || !identical(_storeData, data) ||
+        !identical(catalogueGateway, source) || !controller.ready || controller.busy || controller.pending != null ||
+        _catalogueListingLoads.contains(scope)) return const {};
+    return Set.unmodifiable(ready);
+  }
   String? get workspaceCatalogueListingPendingSkuId => _catalogueListingController?.pending?.skuId;
   String? get workspaceCatalogueListingPendingRequestId => _catalogueListingController?.pending?.idempotencyKey;
   bool get workspaceCatalogueListingPendingIsPriceConfirmation => _catalogueListingController?.pending?.isPriceConfirmation ?? false;

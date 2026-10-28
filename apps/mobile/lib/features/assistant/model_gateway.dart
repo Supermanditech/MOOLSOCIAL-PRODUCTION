@@ -8,6 +8,23 @@ import '../shared/social_content_gateway.dart';
 typedef AssistantModelScope = ({String audience, String? storeId});
 typedef AssistantNativeTargetHint = ({String actionId, String? entityId});
 
+class AssistantNativeTargetMask {
+  factory AssistantNativeTargetMask({required String fingerprint, required String bits}) {
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(fingerprint) || bits.length > 2500 ||
+        !RegExp(r'^[A-Za-z0-9_-]*$').hasMatch(bits)) throw const AssistantModelFailure('invalid_request');
+    try {
+      final bytes = base64Url.decode(base64Url.normalize(bits));
+      if (bytes.length > 1875 || base64Url.encode(bytes).replaceAll('=', '') != bits) {
+        throw const AssistantModelFailure('invalid_request');
+      }
+    } on FormatException {throw const AssistantModelFailure('invalid_request');}
+    return AssistantNativeTargetMask._(fingerprint, bits);
+  }
+  const AssistantNativeTargetMask._(this.fingerprint, this.bits);
+  final String fingerprint, bits;
+  Map<String, Object?> toJson() => {'version': 1, 'fingerprint': fingerprint, 'bits': bits};
+}
+
 List<AssistantNativeTargetHint> assistantNativeTargetSelection(List<AssistantNativeTargetHint> values) {
   if (values.length > 5000 || values.toSet().length != values.length || values.any((value) =>
       !RegExp(r'^AI-ACT-\d{3}$').hasMatch(value.actionId) || value.entityId != null &&
@@ -43,6 +60,7 @@ class AssistantModelInput {
     this.history = const [],
     this.catalogueListingIds,
     this.nativeTargets,
+    this.nativeTargetMask,
   });
   final AssistantModelScope scope;
   final String requestId, message, language, expectedEntitlementRevision;
@@ -51,14 +69,23 @@ class AssistantModelInput {
   final List<Map<String, String>> history;
   final List<String>? catalogueListingIds;
   final List<AssistantNativeTargetHint>? nativeTargets;
+  final AssistantNativeTargetMask? nativeTargetMask;
   AssistantModelInput withCatalogueListingIds(List<String>? ids) => AssistantModelInput(
     scope: scope, requestId: requestId, requestRevision: requestRevision, message: message, language: language,
     expectedEntitlementRevision: expectedEntitlementRevision, actionId: actionId, entityId: entityId, history: history,
-    catalogueListingIds: ids == null ? null : assistantCatalogueListingSelection(ids), nativeTargets: nativeTargets);
+    catalogueListingIds: ids == null ? null : assistantCatalogueListingSelection(ids), nativeTargets: nativeTargets, nativeTargetMask: nativeTargetMask);
   AssistantModelInput withNativeTargets(List<AssistantNativeTargetHint>? targets) => AssistantModelInput(
     scope: scope, requestId: requestId, requestRevision: requestRevision, message: message, language: language,
     expectedEntitlementRevision: expectedEntitlementRevision, actionId: actionId, entityId: entityId, history: history,
-    catalogueListingIds: catalogueListingIds, nativeTargets: targets == null ? null : assistantNativeTargetSelection(targets));
+    catalogueListingIds: catalogueListingIds, nativeTargets: targets == null ? null : assistantNativeTargetSelection(targets), nativeTargetMask: nativeTargetMask);
+  AssistantModelInput withNativeTargetMask(AssistantNativeTargetMask? mask) => AssistantModelInput(
+    scope: scope, requestId: requestId, requestRevision: requestRevision, message: message, language: language,
+    expectedEntitlementRevision: expectedEntitlementRevision, actionId: actionId, entityId: entityId, history: history,
+    catalogueListingIds: catalogueListingIds, nativeTargets: nativeTargets, nativeTargetMask: mask);
+  Map<String, Object?> _maskJson() {
+    if (scope.audience != 'workspace') throw const AssistantModelFailure('invalid_request');
+    return nativeTargetMask!.toJson();
+  }
   Map<String, Object?> toJson() => {
     'scope': {'audience': scope.audience, 'storeId': scope.storeId},
     'requestId': requestId,
@@ -72,6 +99,7 @@ class AssistantModelInput {
     if (catalogueListingIds != null) 'catalogueListingIds': assistantCatalogueListingSelection(catalogueListingIds),
     if (nativeTargets != null) 'nativeTargets': assistantNativeTargetSelection(nativeTargets!)
       .map((value) => {'actionId': value.actionId, 'entityId': value.entityId}).toList(growable: false),
+    if (nativeTargetMask != null) 'nativeTargetMask': _maskJson(),
   };
 }
 
@@ -250,6 +278,9 @@ class AssistantModelGateway implements RecoverableAssistantModelSource {
         input.expectedEntitlementRevision.length > 256) {
       throw const AssistantModelFailure('invalid_request');
     }
+    final body = <String, Object?>{'operation': operation, 'payload': operation == 'prepare' ? input.toJson()
+      : {'scope': {'audience': input.scope.audience, 'storeId': input.scope.storeId}, 'requestId': input.requestId}};
+    if (utf8.encode(jsonEncode(body)).length > 64 * 1024) throw const AssistantModelFailure('invalid_request');
     if(operation=='prepare')await _journal(input,current);
     final elapsed = Stopwatch()..start();
     try {
@@ -270,18 +301,7 @@ class AssistantModelGateway implements RecoverableAssistantModelSource {
           'Authorization': 'Bearer $token',
           'X-Firebase-AppCheck': proof,
         },
-        body: {
-          'operation': operation,
-          'payload': operation == 'prepare'
-              ? input.toJson()
-              : {
-                  'scope': {
-                    'audience': input.scope.audience,
-                    'storeId': input.scope.storeId,
-                  },
-                  'requestId': input.requestId,
-                },
-        },
+        body: body,
       );
       _check(current);
       if (utf8.encode(response.body).length > 1024 * 1024) {

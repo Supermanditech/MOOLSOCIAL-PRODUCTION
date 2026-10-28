@@ -1998,6 +1998,28 @@ abstract interface class MoolAssistantNativeAdapter {
   );
 }
 
+/// Registered product identity adaptation after canonical/native validation.
+/// Only sourceCanonicalId may map to an acknowledged native alias. Request
+/// text, prices, quantities, other fields and stored proposals stay unchanged.
+abstract interface class MoolAssistantCanonicalProductIdentityAdapter implements MoolAssistantNativeAdapter {
+  Future<String?> nativeProductIdentity(MoolAssistantProposal canonicalProposal,
+    bool Function() current);
+}
+/// One consistent read of existing native state; grants no source permission.
+/// Single-target snapshots still revalidate the original Review boundary.
+abstract interface class MoolAssistantBatchNativeAdapter implements MoolAssistantNativeAdapter {
+  Future<MoolAssistantNativeBatchSnapshot> snapshots(
+    MoolAssistantContext context, List<String?> entityIds);
+}
+class MoolAssistantNativeBatchSnapshot {
+  MoolAssistantNativeBatchSnapshot({required this.owner, required this.sourceRevision,
+    required Map<String?, MoolAssistantNativeSnapshot?> entries, required this.current}) : entries = Map.unmodifiable(entries);
+  final Object owner;
+  final String sourceRevision;
+  final Map<String?, MoolAssistantNativeSnapshot?> entries;
+  final bool Function() current;
+}
+
 /// Captures original native state before preparation; it grants no authority.
 /// Used only after the user explicitly chooses Review on a recovered result.
 /// This is a new native review boundary, never a silent replacement of an old draft.
@@ -2016,6 +2038,10 @@ abstract interface class MoolAssistantPreparationGuard {
 abstract interface class MoolAssistantNativeSelectionGuard {
   List<String>? get catalogueListingIds;
   List<AssistantNativeTargetHint>? get nativeTargets;
+}
+abstract interface class MoolAssistantCompactNativeSelectionGuard {
+  AssistantNativeTargetMask? get nativeTargetMask;
+  Set<String> get nativeMaskedActionIds;
 }
 
 /// Additive FE-HANDOFF01 signal. Notification rechecks authority; it grants none.
@@ -2208,11 +2234,13 @@ class MoolAssistantController extends ChangeNotifier {
         if (guard is MoolAssistantNativeSelectionGuard) {
           final selection = guard as MoolAssistantNativeSelectionGuard;
           final targets = selection.nativeTargets;
-          if (targets != null && (targets.isEmpty || input.actionId != null &&
-              !targets.any((target) => target.actionId == input.actionId))) {
+          final compact = guard is MoolAssistantCompactNativeSelectionGuard ? guard as MoolAssistantCompactNativeSelectionGuard : null;
+          final maskedActions = compact?.nativeMaskedActionIds ?? const <String>{};
+          if (targets != null && (targets.isEmpty && maskedActions.isEmpty || input.actionId != null &&
+              !targets.any((target) => target.actionId == input.actionId) && !maskedActions.contains(input.actionId))) {
             unsent(); return false;
           }
-          input = input.withCatalogueListingIds(selection.catalogueListingIds).withNativeTargets(targets);
+          input = input.withCatalogueListingIds(selection.catalogueListingIds).withNativeTargets(targets).withNativeTargetMask(compact?.nativeTargetMask);
           _modelInput = input;
         }
       }

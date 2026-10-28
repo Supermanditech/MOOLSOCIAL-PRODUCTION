@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {canonicalContextOwner, canonicalContextProjection, canonicalContextRequest,
-  contextReadSelection, searchSuggestion} from "./domain_context_contract.js";
-import type {PreparationContext} from "./model_contract.js";
+  contextReadSelection, searchSuggestion, storeNativeSelection, maskedNativeHints} from "./domain_context_contract.js";
+import type {PreparationContext, PreparationNativeTarget} from "./model_contract.js";
 const scope = {audience: "personal" as const, storeId: null};
 const actor = {projectId: "host-fixture-project", uid: "host-a"};
 test("Domain context read accepts only its exact read-only scope envelope", () => {
@@ -52,4 +52,43 @@ test("Domain metadata exposes201 exact native targets without201 model functions
   const value = canonicalContextProjection(actor, scope, c);
   assert.equal(value.revisions.length, 201); assert.deepEqual(value.revisions, targets);
   assert.ok(value.revisions.every(t => t.entityId !== null));
+});
+
+test('Store compact metadata preserves5003 original anchors and stable owner/proof ordering within byte bounds', () => {
+  const where = {audience: 'workspace' as const, storeId: 'store-one'};
+  const nativeTargets: PreparationNativeTarget[] = Array.from({length: 1250}, (_, n) => ['AI-ACT-214', 'AI-ACT-221', 'AI-ACT-370', 'AI-ACT-220']
+    .map(actionId => ({actionId, entityId: `owned-sku-${n}`, sourceRevision: `store-owned-product:evaluation:1:${n}`}))).flat();
+  for (const actionId of ['AI-ACT-218', 'AI-ACT-219', 'AI-ACT-372']) nativeTargets.push({actionId, entityId: null, sourceRevision: `owner:${actionId}`});
+  const context: PreparationContext = {revision: 'original', validUntil: '2026-10-28T08:01:00.000Z', tools: [], nativeTargets};
+  assert.throws(() => canonicalContextProjection(actor, where, context), /context_unavailable/u, 'Legacy bound stays intact');
+  const projected = canonicalContextProjection(actor, where, context, 1);
+  assert.ok('nativeSelection' in projected); if (!('nativeSelection' in projected)) return;
+  assert.equal(projected.nativeSelection.groups.length, 1253);
+  assert.equal(projected.nativeSelection.groups.reduce((n, group) => n + group.actionIds.length, 0), 5003);
+  assert.ok(Buffer.byteLength(JSON.stringify(projected), 'utf8') < 2 * 1024 * 1024);
+  const selected = storeNativeSelection(actor, where, context);
+  assert.equal(storeNativeSelection(actor, where, {...context, nativeTargets: [...nativeTargets].reverse()}).fingerprint, selected.fingerprint);
+  assert.notEqual(storeNativeSelection({...actor, uid: 'foreign'}, where, context).fingerprint, selected.fingerprint);
+  assert.notEqual(storeNativeSelection(actor, where, {...context, nativeTargets: nativeTargets.map((t, i) => i === 0 ? {...t, sourceRevision: 'changed'} : t)}).fingerprint, selected.fingerprint);
+  const bytes = Buffer.alloc(Math.ceil(selected.targets.length / 8)); bytes[0] = 1;
+  const request = {...contextReadSelection(where), nativeTargets: [], nativeTargetMask: {version: 1 as const, fingerprint: selected.fingerprint, bits: bytes.toString('base64url')}};
+  assert.deepEqual(maskedNativeHints(actor, context, request), [{actionId: selected.targets[0]!.actionId, entityId: selected.targets[0]!.entityId}]);
+  assert.ok(Buffer.byteLength(JSON.stringify({operation: 'prepare', payload: request}), 'utf8') < 64 * 1024);
+});
+
+test('Store mask rejects stale ownership, legacy overlap, bad trailing bits, duplicate sources and unsupported selection reads', () => {
+  const where = {audience: 'workspace' as const, storeId: 'store-one'};
+  const context: PreparationContext = {revision: 'original', validUntil: '2026-10-28T08:01:00.000Z', tools: [],
+    nativeTargets: [{actionId: 'AI-ACT-214', entityId: 'sku-one', sourceRevision: 'source-one'}]};
+  const selected = storeNativeSelection(actor, where, context);
+  const request = {...contextReadSelection(where), nativeTargetMask: {version: 1 as const, fingerprint: selected.fingerprint, bits: 'AQ'}};
+  assert.deepEqual(maskedNativeHints(actor, context, request), [{actionId: 'AI-ACT-214', entityId: 'sku-one'}]);
+  for (const bits of ['', 'Ag', 'AQA']) assert.throws(() => maskedNativeHints(actor, context, {...request, nativeTargetMask: {...request.nativeTargetMask, bits}}));
+  assert.throws(() => maskedNativeHints({...actor, uid: 'foreign'}, context, request), /stale_preparation/u);
+  assert.throws(() => maskedNativeHints(actor, context, {...request, nativeTargets: [{actionId: 'AI-ACT-214', entityId: 'sku-one'}]}));
+  assert.throws(() => storeNativeSelection(actor, where, {...context, nativeTargets: [...context.nativeTargets!, ...context.nativeTargets!]}));
+  assert.deepEqual(canonicalContextRequest({operation: 'read', payload: {scope: where, nativeSelectionVersion: 1}}), {scope: where, nativeSelectionVersion: 1});
+  for (const bad of [{scope, nativeSelectionVersion: 1}, {scope: where, nativeSelectionVersion: 2}]) {
+    assert.throws(() => canonicalContextRequest({operation: 'read', payload: bad}));
+  }
 });

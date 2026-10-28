@@ -25,7 +25,7 @@ import {handleAssistantModelRequest} from "./assistant/model_http.js";
 import {AssistantHistoryService} from "./assistant/history_service.js";
 import {DataConnectHistoryRepository} from "./assistant/history_dataconnect_store.js";
 import {handleAssistantHistoryRequest} from "./assistant/history_http.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext} from "./assistant/domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreProductPreparationContext} from "./assistant/domain_context.js";
 import {handleAssistantCanonicalContextRequest} from "./assistant/domain_context_http.js";
 
 import {
@@ -2619,11 +2619,14 @@ function assistantOriginalContextSource(projectId: string) {
     {projectId, readWorkspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)});
   if (profile) accountProfileRuntimeService ??= new AccountProfileService(
     new DataConnectAccountProfileRepository(getDataConnect({location: "asia-south1", serviceId: "moolsocial-core", connector: "mobile"})), projectId);
+  const original = profile && accountProfileRuntimeService ? new ProfileWorkspacePreparationContext({
+    profile: accountProfileRuntimeService, plans: accountPlansRuntimeService,
+    workspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)}) : undefined;
   return new CompositePreparationContext({
     nativePreferencesEnabled: profile && catalogue,
-    ...(profile && accountProfileRuntimeService ? {original: new ProfileWorkspacePreparationContext({
-      profile: accountProfileRuntimeService, plans: accountPlansRuntimeService,
-      workspaces: actor => workspaceProfileService().listWorkspaces(actor.uid)})} : {}),
+    ...(original ? {original} : {}),
+    ...(original && catalogue ? {storeProducts: new OriginalStoreProductPreparationContext({
+      projectId, authority: original, catalogue: workspaceCatalogueService()})} : {}),
     ...(catalogue ? {catalogue: new OriginalCataloguePreparationContext({projectId,
       plans: accountPlansRuntimeService, catalogue: workspaceCatalogueService()})} : {}),
   });

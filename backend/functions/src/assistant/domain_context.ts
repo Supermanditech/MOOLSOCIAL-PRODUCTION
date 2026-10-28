@@ -1,10 +1,10 @@
 import type {AccountPlansService, PlansReadback} from "../account/plans_service.js";
 import type {AccountProfileActor} from "../account/profile_service.js";
-import type {WorkspaceCatalogueService} from "../workspace/workspace_catalogue_service.js";
+import type {WorkspaceCatalogueService, StoreSkuRecord} from "../workspace/workspace_catalogue_service.js";
 import type {PreparationContextSource} from "./model_service.js";
 import {AssistantModelError, canonical, digest, fail, object,
   catalogueListingSelection, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
-import {catalogueProductActions, catalogueSearchActions, nativePreferenceActions, searchSuggestion} from "./domain_context_contract.js";
+import {catalogueProductActions, catalogueSearchActions, nativePreferenceActions, storeProductActions, storeProductOwnerActions, searchSuggestion} from "./domain_context_contract.js";
 
 const paidRevision = (p: PlansReadback) => canonical([p.owner, p.scope, p.catalogueRevision, p.subscriptionRevision]);
 const searchSchema = {type: "object", properties: {query: {type: "string"}},
@@ -441,10 +441,275 @@ export class OriginalCataloguePreparationContext implements PreparationContextSo
   }
 }
 
+// Exact original StoreProductInitialData text controllers. These are proposed
+// inputs, not authoritative Stock balances, tax decisions or order prices.
+export const storeProductNativeTextFields = [
+  "title", "brand", "variant", "pack", "categoryId", "sku", "barcode", "purchasePrice", "sellingPrice", "mrp", "stock",
+  "lowStockThreshold", "minimumOrder", "deliveryPromise", "unitPrice", "origin", "returnPolicy", "composition", "regulatoryNote", "visualLabel",
+  "quantityPerPack", "quantityUnit", "unitsPerCase", "sellingChannels", "wholesaleSaleType", "wholesalePrice", "wholesaleMinimum",
+  "wholesaleIncrement", "wholesaleTiers", "priceChangesFrequently", "priceValidityMinutes", "gstPercent", "gstBasis",
+  "description", "highlights", "specifications", "genericName", "netQuantity", "manufacturerName", "manufacturerAddress", "packerName",
+  "packerAddress", "importerName", "importerAddress", "countryOfOrigin", "fssaiLicenseNumber", "consumerCare",
+] as const;
+const storeSalePriceFields = ["sellingPrice", "wholesalePrice", "wholesaleTiers", "priceChangesFrequently", "priceValidityMinutes"];
+const storeReferenceFields = ["sourceCanonicalId", "sourceSku", "sourcePack", "sourceRetailEnabled", "sourceWholesaleEnabled"];
+// Exact descriptive controls from the existing native warranty guide. These
+// strings do not establish a warranty entitlement or decide claim eligibility.
+export const storeWarrantyNativeLabels = ["Warranty issuer", "Warranty duration", "Warranty start basis", "Warranty coverage",
+  "Warranty exclusions", "Warranty service", "Warranty contact", "Warranty reference"] as const;
+const originalOwnedReadVersions = {supplierTaxReadbackVersion: 1, productFactsReadbackVersion: 1,
+  mediaReadbackVersion: 1, unbrandedProduceReadbackVersion: 1};
+
+/** Original owned catalogue reader; no local inventory is promoted to a master. */
+export class OriginalStoreProductPreparationContext implements PreparationContextSource {
+  constructor(private readonly deps: {projectId: string; authority: PreparationContextSource;
+    catalogue: Pick<WorkspaceCatalogueService, "listSkus">; now?: () => Date}) {}
+  private now() {return (this.deps.now?.() ?? new Date()).getTime();}
+  private async authority(actor: AccountProfileActor, input: PreparationRequest) {
+    const value = await this.deps.authority.read(actor, {...input, actionId: null, entityId: null});
+    if (value.modelContext?.audience !== "workspace" || object(value.modelContext.current).id !== input.scope.storeId ||
+        !value.tools.some(tool => tool.actionId === "AI-ACT-317" && tool.entityId === input.scope.storeId) ||
+        !Number.isFinite(Date.parse(value.validUntil)) || Date.parse(value.validUntil) <= this.now()) return fail("workspace_access_unavailable");
+    return value;
+  }
+  private async snapshot(actor: AccountProfileActor, storeId: string, skuId: string | null, ownerOnly = false) {
+    const records: StoreSkuRecord[] = [], seen = new Set<string>();
+    let after: string | null = null, realm: string | null = null;
+    do {
+      let raw: object;
+      try {raw = await this.deps.catalogue.listSkus(actor.uid, {storeId, ...originalOwnedReadVersions,
+        ...(skuId !== null ? {skuId} : {limit: ownerOnly ? 1 : 50, ...(after !== null ? {after} : {})})});}
+      catch (error) {
+        // Preserve permission/ownership denial; a missing source is not an
+        // empty Store and must not become editable through another reader.
+        const status = error !== null && typeof error === "object" && "status" in error ? error.status : null;
+        if (status === 403 || status === 401) return fail("workspace_access_unavailable", 403);
+        return fail("context_unavailable");
+      }
+      const page = object(raw);
+      if (page.schemaVersion !== 1 || page.storeId !== storeId || !["evaluation", "production"].includes(String(page.realm)) ||
+          realm !== null && page.realm !== realm || !Array.isArray(page.items) || page.items.length > (skuId === null && !ownerOnly ? 50 : 1) ||
+          page.supplierTaxReadbackVersion !== 1 || page.productFactsReadbackVersion !== 1 || page.mediaReadbackVersion !== 1 ||
+          page.nextCursor !== null && (typeof page.nextCursor !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(page.nextCursor))) return fail("context_unavailable");
+      realm = page.realm as string;
+      // This confirms the existing reader's Store-owner boundary only; no
+      // product/default value or complete catalogue is claimed by this path.
+      if (ownerOnly) return {realm, records};
+      for (const rawRecord of page.items) {
+        const row = object(rawRecord), content = object(row.content), pack = object(row.pack);
+        if (row.schemaVersion !== 1 || row.storeId !== storeId || !Number.isSafeInteger(row.revision) || (row.revision as number) < 1 ||
+            typeof row.skuId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(row.skuId) ||
+            skuId !== null && row.skuId !== skuId || seen.has(row.skuId) ||
+            [row.canonicalProductId, row.verifiedPackId].some(value => typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(value)) ||
+            typeof row.sku !== "string" || !row.sku.trim() || row.sku.length > 80 || typeof pack.label !== "string" || !pack.label.trim() ||
+            typeof content.title !== "string" || !content.title.trim() || typeof content.brand !== "string" || typeof content.variant !== "string" ||
+            typeof row.observedAt !== "string" || !Number.isFinite(Date.parse(row.observedAt)) || Date.parse(row.observedAt) > this.now() ||
+            !Array.isArray(row.channels) || !row.channels.length || row.channels.length > 2 ||
+            row.channels.some(value => !["retail", "wholesale", "bulk"].includes(String(object(value).kind))) ||
+            new Set(row.channels.map(value => object(value).kind)).size !== row.channels.length) return fail("context_unavailable");
+        seen.add(row.skuId); records.push(rawRecord as StoreSkuRecord);
+      }
+      if (records.length > 2500 || page.nextCursor !== null && (page.items.length !== 50 ||
+          object(page.items.at(-1)).skuId !== page.nextCursor || page.nextCursor === after) || skuId !== null && page.nextCursor !== null) return fail("context_unavailable");
+      after = page.nextCursor as string | null;
+    } while (after !== null);
+    return {realm, records};
+  }
+  private references(record: StoreSkuRecord): Readonly<Record<string, unknown>> {
+    return {sourceCanonicalId: record.canonicalProductId, sourceSku: record.sku, sourcePack: record.pack.label,
+      sourceRetailEnabled: record.channels.some(channel => channel.kind === "retail"),
+      sourceWholesaleEnabled: record.channels.some(channel => channel.kind === "wholesale" || channel.kind === "bulk")};
+  }
+  private nativeOwnerTools(actor: AccountProfileActor, input: PreparationRequest, authority: PreparationContext, realm: string | null): PreparationTool[] {
+    const sourceRevision = "store-product-defaults-owner:" + digest([actor.projectId, actor.uid, input.scope.storeId, authority.revision, realm]);
+    const validate = (fields: Readonly<Record<string, unknown>>) => {
+      const keys = Object.keys(fields);
+      if (!keys.length || keys.some(key => !["stockMode", "lowStockThreshold", "customerListingRequested"].includes(key))) return false;
+      if (Object.hasOwn(fields, "stockMode") && !["exactQuantity", "availabilityOnly"].includes(String(fields.stockMode))) return false;
+      if (Object.hasOwn(fields, "customerListingRequested") && typeof fields.customerListingRequested !== "boolean") return false;
+      if (Object.hasOwn(fields, "lowStockThreshold")) {
+        const raw = fields.lowStockThreshold;
+        if (typeof raw !== "string" || raw.length > 64 || !/^[+-]?\d+$/u.test(raw.trim())) return false;
+        const count = Number(raw.trim());
+        if (!Number.isSafeInteger(count) || count < 0 || count > 999999999) return false;
+      }
+      return true;
+    };
+    const tools: PreparationTool[] = [
+      {name: "store_review_price_attention", actionId: "AI-ACT-372", entityId: null,
+        sourceRevision: "store-price-attention-owner:" + digest([actor.projectId, actor.uid, input.scope.storeId, authority.revision, realm]),
+        description: "Read the original native supplier price-attention list. This preparation has not read or inferred price status.",
+        parameters: {type: "object", properties: {}, required: [], additionalProperties: false},
+        validate: fields => Object.keys(fields).length === 0},
+      {name: "store_review_product_defaults", actionId: "AI-ACT-218", entityId: null, sourceRevision,
+        description: "Review the current native Store product defaults", parameters: {type: "object", properties: {}, required: [], additionalProperties: false},
+        validate: fields => Object.keys(fields).length === 0},
+      {name: "store_prepare_product_defaults", actionId: "AI-ACT-219", entityId: null, sourceRevision,
+        description: "Review supplied changes to native Store product defaults; no listing publication",
+        parameters: {type: "object", properties: {stockMode: {type: ["string", "null"], enum: [null, "exactQuantity", "availabilityOnly"]},
+          lowStockThreshold: {type: ["string", "null"]}, customerListingRequested: {type: ["boolean", "null"]}},
+          required: ["stockMode", "lowStockThreshold", "customerListingRequested"], additionalProperties: false}, validate,
+        decodeFields: args => {
+          if (Object.keys(args).length !== 3 || !["stockMode", "lowStockThreshold", "customerListingRequested"].every(key => Object.hasOwn(args, key))) return fail("invalid_model_result");
+          const fields = Object.fromEntries(Object.entries(args).filter(([, value]) => value !== null));
+          if (!validate(fields)) return fail("invalid_model_result");
+          return fields;
+        }},
+    ];
+    return tools.filter(tool => input.actionId === null || tool.actionId === input.actionId);
+  }
+  async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
+    proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
+    if (proposal.actionId !== input.actionId || proposal.entityId !== input.entityId) return fail("stale_preparation", 409);
+    return this.read(actor, input);
+  }
+  async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
+    if (actor.projectId !== this.deps.projectId || !actor.uid || actor.tenantId !== undefined) return fail("account_scope_mismatch", 403);
+    if (input.scope.audience !== "workspace" || !input.scope.storeId ||
+        input.actionId !== null && !storeProductActions.has(input.actionId) && !storeProductOwnerActions.has(input.actionId) ||
+        input.entityId !== null && !storeProductActions.has(input.actionId ?? "") || input.catalogueListingIds?.length) return fail("context_unavailable");
+    const started = this.now(), before = await this.authority(actor, input);
+    const ownerOnly = input.actionId !== null && storeProductOwnerActions.has(input.actionId);
+    const first = await this.snapshot(actor, input.scope.storeId, input.entityId, ownerOnly);
+    const second = await this.snapshot(actor, input.scope.storeId, input.entityId, ownerOnly);
+    const after = await this.authority(actor, input);
+    if (before.revision !== after.revision || canonical(first) !== canonical(second)) return fail("stale_preparation", 409);
+    const until = Math.min(started + 60_000, Date.parse(before.validUntil), Date.parse(after.validUntil));
+    if (until <= this.now() || input.entityId !== null && !second.records.length) return fail("context_unavailable");
+    const proof = (record: StoreSkuRecord) => `store-owned-product:${second.realm}:${record.revision}:` +
+      digest([actor.projectId, actor.uid, input.scope.storeId, after.revision, second.realm, record]);
+    const eligible = (actionId: string) => actionId === "AI-ACT-370"
+      ? second.records.filter(record => record.content.categoryId === "other") : actionId === "AI-ACT-220"
+        ? second.records.filter(record => record.channels.some(channel => channel.kind === "wholesale" || channel.kind === "bulk")) : second.records;
+    const tools: PreparationTool[] = [];
+    for (const actionId of storeProductActions) {
+      if (input.actionId !== null && input.actionId !== actionId || !second.records.length) continue;
+      if (actionId === "AI-ACT-220") {
+        const records = eligible(actionId), fixed = input.entityId !== null ? records.find(record => record.skuId === input.entityId) : undefined;
+        if (!records.length || input.entityId !== null && !fixed) continue;
+        const validDuration = (value: unknown) => typeof value === "string" && value.length <= 64 && /^[+-]?\d+$/u.test(value.trim()) &&
+          Number.isSafeInteger(Number(value.trim())) && Number(value.trim()) >= 1 && Number(value.trim()) <= 525600;
+        const validate = (record: StoreSkuRecord, fields: Readonly<Record<string, unknown>>) =>
+          storeReferenceFields.every(key => fields[key] === this.references(record)[key]) &&
+          Object.keys(fields).every(key => storeReferenceFields.includes(key) || key === "validityMinutes" && validDuration(fields[key]));
+        tools.push({name: "store_review_price_confirmation", actionId, entityId: input.entityId,
+          sourceRevision: fixed ? proof(fixed) : "store-owned-selection:" + digest(records), ...(fixed ? {} : {targetSelector: "skuId"}),
+          description: "Review the original SKU trade-price confirmation. Original native status, current price and final Confirm remain authoritative; no price is confirmed here.",
+          parameters: {type: "object", properties: {...(fixed ? {} : {skuId: {type: "string", enum: records.map(record => record.skuId)}}),
+            validityMinutes: {type: ["string", "null"]}}, required: [...(fixed ? [] : ["skuId"]), "validityMinutes"], additionalProperties: false},
+          validate: fields => (fixed ? [fixed] : records).some(record => validate(record, fields)),
+          resolveTarget: args => {
+            if (Object.keys(args).length !== (fixed ? 1 : 2) || !Object.hasOwn(args, "validityMinutes") ||
+                args.validityMinutes !== null && !validDuration(args.validityMinutes)) return fail("invalid_model_result");
+            const record = fixed ?? records.find(value => value.skuId === args.skuId);
+            if (!record) return fail("invalid_model_result");
+            return {entityId: record.skuId, sourceRevision: proof(record), fields: {...this.references(record),
+              ...(args.validityMinutes === null ? {} : {validityMinutes: args.validityMinutes})}, title: "Review price confirmation",
+              summary: [record.content.title, record.content.variant, record.pack.label].filter(Boolean).join(" · ")};
+          }});
+        continue;
+      }
+      if (actionId === "AI-ACT-370") {
+        const records = eligible(actionId), fixed = input.entityId !== null ? records.find(record => record.skuId === input.entityId) : undefined;
+        if (!records.length || input.entityId !== null && !fixed) continue;
+        const validWarranty = (value: unknown) => {
+          if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+          const fields = value as Record<string, unknown>, keys = Object.keys(fields);
+          return keys.length > 0 && keys.length <= storeWarrantyNativeLabels.length &&
+            keys.every(key => (storeWarrantyNativeLabels as readonly string[]).includes(key) && typeof fields[key] === "string" &&
+              (fields[key] as string).length <= 2000 && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(fields[key] as string) &&
+              Buffer.from(fields[key] as string, "utf8").toString("utf8") === fields[key]) &&
+            keys.some(key => (fields[key] as string).trim().length > 0);
+        };
+        const validate = (record: StoreSkuRecord, fields: Readonly<Record<string, unknown>>) =>
+          Object.keys(fields).length === storeReferenceFields.length + 1 &&
+          storeReferenceFields.every(key => fields[key] === this.references(record)[key]) && validWarranty(fields.warranty);
+        const decodeWarranty = (raw: unknown) => {
+          let values: Record<string, unknown>;
+          try {values = object(raw, [...storeWarrantyNativeLabels]);}
+          catch {return fail("invalid_model_result");}
+          const fields = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== null));
+          if (!validWarranty(fields)) return fail("invalid_model_result");
+          return fields;
+        };
+        tools.push({name: "store_prepare_warranty_details", actionId, entityId: input.entityId,
+          sourceRevision: fixed ? proof(fixed) : "store-owned-selection:" + digest(records), ...(fixed ? {} : {targetSelector: "skuId"}),
+          description: "Review supplied descriptive warranty text in the original product guide; never invent warranty terms",
+          parameters: {type: "object", properties: {...(fixed ? {} : {skuId: {type: "string", enum: records.map(record => record.skuId)}}),
+            warranty: {type: "object", properties: Object.fromEntries(storeWarrantyNativeLabels.map(label => [label, {type: ["string", "null"]}])),
+              required: [...storeWarrantyNativeLabels], additionalProperties: false}}, required: [...(fixed ? [] : ["skuId"]), "warranty"], additionalProperties: false},
+          validate: fields => (fixed ? [fixed] : records).some(record => validate(record, fields)),
+          resolveTarget: args => {
+            if (Object.keys(args).length !== (fixed ? 1 : 2)) return fail("invalid_model_result");
+            const warranty = decodeWarranty(args.warranty);
+            const record = fixed ?? records.find(value => value.skuId === args.skuId);
+            if (!record) return fail("invalid_model_result");
+            return {entityId: record.skuId, sourceRevision: proof(record), fields: {...this.references(record), warranty},
+              title: "Review warranty details", summary: [record.content.title, record.content.variant, record.pack.label].filter(Boolean).join(" · ")};
+          }});
+        continue;
+      }
+      const price = actionId === "AI-ACT-221", names: readonly string[] = price ? storeSalePriceFields : storeProductNativeTextFields;
+      const allowed = new Set(names);
+      const validate = (record: StoreSkuRecord, fields: Readonly<Record<string, unknown>>) => {
+        const references = this.references(record), keys = Object.keys(fields).filter(key => !storeReferenceFields.includes(key));
+        if (!keys.length || storeReferenceFields.some(key => fields[key] !== references[key]) ||
+            keys.some(key => !allowed.has(key) || typeof fields[key] !== "string" || (fields[key] as string).length > 2000 ||
+              /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(fields[key] as string) ||
+              Buffer.from(fields[key] as string, "utf8").toString("utf8") !== fields[key])) return false;
+        if (price && (!keys.some(key => ["sellingPrice", "wholesalePrice", "wholesaleTiers"].includes(key)) ||
+            keys.includes("sellingPrice") && references.sourceRetailEnabled !== true ||
+            keys.some(key => key !== "sellingPrice") && references.sourceWholesaleEnabled !== true)) return false;
+        return true;
+      };
+      const fixed = input.entityId !== null ? second.records.find(record => record.skuId === input.entityId) : undefined;
+      tools.push({name: price ? "store_prepare_sale_prices" : "store_prepare_product_details", actionId, entityId: input.entityId,
+        sourceRevision: fixed ? proof(fixed) : "store-owned-selection:" + digest(second),
+        ...(fixed ? {} : {targetSelector: "skuId"}),
+        description: price ? "Review the original SKU sale-price inputs" : "Review edits in the original Store product editor",
+        parameters: {type: "object", properties: {...(fixed ? {} : {skuId: {type: "string", enum: second.records.map(record => record.skuId)}}),
+          changes: {type: "array", items: {type: "object", properties: {field: {type: "string", enum: names}, value: {type: "string"}},
+            required: ["field", "value"], additionalProperties: false}}}, required: [...(fixed ? [] : ["skuId"]), "changes"], additionalProperties: false},
+        validate: fields => (fixed ? [fixed] : second.records).some(record => validate(record, fields)),
+        resolveTarget: args => {
+          if (Object.keys(args).length !== (fixed ? 1 : 2) || !Array.isArray(args.changes) || !args.changes.length || args.changes.length > names.length) return fail("invalid_model_result");
+          const record = fixed ?? second.records.find(value => value.skuId === args.skuId);
+          if (!record) return fail("invalid_model_result");
+          const changes: Record<string, unknown> = {};
+          for (const value of args.changes) {
+            const change = object(value);
+            if (Object.keys(change).length !== 2 || typeof change.field !== "string" || !allowed.has(change.field) || Object.hasOwn(changes, change.field)) return fail("invalid_model_result");
+            changes[change.field] = change.value;
+          }
+          const fields = {...this.references(record), ...changes};
+          if (!validate(record, fields)) return fail("invalid_model_result");
+          return {entityId: record.skuId, sourceRevision: proof(record), fields,
+            title: price ? "Review sale prices" : "Review product changes", summary: [record.content.title, record.content.variant, record.pack.label].filter(Boolean).join(" · ")};
+        }});
+    }
+    tools.push(...this.nativeOwnerTools(actor, input, after, second.realm));
+    if (input.actionId !== null && !tools.length) return fail("context_unavailable");
+    return {revision: "store-owned-products:" + digest([actor.projectId, actor.uid, input.scope.storeId, after.revision, second]),
+      validUntil: new Date(until).toISOString(), tools,
+      nativeTargets: [
+        ...tools.filter(tool => storeProductActions.has(tool.actionId)).flatMap(tool => eligible(tool.actionId).map(record => ({actionId: tool.actionId, entityId: record.skuId, sourceRevision: proof(record)}))),
+        ...tools.filter(tool => storeProductOwnerActions.has(tool.actionId)).map(tool => ({actionId: tool.actionId, entityId: null, sourceRevision: tool.sourceRevision})),
+      ],
+      modelContext: {audience: "workspace", storeId: input.scope.storeId,
+        priceAttentionSource: "Original native commodity-price reads and final confirmation remain native. This preparation has not read attention status or confirmed a price.",
+        defaultsSource: "Existing account/Store-owned native preferences only. Their current values have not been read here; native snapshot and confirmation own them. Requesting a customer listing never confirms publication.",
+        purpose: "Prepare only supplied replacement text for the existing native editor. Preserve omitted fields. Owner catalogue channel prices are INR minor units, not a live trade quote, Stock balance or accepted order. Never infer purchase cost, Stock or missing tax.",
+        products: second.records.map(record => ({skuId: record.skuId, sku: record.sku, canonicalId: record.canonicalProductId,
+          title: record.content.title, brand: record.content.brand, variant: record.content.variant, pack: record.pack,
+          channels: record.channels.map(({kind, priceMinor, mrpMinor, supplierTax}) => ({kind, priceMinor, mrpMinor, supplierTax: supplierTax ?? null}))}))}};
+  }
+}
+
 /** Compose source readers; preserve the qualified original Profile path. */
 export class CompositePreparationContext implements PreparationContextSource {
   constructor(private readonly deps: {original?: PreparationContextSource;
-    catalogue?: OriginalCataloguePreparationContext; nativePreferencesEnabled?: boolean}) {}
+    catalogue?: OriginalCataloguePreparationContext; storeProducts?: OriginalStoreProductPreparationContext;
+    nativePreferencesEnabled?: boolean}) {}
   private preferences(actor: AccountProfileActor, input: PreparationRequest, original: PreparationContext): PreparationContext {
     if (!this.deps.nativePreferencesEnabled || input.scope.audience !== "personal" || input.entityId !== null ||
         original.modelContext?.audience !== "personal") return fail("context_unavailable");
@@ -474,6 +739,10 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
     proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
+    if (storeProductActions.has(proposal.actionId) || storeProductOwnerActions.has(proposal.actionId)) {
+      if (!this.deps.storeProducts) return fail("context_unavailable");
+      return this.deps.storeProducts.readPrepared(actor, input, proposal);
+    }
     if (nativePreferenceActions.has(proposal.actionId)) {
       if (proposal.actionId !== input.actionId || proposal.entityId !== null ||
           Object.keys(proposal.fields).length !== 0) return fail("stale_preparation", 409);
@@ -488,6 +757,10 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (input.actionId !== null) {
+      if (storeProductActions.has(input.actionId) || storeProductOwnerActions.has(input.actionId)) {
+        if (!this.deps.storeProducts) return fail("context_unavailable");
+        return this.deps.storeProducts.read(actor, input);
+      }
       if (nativePreferenceActions.has(input.actionId)) return this.readPreferences(actor, input);
       if (catalogueSearchActions.has(input.actionId)) {
         if (!this.deps.catalogue) return fail("context_unavailable");
@@ -507,6 +780,12 @@ export class CompositePreparationContext implements PreparationContextSource {
       catch (error) {
         // A missing optional catalogue must not remove established Profile
         // tools. Denied access, stale sources or malformed data still fail.
+        if (!(error instanceof AssistantModelError) || error.code !== "context_unavailable" || !values.length) throw error;
+      }
+    }
+    if (this.deps.storeProducts && input.scope.audience === "workspace") {
+      try {values.push(await this.deps.storeProducts.read(actor, input));}
+      catch (error) {
         if (!(error instanceof AssistantModelError) || error.code !== "context_unavailable" || !values.length) throw error;
       }
     }

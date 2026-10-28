@@ -1045,7 +1045,7 @@ class FirebaseAuthenticatedAccountIdentityGateway
         owner.projectId != _auth.app.options.projectId ||
         currentFirebasePrincipal != (projectId: owner.projectId, tenantId: owner.tenantId, userId: owner.userId)) return null;
     return AssistantDomainContextGateway(owner: owner, isCurrent: current,
-      credentials: FirebaseSocialContentCredentials(auth: _auth));
+      credentials: FirebaseSocialContentCredentials(auth: _auth), compactStoreSelection: true);
   }
 
   @override

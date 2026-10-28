@@ -21,6 +21,62 @@ class _SearchNative implements MoolAssistantNativeAdapter {
     opens++; reviewed = p; return MoolAssistantReviewResult.opened;
   }
 }
+class _ProductIdentityNative extends _SearchNative implements MoolAssistantCanonicalProductIdentityAdapter {
+  @override String get actionId => 'AI-ACT-214';
+  String? identity = 'native-product-alias';
+  bool failIdentity = false;
+  final identityStarted = Completer<void>();
+  Completer<void>? identityWait;
+  @override Set<String> get allowedFields => {'sourceCanonicalId', 'price', 'quantity'};
+  @override String? validateFields(Map<String, Object?> fields) =>
+    fields.length == 3 && fields.keys.every(allowedFields.contains) && fields.values.every((v) => v is String)
+      ? null : 'Use original product fields.';
+  @override Future<String?> nativeProductIdentity(MoolAssistantProposal proposal, bool Function() current) async {
+    if (!identityStarted.isCompleted) identityStarted.complete();
+    await identityWait?.future;
+    if (failIdentity) throw StateError('Original acknowledgement unavailable');
+    return current() ? identity : null;
+  }
+}
+class _BatchProductNative extends _ProductIdentityNative implements MoolAssistantBatchNativeAdapter {
+  final batchOwner = Object(), batchStarted = Completer<void>();
+  Completer<void>? batchWait;
+  int batches = 0, singles = 0;
+  String mode = 'ready';
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext c, String? entity) {
+    singles++; return super.snapshot(c, entity);
+  }
+  @override Future<MoolAssistantNativeBatchSnapshot> snapshots(MoolAssistantContext c, List<String?> entities) async {
+    batches++; final captured = version;
+    if (!batchStarted.isCompleted) batchStarted.complete(); await batchWait?.future;
+    final entries = <String?, MoolAssistantNativeSnapshot?>{
+      if (mode != 'missing') for (final entity in entities) entity: mode == 'not-ready' ? null : MoolAssistantNativeSnapshot(
+        binding: mode == 'foreign' ? const MoolAssistantContext(accountScope: 'foreign', authenticationRevision: 1).binding : c.binding,
+        entityId: entity, sourceRevision: 'original-search:$captured', permitted: true),
+    };
+    if (mode == 'extra') entries['foreign-product'] = null;
+    return MoolAssistantNativeBatchSnapshot(owner: batchOwner, sourceRevision: 'host-batch:$captured', entries: entries, current: () => version == captured);
+  }
+}
+class _ProductIdentityFixture {
+  _ProductIdentityFixture({_ProductIdentityNative? adapter}) : native = adapter ?? _ProductIdentityNative();
+  final owner = ValueNotifier(const MoolAssistantContext(accountScope: 'host-owner', authenticationRevision: 1));
+  final _ProductIdentityNative native;
+  final now = DateTime.utc(2026, 10, 28, 8);
+  String revision = 'store-owned-product:production:7:${List.filled(64, 'a').join()}';
+  AssistantCanonicalNativeSelection? selection;
+  late final guard = AssistantProfileContextGuard(readContext: () => owner.value, ownerChanges: owner,
+    nativeAdapters: [native], clock: () => now, canonicalActions: {'AI-ACT-214'}, recoverableActions: {'AI-ACT-214'},
+    readCanonical: (context, current) async => AssistantCanonicalContextSnapshot(binding: context.binding,
+      revisions: {('AI-ACT-214', 'sku-one'): revision}, validUntil: now.add(const Duration(minutes: 1)), nativeSelection: selection));
+  MoolAssistantNativeAdapter get adapter => guard.adapters.single;
+  Future<void> capture() => guard.capture(owner.value, () => true);
+  MoolAssistantProposal proposal() => MoolAssistantProposal(id: 'host-product-proposal', actionId: native.actionId,
+    binding: owner.value.binding, entityId: 'sku-one', requestRevision: 1, entitlementRevision: 'host-paid',
+    validUntil: now.add(const Duration(minutes: 1)), sourceRevision: revision, title: 'Review product', summary: 'Host only',
+    fields: {'sourceCanonicalId': 'original-catalogue-product', 'price': '0012.50', 'quantity': '0003'});
+  void dispose() {guard.dispose(); owner.dispose();}
+}
 class _Fixture {
   _Fixture({bool register = true}) {
     guard = AssistantProfileContextGuard(readContext: () => owner.value, ownerChanges: owner,
@@ -57,6 +113,75 @@ class _Fixture {
   void dispose() {guard.dispose(); owner.dispose();}
 }
 void main() {
+  test('Native batch capture remains read-only and final original single snapshots still protect Review', () async {
+    final native = _BatchProductNative();
+    final f = _ProductIdentityFixture(adapter: native); addTearDown(f.dispose);
+    await f.capture(); expect(native.batches, 1); expect(native.singles, 0);
+    expect(await f.adapter.openReview(f.proposal(), () => true), MoolAssistantReviewResult.opened);
+    expect(native.singles, 2); expect(native.opens, 1);
+  });
+  test('Incomplete or foreign native batch entries cannot become readiness claims', () async {
+    for (final mode in ['missing', 'extra', 'foreign']) {
+      final native = _BatchProductNative()..mode = mode;
+      final f = _ProductIdentityFixture(adapter: native); addTearDown(f.dispose);
+      await expectLater(f.capture(), throwsA(isA<AssistantModelFailure>())); expect(native.opens, 0);
+    }
+    final native = _BatchProductNative()..mode = 'not-ready';
+    final f = _ProductIdentityFixture(adapter: native); addTearDown(f.dispose); await f.capture();
+    expect(f.guard.nativeTargets, isEmpty);
+  });
+  test('Native mutation across batch await retires capture before any review', () async {
+    final native = _BatchProductNative()..batchWait = Completer<void>();
+    final f = _ProductIdentityFixture(adapter: native); addTearDown(f.dispose);
+    final capture = f.capture(); await native.batchStarted.future; native.version++; native.batchWait!.complete();
+    await expectLater(capture, throwsA(isA<AssistantModelFailure>())); expect(native.opens, 0); expect(f.guard.current, false);
+  });
+  test('Compact readiness pairs immutable Store selection proofs and retires with the actor', () async {
+    final f = _ProductIdentityFixture(); addTearDown(f.dispose);
+    f.owner.value = f.owner.value.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'Host Store',
+      profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: 'host-owner'));
+    f.selection = AssistantCanonicalNativeSelection(fingerprint: 'a' * 64, proofs: {('AI-ACT-214', 'sku-one'): f.revision});
+    await f.capture(); expect(f.guard.nativeTargets, isEmpty); expect(f.guard.nativeMaskedActionIds, {'AI-ACT-214'});
+    expect(f.guard.nativeTargetMask!.bits, 'AQ');
+    f.owner.value = const MoolAssistantContext(accountScope: 'other-owner', authenticationRevision: 2);
+    expect(f.guard.nativeTargetMask, isNull); expect(f.guard.nativeMaskedActionIds, isEmpty);
+  });
+  test('Original product identity bridge changes only the native reference and preserves canonical recovery data', () async {
+    final f = _ProductIdentityFixture(); addTearDown(f.dispose); await f.capture();
+    final proposal = f.proposal(); final original = Map<String, Object?>.of(proposal.fields);
+    expect(await f.adapter.openReview(proposal, () => true), MoolAssistantReviewResult.opened);
+    expect(f.native.opens, 1);
+    expect(f.native.reviewed!.fields, {...original, 'sourceCanonicalId': 'native-product-alias'});
+    expect(f.native.reviewed!.sourceRevision, 'original-search:1');
+    expect(f.native.reviewed!.entityId, 'sku-one');
+    expect(proposal.fields, original); expect(proposal.sourceRevision, f.revision);
+  });
+  test('Missing or failed original product acknowledgement never opens a native form', () async {
+    for (final failure in [false, true]) {
+      final f = _ProductIdentityFixture(); addTearDown(f.dispose); await f.capture();
+      f.native.identity = null; f.native.failIdentity = failure;
+      expect(await f.adapter.openReview(f.proposal(), () => true),
+        failure ? MoolAssistantReviewResult.unavailable : MoolAssistantReviewResult.stale);
+      expect(f.native.opens, 0);
+    }
+  });
+  test('Identity await revalidates original source, native revision, actor and caller cancellation', () async {
+    for (final change in ['source', 'native', 'actor', 'cancel']) {
+      final f = _ProductIdentityFixture(); addTearDown(f.dispose); await f.capture();
+      var current = true; f.native.identityWait = Completer<void>();
+      final pending = f.adapter.openReview(f.proposal(), () => current);
+      await f.native.identityStarted.future;
+      switch (change) {
+        case 'source': f.revision = '${f.revision}-changed';
+        case 'native': f.native.version++;
+        case 'actor': f.owner.value = const MoolAssistantContext(accountScope: 'other-owner', authenticationRevision: 2);
+        case 'cancel': current = false;
+      }
+      f.native.identityWait!.complete();
+      expect(await pending, MoolAssistantReviewResult.stale, reason: change);
+      expect(f.native.opens, 0, reason: change);
+    }
+  });
   test('Native readiness hints expose only admitted permitted captured anchors and retire with their owner', () async {
     final f = _Fixture(); addTearDown(f.dispose); await f.capture();
     expect(f.guard.nativeTargets, [(actionId: 'AI-ACT-001', entityId: null)]);

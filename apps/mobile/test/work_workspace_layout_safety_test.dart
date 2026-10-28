@@ -7400,6 +7400,9 @@ class _FinancialRootAccess extends _ReceivingAssistantAccess {
 
 // Isolated HOST-only strict wire fixture. Uses the actual app/router/native
 // adapter and original Buy reader; no synthetic runtime provider or publication.
+class _AssistantAcknowledgementHostSource extends catalogue_fixture.SessionCatalogue {
+  @override String get realm => 'evaluation';
+}
 class _Published230Host {
   _Published230Host(this.channel, {this.fault});
   final BuyV2OfferClass channel;
@@ -7536,6 +7539,118 @@ class _Published230Host {
 }
 
 void main() {
+
+  testWidgets('FE-PRODUCT-01 batch 1250 original native products agrees with single Review snapshots without writes', (tester) async {
+    final inventory = _NativeScopeInventoryStore();
+    final f = _AuthenticatedNativeScopeFixture(inventory: inventory,
+      makeWork: (contact, purchase, inventory, trading) => WorkSession(gateway: ReviewWorkGateway(),
+        contactDraftStore: contact, purchaseEntryStore: purchase, inventoryStore: inventory,
+        tradingPreferencesStoreFactory: (_) => trading, catalogueReference: workspaceMasterCatalogue));
+    await f.ready();
+    try {
+      final work = f.work, key = f.work.workspaceSupplierScope!;
+      final products = [for (var n = 0; n < 1250; n++) catalogue_fixture.listingItem('native-batch-$n').copyWith(
+        sku: 'NATIVE-BATCH-$n', barcode: '890000${n.toString().padLeft(7, '0')}')];
+      final saved = WorkspaceSavedInventory(account: key.$1, store: key.$2, qa: key.$3,
+        revision: 1, savedAt: DateTime.now().toUtc(), products: products, movements: const []);
+      inventory.values[key] = jsonEncode(saved.toJson());
+      work.workspaceCatalogueItems.clear(); work.workspaceStockMovements.clear();
+      expect(await work.loadWorkspaceInventory(retry: true), isTrue, reason: work.workspaceInventoryError);
+      await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+      final before = f.writes, adapters = f.adapters(tester), context = f.readContext();
+      final ids = products.map((p) => p.id).toList();
+      for (final action in ['AI-ACT-214', 'AI-ACT-221']) {
+        final adapter = adapters.singleWhere((a) => a.actionId == action);
+        expect(adapter, isA<scope_contract.MoolAssistantBatchNativeAdapter>());
+        final batch = await (adapter as scope_contract.MoolAssistantBatchNativeAdapter).snapshots(context, ids);
+        expect(batch.entries.length, 1250); expect(batch.current(), isTrue);
+        for (final index in [0, 625, 1249]) {
+          final single = await adapter.snapshot(context, ids[index]);
+          expect(batch.entries[ids[index]]!.sourceRevision, single!.sourceRevision);
+          expect(batch.entries[ids[index]]!.binding, single.binding);
+          expect(batch.entries[ids[index]]!.permitted, single.permitted);
+        }
+        expect(() => batch.entries.clear(), throwsUnsupportedError);
+        if (action == 'AI-ACT-221') {
+          final original = work.workspaceCatalogueItems.first;
+          work.workspaceCatalogueItems[0] = original.copyWith(title: 'Isolated native source changed');
+          expect(batch.current(), isFalse, reason: 'A changed original inventory retires the entire captured batch');
+          final changed = await adapter.snapshot(context, ids.first);
+          expect(changed!.sourceRevision, isNot(batch.entries[ids.first]!.sourceRevision));
+          work.workspaceCatalogueItems[0] = original;
+        }
+      }
+      expect(f.writes, before);
+    } finally {
+      await tester.pumpWidget(const SizedBox.shrink()); await tester.pump(); await f.dispose();
+    }
+  });
+
+  testWidgets('FE-PRODUCT-01 original acknowledgement maps a native alias without reads or writes', (tester) async {
+    // Isolated native projection test. Authentication/backend ownership are
+    // qualified separately by the original-service tests, never by this fixture.
+    final inventory = _NativeScopeInventoryStore(), source = _AssistantAcknowledgementHostSource(),
+      journal = catalogue_fixture.BindingStore();
+    _AuthenticatedNativeScopeFixture makeFixture() => _AuthenticatedNativeScopeFixture(inventory: inventory,
+      makeWork: (contact, purchase, inventory, trading) => WorkSession(gateway: ReviewWorkGateway(),
+        catalogueGateway: source, contactDraftStore: contact, purchaseEntryStore: purchase,
+        inventoryStore: inventory, catalogueBindingPendingStoreFactory: (_) => journal,
+        tradingPreferencesStoreFactory: (_) => trading, catalogueReference: workspaceMasterCatalogue));
+    final first = makeFixture(); await first.ready();
+    expect(await first.work.loadWorkspaceInventory(retry: true), isTrue);
+    final initial = catalogue_fixture.listingItem().copyWith(canonicalId: 'native-product-alias');
+    expect(first.work.addOrUpdateWorkspaceProduct(initial, stockEntryMethod: WorkspaceStockEntryMethod.manual), isTrue);
+    expect(await first.work.workspaceInventorySaved, isTrue);
+    await tester.pump(const Duration(milliseconds: 50));
+    final key = first.work.workspaceSupplierScope!;
+    final saved = WorkspaceSavedInventory.fromJson(jsonDecode(inventory.values[key]!));
+    final aliased = saved.products.singleWhere((item) => item.id == initial.id);
+    final link = WorkspaceReviewedCatalogueLink(realm: 'evaluation', storeId: saved.store, skuId: aliased.id,
+      canonicalProductId: 'canonical-one', verifiedPackId: 'pack-one', mirrorRevision: 7,
+      candidateRevision: 1, candidateFingerprint: 'A' * 64, submissionRevision: 1,
+      submissionFingerprint: 'B' * 64, authoredSha256: WorkspaceProductSubmissionInput.fromSaved(aliased).authoredSha256);
+    expect(link.valid, isTrue);
+    final restored = WorkspaceSavedInventory(account: saved.account, store: saved.store, qa: saved.qa,
+      revision: saved.revision, savedAt: saved.savedAt, products: saved.products, movements: saved.movements,
+      variantFamilies: saved.variantFamilies, reviewedCatalogueLinks: [link],
+      manualReceiptCheckpointRevision: saved.manualReceiptCheckpointRevision,
+      restockProjections: saved.restockProjections, restockBaseline: saved.restockBaseline);
+    expect(WorkspaceSavedInventory.fromJson(restored.toJson()).reviewedCatalogueLinks.single.valid, isTrue);
+    await first.dispose(); inventory.values[key] = jsonEncode(restored.toJson());
+    final resumed = makeFixture(); await resumed.ready();
+    try {
+      final work = resumed.work;
+      // Remove only this fixture's freshly seeded in-memory starter rows before
+      // restoring its saved snapshot. The production reconciliation guard stays.
+      work.workspaceCatalogueItems.clear(); work.workspaceStockMovements.clear();
+      expect(await work.loadWorkspaceInventory(retry: true), isTrue, reason: work.workspaceInventoryError);
+      final revision = 'store-owned-product:evaluation:7:${'a' * 64}';
+      expect(work.workspaceAssistantProductAcknowledgement(aliased.id, revision, current: () => true), isNull);
+      expect(await work.restoreWorkspaceCatalogueListing(), isTrue);
+      final before = Map.of(inventory.values), reads = source.ownerReads, writes = inventory.saves;
+      expect(work.workspaceAssistantAcknowledgedProducts({aliased.id: revision}, current: () => true), {aliased.id});
+      expect(work.workspaceAssistantAcknowledgedProducts({aliased.id: revision}, current: () => false), isEmpty);
+      var current = true;
+      final ack = work.workspaceAssistantProductAcknowledgement(aliased.id, revision, current: () => current);
+      expect(ack, isNotNull); expect(ack!.canonicalProductId, 'canonical-one'); expect(ack.current(), isTrue);
+      expect(work.workspaceCatalogueItems.singleWhere((item) => item.id == aliased.id).canonicalId, 'native-product-alias');
+      for (final wrong in [revision.replaceFirst(':7:', ':8:'), revision.replaceFirst('evaluation', 'production'), 'invalid']) {
+        expect(work.workspaceAssistantProductAcknowledgement(aliased.id, wrong, current: () => true), isNull);
+        expect(work.workspaceAssistantAcknowledgedProducts({aliased.id: wrong}, current: () => true), isEmpty);
+      }
+      expect(inventory.values, before); expect(inventory.saves, writes); expect(source.ownerReads, reads);
+      expect(source.submitted, 0); expect(source.reconciled, 0);
+      current = false; expect(ack.current(), isFalse);
+      current = true; expect(ack.current(), isFalse, reason: 'A retired acknowledgement cannot revive');
+      final live = work.workspaceAssistantProductAcknowledgement(aliased.id, revision, current: () => true)!;
+      expect(work.addOrUpdateWorkspaceProduct(aliased.copyWith(title: 'Changed original product')), isTrue);
+      expect(live.current(), isFalse);
+      expect(work.workspaceAssistantProductAcknowledgement(aliased.id, revision, current: () => true), isNull);
+      expect(work.workspaceAssistantAcknowledgedProducts({aliased.id: revision}, current: () => true), isEmpty);
+      await work.workspaceInventorySaved;
+      await tester.pump(const Duration(milliseconds: 50));
+    } finally {await resumed.dispose();}
+  });
 
   for(final channel in BuyV2OfferClass.values){
     testWidgets('FE-PRODUCT-01 ACT230 ${channel.name} native Review opens original authenticated public reader',(tester)async{
@@ -25437,6 +25552,38 @@ testWidgets('FE-PRODUCT 215 fills original options; native Use keeps group unsav
   } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
 });
 
+for (final retire in [false, true]) {
+  testWidgets('FE-PRODUCT 220 supplied duration reaches original confirmation and ${retire ? 'retired owner' : 'Cancel'} cannot write', (tester) async {
+    final inventory = _ProductPrefillInventory(), owner = ValueNotifier(true);
+    final work = await productPrefillWork(inventory);
+    try {
+      final original = work.workspaceCatalogueItems.firstWhere((item) => item.variantMembership == null);
+      expect(work.addOrUpdateWorkspaceProduct(original.copyWith(wholesaleOffer: WorkspaceWholesaleOffer(
+        priceRupees: 250, minimumPacks: 10, enabled: true, saleType: BuyV2WholesaleSaleType.wholesale))), isTrue);
+      await work.workspaceInventorySaved;
+      final target = work.workspaceCatalogueItems.singleWhere((item) => item.id == original.id);
+      final before = jsonEncode(target.toInventoryJson()), saves = inventory.saves;
+      await mountRemainingProductReview(tester, work, target, StoreProductNativeInitial.fromFields('AI-ACT-220', {
+        ...StoreProductInitialData.referenceFields(target), 'validityMinutes': '00030',
+      }), owner: owner);
+      expect(find.text('Confirm supplier price'), findsOneWidget);
+      final field = tester.widget<TextFormField>(find.byKey(const Key('work-confirm-price-minutes')));
+      expect(field.initialValue, '00030');
+      expect(inventory.saves, saves);
+      final retained = tester.widget<FilledButton>(find.byKey(const Key('work-confirm-price-submit'))).onPressed!;
+      if (retire) {
+        owner.value = false; await tester.pumpAndSettle();
+        retained(); await tester.pumpAndSettle();
+        expect(find.text('Confirm supplier price'), findsNothing);
+      } else {
+        await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.widgetWithText(TextButton, 'Cancel')));
+        await tester.pumpAndSettle();
+      }
+      expect(inventory.saves, saves);
+      expect(jsonEncode(work.workspaceCatalogueItems.singleWhere((item) => item.id == target.id).toInventoryJson()), before);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); owner.dispose();}
+  });
+}
 for (final apply in [false, true]) {
   testWidgets('FE-PRODUCT 370 original warranty ${apply ? 'Use fields stages only' : 'Cancel leaves saved SKU intact'}', (tester) async {
     final inventory = _ProductPrefillInventory();

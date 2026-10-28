@@ -2,6 +2,7 @@ import {randomUUID} from "node:crypto";
 import type {AccountProfileActor} from "../account/profile_service.js";
 import type {AccountPlansService, PlansScope} from "../account/plans_service.js";
 import {assertStrictSchema, canonical, digest, fail, id, text, object, nativeTargetSelection, clarificationToolName, type AssistantCommand, type PreparationContext, type PreparationReply, type PreparationRequest} from "./model_contract.js";
+import {maskedNativeHints} from "./domain_context_contract.js";
 import type {PreparationModel} from "./responses_transport.js";
 
 export type PreparationState = {state: "pending" | "uncertain" | "cancelled" | "failed"} | {state: "ready"; reply: PreparationReply};
@@ -44,9 +45,19 @@ function contextBinding(c: PreparationContext): string {
 }
 /** Intersect native readiness hints with original registered source targets.
  * No caller-authored tool, field, permission or source revision is admitted. */
-function nativeContext(context: PreparationContext, request: PreparationRequest): PreparationContext {
-  if (request.nativeTargets === undefined) return context;
-  const hints = new Set(nativeTargetSelection(request.nativeTargets).map(value => canonical([value.actionId, value.entityId])));
+function nativeContext(actor: AccountProfileActor, context: PreparationContext, request: PreparationRequest,
+  maskContext: PreparationContext = context): PreparationContext {
+  if (request.nativeTargets === undefined && request.nativeTargetMask === undefined) return context;
+  if (request.nativeTargetMask !== undefined && maskContext !== context) {
+    const proofs = new Map((maskContext.nativeTargets ?? maskContext.tools).map(target => [canonical([target.actionId, target.entityId]), target.sourceRevision]));
+    if ((context.nativeTargets ?? context.tools).some(target => proofs.get(canonical([target.actionId, target.entityId])) !== target.sourceRevision)) {
+      return fail("stale_preparation", 409);
+    }
+  }
+  const selected = [...nativeTargetSelection(request.nativeTargets ?? []), ...maskedNativeHints(actor, maskContext, request)]
+    .filter(target => request.nativeTargetMask === undefined ||
+      (request.actionId === null || target.actionId === request.actionId) && (request.entityId === null || target.entityId === request.entityId));
+  const hints = new Set(selected.map(value => canonical([value.actionId, value.entityId])));
   const targets = context.nativeTargets ?? context.tools.map(({actionId, entityId, sourceRevision}) => ({actionId, entityId, sourceRevision}));
   const nativeTargets = targets.filter(target => hints.has(canonical([target.actionId, target.entityId])));
   const tools = context.tools.flatMap(tool => {
@@ -75,7 +86,12 @@ export class AssistantPreparationService {
   }
   private async readContext(actor: AccountProfileActor, input: PreparationRequest) {
     if (!this.deps.context) return fail("context_unavailable");
-    return nativeContext(await this.deps.context.read(actor, input), input);
+    // The compact hint positions bind the same full original scope used by the
+    // metadata read. Apply selected action/entity only after validating it.
+    if (input.nativeTargetMask === undefined) return nativeContext(actor, await this.deps.context.read(actor, input), input);
+    const captured = await this.deps.context.read(actor, {...input, actionId: null, entityId: null});
+    const context = input.entityId === null ? captured : await this.deps.context.read(actor, input);
+    return nativeContext(actor, context, input, captured);
   }
   private async validateReady(actor: AccountProfileActor, state: PreparationState, revision: string): Promise<PreparationState> {
     if (state.state !== "ready") return state;

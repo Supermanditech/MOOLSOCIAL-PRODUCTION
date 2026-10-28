@@ -1,12 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {command, canonical, digest, assertStrictSchema, catalogueListingSelection, nativeTargetSelection} from "./model_contract.js";
+import {command, canonical, digest, assertStrictSchema, catalogueListingSelection, nativeTargetSelection, nativeTargetMaskSelection} from "./model_contract.js";
 const payload = {scope: {audience: "personal", storeId: null}, requestId: "fixture-request", requestRevision: 1,
   message: "મને ચોખા જોઈએ / चावल चाहिए", language: "Auto", expectedEntitlementRevision: "personal:null:1:1", history: [], actionId: null, entityId: null};
 test("AI-B01 contract preserves original Unicode and stable canonical identity", () => {
   assert.deepEqual(command({operation: "prepare", payload}), {operation: "prepare", payload});
   assert.equal(digest({a: 1, b: "हिन्दी"}), digest({b: "हिन्दी", a: 1}));
   assert.throws(() => canonical({bad: Infinity}));
+});
+
+test('Store readiness mask has canonical bounded bytes and belongs in preparation identity only', () => {
+  const mask = {version: 1, fingerprint: 'a'.repeat(64), bits: 'AQ'};
+  const input = {...payload, scope: {audience: 'workspace', storeId: 'store-one'}, nativeTargetMask: mask};
+  const parsed = command({operation: 'prepare', payload: input});
+  assert.equal(parsed.operation, 'prepare');
+  if (parsed.operation === 'prepare') assert.deepEqual(parsed.payload.nativeTargetMask, mask);
+  assert.ok(Object.isFrozen(nativeTargetMaskSelection(mask)));
+  for (const bad of [{...mask, version: 2}, {...mask, bits: 'AR'}, {...mask, bits: 'AQ=='}, {...mask, bits: 'A'},
+    {...mask, bits: Buffer.alloc(1876).toString('base64url')}, {...mask, grantAccess: true}]) assert.throws(() => nativeTargetMaskSelection(bad));
+  assert.throws(() => command({operation: 'prepare', payload: {...payload, nativeTargetMask: mask}}));
+  assert.throws(() => command({operation: 'status', payload: {scope: input.scope, requestId: input.requestId, nativeTargetMask: mask}}));
+  assert.notEqual(digest(input), digest({...input, nativeTargetMask: {...mask, bits: 'AA'}}));
 });
 test("Native target hints are immutable two-field selectors and cannot assert source authority", () => {
   const hints = [{actionId: "AI-ACT-006", entityId: "listing-original"}, {actionId: "AI-ACT-001", entityId: null}];

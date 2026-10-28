@@ -95,6 +95,29 @@ SocialContentResponse modelResponse(Map<String, Object?> data) =>
       body: jsonEncode({'ok': true, 'data': data}),
     );
 void main() {
+  test('Compact Store readiness has canonical bounded bytes and survives immutable input copies', () {
+    final mask = AssistantNativeTargetMask(fingerprint: 'a' * 64, bits: 'AQ');
+    final input = AssistantModelInput(scope: (audience: 'workspace', storeId: 'store-one'), requestId: 'host-mask',
+      requestRevision: 1, message: 'Original product', language: 'Auto', expectedEntitlementRevision: 'host-paid', nativeTargetMask: mask);
+    expect(input.withNativeTargets([]).withCatalogueListingIds(null).toJson()['nativeTargetMask'],
+      {'version': 1, 'fingerprint': 'a' * 64, 'bits': 'AQ'});
+    expect(() => modelInput.withNativeTargetMask(mask).toJson(), throwsA(isA<AssistantModelFailure>()));
+    for (final invalid in ['AR', 'AQ==', 'A', 'a' * 2501]) {
+      expect(() => AssistantNativeTargetMask(fingerprint: 'a' * 64, bits: invalid), throwsA(isA<AssistantModelFailure>()));
+    }
+  });
+  test('Full serialized request exceeding64KiB cannot create a pending record or request credentials', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final credentials = ModelCredentials(), wire = ModelTransport((_) => throw StateError('No dispatch'));
+    final gateway = AssistantModelGateway(owner: modelOwner, isCurrent: () => true, credentials: credentials, transport: wire, clock: () => modelAt);
+    addTearDown(gateway.dispose);
+    final input = AssistantModelInput(scope: modelInput.scope, requestId: 'host-too-large', requestRevision: 1,
+      message: 'Original task', language: 'Auto', expectedEntitlementRevision: modelInput.expectedEntitlementRevision,
+      history: [for (var n = 0; n < 20; n++) {'role': 'user', 'text': 'x' * 8000}]);
+    await expectLater(gateway.prepare(input, () => true), throwsA(isA<AssistantModelFailure>()));
+    expect(wire.calls, isEmpty); expect(credentials.proofs, 0);
+    expect(await gateway.pending(input.scope, () => true), isNull);
+  });
   test('Native target hints freeze exact IDs without source permissions or alternate task codes', () {
     final hints = <AssistantNativeTargetHint>[(actionId: 'AI-ACT-001', entityId: null)];
     final input = modelInput.withNativeTargets(hints); hints.clear();

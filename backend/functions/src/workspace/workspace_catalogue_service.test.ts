@@ -3,7 +3,7 @@ import test from "node:test";
 import {createHash, generateKeyPairSync, randomUUID} from "node:crypto";
 import {createServer} from "node:http";
 import {Readable} from "node:stream";
-import {readFileSync} from "node:fs";
+import {readFileSync, writeFileSync} from "node:fs";
 import {resolve} from "node:path";
 import {EventEmitter} from "node:events";
 import {execFile} from "node:child_process";
@@ -27,7 +27,7 @@ import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingB
   type StorePublicDetailsRecord, type StorePublicDetailsReceipt,
   normalizeStoreVariantFamily, storeVariantFamilyOperation, storeVariantFamilySubmission, planStoreVariantFamilySubmission,
   planStoreVariantFamilyReview, type StoreVariantFamilyInput, type StoreVariantFamilyCandidate} from "./workspace_catalogue_service.js";
-import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
+import {InMemoryWorkspaceProfileRepository, WorkspaceProfileService, type WorkspaceProfileRecord} from "./workspace_profile_service.js";
 import {requireDefaultPurchaseTenant, WorkspaceBulkQuoteService, bulkSupplierQuoteOperation} from "./workspace_purchase_projection_service.js";
 import {WorkspacePromotionService, FirestorePromotionRepository, planPromotionSave, type PromotionRepository, type PromotionRecord} from "./workspace_promotion_service.js";
 import {WorkspaceSupplierPolicyService, FirestoreSupplierPolicyRepository} from "./workspace_supplier_policy_service.js";
@@ -35,7 +35,14 @@ import {createCatalogueAggregate, type CatalogueAggregate} from "../commerce/cat
 import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
   type SupplyParticipantWorkspace} from "../commerce/supply_participant_contract.js";
 import {AccountPlansService} from "../account/plans_service.js";
-import {OriginalCataloguePreparationContext} from "../assistant/domain_context.js";
+import {OriginalCataloguePreparationContext, OriginalStoreProductPreparationContext, CompositePreparationContext, storeProductNativeTextFields, storeWarrantyNativeLabels} from "../assistant/domain_context.js";
+import {ProfileWorkspacePreparationContext} from "../assistant/profile_context.js";
+import {AccountProfileService} from "../account/profile_service.js";
+import {assertStrictSchema, type PreparationRequest} from "../assistant/model_contract.js";
+import {AssistantPreparationService, type PreparationRequestStore, type PreparationState} from "../assistant/model_service.js";
+import {storeNativeSelection} from "../assistant/domain_context_contract.js";
+import {handleAssistantCanonicalContextRequest} from "../assistant/domain_context_http.js";
+import {handleAssistantModelRequest} from "../assistant/model_http.js";
 import {planCommodityPriceConfirmation, type CommodityPriceRecord} from "./workspace_catalogue_service.js";
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
@@ -3888,6 +3895,394 @@ for (const channel of ['retail', 'wholesale', 'bulk'] as const) {
     assert.equal(before, cataloguePayloadHash({records: [...repository.records], catalogue: repository.aggregate, price: repository.price ?? null}));
   });
 }
+
+async function assistantOwnedOriginalFixture(count = 1, channel: 'retail' | 'wholesale' | 'bulk' = 'retail', category?: string) {
+  const repository = new Memory(), value = input('owned-sku-0001');
+  if (category !== undefined) value.content.categoryId = category;
+  value.channels[0]!.kind = channel;
+  value.channels[0]!.supplierTax = {version: 2, rateBasisPoints: 1800, basis: 'included'};
+  let aggregate: CatalogueAggregate | undefined;
+  for (const raw of productionCommands(value)) {
+    const command = raw.type === 'create_offer' ? {...raw, buyingContext: channel === 'retail' ? 'consumer' : 'wholesale'} : raw;
+    const authority = producerAuthority(['propose_product', 'propose_pack', 'create_offer'].includes(String(command.type)));
+    aggregate = planCatalogueProduction({operatorUserId: authority.userId, identity: catalogueIdentity,
+      input: command, observedAt: at}, authority, aggregate, producerParticipant('store-one', value.content.categoryId), profile).aggregate;
+  }
+  repository.aggregate = aggregate!;
+  const provider = subject(repository);
+  for (let n = 1; n <= count; n++) {
+    const row = {...structuredClone(value), skuId: `owned-sku-${String(n).padStart(4, '0')}`, sku: `OWNED-${n}`};
+    await provider.saveSku('owner-one', save(row));
+  }
+  let member = true, paid = true, personalReads = 0, onRead: (() => void) | undefined;
+  const profiles = new InMemoryWorkspaceProfileRepository();
+  await profiles.createOrRead({...profile, status: 'approved', area: 'Jodhpur', primaryActivity: 'Host fixture',
+    proofReferences: {'personal-kyc': 'isolated-host-proof'}, alternateMobileVerified: false,
+    idempotencyKey: 'host-approved-store', requestFingerprint: 'host-approved-fingerprint', plan: 'free',
+    createdAt: '2026-10-15T00:00:00.000Z', updatedAt: '2026-10-15T00:00:00.000Z'});
+  const workspaces = new WorkspaceProfileService(profiles, () => new Date(at), undefined, {async readAccount() {
+    return [{schemaVersion: 1, membershipId: 'host-member-one', accountId: 'owner-one', workspaceId: 'store-one',
+      workspaceProfileId: 'retailer-grocery', state: member ? 'active' as const : 'revoked' as const,
+      version: member ? 1 : 2, grantedAt: '2026-10-15T00:00:00.000Z'}];
+  }});
+  const actor = {uid: 'owner-one', projectId: 'host-owned-project'};
+  const plans = new AccountPlansService({async read(uid, scope) {return {ownerUid: uid, accountStatus: 'ACTIVE',
+    catalogue: {audience: scope.audience, revision: 1, state: 'approved', offers: []},
+    subscription: {ownerUid: uid, scope, revision: paid ? 1 : 2, planId: 'host-paid', planVersion: 'v1', name: 'Host fixture only',
+      state: paid ? 'active' : 'revoked', validFrom: '2026-10-15T00:00:00.000Z', validUntil: '2026-10-17T00:00:00.000Z', featureIds: ['mool_ai']}};}},
+  {projectId: actor.projectId, now: () => new Date(at), readWorkspaces: a => workspaces.listWorkspaces(a.uid)});
+  const profileSource = new AccountProfileService({async readAccount() {personalReads++; return undefined;},
+    async readReceipt() {return undefined;}, async commit() {throw Error('No host preparation writes');}}, actor.projectId);
+  const authority = new ProfileWorkspacePreparationContext({profile: profileSource, plans,
+    workspaces: a => workspaces.listWorkspaces(a.uid), now: () => new Date(at)});
+  const calls: Readonly<Record<string, unknown>>[] = [], read = provider.listSkus.bind(provider);
+  provider.listSkus = async (uid, body) => {calls.push(body); const result = await read(uid, body); onRead?.(); return result;};
+  const context = new OriginalStoreProductPreparationContext({projectId: actor.projectId, authority, catalogue: provider, now: () => new Date(at)});
+  const request: PreparationRequest = {scope: {audience: 'workspace', storeId: 'store-one'}, requestId: 'host-owned-request', requestRevision: 1,
+    expectedEntitlementRevision: 'workspace:store-one:1:1', message: 'Update the original product', language: 'English', history: [],
+    actionId: 'AI-ACT-214', entityId: 'owned-sku-0001'};
+  return {repository, provider, context, authority, plans, actor, request, calls, personalReads: () => personalReads,
+    onRead: (hook: () => void) => {onRead = hook;}, revokeMember: () => {member = false;}, revokePaid: () => {paid = false;}};
+}
+
+test('AI-DOMAIN owned Store product edits use original references, partial native text and no writes', async () => {
+  const f = await assistantOwnedOriginalFixture(), before = cataloguePayloadHash([...f.repository.records]);
+  const context = await f.context.read(f.actor, f.request), tool = context.tools[0]!;
+  const result = tool.resolveTarget!({changes: [{field: 'title', value: 'મૂળ ઉત્પાદન'}, {field: 'description', value: 'मूल पैक की जानकारी'}]});
+  assert.equal(result.entityId, 'owned-sku-0001');
+  assert.deepEqual(result.fields, {sourceCanonicalId: 'canonical-one', sourceSku: 'OWNED-1', sourcePack: '1 L',
+    sourceRetailEnabled: true, sourceWholesaleEnabled: false, title: 'મૂળ ઉત્પાદન', description: 'मूल पैक की जानकारी'});
+  assert.equal(tool.validate(result.fields), true);
+  assert.equal(Object.hasOwn(result.fields, 'stock'), false); assert.equal(Object.hasOwn(result.fields, 'sellingPrice'), false);
+  assert.equal(f.personalReads(), 0); assert.equal(before, cataloguePayloadHash([...f.repository.records]));
+  assert.ok(f.calls.every(body => body.supplierTaxReadbackVersion === 1 && body.productFactsReadbackVersion === 1 && body.mediaReadbackVersion === 1));
+  assert.equal(JSON.stringify(context.modelContext).includes('Isolated test description'), false);
+});
+
+for (const channel of ['retail', 'wholesale', 'bulk'] as const) {
+  test(`AI-DOMAIN owned Store ${channel} price proposals preserve decimals and existing channel boundaries`, async () => {
+    const f = await assistantOwnedOriginalFixture(1, channel);
+    const context = await f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-221'}), tool = context.tools[0]!;
+    const field = channel === 'retail' ? 'sellingPrice' : 'wholesalePrice';
+    const result = tool.resolveTarget!({changes: [{field, value: '100.25'}]});
+    assert.equal(result.fields[field], '100.25'); assert.equal(tool.validate(result.fields), true);
+    assert.equal(result.fields.sourceRetailEnabled, channel === 'retail');
+    assert.equal(result.fields.sourceWholesaleEnabled, channel !== 'retail');
+    assert.throws(() => tool.resolveTarget!({changes: [{field: channel === 'retail' ? 'wholesalePrice' : 'sellingPrice', value: '10'}]}));
+    assert.throws(() => tool.resolveTarget!({changes: [{field: 'gstPercent', value: '0'}]}));
+    assert.throws(() => tool.resolveTarget!({changes: [{field: 'priceValidityMinutes', value: '30'}]}));
+    const product = (context.modelContext!.products as Array<{channels: StoreSkuChannel[]}>)[0]!;
+    assert.deepEqual(product.channels[0]!.supplierTax, {version: 2, rateBasisPoints: 1800, basis: 'included'});
+  });
+}
+
+test('AI-DOMAIN owned Store compact selector and recovery bind exact original SKU without model-authored references', async () => {
+  const f = await assistantOwnedOriginalFixture(2), context = await f.context.read(f.actor, {...f.request, actionId: null, entityId: null});
+  const tool = context.tools.find(t => t.actionId === 'AI-ACT-214')!;
+  assert.equal(tool.targetSelector, 'skuId');
+  const prepared = tool.resolveTarget!({skuId: 'owned-sku-0002', changes: [{field: 'pack', value: '2 L'}]});
+  assert.equal(prepared.fields.sourceSku, 'OWNED-2'); assert.equal(prepared.fields.sourcePack, '1 L');
+  assert.equal(prepared.fields.pack, '2 L'); assert.equal(tool.validate(prepared.fields), true);
+  assert.ok(context.nativeTargets!.some(t => t.entityId === prepared.entityId && t.sourceRevision === prepared.sourceRevision));
+  const input = {...f.request, entityId: prepared.entityId};
+  const fresh = await f.context.readPrepared(f.actor, input, {kind: 'proposal', id: 'host-proposal', actionId: 'AI-ACT-214',
+    entityId: prepared.entityId, sourceRevision: prepared.sourceRevision, title: 'Host', summary: 'Host', fields: prepared.fields});
+  assert.equal(fresh.tools[0]!.sourceRevision, prepared.sourceRevision);
+  assert.equal(fresh.tools[0]!.validate(prepared.fields), true);
+  assert.throws(() => tool.resolveTarget!({skuId: 'foreign-sku', changes: [{field: 'title', value: 'Bad'}]}));
+  assert.throws(() => tool.resolveTarget!({skuId: 'owned-sku-0002', changes: [{field: 'sourceCanonicalId', value: 'foreign'}]}));
+  assert.throws(() => tool.resolveTarget!({skuId: 'owned-sku-0002', changes: [{field: 'title', value: 'A'}, {field: 'title', value: 'B'}]}));
+  assert.throws(() => tool.resolveTarget!({skuId: 'owned-sku-0002', changes: []}));
+  const original = f.repository.records.get('store-one/owned-sku-0002')!;
+  f.repository.records.set('store-one/owned-sku-0002', {...original, revision: 2});
+  const changed = await f.context.read(f.actor, input);
+  assert.notEqual(changed.tools[0]!.sourceRevision, prepared.sourceRevision);
+});
+
+test('AI-DOMAIN owned Store original paged source handles 201 records without a second product master', async () => {
+  const f = await assistantOwnedOriginalFixture(201), before = cataloguePayloadHash([...f.repository.records]);
+  const context = await f.context.read(f.actor, {...f.request, actionId: null, entityId: null});
+  assert.equal(context.tools.length, 5); assert.equal(context.nativeTargets!.length, 405);
+  assert.equal(f.calls.length, 10); assert.ok(f.calls.every(body => body.limit === 50));
+  const result = context.tools[0]!.resolveTarget!({skuId: 'owned-sku-0201', changes: [{field: 'title', value: 'Last original product'}]});
+  assert.equal(result.entityId, 'owned-sku-0201'); assert.equal(result.fields.sourceSku, 'OWNED-201');
+  assert.equal(before, cataloguePayloadHash([...f.repository.records]));
+});
+
+test('AI-DOMAIN owned Store denies foreign account tenant Store and personal context before product reads', async () => {
+  const f = await assistantOwnedOriginalFixture();
+  for (const actor of [{...f.actor, projectId: 'foreign-project'}, {...f.actor, tenantId: 'foreign'}, {...f.actor, uid: 'foreign-owner'}]) {
+    await assert.rejects(f.context.read(actor, f.request));
+  }
+  await assert.rejects(f.context.read(f.actor, {...f.request, scope: {audience: 'personal', storeId: null}}));
+  await assert.rejects(f.context.read(f.actor, {...f.request, scope: {audience: 'workspace', storeId: 'foreign-store'}}));
+  assert.equal(f.calls.length, 0);
+});
+
+for (const boundary of ['membership', 'paid', 'owner', 'record'] as const) {
+  test(`AI-DOMAIN owned Store ${boundary} changes during original reads retire preparation`, async () => {
+    const f = await assistantOwnedOriginalFixture();
+    f.onRead(() => {
+      if (boundary === 'membership') f.revokeMember();
+      else if (boundary === 'paid') f.revokePaid();
+      else if (boundary === 'owner') f.repository.stores.set('store-one', {...profile, ownerUserId: 'foreign-owner'});
+      else {
+        const row = f.repository.records.get('store-one/owned-sku-0001')!;
+        f.repository.records.set('store-one/owned-sku-0001', {...row, revision: row.revision + 1});
+      }
+    });
+    await assert.rejects(f.context.read(f.actor, f.request));
+  });
+}
+
+test('AI-DOMAIN owned Store unavailable source preserves original Workspace navigation but never selected edit substitution', async () => {
+  const f = await assistantOwnedOriginalFixture();
+  f.provider.listSkus = async () => {throw Error('Original owned source unavailable');};
+  const composite = new CompositePreparationContext({original: f.authority, storeProducts: f.context});
+  const natural = await composite.read(f.actor, {...f.request, actionId: null, entityId: null});
+  assert.deepEqual(natural.tools.map(t => t.actionId), ['AI-ACT-317']);
+  await assert.rejects(composite.read(f.actor, f.request), /context_unavailable/u);
+});
+
+test('AI-DOMAIN owned Store native defaults keep current private values native and preserve explicit false and omitted fields', async () => {
+  const f = await assistantOwnedOriginalFixture(), before = cataloguePayloadHash([...f.repository.records]);
+  const context = await f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-219', entityId: null}), tool = context.tools[0]!;
+  assert.equal(tool.entityId, null); assert.ok(f.calls.every(body => body.limit === 1));
+  const fields = tool.decodeFields!({stockMode: null, lowStockThreshold: '0005', customerListingRequested: false});
+  assert.deepEqual(fields, {lowStockThreshold: '0005', customerListingRequested: false});
+  assert.equal(tool.validate(fields), true);
+  for (const args of [{stockMode: null, lowStockThreshold: null, customerListingRequested: null},
+    {stockMode: 'invented', lowStockThreshold: null, customerListingRequested: null},
+    {stockMode: null, lowStockThreshold: '1.5', customerListingRequested: null},
+    {stockMode: null, lowStockThreshold: '-1', customerListingRequested: null},
+    {stockMode: null, lowStockThreshold: '1000000000', customerListingRequested: null},
+    {stockMode: null, lowStockThreshold: null, customerListingRequested: true, publish: true}]) {
+    assert.throws(() => tool.decodeFields!(args));
+  }
+  assert.equal(Object.hasOwn(context.modelContext!, 'currentDefaults'), false);
+  assert.equal(before, cataloguePayloadHash([...f.repository.records]));
+  await assert.rejects(f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-219', entityId: 'store-one'}), /context_unavailable/u);
+});
+
+test('AI-DOMAIN owned Store empty catalogue still permits original native defaults review without a fabricated product', async () => {
+  const f = await assistantOwnedOriginalFixture(0);
+  const context = await f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-218', entityId: null});
+  assert.deepEqual(context.tools.map(tool => tool.actionId), ['AI-ACT-218']);
+  assert.equal(context.tools[0]!.validate({}), true); assert.equal(context.tools[0]!.validate({stockMode: 'exactQuantity'}), false);
+  assert.deepEqual(context.nativeTargets, [{actionId: 'AI-ACT-218', entityId: null, sourceRevision: context.tools[0]!.sourceRevision}]);
+  assert.equal(f.repository.records.size, 0);
+  await assert.rejects(f.context.read(f.actor, f.request), /context_unavailable/u);
+  f.revokeMember();
+  await assert.rejects(f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-218', entityId: null}));
+});
+
+test('AI-DOMAIN owned Store actual preparation and status keep original fields native targets and single usage', async () => {
+  const f = await assistantOwnedOriginalFixture(2), rows = new Map<string, {fingerprint: string; state: PreparationState}>();
+  // The sealed durable request/usage suites qualify their actual SQL classes.
+  // These explicit host seams isolate this source-to-model-to-native contract.
+  const requests: PreparationRequestStore = {
+    async claim(key, fingerprint) {
+      const row = rows.get(key);
+      if (row) return row.fingerprint === fingerprint ? row.state : {state: 'conflict'};
+      rows.set(key, {fingerprint, state: {state: 'pending'}}); return {state: 'claimed', lease: key};
+    },
+    async read(key) {return rows.get(key)?.state;},
+    async finish(key, lease, state) {assert.equal(key, lease); rows.get(key)!.state = state; return state;},
+    async cancel(key) {const row = rows.get(key); if (!row) return undefined; row.state = {state: 'cancelled'}; return row.state;},
+  };
+  let models = 0, reserves = 0; const settlements: string[] = [];
+  const context = new CompositePreparationContext({original: f.authority, storeProducts: f.context});
+  const service = new AssistantPreparationService({projectId: f.actor.projectId, plans: f.plans, context, requests,
+    now: () => new Date(at), usage: {
+      async reserve() {reserves++; return {id: 'host-owned-permit', validUntil: '2026-10-16T12:01:00.000Z'};},
+      async settle(_id, state) {settlements.push(state);},
+    }, model: {async prepare(_request, tools) {
+      models++; assert.equal(tools.length, 1);
+      const properties = tools[0]!.parameters.properties as {skuId: {enum: string[]}};
+      assert.deepEqual(properties.skuId.enum, ['owned-sku-0002']);
+      return {kind: 'tool', name: tools[0]!.name, arguments: {skuId: 'owned-sku-0002',
+        changes: [{field: 'description', value: 'मूल उत्पाद की जानकारी'}, {field: 'sellingPrice', value: '100.25'}]}};
+    }}});
+  const payload = {...f.request, requestId: 'host-owned-native-contract', entityId: null,
+    nativeTargets: [{actionId: 'AI-ACT-214', entityId: 'owned-sku-0002'}]};
+  const before = cataloguePayloadHash([...f.repository.records]);
+  const result = await service.handle(f.actor, {operation: 'prepare', payload});
+  assert.equal(result.state, 'ready'); if (result.state !== 'ready') return;
+  assert.equal(result.reply.outcome.kind, 'proposal'); if (result.reply.outcome.kind !== 'proposal') return;
+  const proposal = result.reply.outcome;
+  assert.equal(proposal.entityId, 'owned-sku-0002'); assert.equal(proposal.fields.sourceSku, 'OWNED-2');
+  assert.equal(proposal.fields.description, 'मूल उत्पाद की जानकारी'); assert.equal(proposal.fields.sellingPrice, '100.25');
+  assert.equal(Object.hasOwn(proposal.fields, 'stock'), false);
+  assert.deepEqual(await service.handle(f.actor, {operation: 'prepare', payload}), result);
+  assert.deepEqual(await service.handle(f.actor, {operation: 'status', payload: {scope: payload.scope, requestId: payload.requestId}}), result);
+  assert.equal(models, 1); assert.equal(reserves, 1); assert.deepEqual(settlements, ['completed']);
+  assert.equal(before, cataloguePayloadHash([...f.repository.records]));
+  const exportPath = process.env.MOOLSOCIAL_ASSISTANT_STORE_NATIVE_EXPORT;
+  if (exportPath !== undefined) {
+    assert.equal(resolve(exportPath), resolve('C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/ai-domain-batch-20261028-v1/scope02-original-proposal-contract.json'));
+    const defaults = await f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-219', entityId: null});
+    const defaultsInput = defaults.tools[0]!.decodeFields!({stockMode: null, lowStockThreshold: '0005', customerListingRequested: false});
+    writeFileSync(exportPath, JSON.stringify({schemaVersion: 1, hostOnly: true, nativeTextFields: storeProductNativeTextFields,
+      nativeDefaultFields: Object.keys(defaults.tools[0]!.parameters.properties as object), defaultsInput,
+      reply: result.reply, noDomainWrites: before === cataloguePayloadHash([...f.repository.records])}, null, 2) + '\n', 'utf8');
+  }
+  const original = f.repository.records.get('store-one/owned-sku-0002')!;
+  f.repository.records.set('store-one/owned-sku-0002', {...original, revision: original.revision + 1});
+  await assert.rejects(service.handle(f.actor, {operation: 'status', payload: {scope: payload.scope, requestId: payload.requestId}}), /stale_preparation/u);
+  assert.equal(models, 1); assert.equal(reserves, 1);
+});
+
+test('AI-DOMAIN owned Store descriptive warranty uses original allowed category and exact native guide labels', async () => {
+  const f = await assistantOwnedOriginalFixture(1, 'retail', 'other'), before = cataloguePayloadHash([...f.repository.records]);
+  const context = await f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-370'}), tool = context.tools[0]!;
+  const warranty = {'Warranty issuer': 'मूल निर्माता', 'Warranty duration': '12 महीने', 'Warranty exclusions': ''};
+  const suppliedWarranty = {...Object.fromEntries(storeWarrantyNativeLabels.map(label => [label, null])), ...warranty};
+  const prepared = tool.resolveTarget!({warranty: suppliedWarranty});
+  assert.equal(prepared.entityId, f.request.entityId);
+  assert.deepEqual(prepared.fields.warranty, warranty); assert.equal(tool.validate(prepared.fields), true);
+  assert.equal(prepared.fields.sourceCanonicalId, 'canonical-one');
+  for (const invalid of [{}, {'automaticEntitlement': true}, {'Warranty duration': 12}, {'Warranty issuer': ' '},
+      {'Warranty issuer': '\u0000'}, {'Warranty issuer': '\ud800'}]) {
+    assert.throws(() => tool.resolveTarget!({warranty: {...Object.fromEntries(storeWarrantyNativeLabels.map(label => [label, null])), ...invalid}}), /invalid_model_result/u);
+    assert.equal(tool.validate({...prepared.fields, warranty: invalid}), false);
+  }
+  assert.equal(tool.validate({...prepared.fields, refundApproved: true}), false);
+  assert.equal(tool.validate({...prepared.fields, sourceCanonicalId: 'foreign-canonical'}), false);
+  const ordinary = await assistantOwnedOriginalFixture();
+  await assert.rejects(ordinary.context.read(ordinary.actor, {...ordinary.request, actionId: 'AI-ACT-370'}), /context_unavailable/u);
+  const exportPath = process.env.MOOLSOCIAL_ASSISTANT_STORE_NATIVE_EXPORT;
+  if (exportPath !== undefined) {
+    const saved = JSON.parse(readFileSync(exportPath, 'utf8')) as Record<string, unknown>;
+    writeFileSync(exportPath, JSON.stringify({...saved, nativeWarrantyLabels: storeWarrantyNativeLabels,
+      warrantyInput: prepared.fields}, null, 2) + '\n', 'utf8');
+  }
+  assert.equal(before, cataloguePayloadHash([...f.repository.records]));
+});
+
+test('AI-DOMAIN owned Store warranty crosses actual preparation strict schema and original status without writes', async () => {
+  const f = await assistantOwnedOriginalFixture(1, 'wholesale', 'other');
+  const all = await f.context.read(f.actor, {...f.request, actionId: null, entityId: null});
+  for (const tool of all.tools) assertStrictSchema(tool.parameters);
+  let stored: PreparationState | undefined, models = 0, reserves = 0;
+  const requests: PreparationRequestStore = {
+    async claim(key) {stored = {state: 'pending'}; return {state: 'claimed', lease: key};}, async read() {return stored;},
+    async finish(_key, _lease, state) {stored = state; return state;}, async cancel() {return undefined;},
+  };
+  const warranty = {'Warranty issuer': 'मूल निर्माता', 'Warranty duration': '12 महीने', 'Warranty exclusions': ''};
+  const args = {...Object.fromEntries(storeWarrantyNativeLabels.map(label => [label, null])), ...warranty};
+  const before = cataloguePayloadHash([...f.repository.records]);
+  const service = new AssistantPreparationService({projectId: f.actor.projectId, plans: f.plans, context: f.context, requests,
+    now: () => new Date(at), usage: {async reserve() {reserves++; return {id: 'host-warranty-permit', validUntil: '2026-10-16T12:01:00.000Z'};}, async settle() {}},
+    model: {async prepare(_input, tools) {models++; assert.equal(tools.length, 1); return {kind: 'tool', name: tools[0]!.name, arguments: {warranty: args}};}}});
+  const payload = {...f.request, requestId: 'host-warranty-preparation', actionId: 'AI-ACT-370'};
+  const result = await service.handle(f.actor, {operation: 'prepare', payload});
+  assert.equal(result.state, 'ready'); if (result.state !== 'ready' || result.reply.outcome.kind !== 'proposal') return;
+  assert.deepEqual(result.reply.outcome.fields.warranty, warranty);
+  assert.deepEqual(await service.handle(f.actor, {operation: 'status', payload: {scope: payload.scope, requestId: payload.requestId}}), result);
+  assert.equal(models, 1); assert.equal(reserves, 1); assert.equal(before, cataloguePayloadHash([...f.repository.records]));
+  const exportPath = process.env.MOOLSOCIAL_ASSISTANT_STORE_NATIVE_EXPORT;
+  if (exportPath !== undefined) {
+    const saved = JSON.parse(readFileSync(exportPath, 'utf8')) as Record<string, unknown>;
+    writeFileSync(exportPath, JSON.stringify({...saved, warrantyInput: result.reply.outcome.fields,
+      warrantyActualPreparationVerified: true}, null, 2) + '\n', 'utf8');
+  }
+});
+
+for (const channel of ['wholesale', 'bulk'] as const) {
+  test(`AI-DOMAIN owned Store ${channel} confirmation preserves original price and supplied duration without confirmation writes`, async () => {
+    const f = await assistantOwnedOriginalFixture(1, channel), before = cataloguePayloadHash([...f.repository.records]);
+    const context = await f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-220'}), tool = context.tools[0]!;
+    const supplied = tool.resolveTarget!({validityMinutes: '00030'});
+    assert.equal(supplied.entityId, f.request.entityId); assert.equal(supplied.fields.validityMinutes, '00030');
+    assert.equal(tool.validate(supplied.fields), true); assert.equal(supplied.fields.sourceWholesaleEnabled, true);
+    assert.equal(Object.hasOwn(tool.resolveTarget!({validityMinutes: null}).fields, 'validityMinutes'), false);
+    for (const invalid of ['0', '-1', '525601', '1.5', 30, true]) {
+      assert.throws(() => tool.resolveTarget!({validityMinutes: invalid}), /invalid_model_result/u);
+      assert.equal(tool.validate({...supplied.fields, validityMinutes: invalid}), false);
+    }
+    assert.throws(() => tool.resolveTarget!({validityMinutes: '30', price: '1'}), /invalid_model_result/u);
+    assert.equal(tool.validate({...supplied.fields, confirmed: true}), false);
+    assert.equal(tool.validate({...supplied.fields, sourceSku: 'foreign-sku'}), false);
+    assert.equal(before, cataloguePayloadHash([...f.repository.records]));
+    const exportPath = process.env.MOOLSOCIAL_ASSISTANT_STORE_NATIVE_EXPORT;
+    if (exportPath !== undefined && channel === 'wholesale') {
+      const saved = JSON.parse(readFileSync(exportPath, 'utf8')) as Record<string, unknown>;
+      writeFileSync(exportPath, JSON.stringify({...saved, priceConfirmationInput: supplied.fields}, null, 2) + '\n', 'utf8');
+    }
+    f.revokeMember(); await assert.rejects(f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-220'}));
+  });
+}
+test('AI-DOMAIN owned Store1250 actual metadata and preparation preserve5003 targets within original HTTP byte caps', async () => {
+  const f = await assistantOwnedOriginalFixture(1250, 'wholesale', 'other');
+  const context = new CompositePreparationContext({original: f.authority, storeProducts: f.context});
+  const headers = {authorization: 'Bearer host-only-token', 'x-firebase-appcheck': 'host-only-proof'};
+  const auth = {projectId: f.actor.projectId, enabled: true,
+    async verifyAppCheck() {return {};}, async verifyIdToken() {return f.actor;}};
+  const readBody = {operation: 'read', payload: {scope: f.request.scope, nativeSelectionVersion: 1}};
+  const metadata = await handleAssistantCanonicalContextRequest({method: 'POST', headers, body: readBody,
+    bodyBytes: Buffer.byteLength(JSON.stringify(readBody))}, {...auth, context, now: () => new Date(at)});
+  assert.equal(metadata.status, 200); assert.ok(metadata.body.ok); if (!metadata.body.ok) return;
+  assert.ok(Buffer.byteLength(JSON.stringify(metadata.body)) < 2 * 1024 * 1024);
+  const original = await context.read(f.actor, {...f.request, actionId: null, entityId: null});
+  const selection = storeNativeSelection(f.actor, f.request.scope, original);
+  assert.equal(selection.targets.length, 5003);
+  const index = selection.targets.findIndex(target => target.actionId === 'AI-ACT-214' && target.entityId === 'owned-sku-1250');
+  assert.ok(index >= 0); const bytes = Buffer.alloc(Math.ceil(selection.targets.length / 8));
+  bytes[index >> 3] = (bytes[index >> 3] ?? 0) | (1 << (index % 8));
+  const rows = new Map<string, {fingerprint: string; state: PreparationState}>();
+  const requests: PreparationRequestStore = {
+    async claim(key, fingerprint) {const prior = rows.get(key); if (prior) return prior.fingerprint === fingerprint ? prior.state : {state: 'conflict'};
+      rows.set(key, {fingerprint, state: {state: 'pending'}}); return {state: 'claimed', lease: key};},
+    async read(key) {return rows.get(key)?.state;}, async finish(key, _lease, state) {rows.get(key)!.state = state; return state;},
+    async cancel() {return undefined;},
+  };
+  let models = 0, reserves = 0;
+  const service = new AssistantPreparationService({projectId: f.actor.projectId, plans: f.plans, context, requests,
+    now: () => new Date(at), usage: {async reserve() {reserves++; return {id: 'host-capacity-permit', validUntil: '2026-10-16T12:01:00.000Z'};}, async settle() {}},
+    model: {async prepare(_input, tools) {models++; assert.equal(tools.length, 1);
+      const properties = tools[0]!.parameters.properties as {skuId?: {enum: string[]}};
+      if (properties.skuId) assert.deepEqual(properties.skuId.enum, ['owned-sku-1250']);
+      else assert.equal(tools[0]!.entityId, 'owned-sku-1250');
+      return {kind: 'tool', name: tools[0]!.name, arguments: {...(properties.skuId ? {skuId: 'owned-sku-1250'} : {}), changes: [{field: 'title', value: 'मूल उत्पाद'}]}};}}});
+  const body = {operation: 'prepare', payload: {...f.request, requestId: 'host-capacity-request', entityId: null,
+    nativeTargets: [{actionId: 'AI-ACT-317', entityId: 'store-one'}],
+    nativeTargetMask: {version: 1, fingerprint: selection.fingerprint, bits: bytes.toString('base64url')}}};
+  const call = (value: {operation: string; payload: Omit<typeof body.payload, 'entityId'> & {entityId: string | null}}, bodyBytes = Buffer.byteLength(JSON.stringify(value))) =>
+    handleAssistantModelRequest({method: 'POST', headers, body: value, bodyBytes}, {...auth, service});
+  assert.ok(Buffer.byteLength(JSON.stringify(body)) < 64 * 1024);
+  const before = cataloguePayloadHash([...f.repository.records]);
+  const result = await call(body); assert.equal(result.status, 200); assert.ok(result.body.ok);
+  if (!result.body.ok || result.body.data.state !== 'ready') return;
+  assert.equal(result.body.data.reply.outcome.kind, 'proposal');
+  assert.deepEqual(await call(body), result); assert.equal(models, 1); assert.equal(reserves, 1);
+  const fixed = await call({...body, payload: {...body.payload, requestId: 'host-capacity-fixed', entityId: 'owned-sku-1250'}});
+  assert.equal(fixed.status, 200); assert.equal(models, 2); assert.equal(reserves, 2);
+  const conflict = await call({...body, payload: {...body.payload,
+    nativeTargetMask: {...body.payload.nativeTargetMask, bits: Buffer.alloc(bytes.length).toString('base64url')}}});
+  assert.equal(conflict.status, 409); assert.equal(models, 2); assert.equal(reserves, 2);
+  const stale = await call({...body, payload: {...body.payload, requestId: 'host-capacity-stale',
+    nativeTargetMask: {...body.payload.nativeTargetMask, fingerprint: '0'.repeat(64)}}});
+  assert.equal(stale.status, 409); assert.equal(models, 2); assert.equal(reserves, 2);
+  assert.equal((await call(body, 64 * 1024 + 1)).status, 413);
+  assert.equal(before, cataloguePayloadHash([...f.repository.records]));
+  const exportPath = process.env.MOOLSOCIAL_ASSISTANT_STORE_NATIVE_EXPORT;
+  if (exportPath !== undefined) {
+    const saved = JSON.parse(readFileSync(exportPath, 'utf8')) as Record<string, unknown>;
+    writeFileSync(exportPath, JSON.stringify({...saved, capacityMetadata: metadata.body, capacityActor: f.actor,
+      capacityTargetCount: selection.targets.length}, null, 2) + '\n', 'utf8');
+  }
+});
+
+test('AI-DOMAIN owned Store price-attention read stays native and retail-only SKU cannot become a trade confirmation', async () => {
+  const f = await assistantOwnedOriginalFixture();
+  await assert.rejects(f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-220'}), /context_unavailable/u);
+  const context = await f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-372', entityId: null}), tool = context.tools[0]!;
+  assert.deepEqual(context.nativeTargets, [{actionId: 'AI-ACT-372', entityId: null, sourceRevision: tool.sourceRevision}]);
+  assert.equal(tool.validate({}), true); assert.equal(tool.validate({confirmed: true}), false);
+  assert.deepEqual(context.modelContext!.products, [], 'No native attention status or price is inferred from an owner proof');
+  assert.ok(f.calls.slice(-2).every(body => body.limit === 1));
+  f.revokePaid(); await assert.rejects(f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-372', entityId: null}));
+});
 
 const procurementContext = {accountId: 'buyer-one', storeId: 'buying-store',
   purpose: 'restock', originOperationId: 'host-procurement-origin'};

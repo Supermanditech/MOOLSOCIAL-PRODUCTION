@@ -76,6 +76,7 @@ class AssistantOriginalContextReader {
     }
     final domainGateway = session.assistantDomainContextGateway;
     List<String>? catalogueListingIds;
+    AssistantCanonicalNativeSelection? nativeSelection;
     if (domainGateway != null) {
       try {
         final selected = buy?.selectedProduct;
@@ -93,7 +94,28 @@ class AssistantOriginalContextReader {
             !assistantDomainContextActions.contains(key.$1) || revisions.containsKey(key))) {
           throw const AssistantModelFailure('context_unavailable');
         }
-        revisions.addAll(domain.revisions);
+        final ready = <AssistantContextKey, String>{};
+          if (domain.revisions.keys.any((key) => assistantStoreProductContextActions.contains(key.$1))) {
+            // Read only the original pending journal. Never reconcile or replay
+            // a command to make an AI preparation appear ready after restart.
+            if (!await work.restoreWorkspaceCatalogueListing() || !alive()) {
+              throw const AssistantModelFailure('context_unavailable');
+            }
+          }
+        final productProofs = <String, String>{};
+        for (final entry in domain.revisions.entries.where((entry) => assistantStoreProductContextActions.contains(entry.key.$1))) {
+          final id = entry.key.$2!;
+          if (productProofs.containsKey(id) && productProofs[id] != entry.value) throw const AssistantModelFailure('stale_preparation');
+          productProofs[id] = entry.value;
+        }
+        final acknowledged = work.workspaceAssistantAcknowledgedProducts(productProofs, current: alive);
+        if (!alive()) throw const AssistantModelFailure('stale_preparation');
+        for (final entry in domain.revisions.entries) {
+          if (assistantStoreProductContextActions.contains(entry.key.$1) && !acknowledged.contains(entry.key.$2)) continue;
+          ready[entry.key] = entry.value;
+        }
+        revisions.addAll(ready);
+        nativeSelection = domain.nativeSelection;
         catalogueListingIds = domain.catalogueListingIds;
         if (domain.validUntil.isBefore(until)) until = domain.validUntil;
       } on AssistantModelFailure catch (error) {
@@ -104,7 +126,7 @@ class AssistantOriginalContextReader {
     }
     if (!alive() || !until.isAfter(DateTime.now().toUtc())) throw const AssistantModelFailure('stale_preparation');
     return AssistantCanonicalContextSnapshot(binding: context.binding, revisions: revisions, validUntil: until,
-      catalogueListingIds: catalogueListingIds);
+      catalogueListingIds: catalogueListingIds, nativeSelection: nativeSelection);
   }
 }
 

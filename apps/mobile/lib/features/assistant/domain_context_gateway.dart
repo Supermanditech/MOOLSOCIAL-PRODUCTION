@@ -10,8 +10,13 @@ import 'profile_context.dart';
 const assistantDomainProductContextActions = {'AI-ACT-006', 'AI-ACT-007', 'AI-ACT-009',
   'AI-ACT-336', 'AI-ACT-337', 'AI-ACT-338', 'AI-ACT-339'};
 const assistantDomainPreferenceContextActions = {'AI-ACT-010', 'AI-ACT-011', 'AI-ACT-012', 'AI-ACT-013'};
+const assistantStoreProductContextActions = {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-370', 'AI-ACT-220'};
+const assistantStoreDefaultContextActions = {'AI-ACT-218', 'AI-ACT-219'};
+const assistantStoreOwnerReadContextActions = {'AI-ACT-372'};
+const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions};
 const assistantDomainContextActions = {'AI-ACT-001', 'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
-  ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions};
+  ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions,
+  ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions};
 
 abstract interface class AssistantDomainContextGatewaySource {
   AssistantDomainContextGateway? assistantDomainContextGateway(
@@ -22,7 +27,7 @@ abstract interface class AssistantDomainContextGatewaySource {
 class AssistantDomainContextGateway {
   AssistantDomainContextGateway({required this.owner, required this.isCurrent,
       required SocialContentCredentials credentials, SocialContentTransport? transport,
-      DateTime Function()? clock})
+      DateTime Function()? clock, this.compactStoreSelection = false})
       : _credentials = credentials, _clock = clock ?? DateTime.now,
         _transport = transport ?? IoSocialContentTransport(
           followRedirects: false, maximumResponseBytes: 2 * 1024 * 1024) {
@@ -33,6 +38,7 @@ class AssistantDomainContextGateway {
   }
   final AccountProfileOwner owner;
   final bool Function() isCurrent;
+  final bool compactStoreSelection;
   final SocialContentCredentials _credentials;
   final SocialContentTransport _transport;
   final DateTime Function() _clock;
@@ -62,6 +68,7 @@ class AssistantDomainContextGateway {
     check();
     final scope = {'audience': context.inWorkspace ? 'workspace' : 'personal',
       'storeId': context.inWorkspace ? context.workspaceId : null};
+    final compact = compactStoreSelection && context.inWorkspace;
     final token = await _credentials.firebaseIdToken(); check();
     final proof = await _credentials.appCheckToken(SocialAppCheckTokenMode.standard); check();
     if (token.trim().isEmpty || proof.trim().isEmpty) {
@@ -71,6 +78,7 @@ class AssistantDomainContextGateway {
       Uri.https('asia-south1-${owner.projectId}.cloudfunctions.net', '/moolSocialAssistantContext'),
       headers: {'Authorization': 'Bearer $token', 'X-Firebase-AppCheck': proof},
       body: {'operation': 'read', 'payload': {'scope': scope,
+        if (compact) 'nativeSelectionVersion': 1,
         if (selection != null) 'catalogueListingIds': selection}});
     check();
     if (response.statusCode == 401 || response.statusCode == 403) {
@@ -80,7 +88,7 @@ class AssistantDomainContextGateway {
     if (utf8.encode(response.body).length > 2 * 1024 * 1024 || response.statusCode != 200) _invalid();
     final envelope = _map(jsonDecode(response.body), {'ok', 'data'});
     if (envelope['ok'] != true) _invalid();
-    final data = _map(envelope['data'], {'ownerKey', 'scope', 'validUntil', 'revisions'});
+    final data = _map(envelope['data'], {'ownerKey', 'scope', 'validUntil', 'revisions', if (compact) 'nativeSelection'});
     final where = _map(data['scope'], {'audience', 'storeId'});
     final expectedOwner = sha256.convert(utf8.encode(jsonEncode([
       owner.projectId, owner.userId, scope['audience'], scope['storeId']]))).toString();
@@ -94,10 +102,33 @@ class AssistantDomainContextGateway {
     if (until == null || until.toIso8601String() != stamp || !until.isAfter(now) ||
         until.isAfter(now.add(const Duration(seconds: 65)))) _invalid();
     if (data['revisions'] is! List || (data['revisions'] as List).length > 5000) _invalid();
+    final rows = List<Object?>.of(data['revisions'] as List);
+    final masked = <AssistantContextKey, String>{};
+    String? selectionFingerprint;
+    const maskActions = {...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions};
+    if (compact) {
+      final selected = _map(data['nativeSelection'], {'version', 'fingerprint', 'groups'});
+      if (selected['version'] != 1 || selected['fingerprint'] is! String ||
+          !RegExp(r'^[a-f0-9]{64}$').hasMatch(selected['fingerprint'] as String) || selected['groups'] is! List ||
+          (selected['groups'] as List).length > 5000) _invalid();
+      selectionFingerprint = selected['fingerprint'] as String;
+      for (final raw in rows) {
+        final row = _map(raw, {'actionId', 'entityId', 'sourceRevision'});
+        if (maskActions.contains(row['actionId'])) _invalid();
+      }
+      for (final raw in selected['groups'] as List) {
+        final group = _map(raw, {'actionIds', 'entityId', 'sourceRevision'}), ids = group['actionIds'];
+        if (ids is! List || ids.isEmpty || ids.length > maskActions.length || ids.toSet().length != ids.length ||
+            rows.length + ids.length > 15000 || ids.any((action) => !maskActions.contains(action))) _invalid();
+        for (final action in ids) {
+          rows.add({'actionId': action, 'entityId': group['entityId'], 'sourceRevision': group['sourceRevision']});
+        }
+      }
+    }
     final revisions = <AssistantContextKey, String>{}, seen = <AssistantContextKey>{};
     const known = {...assistantProfileContextActions, ...assistantWorkspaceContextActions,
       ...assistantDomainContextActions};
-    for (final raw in data['revisions'] as List) {
+    for (final raw in rows) {
       final row = _map(raw, {'actionId', 'entityId', 'sourceRevision'});
       final action = _text(row['actionId'], 32);
       if (!known.contains(action)) _invalid();
@@ -108,10 +139,17 @@ class AssistantDomainContextGateway {
           (entity != null || context.inWorkspace)) _invalid();
       if (assistantDomainProductContextActions.contains(action) && (context.inWorkspace || entity == null ||
           selection == null || !selection.contains(entity))) _invalid();
+      if (assistantStoreProductContextActions.contains(action) && (!context.inWorkspace || entity == null)) _invalid();
+      if (assistantStoreOwnerContextActions.contains(action) && (!context.inWorkspace || entity != null)) _invalid();
       if (assistantDomainContextActions.contains(action)) revisions[key] = revision;
+      if (compact && maskActions.contains(action)) {
+        if (entity != null && !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]*$').hasMatch(entity)) _invalid();
+        masked[key] = revision;
+      }
     }
     check();
     return AssistantCanonicalContextSnapshot(binding: context.binding,
-      revisions: revisions, validUntil: until, catalogueListingIds: selection);
+      revisions: revisions, validUntil: until, catalogueListingIds: selection,
+      nativeSelection: compact ? AssistantCanonicalNativeSelection(fingerprint: selectionFingerprint!, proofs: masked) : null);
   }
 }

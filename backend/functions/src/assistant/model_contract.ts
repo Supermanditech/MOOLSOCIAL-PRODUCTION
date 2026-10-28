@@ -36,6 +36,17 @@ export interface PreparationRequest {
   readonly catalogueListingIds?: readonly string[];
   /** Untrusted hints from captured native reviews; original sources still grant all authority. */
   readonly nativeTargets?: readonly PreparationTargetHint[];
+  /** Compact readiness hints only; positions bind exact original source proofs. */
+  readonly nativeTargetMask?: PreparationTargetMask;
+}
+export interface PreparationTargetMask {readonly version: 1; readonly fingerprint: string; readonly bits: string;}
+export function nativeTargetMaskSelection(value: unknown): PreparationTargetMask {
+  const row = object(value, ["version", "fingerprint", "bits"]);
+  if (row.version !== 1 || typeof row.fingerprint !== "string" || !/^[a-f0-9]{64}$/u.test(row.fingerprint) ||
+      typeof row.bits !== "string" || row.bits.length > 2500 || !/^[A-Za-z0-9_-]*$/u.test(row.bits)) return fail("invalid_request", 400);
+  const bytes = Buffer.from(row.bits, "base64url");
+  if (bytes.length > 1875 || bytes.toString("base64url") !== row.bits) return fail("invalid_request", 400);
+  return Object.freeze({version: 1, fingerprint: row.fingerprint, bits: row.bits});
 }
 export interface PreparationTargetHint {readonly actionId: string; readonly entityId: string | null;}
 export function nativeTargetSelection(value: unknown): readonly PreparationTargetHint[] {
@@ -67,9 +78,11 @@ export function command(value: unknown): AssistantCommand {
   const payload = object(row.payload);
   const p = object(payload, prepare ? ["scope", "requestId", "requestRevision", "message", "language", "actionId", "entityId", "history", "expectedEntitlementRevision",
     ...(Object.hasOwn(payload, "catalogueListingIds") ? ["catalogueListingIds"] : []),
-    ...(Object.hasOwn(payload, "nativeTargets") ? ["nativeTargets"] : [])] : ["scope", "requestId"]);
+    ...(Object.hasOwn(payload, "nativeTargets") ? ["nativeTargets"] : []),
+    ...(Object.hasOwn(payload, "nativeTargetMask") ? ["nativeTargetMask"] : [])] : ["scope", "requestId"]);
   const scope = decodePlansScope(p.scope), requestId = id(p.requestId);
   if (!prepare) return {operation: row.operation as "status" | "cancel", payload: {scope, requestId}};
+  if (Object.hasOwn(p, "nativeTargetMask") && scope.audience !== "workspace") return fail("invalid_request", 400);
   if (!Number.isSafeInteger(p.requestRevision) || (p.requestRevision as number) < 0) return fail("invalid_request", 400);
   if (typeof p.language !== "string" || !preparationLanguages.has(p.language)) return fail("invalid_request", 400);
   if (!Array.isArray(p.history) || p.history.length > 20) return fail("invalid_request", 400);
@@ -79,7 +92,8 @@ export function command(value: unknown): AssistantCommand {
   return {operation: "prepare", payload: {scope, requestId, history, expectedEntitlementRevision: text(p.expectedEntitlementRevision), requestRevision: p.requestRevision as number,
     message: text(p.message, 8000), language: text(p.language, 80), actionId: p.actionId === null ? null : id(p.actionId), entityId: p.entityId === null ? null : id(p.entityId),
     ...(Object.hasOwn(p, "catalogueListingIds") ? {catalogueListingIds: catalogueListingSelection(p.catalogueListingIds)} : {}),
-    ...(Object.hasOwn(p, "nativeTargets") ? {nativeTargets: nativeTargetSelection(p.nativeTargets)} : {})}};
+    ...(Object.hasOwn(p, "nativeTargets") ? {nativeTargets: nativeTargetSelection(p.nativeTargets)} : {}),
+    ...(Object.hasOwn(p, "nativeTargetMask") ? {nativeTargetMask: nativeTargetMaskSelection(p.nativeTargetMask)} : {})}};
 }
 export interface PreparationNativeTarget {
   readonly actionId: string; readonly entityId: string | null; readonly sourceRevision: string;
