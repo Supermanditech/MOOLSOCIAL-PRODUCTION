@@ -20,11 +20,12 @@ const assistantStoreRestockOwnerContextActions={'AI-ACT-234'};
 const assistantStoreOrderOriginalContextActions={'AI-ACT-274'};
 const assistantStoreSupplierDraftContextActions={'AI-ACT-235','AI-ACT-236'};
 const assistantStorePurchaseRootContextActions={'AI-ACT-253','AI-ACT-269'};
+const assistantStoreReceivingOriginalContextActions={'AI-ACT-243'};
 const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions,...assistantStoreSupplierDraftContextActions,...assistantStorePurchaseRootContextActions};
 const assistantDomainContextActions = {'AI-ACT-001', 'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
   ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions,
   ...assistantDomainAddressContextActions,...assistantPrivateStarsContextActions,
-  ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions};
+  ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreReceivingOriginalContextActions};
 
 abstract interface class AssistantDomainContextGatewaySource {
   AssistantDomainContextGateway? assistantDomainContextGateway(
@@ -113,7 +114,7 @@ class AssistantDomainContextGateway {
     final rows = List<Object?>.of(data['revisions'] as List);
     final masked = <AssistantContextKey, String>{};
     String? selectionFingerprint;
-    const maskActions = {...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions};
+    const maskActions = {...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreReceivingOriginalContextActions};
     if (compact) {
       final selected = _map(data['nativeSelection'], {'version', 'fingerprint', 'groups'});
       if (selected['version'] != 1 || selected['fingerprint'] is! String ||
@@ -162,6 +163,9 @@ class AssistantDomainContextGateway {
       if (assistantStoreOrderOriginalContextActions.contains(action) && (!context.inWorkspace ||
           !context.storeWorkspace || !context.workspaceApproved || entity == null ||
           !RegExp(r'^store-order-original:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))) _invalid();
+      if (assistantStoreReceivingOriginalContextActions.contains(action) && (!context.inWorkspace ||
+          !context.storeWorkspace || !context.workspaceApproved || entity == null ||
+          !RegExp(r'^store-receiving-original:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))) _invalid();
       if (assistantDomainContextActions.contains(action)) revisions[key] = revision;
       if (compact && maskActions.contains(action)) {
         if (entity != null && !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]*$').hasMatch(entity)) _invalid();

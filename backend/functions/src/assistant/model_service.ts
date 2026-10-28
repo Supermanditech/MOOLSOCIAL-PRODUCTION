@@ -47,6 +47,7 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
   targets: readonly {actionId: string; entityId: string | null}[]): PreparationContext['modelContext'] {
   const skus = new Set<string>();
   const orders = new Set(targets.filter(target=>target.actionId==='AI-ACT-274'&&target.entityId!==null).map(target=>target.entityId!));
+  const receivingOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-243'&&target.entityId!==null).map(target=>target.entityId!));
   const privateStarsOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-055'&&target.entityId!==null).map(target=>target.entityId!));
   for(const tool of tools){
     if(!storeProductActions.has(tool.actionId))continue;
@@ -66,6 +67,13 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
       return {...value,orders:value.orders.filter(row=>{
         const orderId=object(row).orderId;if(typeof orderId!=='string')return fail('context_unavailable');
         return privateStarsOrders.has(orderId);
+      })};
+    }
+    if(value.sourceKind==='original-store-receiving-v1'){
+      if(!Array.isArray(value.orders))return fail('context_unavailable');
+      return {...value,orders:value.orders.filter(row=>{
+        const orderId=object(row).orderId;if(typeof orderId!=='string')return fail('context_unavailable');
+        return receivingOrders.has(orderId);
       })};
     }
     if(value.sourceKind==='original-store-order-facts-v1'){

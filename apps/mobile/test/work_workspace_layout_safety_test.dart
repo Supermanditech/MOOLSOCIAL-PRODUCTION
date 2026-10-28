@@ -2563,7 +2563,7 @@ class _AuthenticatedNativeScopeFixture {
       ..reviewStatusNeedsRefresh = false;
     if (principal.connected) await work.refreshFeed();
     expect(work.workspaceAccountCurrent(accountReady: true), isTrue);
-    expect(work.workspaceApprovalMatchesAccount(account), isTrue);
+    expect(work.workspaceApprovalMatchesAccount(account), isTrue, reason: work.errorMessage);
     expect(work.workspaceStoreAuthoringAvailable, isTrue);
     // Different data shapes are intentional: record for authenticated context,
     // String user ID for this native private storage namespace.
@@ -5956,7 +5956,7 @@ class _ReportCountingPageStorage extends PageStorageBucket {
 
 // HOST only: authenticated existing fixture and native secure stores, no runtime provider.
 class _Receiving251Work extends WorkSession {
-  _Receiving251Work({required super.contactDraftStore,required super.purchaseEntryStore,
+  _Receiving251Work({super.gateway,required super.contactDraftStore,required super.purchaseEntryStore,
     required super.inventoryStore,required super.tradingPreferencesStoreFactory})
     :super(catalogueReference:workspaceMasterCatalogue);
   bool forbidAdmission=false;int admissions=0;
@@ -5966,6 +5966,8 @@ class _Receiving251Work extends WorkSession {
   @override Future<bool> recoverCustomerLedger(){_admission();return super.recoverCustomerLedger();}
 }
 class _Receiving251Fixture {
+  _Receiving251Fixture({this.connected = false});
+  final bool connected;
   late final _AuthenticatedNativeScopeFixture native;
   late final _Receiving251Work work;
   late final SecureWorkPurchaseEntryStore purchase;
@@ -5979,11 +5981,28 @@ class _Receiving251Fixture {
   bool ready=false;int notifications=0;
   void changed(){notifications++;}
   Future<void> start() async {
-    native=_AuthenticatedNativeScopeFixture(makeWork:(contact,_,unusedInventory,trading){
+    final feed = catalogue_fixture.OwnerTransport((body) async {
+      if (body['operation'] != 'listWorkspaces') return const SocialContentResponse(statusCode: 503, body: '{}');
+      final checked = DateTime.now().toUtc().subtract(const Duration(seconds: 1));
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {'workspaces': [{
+        'caseId': 'WP-240701', 'status': 'live', 'plan': 'free', 'workspaceId': 'WK-510001', 'profileId': 'retailer-grocery',
+        'name': 'HOST original receiving Store', 'area': 'HOST test area', 'primaryActivity': 'Groceries',
+        'access': {'schemaVersion': 1, 'state': 'active', 'accountId': 'host-native-scope-user', 'caseId': 'WP-240701',
+          'workspaceId': 'WK-510001', 'profileId': 'retailer-grocery', 'checkedAt': checked.toIso8601String(),
+          'applicationUpdatedAt': checked.subtract(const Duration(seconds: 10)).toIso8601String(),
+          'membership': {'schemaVersion': 1, 'state': 'active', 'membershipId': 'HOST-receiving-member',
+            'workspaceId': 'WK-510001', 'workspaceProfileId': 'retailer-grocery', 'version': 1,
+            'effectiveFrom': checked.subtract(const Duration(days: 1)).toIso8601String(),
+            'expiresAt': checked.add(const Duration(hours: 1)).toIso8601String()}}}]}}));
+    });
+    native=_AuthenticatedNativeScopeFixture(connectedPrincipal: connected, makeWork:(contact,_,unusedInventory,trading){
       purchase=SecureWorkPurchaseEntryStore(accountScope:()=>contact.accountScope);
       inventory=SecureWorkInventoryStore(accountScope:()=>contact.accountScope);
       work=_Receiving251Work(contactDraftStore:contact,purchaseEntryStore:purchase,inventoryStore:inventory,
-        tradingPreferencesStoreFactory:(_)=>trading);return work;
+        tradingPreferencesStoreFactory:(_)=>trading,
+        gateway: connected ? AuthenticatedWorkGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: catalogue_fixture.Credentials(), transport: feed) : null);return work;
     });
     await native.ready();ready=true;
     final scope=work.workspaceSupplierScope!,at=DateTime.now().toUtc();
@@ -6053,11 +6072,254 @@ class _Receiving251Fixture {
     });
   }
   void expectReadOperationsOnly(){expect(wire.requests.map((r)=>r['operation']).toSet(),
-    everyElement(isIn(['readBuyerPurchaseProjection','readBuyerGoodsReceiving'])));}
+    everyElement(isIn(['listBuyerPurchaseReferences','readBuyerPurchaseProjection','readBuyerGoodsReceiving'])));}
   Future<void> close() async {
     wire.beforePost=null;wire.pending?.complete();wire.pending=null;
     if(ready){work.forbidAdmission=false;work.removeListener(changed);await native.dispose();ready=false;}
   }
+}
+
+void registerOriginalReceivingAssistantTests() {
+  const connectedSkip = String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL') !=
+    'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace';
+  for (final grouped in [false, true]) test('SCOPE13 original cache matches checked status group=$grouped without native admission', () async {
+    final f = _Receiving251Fixture(connected: true); addTearDown(f.close); await f.start(); f.includeGroup = grouped;
+    expect(f.work.workspaceRequiresMembershipReadback, isTrue);
+    final read = await f.work.readWorkspaceRestockReceivingForReview(f.original); expect(read, isNotNull);
+    final proof = WorkSession.workspaceAssistantReceivingOriginalProof(read!), id = f.original.reference['orderId']!;
+    final before = await f.fingerprint(), admissions = f.work.admissions;
+    final matched = await f.work.readWorkspaceAssistantReceivingOriginals({id: proof}, inputCurrent: () => true,
+      validUntil: DateTime.now().add(const Duration(minutes: 1)));
+    expect(matched, {id}); expect(f.work.workspaceAssistantReceivingOriginal(id), isNotNull);
+    expect(WorkSession.workspaceAssistantReceivingOriginalProof(f.work.workspaceAssistantReceivingOriginal(id)!), proof);
+    expect(f.work.workspaceRestockReceiving(f.original), isNull);
+    expect(await f.fingerprint(), before); expect(f.work.admissions, admissions);
+    f.lifetime = Object(); expect(f.work.workspaceAssistantReceivingOriginal(id), isNull);
+    f.expectReadOperationsOnly();
+  }, skip: connectedSkip ? 'Requires the explicit original Workspace connection contract; host transports only.' : false);
+  for (final fault in ['proof', 'status', 'expired', 'review-approval']) test('SCOPE13 original cache rejects $fault without fallback', () async {
+    final f = _Receiving251Fixture(connected: fault != 'review-approval'); addTearDown(f.close); await f.start(); f.includeGroup = false;
+    final read = await f.work.readWorkspaceRestockReceivingForReview(f.original); expect(read, isNotNull);
+    final proof = WorkSession.workspaceAssistantReceivingOriginalProof(read!), id = f.original.reference['orderId']!;
+    if (fault == 'status') f.malformed = true;
+    final before = await f.fingerprint();
+    final matched = await f.work.readWorkspaceAssistantReceivingOriginals({id: fault == 'proof' ? 'store-receiving-original:evaluation:${'b' * 64}' : proof},
+      inputCurrent: () => true, validUntil: DateTime.now().add(Duration(minutes: fault == 'expired' ? -1 : 1)));
+    expect(matched, isEmpty); expect(f.work.workspaceAssistantReceivingOriginal(id), isNull);
+    expect(await f.fingerprint(), before); expect(f.work.workspaceRestockReceiving(f.original), isNull); f.expectReadOperationsOnly();
+  }, skip: connectedSkip && fault != 'review-approval' ? 'Requires the explicit original Workspace connection contract; host transports only.' : false);
+  void partialGroup(_Receiving251Fixture f, {String supplier = 'HOST-receive251-supplier'}) {
+    final product = f.work.workspaceCatalogueItems.firstWhere((p) => p.stockMode == WorkspaceStockMode.exactQuantity);
+    final at = DateTime.now().toUtc();
+    final receipt = WorkspaceSupplierGoodsReceipt(id: 'HOST-original-partial-arrival', expectedDeliveryId: f.original.deliveryGroupId,
+      reference: 'HOST original partial', deliveredOn: at.toIso8601String().substring(0, 10), recordedAt: at,
+      recordedUtcOffsetMinutes: 0, restockOriginal: f.original, lines: [for (final line in f.original.lines.entries)
+        WorkspaceSupplierGoodsReceiptLine(sourceLineId: line.key, productId: product.id, productLabel: product.title,
+          purchaseUnit: line.value.quantityUnit, stockUnit: product.pack, unitsPerPack: 1000,
+          deliveredMilli: line.value.quantityMilli ~/ 2, acceptedMilli: line.value.quantityMilli ~/ 2,
+          damagedMilli: 0, shortMilli: 0, expectedMilli: line.value.quantityMilli)]);
+    f.group = (purchase_fixture.restockArrivalResponse(WorkspaceGoodsArrivalCommand(supplierId: supplier, receipt: receipt))['group'] as Map).cast<String, dynamic>();
+  }
+  Future<Completer<MoolAssistantReviewResult>> open(WidgetTester tester, _Receiving251Fixture f, ValueNotifier<bool> owner) async {
+    final read = await f.work.readWorkspaceRestockReceivingForReview(f.original);
+    expect(read, isNotNull);
+    final result = Completer<MoolAssistantReviewResult>();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(builder: (context) => Scaffold(body:
+      TextButton(key: const Key('scope13-open-original'), onPressed: () async {
+        result.complete(await showStoreOriginalReceivingAssistantReview(context, f.work,
+          original: f.original, expectedRead: read!, isCurrent: () => owner.value,
+          ownerCurrent: () => owner.value, ownerChanges: owner));
+      }, child: const Text('HOST original goods review'))))));
+    await tester.tap(find.byKey(const Key('scope13-open-original'))); await tester.pumpAndSettle();
+    return result;
+  }
+  for (final recorded in [false, true]) {
+    testWidgets('SCOPE13 original receiving ${recorded ? 'partial group' : 'no group'} open supplier choice and close never recover or write', (tester) async {
+      final f = _Receiving251Fixture(), owner = ValueNotifier(true);
+      try {
+        await f.start(); f.includeGroup = recorded; if (recorded) partialGroup(f);
+        final before = await f.fingerprint(), admissions = f.work.admissions;
+        final result = await open(tester, f, owner);
+        expect(result.isCompleted, isFalse);
+        expect(find.byKey(const Key('receiving-original-review-back')), findsOneWidget);
+        expect(f.work.workspaceRestockReceiving(f.original), isNull);
+        expect(await f.fingerprint(), before); expect(f.work.admissions, admissions);
+        if (!recorded) {
+          await tester.ensureVisible(find.byKey(const Key('work-receive-supplier')));
+          await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('work-supplier-choice-HOST-receive251-supplier'))); await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(find.byKey(const Key('work-receive-delivered-0'))).controller!.text, isEmpty);
+          expect(await f.fingerprint(), before); expect(f.work.admissions, admissions);
+        }
+        expect(tester.widget<TextField>(find.byKey(const Key('work-receive-delivered-0'))).controller!.text, isEmpty);
+        expect(tester.widget<TextField>(find.byKey(const Key('work-receive-expected-0'))).controller!.text, isNotEmpty);
+        await tester.tap(find.byKey(const Key('receiving-original-review-back'))); await tester.pumpAndSettle();
+        expect(await result.future, MoolAssistantReviewResult.opened);
+        expect(await f.fingerprint(), before); expect(f.work.admissions, admissions); f.expectReadOperationsOnly();
+        expect(tester.takeException(), isNull);
+      } finally {await tester.pumpWidget(const SizedBox.shrink()); await f.close(); owner.dispose();}
+    });
+  }
+  testWidgets('SCOPE13 original actual service export matches mobile proof and native untouched form', (tester) async {
+    final f = _Receiving251Fixture(connected: true), owner = ValueNotifier(true);
+    try {
+      await f.start();
+      final exported = jsonDecode(File(Platform.environment['AI_DOMAIN_RECEIVING_ORIGINAL_EXPORT_PATH']!).readAsStringSync()) as Map<String, dynamic>;
+      expect(exported['kind'], 'isolated-host-original-receiving-service-contract');
+      expect(exported['ownerUid'], f.work.workspaceSupplierScope!.$1); expect(exported['storeId'], f.work.workspaceSupplierScope!.$2);
+      f.details = Map<String, dynamic>.from(exported['projection'] as Map);
+      f.refs = Map<String, dynamic>.from(exported['references'] as Map); f.includeGroup = false;
+      final source = f.details['orders'][0]['original'] as Map;
+      f.original = WorkspaceRestockPurchaseOriginal.fromJson({'schemaVersion': 1, 'realm': 'evaluation',
+        'accountScope': exported['ownerUid'], 'buyingStoreId': exported['storeId'], 'reference': f.refs['references'][0],
+        'lines': [for (final line in source['lines'] as List)
+          {'lineId': line['lineId'], 'quantityMilli': line['quantityMilli'], 'quantityUnit': line['quantityUnit']}]});
+      final read = await f.work.readWorkspaceRestockReceivingForReview(f.original); expect(read, isNotNull);
+      final target = (exported['proofs'] as List).single as Map;
+      final proof = WorkSession.workspaceAssistantReceivingOriginalProof(read!);
+      expect(proof, target['sourceRevision'], reason: 'The proof must match actual backend-service bytes, not a mobile-created oracle.');
+      f.work.forbidAdmission = false;
+      await tester.pumpWidget(f.native.app); await tester.pumpAndSettle();
+      f.work.bindOriginalPurchaseReader(f.reader, 'evaluation'); f.work.forbidAdmission = true;
+      final before = await f.fingerprint();
+      expect(await f.work.readWorkspaceAssistantReceivingOriginals({target['entityId'] as String: proof},
+        inputCurrent: () => true, validUntil: DateTime.now().add(const Duration(minutes: 1))), {target['entityId']});
+      final adapter = f.native.adapters(tester).singleWhere((adapter) => adapter.actionId == 'AI-ACT-243');
+      final host = tester.element(find.byType(MoolAssistantNativeScope)), navigator = Navigator.of(host, rootNavigator: true);
+      final assistant = MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('HOST receiving AI route')));
+      (adapter as MoolAssistantRouteBoundNativeAdapter).bindAssistantRoute(assistant, navigator);
+      unawaited(navigator.push<void>(assistant)); await tester.pumpAndSettle();
+      final context = f.native.readContext(), id = target['entityId'] as String;
+      final snapshot = await adapter.snapshot(context, id); expect(snapshot, isNotNull);
+      expect(snapshot!.sourceRevision, startsWith('receiving-original-native:'));
+      final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-original-receiving-proposal', actionId: 'AI-ACT-243',
+        binding: context.binding, entityId: id, requestRevision: 1, entitlementRevision: 'HOST-paid-only',
+        sourceRevision: snapshot.sourceRevision, validUntil: DateTime.now().add(const Duration(minutes: 1)),
+        fields: const {}, title: 'Receive goods', summary: 'HOST actual-service contract replay');
+      final result = (adapter as scope_contract.MoolAssistantOwnerAwareNativeAdapter).openOwnedReview(proposal,
+        isCurrent: () => owner.value, ownerChanges: owner);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('receiving-original-review-back')), findsOneWidget);
+      expect(f.work.workspaceRestockReceiving(f.original), isNull); expect(await f.fingerprint(), before);
+      // Accepted native ownership survives identical AI recapture and actual
+      // expiry of the preparation snapshot while the user is counting goods.
+      expect(await f.work.readWorkspaceAssistantReceivingOriginals({id: proof}, inputCurrent: () => true,
+        validUntil: DateTime.now().add(const Duration(seconds: 1))), {id});
+      owner.value = false; await tester.pumpAndSettle();
+      expect(find.text('This original receiving source is no longer available. Close this review.'), findsNothing);
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 1200)));
+      expect(f.work.workspaceAssistantReceivingOriginal(id), isNull);
+      owner.value = true; await tester.pumpAndSettle();
+      expect(find.text('This original receiving source is no longer available. Close this review.'), findsNothing);
+      expect(tester.widget<FormField<String>>(find.descendant(of: find.byKey(const Key('work-receive-supplier')),
+        matching: find.byType(FormField<String>))).enabled, isTrue);
+      await tester.tap(find.byKey(const Key('receiving-original-review-back'))); await tester.pumpAndSettle();
+      expect(await result, MoolAssistantReviewResult.opened); expect(await f.fingerprint(), before); f.expectReadOperationsOnly();
+      expect(await (adapter as scope_contract.MoolAssistantOwnerAwareNativeAdapter).openOwnedReview(proposal,
+        isCurrent: () => true, ownerChanges: owner), MoolAssistantReviewResult.stale,
+        reason: 'Expired source cannot open another form or fall back to a legacy shipment.');
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await f.close(); owner.dispose();}
+  }, skip: connectedSkip || Platform.environment['AI_DOMAIN_RECEIVING_ORIGINAL_EXPORT_PATH'] == null);
+  testWidgets('SCOPE13 original group never guesses a missing private supplier', (tester) async {
+    final f = _Receiving251Fixture(), owner = ValueNotifier(true);
+    try {
+      await f.start(); partialGroup(f, supplier: 'HOST-missing-private-supplier');
+      final before = await f.fingerprint(), result = await open(tester, f, owner);
+      expect(await result.future, MoolAssistantReviewResult.unavailable);
+      expect(find.byKey(const Key('receiving-original-review-back')), findsNothing);
+      expect(await f.fingerprint(), before); f.expectReadOperationsOnly();
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await f.close(); owner.dispose();}
+  });
+  testWidgets('SCOPE13 original double Review opens one form and releases after close', (tester) async {
+    final f = _Receiving251Fixture(), owner = ValueNotifier(true);
+    try {
+      await f.start(); f.includeGroup = false;
+      final read = await f.work.readWorkspaceRestockReceivingForReview(f.original);
+      final before = await f.fingerprint();
+      late BuildContext host;
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(builder: (context) {
+        host = context; return const Scaffold(body: Text('HOST duplicate review'));
+      })));
+      Future<MoolAssistantReviewResult> review() => showStoreOriginalReceivingAssistantReview(host, f.work,
+        original: f.original, expectedRead: read!, isCurrent: () => owner.value,
+        ownerCurrent: () => owner.value, ownerChanges: owner);
+      final first = review(), duplicate = review();
+      expect(await duplicate, MoolAssistantReviewResult.unavailable);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('receiving-original-review-back')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('receiving-original-review-back'))); await tester.pumpAndSettle();
+      expect(await first, MoolAssistantReviewResult.opened);
+      final reopened = review(); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('receiving-original-review-back')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('receiving-original-review-back'))); await tester.pumpAndSettle();
+      expect(await reopened, MoolAssistantReviewResult.opened);
+      expect(await f.fingerprint(), before); f.expectReadOperationsOnly(); expect(tester.takeException(), isNull);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await f.close(); owner.dispose();}
+  });
+  testWidgets('SCOPE13 original explicit native Review uses original save without recording goods', (tester) async {
+    final f = _Receiving251Fixture(), owner = ValueNotifier(true);
+    try {
+      await f.start(); partialGroup(f);
+      final before = await f.fingerprint();
+      await open(tester, f, owner);
+      expect(await f.fingerprint(), before);
+      expect(f.work.workspaceRestockReceiving(f.original), isNull);
+      await tester.ensureVisible(find.byKey(const Key('work-receive-reference')));
+      await tester.enterText(find.byKey(const Key('work-receive-reference')), 'HOST explicit reviewed arrival');
+      for (var index = 0; index < f.original.lines.length; index++) {
+        final field = find.byKey(Key('work-receive-delivered-$index'));
+        await tester.scrollUntilVisible(field, 120,
+          scrollable: find.descendant(of: find.byKey(const Key('work-goods-receiving')),
+            matching: find.byWidgetPredicate((widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down)).first);
+        await tester.enterText(field, '0.001');
+      }
+      await tester.pumpAndSettle();
+      expect(await f.fingerprint(), before, reason: 'Editing preparation must remain unsaved.');
+      // Only this explicit native action may enter the existing recovery/save path.
+      f.work.forbidAdmission = false;
+      await tester.scrollUntilVisible(find.byKey(const Key('work-receive-review')), 180,
+        scrollable: find.descendant(of: find.byKey(const Key('work-goods-receiving')),
+          matching: find.byWidgetPredicate((widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down)).first);
+      await tester.tap(find.byKey(const Key('work-receive-review'))); await tester.pumpAndSettle();
+      expect(f.work.workspaceGoodsReceiptDrafts, hasLength(1));
+      expect(f.work.workspaceGoodsReceiptDrafts.single.receipt.reference, 'HOST explicit reviewed arrival');
+      expect(f.work.workspaceRestockAttempt(f.work.workspaceGoodsReceiptDrafts.single.receipt.id), isNull);
+      f.expectReadOperationsOnly(); expect(tester.takeException(), isNull);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await f.close(); owner.dispose();}
+  });
+  testWidgets('SCOPE13 original group preserves an existing supplier receiving draft', (tester) async {
+    final f = _Receiving251Fixture(), owner = ValueNotifier(true);
+    try {
+      await f.start(); partialGroup(f);
+      final key = f.work.supplierReceivingInputFormKey('HOST-receive251-supplier');
+      expect(key, isNotNull);
+      final draft = WorkspaceLedgerFormDraft(key: key!, revision: 1,
+        fields: {'arrivalId': 'HOST-existing-arrival', 'groupId': 'HOST-unrelated-manual-delivery',
+          'input': jsonEncode(['HOST retained manual reference', '2026-10-28',
+            ['HOST-retained-row', 'HOST-retained-product', false, 'piece', '1', '1', '', '', '', <String, String>{}]])});
+      expect(draft.valid, isTrue);
+      await f.work.saveLedgerForm(draft, expectedRevision: null);
+      final before = await f.fingerprint(), admissions = f.work.admissions;
+      final result = await open(tester, f, owner);
+      expect(await result.future, MoolAssistantReviewResult.unavailable);
+      expect(find.byKey(const Key('receiving-original-review-back')), findsNothing);
+      expect((await f.work.readLedgerForm(key))?.fields, draft.fields);
+      expect(await f.fingerprint(), before); expect(f.work.admissions, admissions);
+      f.expectReadOperationsOnly(); expect(tester.takeException(), isNull);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await f.close(); owner.dispose();}
+  });
+  testWidgets('SCOPE13 original receiving owner retirement permits unchanged close without recovery', (tester) async {
+    final f = _Receiving251Fixture(), owner = ValueNotifier(true);
+    try {
+      await f.start(); f.includeGroup = false;
+      final before = await f.fingerprint(), result = await open(tester, f, owner);
+      owner.value = false; await tester.pumpAndSettle();
+      expect(find.text('This original receiving source is no longer available. Close this review.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('receiving-original-review-back'))); await tester.pumpAndSettle();
+      expect(await result.future, MoolAssistantReviewResult.stale);
+      expect(await f.fingerprint(), before); f.expectReadOperationsOnly(); expect(tester.takeException(), isNull);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await f.close(); owner.dispose();}
+  });
 }
 
 void registerReceiving251ReadOnlyTests(){
@@ -8957,6 +9219,7 @@ void main() {
   registerReceivingRemainingTaxTests();
   registerReceivingRemainingContinuationTests();
   registerReceivingRetentionBoundaryTests();
+  registerOriginalReceivingAssistantTests();
   registerReceiving251ReadOnlyTests();
   _settlementNativeTests();
   _work02NativeTests();
@@ -32509,6 +32772,10 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
                   .text,
               'HOST unfinished delivery',
             );
+            final receivingScroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')),
+              matching: find.byWidgetPredicate((widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down)).first;
+            await tester.scrollUntilVisible(find.byKey(const Key('work-receive-delivered-0')), 120,
+              scrollable: receivingScroll);
             expect(
               tester
                   .widget<TextField>(
@@ -32518,6 +32785,8 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
                   .text,
               '1',
             );
+            await tester.scrollUntilVisible(find.byKey(const Key('work-receive-supplier')), -120,
+              scrollable: receivingScroll);
             final picker = tester.widget<FormField<String>>(
               find.descendant(
                 of: find.byKey(const Key('work-receive-supplier')),

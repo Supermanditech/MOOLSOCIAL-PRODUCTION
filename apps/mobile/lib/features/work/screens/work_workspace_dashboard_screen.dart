@@ -7488,6 +7488,15 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
         final draft=await source.readLedgerForm(key);if(!current()||draft?.fields['attempt']?.isNotEmpty!=true)return null;
       }
     } else if(action=='AI-ACT-243') {
+      final original = source.workspaceAssistantReceivingOriginal(entity);
+      if (original != null) {
+        if (!source.workspaceServerReceivingFor(original.original) || !source.workspaceSuppliersLoaded ||
+            !source.workspaceInventoryLoaded || source.workspaceSupplierSaving || source.workspaceSupplierRecoveryRequired ||
+            source.workspaceGoodsReceiptRecoveryPending || source.workspaceRestockUsesLegacyReceipts(original.original)) return null;
+        return MoolAssistantNativeSnapshot(binding: context.binding, permitted: true, entityId: entity,
+          sourceRevision: 'receiving-original-native:${assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+            WorkSession.workspaceAssistantReceivingOriginalProof(original), _receivingNativeRevision(source,action,entity)])))}');
+      }
       final purchase=source.workspacePurchases.where((p)=>p.shipmentId==entity).singleOrNull;
       if(purchase==null)return null;
       await source.loadWorkspaceReceiptDraft(purchase);
@@ -7517,6 +7526,27 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
     if(_receivingNativeOpen)return MoolAssistantReviewResult.stale;
     _receivingNativeOpen=true;
     try {
+    if (initial.actionId == 'AI-ACT-243' && proposal.sourceRevision.startsWith('receiving-original-native:')) {
+      final read = source.workspaceAssistantReceivingOriginal(entity);
+      if (read == null) return MoolAssistantReviewResult.stale;
+      final account = widget.accountIdentity, scope = source.workspaceSupplierScope,
+        navigation = source.navigationScopeRevision, epoch = source.restockReceivingReviewOwner,
+        reader = source.originalPurchaseReader,
+        route = GoRouter.of(hostContext).routerDelegate.currentConfiguration.last, visit = (_view,_operation,_focusedFinance);
+      // Preparation freshness was checked above. Once transferred, the original
+      // native controller and its per-operation CAS own mutable status; the AI
+      // cache deadline/recapture must not retire a user who is counting goods.
+      bool nativeOwner() {
+        return reader != null && identical(reader,source.originalPurchaseReader) && reader.isCurrent &&
+        mounted && hostContext.mounted && identical(widget.session, source) &&
+        identical(widget.accountIdentity, account) && scope == source.workspaceSupplierScope &&
+        navigation == source.navigationScopeRevision && identical(epoch,source.restockReceivingReviewOwner) &&
+        _financePermitted(context) && _financeAssistantContext(hostContext)?.binding == context.binding &&
+        visit == (_view,_operation,_focusedFinance) && identical(GoRouter.of(hostContext).routerDelegate.currentConfiguration.last,route);
+      }
+      return await showStoreOriginalReceivingAssistantReview(hostContext, source, original: read.original, expectedRead: read,
+        isCurrent: proposalCurrent, ownerCurrent: nativeOwner, ownerChanges: Listenable.merge([source,ownerChanges]));
+    }
     if(_receivingPrepareActions.contains(initial.actionId)&&initial.items.any((row)=>row.containsKey('lineId')||
       !source.workspaceCatalogueItems.any((p)=>p.id==row['productId']&&p.stockMode==WorkspaceStockMode.exactQuantity)))return MoolAssistantReviewResult.unavailable;
     if(initial.text('productId') case final id?) {
@@ -25208,8 +25238,9 @@ class _ReceivingOwnerSurface extends StatelessWidget {
   });
 }
 class _ReceivingReviewRoute extends StatefulWidget {
-  const _ReceivingReviewRoute({required this.session,required this.initial,required this.entity,required this.supplierId,required this.lease,this.receivingRead});
-  final WorkSession session;final StoreReceivingReviewInitial initial;final String entity,supplierId;final _ReceivingNativeLease lease;final WorkspaceGoodsReceivingRead? receivingRead;
+  const _ReceivingReviewRoute({required this.session,required this.initial,required this.entity,required this.supplierId,required this.lease,this.receivingRead,this.original,this.originalOrder});
+  final WorkSession session;final StoreReceivingReviewInitial initial;final String entity;final String? supplierId;final _ReceivingNativeLease lease;final WorkspaceGoodsReceivingRead? receivingRead;
+  final WorkspaceRestockPurchaseOriginal? original;final WorkspacePurchaseOrder? originalOrder;
   @override State<_ReceivingReviewRoute> createState()=>_ReceivingReviewRouteState();
 }
 class _ReceivingReviewRouteState extends State<_ReceivingReviewRoute> {
@@ -25224,10 +25255,81 @@ class _ReceivingReviewRouteState extends State<_ReceivingReviewRoute> {
     }finally{closing=false;}
   }
   @override Widget build(BuildContext context)=>PopScope(canPop:allowingPop,onPopInvokedWithResult:(didPop,_){if(!didPop)unawaited(close());},
-    child:Scaffold(appBar:AppBar(title:const Text('Receive goods'),leading:BackButton(onPressed:close)),body:
+    child:Scaffold(appBar:AppBar(title:const Text('Receive goods'),leading:BackButton(key:widget.original==null?null:const Key('receiving-original-review-back'),onPressed:close)),body:
       _ReceivingOwnerSurface(current:()=>widget.lease.current,changes:widget.lease.changes,
         child:_StoreReceiveGoodsSurface(key:key,session:widget.session,onBack:close,initialSupplierId:widget.supplierId,
-          assistantInitial:widget.initial,assistantEntity:widget.entity,assistantLease:widget.lease,assistantReceivingRead:widget.receivingRead))));
+          assistantInitial:widget.initial,assistantEntity:widget.entity,assistantLease:widget.lease,assistantReceivingRead:widget.receivingRead,
+          initialRestockOriginal:widget.original,initialRestockOrder:widget.originalOrder))));
+}
+
+/// The real original-purchase form, with no implicit recovery or Stock admission.
+/// Native final review/confirmation remains the only durable effect boundary.
+final _originalReceivingReviewOpen = Expando<bool>('originalReceivingReviewOpen');
+Future<MoolAssistantReviewResult> showStoreOriginalReceivingAssistantReview(BuildContext context, WorkSession session, {
+  required WorkspaceRestockPurchaseOriginal original, required WorkspaceGoodsReceivingRead expectedRead,
+  required bool Function() isCurrent, required bool Function() ownerCurrent, required Listenable ownerChanges,
+}) async {
+  if (_originalReceivingReviewOpen[session] == true) return MoolAssistantReviewResult.unavailable;
+  _originalReceivingReviewOpen[session] = true;
+  try {
+    return await _showStoreOriginalReceivingAssistantReview(context, session, original: original,
+      expectedRead: expectedRead, isCurrent: isCurrent, ownerCurrent: ownerCurrent, ownerChanges: ownerChanges);
+  } finally {_originalReceivingReviewOpen[session] = false;}
+}
+Future<MoolAssistantReviewResult> _showStoreOriginalReceivingAssistantReview(BuildContext context, WorkSession session, {
+  required WorkspaceRestockPurchaseOriginal original, required WorkspaceGoodsReceivingRead expectedRead,
+  required bool Function() isCurrent, required bool Function() ownerCurrent, required Listenable ownerChanges,
+}) async {
+  final reader = session.originalPurchaseReader, scope = session.workspaceSupplierScope,
+    epoch = session.restockReceivingReviewOwner, navigation = session.navigationScopeRevision;
+  bool owner() => context.mounted && ownerCurrent() && scope != null && scope == session.workspaceSupplierScope &&
+    identical(reader, session.originalPurchaseReader) && reader?.isCurrent == true &&
+    identical(epoch, session.restockReceivingReviewOwner) && navigation == session.navigationScopeRevision &&
+    session.workspaceServerReceivingFor(original);
+  bool ready() => owner() && session.workspaceSuppliersLoaded && session.workspaceInventoryLoaded &&
+    !session.workspaceSupplierSaving && !session.workspaceSupplierRecoveryRequired && !session.workspaceGoodsReceiptBusy &&
+    !session.workspaceGoodsReceiptRecoveryPending && !session.workspaceRestockUsesLegacyReceipts(original);
+  if (!isCurrent() || !ready() || reader == null ||
+      jsonEncode(expectedRead.original.toJson()) != jsonEncode(original.toJson())) return MoolAssistantReviewResult.stale;
+  try {
+    final order = await reader.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: original.realm,
+      reference: WorkspacePurchaseReference.fromJson(original.reference), buyingStoreId: original.buyingStoreId);
+    if (!isCurrent() || !ready()) return MoolAssistantReviewResult.stale;
+    if (order == null || order.storeId != original.reference['storeId'] || order.orderId != original.reference['orderId'] ||
+        order.originalFingerprint != original.reference['originalFingerprint'] || order.purchaser?.kind != 'store' ||
+        order.purchaser?.storeId != original.buyingStoreId || order.lines.length != original.lines.length ||
+        order.lines.any((line) => original.lines[line.lineId]?.quantityMilli != line.quantityMilli ||
+          original.lines[line.lineId]?.quantityUnit != line.quantityUnit)) return MoolAssistantReviewResult.unavailable;
+    final read = await session.readWorkspaceRestockReceivingForReview(original, inputCurrent: () => isCurrent() && ready());
+    if (!isCurrent() || !ready()) return MoolAssistantReviewResult.stale;
+    if (read == null || jsonEncode(read.group?.toJson()) != jsonEncode(expectedRead.group?.toJson())) return MoolAssistantReviewResult.unavailable;
+    if (original.lines.entries.every((entry) => (read.group?.lines.where((line) => line.sourceLineId == entry.key)
+        .singleOrNull?.deliveredMilli ?? 0) >= entry.value.quantityMilli)) return MoolAssistantReviewResult.unavailable;
+    final supplier = read.group?.supplierId;
+    if (supplier != null && session.workspaceSuppliers.where((p) => p.id == supplier).length != 1) return MoolAssistantReviewResult.unavailable;
+    // A pending saved arrival must be opened through its existing attempt, not
+    // relabelled as another physical arrival by this read/review handoff.
+    for (final saved in session.workspaceGoodsReceiptDrafts.where((r) =>
+        jsonEncode(r.receipt.restockOriginal?.toJson()) == jsonEncode(original.toJson()))) {
+      final attempt = session.workspaceRestockAttempt(saved.receipt.id);
+      if (attempt == null || attempt.recorded == null && attempt.closed == null) return MoolAssistantReviewResult.unavailable;
+    }
+    if (supplier != null) {
+      final key = session.supplierReceivingInputFormKey(supplier);
+      if (key == null) return MoolAssistantReviewResult.unavailable;
+      final saved = await session.readLedgerForm(key);
+      if (!isCurrent() || !ready()) return MoolAssistantReviewResult.stale;
+      if (saved?.fields.isNotEmpty == true) return MoolAssistantReviewResult.unavailable;
+    }
+    final lease = _ReceivingNativeLease(owner, Listenable.merge([session, ownerChanges]));
+    try {
+      if (!isCurrent() || !lease.current) return MoolAssistantReviewResult.stale;
+      await Navigator.of(context, rootNavigator: true).push<void>(MaterialPageRoute(builder: (_) =>
+        _ReceivingReviewRoute(session: session, initial: StoreReceivingReviewInitial.fromFields('AI-ACT-243', const {}),
+          entity: order.orderId, supplierId: supplier, lease: lease, receivingRead: read, original: original, originalOrder: order)));
+      return lease.current ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+    } finally {lease.dispose();}
+  } on Object {return owner() ? MoolAssistantReviewResult.unavailable : MoolAssistantReviewResult.stale;}
 }
 Future<bool> _confirmReceivingPreparedLeave(BuildContext context) async=>await showDialog<bool>(context:context,builder:(dialog)=>AlertDialog(
   key:const Key('receiving-local-preparation-leave'),title:const Text('Discard field changes?'),
@@ -25452,7 +25554,7 @@ Future<String?> _showStoreSupplierSelector(BuildContext context, WorkSession ses
   String? purposeGuide, String? emptyMessage,
   StoreSupplierInitialData? initialData, int? initialRevision,
   String? initialQuery, WorkspaceSupplierProfile? initialProfile,
-  bool Function()? prefillCurrent, bool Function()? ownerCurrent,
+  bool Function()? prefillCurrent, bool Function()? ownerCurrent, bool useLoadedDirectory = false,
 }) async {
   if (_openSupplierSelectors[session] == true || ownerCurrent?.call() == false) return null;
   _openSupplierSelectors[session] = true;
@@ -25465,7 +25567,7 @@ Future<String?> _showStoreSupplierSelector(BuildContext context, WorkSession ses
         eligibleSupplierIds: eligibleSupplierIds, purposeGuide: purposeGuide,
         emptyMessage: emptyMessage, initialData: initialData, initialQuery: initialQuery,
         initialProfile: initialProfile, initialRevision: initialRevision, prefillCurrent: prefillCurrent,
-        ownerCurrent: ownerCurrent)));
+        ownerCurrent: ownerCurrent, useLoadedDirectory: useLoadedDirectory)));
   } finally { _openSupplierSelectors[session] = false; }
 }
 
@@ -25501,7 +25603,8 @@ class _StoreSupplierSelector extends StatefulWidget {
   const _StoreSupplierSelector({required this.session, this.selectedId, this.lockedSupplierId,
     this.eligibleSupplierIds, this.purposeGuide, this.emptyMessage,
     this.initialData, this.initialRevision, this.prefillCurrent, this.ownerCurrent,
-    this.initialQuery, this.initialProfile});
+    this.initialQuery, this.initialProfile, this.useLoadedDirectory = false});
+  final bool useLoadedDirectory;
   final WorkSession session;
   final String? selectedId, lockedSupplierId;
   final String? purposeGuide, emptyMessage;
@@ -25552,7 +25655,9 @@ class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
   Future<void> _loadDirectory() async {
     if (!_current) return;
     setState(() { _loading = true; _directoryReady = false; });
-    final ready = await widget.session.loadWorkspaceSuppliers(retry: true);
+    final ready = widget.useLoadedDirectory
+      ? widget.session.workspaceSuppliersLoaded && !widget.session.workspaceSupplierSaving && !widget.session.workspaceSupplierRecoveryRequired
+      : await widget.session.loadWorkspaceSuppliers(retry: true);
     if (!_current) return;
     setState(() {
       _loading = false;
@@ -25977,6 +26082,56 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     if(action=='AI-ACT-401')_copyType=initial.text('documentType')!;
     _receivingDirty=true;setState((){});return true;
   }
+  bool get _originalAssistantReview => widget.initialRestockOriginal != null &&
+    widget.assistantInitial?.actionId == 'AI-ACT-243' && widget.assistantLease != null;
+  Future<bool> _readOriginalSupplierInput(String id) async {
+    if (!_current || !_originalAssistantReview || !_receivingPreparing ||
+        !session.workspaceSuppliers.any((p) => p.id == id)) return false;
+    final key = session.supplierReceivingInputFormKey(id), revision = session.workspacePurchaseEntryRevision;
+    if (key == null) return false;
+    final candidate = _LedgerFormAutosave(session, key);
+    final fields = await candidate.load();
+    if (!_current || revision != session.workspacePurchaseEntryRevision || fields == null || !candidate.ready || fields.isNotEmpty) {
+      candidate.dispose();
+      if (_current) _error = 'This supplier has saved or unavailable receiving input. Open that original entry before starting another arrival.';
+      return false;
+    }
+    _draft?.removeListener(_draftChanged); _draft?.dispose();
+    _draft = candidate..addListener(_draftChanged);
+    _supplierId = id; _receivingCapturedSupplier = id;
+    _bookRevision = revision;
+    return true;
+  }
+  Future<void> _startOriginalReceivingAssistant() async {
+    try {
+      _setReceivingLease(widget.assistantLease!);
+      _receivingPreparing = true;
+      final original = widget.initialRestockOriginal!, read = widget.assistantReceivingRead;
+      if (!_current || !session.workspaceServerReceivingFor(original) || !session.workspaceSuppliersLoaded ||
+          !session.workspaceInventoryLoaded || session.workspaceSupplierSaving || session.workspaceSupplierRecoveryRequired ||
+          session.workspaceGoodsReceiptRecoveryPending || read == null ||
+          jsonEncode(read.original.toJson()) != jsonEncode(original.toJson())) return;
+      for (final saved in session.workspaceGoodsReceiptDrafts.where((r) =>
+          jsonEncode(r.receipt.restockOriginal?.toJson()) == jsonEncode(original.toJson()))) {
+        final attempt = session.workspaceRestockAttempt(saved.receipt.id);
+        if (attempt == null || attempt.recorded == null && attempt.closed == null) {
+          _error = 'An original receiving operation needs recovery. Keep it and open that saved arrival.';
+          return;
+        }
+      }
+      _restockOriginal = original; _receivingStatusRead = read;
+      _bookRevision = session.workspacePurchaseEntryRevision;
+      if (read.group?.supplierId case final supplier?) {
+        if (!await _readOriginalSupplierInput(supplier) || !_current) return;
+      }
+      if (!_prepareNewArrival()) return;
+      _receivingCapturedArrival = _arrivalId; _receivingCapturedSupplier = _supplierId;
+      _lastQueuedInput = Map.of(_draftFields);
+      _loaded = true; _receivingDirty = false;
+    } on Object {
+      if (mounted) _error = 'This original receiving input could not be opened. Saved records have been kept.';
+    } finally {if (mounted) setState(() => _busy = false);}
+  }
   Future<void> _startReceivingAssistant() async {
     try {
     final initial=widget.assistantInitial!,lease=widget.assistantLease!;
@@ -26202,12 +26357,14 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   bool get _serverReceiving => _frozen != null ? session.workspaceGoodsReceiptUsesServer(_frozen!)
     : (_restockOriginal ?? widget.initialRestockOriginal) != null &&
       !session.workspaceRestockUsesLegacyReceipts((_restockOriginal ?? widget.initialRestockOriginal)!);
+  WorkspaceGoodsReceivingRead? _checkedReceivingRead(WorkspaceRestockPurchaseOriginal source) {
+    final live = session.workspaceRestockReceiving(source), read = _receivingStatusRead;
+    final local = read != null && jsonEncode(read.original.toJson()) == jsonEncode(source.toJson()) ? read : null;
+    return live != null && (local == null || (live.group?.revision ?? 0) >= (local.group?.revision ?? 0)) ? live : local;
+  }
   WorkspaceGoodsReceivingGroup? get _serverGroup {
     final source = _restockOriginal ?? widget.initialRestockOriginal;
-    if(source==null)return null;
-    final live=session.workspaceRestockReceiving(source)?.group,read=_receivingStatusRead;
-    final local=read!=null&&jsonEncode(read.original.toJson())==jsonEncode(source.toJson())?read.group:null;
-    return live!=null&&(local==null||live.revision>=local.revision)?live:local;
+    return source == null ? null : _checkedReceivingRead(source)?.group;
   }
   bool get _committed => _frozen != null && _receiptRecorded(_frozen!);
   bool get _billContextValid => widget.initialBill == null ||
@@ -26222,7 +26379,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   bool get _hasPendingArrival {
     if (_serverReceiving) {
       final source = _restockOriginal;
-      if (source == null || session.workspaceRestockReceiving(source) == null) return false;
+      if (source == null || _checkedReceivingRead(source) == null) return false;
       return source.lines.entries.any((entry) => (_serverGroup?.lines.where((line) => line.sourceLineId == entry.key)
         .singleOrNull?.deliveredMilli ?? 0) < entry.value.quantityMilli);
     }
@@ -26241,7 +26398,9 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   @override
   void initState() {
     super.initState();_day.addListener(_syncDisplayDay);
-    if(widget.assistantInitial!=null) {
+    if (_originalAssistantReview) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {if (mounted) unawaited(_startOriginalReceivingAssistant());});
+    } else if(widget.assistantInitial!=null) {
       WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)unawaited(_startReceivingAssistant());});
     } else {unawaited(_recover());}
   }
@@ -26529,14 +26688,15 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   String? get _sourceSupplierId {
     final source = widget.initialRestockOriginal;
     if (source == null) return null;
-    return session.workspaceRestockReceiving(source)?.group?.supplierId ??
+    return _checkedReceivingRead(source)?.group?.supplierId ??
       session.workspaceSuppliers.where((supplier) =>
         session.workspaceSupplierLedger(supplier.id)?.goodsReceipts.values.any((receipt) =>
           receipt.expectedDeliveryId == source.deliveryGroupId) == true).singleOrNull?.id;
   }
   Future<void> _pickSupplier() async {
     final selected = await _showStoreSupplierSelector(context, session,
-      selectedId: _supplierId, lockedSupplierId: _sourceSupplierId, ownerCurrent: widget.ownerCurrent);
+      selectedId: _supplierId, lockedSupplierId: _sourceSupplierId, ownerCurrent: _receivingEffectiveOwner,
+      useLoadedDirectory: _originalAssistantReview && _receivingPreparing);
     if (!_current) return;
     // A contact-only save advances the book, but never reloads dirty receipt inputs.
     _bookRevision = session.workspacePurchaseEntryRevision;
@@ -26547,7 +26707,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     if (_supplierId == id) return;
     if (_busy) { _supplierPicker.currentState?.didChange(_supplierId); return; }
     final requested = widget.initialRestockOriginal;
-    final serverSupplier = requested == null ? null : session.workspaceRestockReceiving(requested)?.group?.supplierId;
+    final serverSupplier = requested == null ? null : _checkedReceivingRead(requested)?.group?.supplierId;
     if (serverSupplier != null && serverSupplier != id) {
       setState(() => _error = 'This purchase is linked to another saved supplier. Keep that supplier for the next arrival.');
       _supplierPicker.currentState?.didChange(_supplierId);
@@ -26559,6 +26719,16 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     if (linked != null && linked.id != id) {
       setState(() => _error = 'This purchase is already linked to ${linked.name}. Choose that supplier to continue.');
       _supplierPicker.currentState?.didChange(_supplierId);
+      return;
+    }
+    if (_originalAssistantReview && _receivingPreparing) {
+      if (!_current) return;
+      setState(() => _busy = true);
+      try {
+        if (await _readOriginalSupplierInput(id) && _current) {
+          _lastQueuedInput = Map.of(_draftFields);
+        }
+      } finally {if (mounted) setState(() => _busy = false);}
       return;
     }
     setState(() => _busy = true);
@@ -26610,7 +26780,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     final source = previous != null ? previous.restockOriginal : widget.initialRestockOriginal;
     final groupId = source?.deliveryGroupId ?? previous?.expectedDeliveryId;
     final server = source != null && !session.workspaceRestockUsesLegacyReceipts(source);
-    final serverRead = source == null ? null : session.workspaceRestockReceiving(source);
+    final serverRead = source == null ? null : _originalAssistantReview && _receivingPreparing
+      ? _checkedReceivingRead(source) : session.workspaceRestockReceiving(source);
     if (server && (serverRead == null || session.workspaceGoodsReceiptRecoveryPending)) {
       _error = 'Recover this purchase’s receiving status before starting another arrival.';
       return false;
@@ -27394,7 +27565,9 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         ],
         if (!_committed || _conflict) const Text('Enter the goods received. Supplier bill and payment are recorded separately.',
           style: TextStyle(fontSize: 12, color: MoolColors.ink)),
-        if (!_loaded) TextButton(onPressed: _busy ? null : _recover, child: const Text('Retry saved records')),
+        if (!_loaded) TextButton(onPressed: _busy ? null :
+          _originalAssistantReview && _receivingPreparing ? _startOriginalReceivingAssistant : _recover,
+          child: const Text('Retry saved records')),
         if (_stockRecoverySource != null && (session.workspaceRestockBaselineMissing || session.workspaceRestockStockConflict != null)) ...[
           Text(session.workspaceRestockStockConflict != null ? 'Saved Stock differs from this view. Review the saved quantities before receiving.'
             : 'Confirm current Stock quantities before adding this delivery.', style: const TextStyle(fontSize: 12, color: MoolColors.ink)),

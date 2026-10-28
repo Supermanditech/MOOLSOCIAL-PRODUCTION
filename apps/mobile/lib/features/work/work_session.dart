@@ -747,6 +747,68 @@ class WorkSession extends ChangeNotifier {
   WorkspacePurchaseReference? workspaceAssistantOriginalOrderReference(String orderId) =>
       _assistantOriginalReferencesCurrent?.call() == true ? _assistantOriginalReferences[orderId] : null;
 
+  Map<String, WorkspaceGoodsReceivingRead> _assistantReceivingOriginals = const {};
+  bool Function()? _assistantReceivingOriginalsCurrent;
+  int _assistantReceivingOriginalsGeneration = 0;
+  WorkspaceGoodsReceivingRead? workspaceAssistantReceivingOriginal(String orderId) =>
+    _assistantReceivingOriginalsCurrent?.call() == true ? _assistantReceivingOriginals[orderId] : null;
+  static String workspaceAssistantReceivingOriginalProof(WorkspaceGoodsReceivingRead read) {
+    Object? canonical(Object? value) => value is List ? value.map(canonical).toList() : value is Map
+      ? {for (final key in value.keys.cast<String>().toList()..sort()) key: canonical(value[key])} : value;
+    final source = read.original;
+    return 'store-receiving-original:${source.realm}:${crypto.sha256.convert(utf8.encode(jsonEncode(canonical([
+      source.accountScope, source.buyingStoreId, source.toJson(), read.group?.toJson()]))))}';
+  }
+  /// Independent original read only: no manual receiving cache, replay, Stock
+  /// baseline admission, draft recovery or persistence occurs during preparation.
+  Future<Set<String>> readWorkspaceAssistantReceivingOriginals(Map<String, String> expected,
+      {required bool Function() inputCurrent, required DateTime validUntil}) async {
+    final reader = originalPurchaseReader, realm = originalPurchaseRealm, scope = workspaceSupplierScope,
+      epoch = restockReceivingReviewOwner, navigation = navigationScopeRevision, data = _storeData;
+    final generation = ++_assistantReceivingOriginalsGeneration;
+    _assistantReceivingOriginals = const {}; _assistantReceivingOriginalsCurrent = null;
+    bool current() => !_disposed && inputCurrent() && DateTime.now().toUtc().isBefore(validUntil.toUtc()) &&
+      generation == _assistantReceivingOriginalsGeneration && reader != null && identical(reader, originalPurchaseReader) &&
+      reader.isCurrent && scope != null && scope == workspaceSupplierScope && reader.accountUserId == scope.$1 &&
+      realm == originalPurchaseRealm && identical(epoch, restockReceivingReviewOwner) && identical(data, _storeData) &&
+      navigation == navigationScopeRevision && workspaceRequiresMembershipReadback &&
+      _currentWorkspaceAccess(scope.$2, activeWorkspace?.profileId);
+    bool ready() => current() && workspaceSuppliersLoaded && workspaceInventoryLoaded &&
+      !workspaceSupplierSaving && !workspaceSupplierRecoveryRequired && !workspaceGoodsReceiptRecoveryPending;
+    if (expected.isEmpty || !ready() || expected.values.any((value) =>
+        !RegExp('^store-receiving-original:$realm:[a-f0-9]{64}\$').hasMatch(value))) return const {};
+    final references = <String, WorkspacePurchaseReference>{}, seen = <String>{}, cursors = <String>{};
+    final reads = <String, WorkspaceGoodsReceivingRead>{};
+    String? cursor;
+    try {
+      do {
+        final page = await reader!.listPurchaseReferences(role: WorkspaceOrderIdentityRole.buyer,
+          realm: realm, buyingStoreId: scope!.$2, cursor: cursor);
+        if (!ready() || page == null || page.coverage != 'saved_original_facts') return const {};
+        for (final reference in page.references) {
+          if (!reference.valid || !seen.add(reference.orderId) || seen.length > 30000) return const {};
+          if (expected.containsKey(reference.orderId)) references[reference.orderId] = reference;
+        }
+        cursor = page.nextCursor;
+        if (cursor != null && !cursors.add(cursor)) return const {};
+      } while (cursor != null);
+      for (final reference in references.values) {
+        final order = await reader.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: realm,
+          buyingStoreId: scope.$2, reference: reference);
+        if (!ready() || order == null || order.purchaser?.kind != 'store' || order.purchaser?.storeId != scope.$2) return const {};
+        final original = WorkspaceRestockPurchaseOriginal.fromJson({'schemaVersion': 1, 'realm': realm, 'accountScope': scope.$1,
+          'buyingStoreId': scope.$2, 'reference': reference.toJson(), 'lines': [for (final line in order.lines)
+            {'lineId': line.lineId, 'quantityMilli': line.quantityMilli, 'quantityUnit': line.quantityUnit}]});
+        final read = await readWorkspaceRestockReceivingForReview(original, inputCurrent: ready);
+        if (!ready() || read == null) return const {};
+        if (workspaceAssistantReceivingOriginalProof(read) == expected[reference.orderId]) reads[reference.orderId] = read;
+      }
+      if (!ready()) return const {};
+      _assistantReceivingOriginals = Map.unmodifiable(reads); _assistantReceivingOriginalsCurrent = current;
+      return Set.unmodifiable(reads.keys);
+    } on Object {return const {};}
+  }
+
   /// Read the existing immutable original-reference pages only. Preparation
   /// never restores/reconciles operational commands or changes the order feed.
   Future<Set<String>> readWorkspaceAssistantOriginalReferences(Map<String,String> expected,
@@ -791,6 +853,8 @@ class WorkSession extends ChangeNotifier {
     if (_disposed || identical(reader, _originalPurchaseReader) && realm == originalPurchaseRealm) return;
     _assistantOriginalReferencesGeneration++;
     _assistantOriginalReferences=const {};_assistantOriginalReferencesCurrent=null;
+    _assistantReceivingOriginalsGeneration++;
+    _assistantReceivingOriginals=const {};_assistantReceivingOriginalsCurrent=null;
     _restockReceivingEpoch = Object();
     for (final data in {..._storeDataById.values, _storeData}) {
       data.restockReceiving.clear();

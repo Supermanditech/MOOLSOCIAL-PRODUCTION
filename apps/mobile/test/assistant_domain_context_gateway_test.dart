@@ -71,19 +71,19 @@ void main() {
     });
   }
   }
-  for(final compact in [false,true]){
-    test('Original Store order metadata requires exact owned order proof compact$compact',()async{
+  for(final compact in [false,true]) for (final action in ['AI-ACT-274','AI-ACT-243']) {
+    test('Original Store $action metadata requires exact owned order proof compact$compact',()async{
       final store=_context.withWorkspace(const MoolAssistantWorkspace(id:'store-one',name:'Host Store',profile:'retailer-grocery',
         revision:1,isStore:true,approved:true,approvalAccountScope:_owner));
-      final proof='store-order-original:evaluation:${'a'*64}';
+      final proof='${action == 'AI-ACT-274' ? 'store-order-original' : 'store-receiving-original'}:evaluation:${'a'*64}';
       final data=<String,Object?>{..._data(),'ownerKey':sha256.convert(utf8.encode(jsonEncode([
         'fixture-project','domain-host-a','workspace','store-one']))).toString(),
         'scope':{'audience':'workspace','storeId':'store-one'},'revisions':compact?<Object?>[]:[
-          {'actionId':'AI-ACT-274','entityId':'order-one','sourceRevision':proof}],
+          {'actionId':action,'entityId':'order-one','sourceRevision':proof}],
         if(compact)'nativeSelection':{'version':1,'fingerprint':'b'*64,'groups':[
-          {'entityId':'order-one','sourceRevision':proof,'actionIds':['AI-ACT-274']}]}};
+          {'entityId':'order-one','sourceRevision':proof,'actionIds':[action]}]}};
       final result=await _source(_Wire(()=>_ok(data)),compact:compact).read(store,()=>true);
-      expect(result.revisions,{('AI-ACT-274','order-one'):proof});
+      expect(result.revisions,{(action,'order-one'):proof});
       if(compact)expect(result.nativeSelection!.proofs,result.revisions);
       for(final fault in ['missing-order','wrong-proof','personal']){
         final changed=jsonDecode(jsonEncode(data)) as Map<String,dynamic>;

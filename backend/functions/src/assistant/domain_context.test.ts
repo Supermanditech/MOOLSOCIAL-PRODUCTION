@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {AccountPlansService} from "../account/plans_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext, OriginalPurchasedStarsPreparationContext} from "./domain_context.js";
-import type {PurchaseReferencePage,ProductFeedbackTarget,ProductFeedbackTargetPage} from "../workspace/workspace_purchase_projection_service.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext} from "./domain_context.js";
+import type {PurchaseReferencePage,PurchaseProjection,ProductFeedbackTarget,ProductFeedbackTargetPage} from "../workspace/workspace_purchase_projection_service.js";
 import {AssistantModelError, digest, type PreparationContext, type PreparationRequest} from "./model_contract.js";
 import {canonicalContextProjection, storeProductActions} from "./domain_context_contract.js";
 
@@ -12,6 +12,92 @@ const scope = {audience: "personal" as const, storeId: null};
 const request: PreparationRequest = {scope, requestId: "host-request", requestRevision: 1,
   message: "Find rice", language: "English", history: [], actionId: "AI-ACT-001", entityId: null,
   expectedEntitlementRevision: "personal:null:1:1"};
+
+/** Isolated original-reader ports, never a runtime provider or an issued arrival. */
+function receivingOriginalFixture(count = 7) {
+  const store = 'HOST-buying-store', calls: string[] = [];
+  let denied = false, authorityRevision = 1, reads = 0, clock = new Date(at);
+  let change = (_projection: PurchaseProjection, _count: number) => {};
+  const references = Array.from({length: count}, (_, index) => ({purchaseId: `HOST-receiving-purchase-${index}`,
+    storeId: 'HOST-seller', orderId: `HOST-receiving-order-${index}`, originalFingerprint: 'a'.repeat(64), sourceRevision: 'HOST-original-v1'}));
+  const authority = {async read() {
+    if (denied) throw new AssistantModelError('workspace_access_unavailable', 403);
+    return {revision: `HOST-owner-${authorityRevision}`, validUntil: '2026-10-28T08:01:00.000Z',
+      modelContext: {audience: 'workspace', current: {id: store}}, tools: [{name: 'HOST-approval-only', actionId: 'AI-ACT-317',
+        entityId: store, sourceRevision: 'HOST-member', description: 'Host authority port', parameters: {}, validate: () => true}]};
+  }};
+  const source = new OriginalStoreReceivingPreparationContext({projectId: actor.projectId, authority, now: () => clock,
+    purchases: {async listBuyer(uid, body) {
+      assert.equal(uid, actor.uid); assert.equal(body.buyingStoreId, store); calls.push('listBuyer');
+      const offset = body.cursor === null ? 0 : Number(String(body.cursor));
+      return {schemaVersion: 3, realm: 'evaluation', authNamespace: 'firebase-default', viewerRole: 'buyer', viewerUserId: uid,
+        storeId: null, buyingStoreId: store, coverage: 'saved_original_facts', references: references.slice(offset, offset + 5),
+        nextCursor: offset + 5 < count ? String(offset + 5) : null};
+    }, async readBuyer(uid, body) {
+      calls.push('readBuyer'); assert.equal(body.buyingStoreId, store);
+      const reference = references.find(row => row.purchaseId === body.purchaseId)!;
+      const projection: PurchaseProjection = {schemaVersion: 11, realm: 'evaluation', authNamespace: 'firebase-default',
+        viewerRole: 'buyer', viewerUserId: uid, purchaseId: reference.purchaseId, buyerId: 'HOST-buyer',
+        sourceRevision: reference.sourceRevision, state: 'original_facts', orders: [{factsVersion: 11,
+          storeId: reference.storeId, orderId: reference.orderId, originalFingerprint: reference.originalFingerprint,
+          original: {currency: 'INR', purchaser: {schemaVersion: 1, kind: 'store', storeId: store, name: 'HOST buying Store', purpose: 'restock'},
+            lines: [{lineId: 'HOST-original-line', skuId: 'HOST-sku', canonicalProductId: 'HOST-product', verifiedPackId: 'HOST-pack',
+              offerId: 'HOST-offer', offerRevision: 'HOST-offer-v1', name: 'HOST ordered item', packLabel: '1 kg',
+              quantityMilli: 2000, quantityUnit: 'pack', unitPriceMinor: 100, lineTotalMinor: 200}],
+            totals: {itemsMinor: 200, discountMinor: 0, taxMinor: 0, deliveryMinor: 0, freightMinor: 0, paymentFeeMinor: 0, tipMinor: 0, totalMinor: 200}}}]};
+      change(projection, ++reads); return projection;
+    }, async readBuyerGoodsReceiving(uid, body) {
+      calls.push('readBuyerGoodsReceiving'); assert.equal(body.buyingStoreId, store);
+      return {schemaVersion: 1, realm: 'evaluation', viewerUserId: uid, buyingStoreId: store, group: null};
+    }}});
+  const input: PreparationRequest = {...request, scope: {audience: 'workspace', storeId: store}, actionId: 'AI-ACT-243'};
+  return {source, input, calls, references, authority, change: (fn: typeof change) => {change = fn;},
+    deny: () => {denied = true;}, bump: () => {authorityRevision++;}, advance: () => {clock = new Date(at.getTime() + 60_001);}};
+}
+test('Original receiving walks complete buyer index and offers only exact native review without quantities', async () => {
+  const f = receivingOriginalFixture(), value = await f.source.read(actor, f.input);
+  assert.equal(value.nativeTargets!.length, 7);
+  assert.equal(f.calls.filter(call => call === 'listBuyer').length, 4);
+  const selected = value.tools[0]!.resolveTarget!({orderId: f.references.at(-1)!.orderId});
+  assert.deepEqual(selected.fields, {}); assert.equal(selected.entityId, f.references.at(-1)!.orderId);
+  assert.match(selected.sourceRevision, /^store-receiving-original:evaluation:[a-f0-9]{64}$/u);
+  assert.equal(value.tools[0]!.validate({receivedQuantity: 2}), false);
+  assert.throws(() => value.tools[0]!.resolveTarget!({orderId: selected.entityId, receivedQuantity: 2}), /invalid_model_result/u);
+  assert(!JSON.stringify(value.modelContext).includes('originalFingerprint'));
+  const restored = await f.source.readPrepared(actor, {...f.input, entityId: selected.entityId}, {kind: 'proposal', id: 'HOST-proposal',
+    actionId: 'AI-ACT-243', ...selected, title: 'Receive goods', summary: 'Host fixture'});
+  assert.equal(restored.tools[0]!.sourceRevision, selected.sourceRevision);
+  await assert.rejects(f.source.readPrepared(actor, {...f.input, entityId: selected.entityId}, {kind: 'proposal', id: 'HOST-proposal',
+    actionId: 'AI-ACT-243', ...selected, sourceRevision: 'store-receiving-original:evaluation:' + 'b'.repeat(64),
+    title: 'Receive goods', summary: 'Host fixture'}), /stale_preparation/u);
+});
+for (const fault of ['buyer', 'store', 'reference', 'realm', 'duplicate-line', 'quantity', 'changed-source', 'changed-owner']) {
+  test(`Original receiving rejects ${fault} without constructing a receipt`, async () => {
+    const f = receivingOriginalFixture(1);
+    f.change((projection, count) => {
+      if (fault === 'buyer') projection.viewerUserId = 'HOST-foreign';
+      if (fault === 'store') projection.orders[0]!.original.purchaser = {schemaVersion: 1, kind: 'store', storeId: 'HOST-foreign-store', name: 'HOST other Store', purpose: 'restock'};
+      if (fault === 'reference') projection.orders[0]!.originalFingerprint = 'b'.repeat(64);
+      if (fault === 'realm') projection.realm = 'production';
+      if (fault === 'duplicate-line') projection.orders[0]!.original.lines.push(projection.orders[0]!.original.lines[0]!);
+      if (fault === 'quantity') projection.orders[0]!.original.lines[0]!.quantityMilli = 0;
+      if (fault === 'changed-source' && count === 2) projection.orders[0]!.original.lines[0]!.quantityMilli++;
+      if (fault === 'changed-owner' && count === 2) f.bump();
+    });
+    await assert.rejects(f.source.read(actor, f.input), /context_unavailable|stale_preparation/u);
+    assert(f.calls.every(call => ['listBuyer', 'readBuyer', 'readBuyerGoodsReceiving'].includes(call)));
+  });
+}
+test('Original receiving denies unpaid/unapproved source authority before original reads and rejects personal use', async () => {
+  const f = receivingOriginalFixture(); f.deny();
+  await assert.rejects(f.source.read(actor, f.input), /workspace_access_unavailable/u); assert.deepEqual(f.calls, []);
+  await assert.rejects(f.source.read(actor, {...f.input, scope}), /context_unavailable/u);
+});
+test('Original receiving stops after an expired original read before another private status read', async () => {
+  const f = receivingOriginalFixture(1); f.change(() => f.advance());
+  await assert.rejects(f.source.read(actor, f.input), /stale_preparation/u);
+  assert.deepEqual(f.calls, ['listBuyer', 'readBuyer']);
+});
 
 /** Isolated existing completion-index port; no runtime completions are minted. */
 function privateStarsFixture(count=13){

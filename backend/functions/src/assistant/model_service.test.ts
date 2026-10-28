@@ -95,6 +95,37 @@ test('Private purchased-stars native selection restricts model order, line choic
     assert.equal(value.reply.outcome.entityId,first);assert.deepEqual(value.reply.outcome.fields,{lineId:'host-line-a',stars:4});
   }}
 });
+for (const available of [true, false]) test(`Receiving native selection filters order references and tools together available=${available}`, async () => {
+  const f = fixture(), selected = 'HOST-receiving-a', excluded = 'HOST-receiving-b';
+  Object.assign(f.context, {nativeTargets: [selected, excluded].map(entityId =>
+    ({actionId: 'AI-ACT-243', entityId, sourceRevision: `HOST-proof-${entityId}`})),
+    modelContext: {sourceKind: 'composite-original-context-v1', sources: [{sourceKind: 'original-store-receiving-v1',
+      orders: [{orderId: selected, purchaseId: 'HOST-visible-purchase', supplierStoreId: 'HOST-visible-supplier'},
+        {orderId: excluded, purchaseId: 'HOST-excluded-purchase', supplierStoreId: 'HOST-excluded-supplier'}]}]},
+    tools: [{name: 'store_review_original_receiving', actionId: 'AI-ACT-243', entityId: null, sourceRevision: 'HOST-receiving-root',
+      description: 'Host original receiving port', targetSelector: 'orderId',
+      parameters: {type: 'object', additionalProperties: false, required: ['orderId'], properties: {orderId: {type: 'string', enum: [selected, excluded]}}},
+      validate: (fields: Readonly<Record<string, unknown>>) => Object.keys(fields).length === 0,
+      resolveTarget: (args: Readonly<Record<string, unknown>>) => {
+        assert.deepEqual(args, {orderId: selected}); return {entityId: selected, sourceRevision: `HOST-proof-${selected}`, fields: {}};
+      }}]});
+  let modelCalls = 0;
+  const service = new AssistantPreparationService({...f.deps, model: {async prepare(_input, tools, _signal, reference) {
+    modelCalls++; assert.deepEqual((tools[0]!.parameters.properties as Record<string, {enum: string[]}>).orderId!.enum, [selected]);
+    const text = JSON.stringify(reference); assert(text.includes('HOST-visible-purchase'));
+    assert(!text.includes(excluded)); assert(!text.includes('HOST-excluded-purchase')); assert(!text.includes('HOST-excluded-supplier'));
+    return {kind: 'tool', name: 'store_review_original_receiving', arguments: {orderId: selected}};
+  }}});
+  const payload = {...request, actionId: 'AI-ACT-243', nativeTargets: available ? [{actionId: 'AI-ACT-243', entityId: selected}] : []};
+  if (available) {
+    const result = await service.handle(actor, {operation: 'prepare', payload});
+    assert.equal(result.state, 'ready'); assert.equal(modelCalls, 1);
+    if (result.state === 'ready' && result.reply.outcome.kind === 'proposal') assert.deepEqual(result.reply.outcome.fields, {});
+  } else {
+    await assert.rejects(service.handle(actor, {operation: 'prepare', payload}), /context_unavailable/u);
+    assert.equal(modelCalls, 0);
+  }
+});
 test("AI-B01 actual paid service prepares a typed native proposal without domain execution", async () => {
   const f = fixture(); const result = await f.service.handle(actor, {operation: "prepare", payload: request});
   assert.equal(result.state, "ready"); if (result.state !== "ready") return;

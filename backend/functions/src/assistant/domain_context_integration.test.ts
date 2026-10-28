@@ -4,7 +4,7 @@ import {AccountPlansService} from "../account/plans_service.js";
 import {AccountProfileService} from "../account/profile_service.js";
 import {ProfileWorkspacePreparationContext} from "./profile_context.js";
 import {WorkspaceCatalogueService, type WorkspaceCatalogueRepository} from "../workspace/workspace_catalogue_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext,OriginalPurchasedStarsPreparationContext} from "./domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext,OriginalPurchasedStarsPreparationContext,OriginalStoreReceivingPreparationContext} from "./domain_context.js";
 import {digest} from './model_contract.js';
 import {initializeApp, deleteApp} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
@@ -164,6 +164,76 @@ test('Supplier recovery rechecks current authority and exact source proof withou
   }
 });
 
+test('Receiving originals actual loopback SDK joins buying Store original and changed cumulative status without preparation writes', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST, timeout: 120000,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const owner = {uid: 'host-native-scope-user', projectId: 'host-receiving-project'}, storeId = 'WK-510001', caseId = 'WP-240701';
+  const app = initializeApp({projectId: `demo-ai-receiving-${randomUUID().slice(0, 8)}`}, `host-receiving-${randomUUID()}`);
+  const db = getFirestore(app); db.settings({gaxServerStreamingRetries: true});
+  const workspaces = async () => ({workspaces: [{caseId, status: 'live', workspaceId: storeId, profileId: 'retailer-grocery', name: 'HOST buying Store',
+    access: {schemaVersion: 1, state: 'active', accountId: owner.uid, caseId, workspaceId: storeId, profileId: 'retailer-grocery',
+      checkedAt: at.toISOString(), applicationUpdatedAt: '2026-10-27T08:00:00.000Z', membership: {schemaVersion: 1, state: 'active',
+        membershipId: 'HOST-receiving-member', workspaceId: storeId, workspaceProfileId: 'retailer-grocery', version: 1,
+        effectiveFrom: '2026-10-27T00:00:00.000Z', expiresAt: '2026-10-29T00:00:00.000Z'}}}]});
+  const plans = new AccountPlansService({async read(uid, scope) {return {ownerUid: uid, accountStatus: 'ACTIVE',
+    catalogue: {audience: scope.audience, revision: 1, state: 'approved', offers: []}, subscription: {ownerUid: uid, scope,
+      revision: 1, planId: 'HOST-paid-plan', planVersion: 'v1', name: 'Host fixture only', state: 'active',
+      validFrom: '2026-10-27T00:00:00.000Z', validUntil: '2026-10-29T00:00:00.000Z', featureIds: ['mool_ai']}};}},
+    {projectId: owner.projectId, now: () => at, readWorkspaces: workspaces});
+  const authority = new ProfileWorkspacePreparationContext({profile: {async read() {throw Error('No personal Profile read');}}, plans, workspaces, now: () => at});
+  try {
+    const profile = {schemaVersion: 1, caseId, workspaceId: storeId, ownerUserId: owner.uid, familyId: 'products-trade',
+      profileId: 'retailer-grocery', status: 'live', shopEnabled: true};
+    await db.collection('workspaceProfiles').doc(caseId).set(profile);
+    await db.collection('workspaceProfiles').doc('HOST-seller-case').set({...profile, caseId: 'HOST-seller-case', workspaceId: 'HOST-seller', ownerUserId: 'HOST-seller-owner'});
+    const receipt: TrustedPlacementReceipt = {schemaVersion: 10, realm: 'evaluation', authNamespace: 'firebase-default', finalPlacement: true,
+      issuer: 'HOST-receiving-fixture', receiptId: 'HOST-receiving-final', revision: 'HOST-source-v1', buyerUserId: owner.uid,
+      purchaser: {schemaVersion: 1, kind: 'store', storeId, name: 'HOST buying Store', purpose: 'restock'}, purchasingStoreCaseId: caseId,
+      stores: [{storeId: 'HOST-seller', caseId: 'HOST-seller-case', ownerUserId: 'HOST-seller-owner', lines: [{sourceLineId: 'HOST-source-line',
+        skuId: 'HOST-sku', canonicalProductId: 'HOST-product', verifiedPackId: 'HOST-pack', offerId: 'HOST-offer', offerRevision: 'HOST-offer-v1',
+        name: 'HOST original product', packLabel: '1 kg', variant: '', scheduledFulfilment: null, publicListing: null,
+        supplierTaxSnapshot: null, commodityPriceSnapshot: null, quantityMilli: 2000, quantityUnit: 'pack', unitPriceMinor: 100, lineTotalMinor: 200}],
+        benefitAttribution: {schemaVersion: 1, components: []}, fulfilmentContext: null, supplierQuote: null,
+        totals: {itemsMinor: 200, discountMinor: 0, taxMinor: 0, deliveryMinor: 0, freightMinor: 0, paymentFeeMinor: 0, tipMinor: 0, totalMinor: 200}}]};
+    const made = await new WorkspacePurchaseProjectionService(db, 'evaluation', {async readFinalPlacement() {return receipt;}}).materialize('HOST-final-source');
+    const purchases = new WorkspacePurchaseProjectionService(db, 'evaluation');
+    const source = new OriginalStoreReceivingPreparationContext({projectId: owner.projectId, authority, purchases, now: () => at});
+    const input = {scope: {audience: 'workspace' as const, storeId}, requestId: 'HOST-receiving-preparation', requestRevision: 1,
+      expectedEntitlementRevision: 'HOST-read-only', message: 'Receive this purchase', language: 'English', history: [], actionId: 'AI-ACT-243', entityId: null};
+    const page = await purchases.listBuyer(owner.uid, {buyingStoreId: storeId, limit: 5, cursor: null});
+    assert.equal(page.references.length, 1); const reference = page.references[0]!;
+    const projection = await purchases.readBuyer(owner.uid, {purchaseId: made.purchaseId, buyingStoreId: storeId});
+    const original = {schemaVersion: 1, realm: 'evaluation', accountScope: owner.uid, buyingStoreId: storeId, reference,
+      lines: projection.orders[0]!.original.lines.map(line => ({lineId: line.lineId, quantityMilli: line.quantityMilli, quantityUnit: line.quantityUnit}))};
+    const before = await source.read(owner, input), selected = before.tools[0]!.resolveTarget!({orderId: reference.orderId});
+    assert.equal(selected.sourceRevision, 'store-receiving-original:evaluation:' + digest([owner.uid, storeId, original, null]));
+    const groups = db.collection('workspacePurchaseProjections').doc('evaluation').collection('goodsReceiving');
+    assert.equal((await groups.get()).size, 0, 'Preparation must not create a receiving group.');
+    if (process.env.AI_DOMAIN_RECEIVING_ORIGINAL_EXPORT_PATH) {
+      const path = process.env.AI_DOMAIN_RECEIVING_ORIGINAL_EXPORT_PATH; assert(isAbsolute(path));
+      writeFileSync(path, JSON.stringify({kind: 'isolated-host-original-receiving-service-contract', storeId, ownerUid: owner.uid,
+        references: page, projection, receiving: await purchases.readBuyerGoodsReceiving(owner.uid, {schemaVersion: 1, buyingStoreId: storeId, reference}),
+        proofs: before.nativeTargets}, null, 2) + '\n', {flag: 'wx'});
+    }
+    // Explicit isolated host arrival exercises the original receiver, never preparation or a phone.
+    await purchases.recordBuyerGoodsArrival(owner.uid, {schemaVersion: 1, buyingStoreId: storeId, supplierId: 'HOST-private-supplier', receipt: {
+      id: 'HOST-explicit-arrival', expectedDeliveryId: 'restock-' + digest(['evaluation', storeId, reference.purchaseId, reference.storeId, reference.orderId]),
+      reference: 'HOST counted arrival', deliveredOn: '2026-10-28', recordedAt: at.toISOString(), recordedUtcOffsetMinutes: 0,
+      restockOriginal: original, lines: [{sourceLineId: original.lines[0]!.lineId, productId: 'HOST-native-product', productLabel: 'HOST native product',
+        purchaseUnit: 'pack', stockUnit: 'pack', unitsPerPack: 1, expectedMilli: 2000, deliveredMilli: 1000, acceptedMilli: 1000,
+        damagedMilli: 0, shortMilli: 0, priorStockUnits: {}}]}});
+    const after = await source.read(owner, input), changed = after.tools[0]!.resolveTarget!({orderId: reference.orderId});
+    assert.notEqual(changed.sourceRevision, selected.sourceRevision);
+    assert.equal((await groups.get()).size, 1);
+    const read = await purchases.readBuyerGoodsReceiving(owner.uid, {schemaVersion: 1, buyingStoreId: storeId, reference});
+    assert.equal(changed.sourceRevision, 'store-receiving-original:evaluation:' + digest([owner.uid, storeId, original, read.group]));
+    await assert.rejects(source.readPrepared(owner, {...input, entityId: reference.orderId}, {kind: 'proposal', id: 'HOST-old-review',
+      actionId: 'AI-ACT-243', ...selected, title: 'Receive goods', summary: 'Host fixture'}), /stale_preparation/u);
+    await db.collection('workspaceProfiles').doc(caseId).update({status: 'suspended'});
+    await assert.rejects(source.read(owner, input), /workspace_access_unavailable/u);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
 test('Order originals actual loopback SDK projection service to authorised AI metadata preserves all indexed references',{
   skip:!process.env.FIRESTORE_EMULATOR_HOST,timeout:120000,
 },async()=>{
