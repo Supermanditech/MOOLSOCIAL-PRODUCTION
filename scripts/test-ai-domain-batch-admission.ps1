@@ -530,4 +530,14 @@ $bad=($quoteRecurrence|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.owners+=@
 Check (!(Test-AiDomainQuoteRecurrenceAdmission $bad)) 'reject expanded recurrence owners'
 $bad=($quoteRecurrence|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.incident.correctiveSourceRetryPerformed=$true
 Check (!(Test-AiDomainQuoteRecurrenceAdmission $bad)) 'reject changed incident boundary'
+$historicalRaw=@(& git -C $root show '600a05992dea066d73cb1c108357b58d1039bef7:docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')
+if($LASTEXITCODE -ne 0){throw 'Original recurrence checkpoint missing'}
+$historical=($historicalRaw -join "`n"|ConvertFrom-Json).quoteImplementationRecurrence20261029
+Check (Test-AiDomainQuoteRecurrenceAdmission $historical -Historical) 'preserve exact historical recurrence authority'
+Check (!(Test-AiDomainQuoteRecurrenceAdmission $historical)) 'old file-fragment evidence cannot be current admission'
+foreach($property in @('after','replacements','existingEntries','metadataCommitSubject')){
+ $bad=($quoteRecurrence|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.evidencePathCorrection.$property=if($property -cin @('replacements','existingEntries')){99}else{'foreign'}
+ Check (!(Test-AiDomainQuoteRecurrenceAdmission $bad)) "reject changed literal evidence correction $property"
+}
 Write-Output "AI domain batch admission checks passed: $n."

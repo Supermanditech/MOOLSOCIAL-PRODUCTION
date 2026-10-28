@@ -1143,30 +1143,34 @@ function Invoke-AiDomainPrivateStarsTestAdmission($Admission,[string]$Head,[stri
 function Get-AiDomainQuoteRecurrenceAdmissionOwners {
  @('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json','config/codex-development-regression-registry.json','scripts/ai-domain-batch-admission.ps1','scripts/test-ai-domain-batch-admission.ps1')
 }
-function Test-AiDomainQuoteRecurrenceAdmission($Admission) {
+function Test-AiDomainQuoteRecurrenceAdmission($Admission,[switch]$Historical) {
  if($null -eq $Admission){return $false}
  $raw=$Admission|ConvertTo-Json -Depth 60 -Compress
- return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($raw))) -ceq '4AEA64EC6CB51D0CEDE173ADD33FD8C69943C871FC08B4F474C04DA2EC573C38'
+ $hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($raw)))
+ return $hash -ceq 'E91BEB4632C544C0E61D7B23105A060DE2CB0F3D64B4A738415C04C15E17A05F' -or
+   ($Historical -and $hash -ceq '4AEA64EC6CB51D0CEDE173ADD33FD8C69943C871FC08B4F474C04DA2EC573C38')
 }
 function Invoke-AiDomainQuoteRecurrenceAdmission($Admission,[string]$Head,[string]$Phase) {
- Assert-Coordination (Test-AiDomainQuoteRecurrenceAdmission $Admission) 'Exact existing regression recurrence admission required.'
+ Assert-Coordination (Test-AiDomainQuoteRecurrenceAdmission $Admission) 'Exact corrected existing regression recurrence admission required.'
  $base=$Admission.baseline;$allowed=@(Get-AiDomainQuoteRecurrenceAdmissionOwners)
  $chain=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"${base}..${Head}"))
- Assert-Coordination ($chain.Count -le 1) 'Only one exact recurrence metadata commit admitted.'
- if($chain.Count -eq 1){
-  Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$chain[0]))[0]) -ceq $base -and
-   (@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$chain[0]))[0]) -ceq $Admission.metadataCommitSubject -and
-   (@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base,$chain[0])|Sort-Object)-join '|') -ceq (@($allowed|Sort-Object)-join '|')) 'Recurrence parent, subject or exact owners changed.'
-  $sealed=(@(Get-OctoberCompatibilityGitLines @('show',"$($chain[0]):docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json"))-join "`n")|ConvertFrom-Json
-  Assert-Coordination (Test-AiDomainQuoteRecurrenceAdmission $sealed.quoteImplementationRecurrence20261029) 'Committed recurrence admission changed.'
+ Assert-Coordination ($chain.Count -ge 1 -and $chain.Count -le 2) 'Only exact registered recurrence and literal evidence-path correction admitted.'
+ $subjects=@($Admission.metadataCommitSubject,$Admission.evidencePathCorrection.metadataCommitSubject)
+ for($i=0;$i -lt $chain.Count;$i++){
+  $parent=if($i -eq 0){$base}else{$chain[$i-1]}
+  Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$chain[$i]))[0]) -ceq $parent -and
+   (@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$chain[$i]))[0]) -ceq $subjects[$i] -and
+   (@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$parent,$chain[$i])|Sort-Object)-join '|') -ceq (@($allowed|Sort-Object)-join '|')) 'Recurrence/correction parent, subject or exact owners changed.'
+  $sealed=(@(Get-OctoberCompatibilityGitLines @('show',"$($chain[$i]):docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json"))-join "`n")|ConvertFrom-Json
+  Assert-Coordination (Test-AiDomainQuoteRecurrenceAdmission $sealed.quoteImplementationRecurrence20261029 -Historical:($i -eq 0)) 'Committed recurrence admission changed.'
  }
  Assert-Coordination ((Get-Sha256 (Join-Path $root 'config/codex-development-regression-registry.json')) -ceq $Admission.registryAfterSha256) 'Registered recurrence bytes changed.'
  foreach($owner in @(Get-AiDomainBatchMetadataOwners)){
-  if($chain.Count -eq 0 -and $owner -cin $allowed){continue}
+  if($chain.Count -eq 1 -and $owner -cin $allowed){continue}
   Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
  }
  if($Phase -ceq 'pre_commit'){
-  Assert-Coordination ($chain.Count -eq 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($allowed|Sort-Object)-join '|')) 'Only exact recurrence metadata may be committed.'
+  Assert-Coordination ($chain.Count -eq 1 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($allowed|Sort-Object)-join '|')) 'Only exact recurrence evidence-path metadata correction may be committed.'
  }
 }
 
@@ -1201,7 +1205,7 @@ function Invoke-AiDomainBatchAdmission {
  $scopeTwo = $approval.scope02Admission
  $scopeTwoCheckpoint = $approval.scope02Checkpoint
  $middle=if($approval.PSObject.Properties.Name -ccontains 'scope03Through07Checkpoint'){$approval.scope03Through07Checkpoint}else{$null}
- $metadataCount = if($null -ne $quoteRecurrence){25} elseif($null -ne $cartClearCheckpoint){24} elseif($null -ne $purchaseReferenceCheckpoint){23} elseif($null -ne $publicationReadyCheckpoint){22} elseif($null -ne $storeSettingsCheckpoint){21} elseif($null -ne $storeReportsCheckpoint){20} elseif($null -ne $storeCouponsCheckpoint){19} elseif($null -ne $storeOperationsCheckpoint){18} elseif($null -ne $originalReceivingCheckpoint){17} elseif($null -ne $purchaseRootCheckpoint){16} elseif($null -ne $supplierDraftCheckpoint){15} elseif($null -ne $privateStarsCheckpoint){14} elseif($null -ne $privateStarsAdmission){13} elseif($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
+ $metadataCount = if($null -ne $quoteRecurrence){26} elseif($null -ne $cartClearCheckpoint){24} elseif($null -ne $purchaseReferenceCheckpoint){23} elseif($null -ne $publicationReadyCheckpoint){22} elseif($null -ne $storeSettingsCheckpoint){21} elseif($null -ne $storeReportsCheckpoint){20} elseif($null -ne $storeCouponsCheckpoint){19} elseif($null -ne $storeOperationsCheckpoint){18} elseif($null -ne $originalReceivingCheckpoint){17} elseif($null -ne $purchaseRootCheckpoint){16} elseif($null -ne $supplierDraftCheckpoint){15} elseif($null -ne $privateStarsCheckpoint){14} elseif($null -ne $privateStarsAdmission){13} elseif($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
  Assert-Coordination ($approval.acceptedUiCommit -ceq $base -and $approval.uiContractSha256 -ceq $hash -and $approval.founderAnswer -ceq 'EXECUTE' -and $approval.localMetadataCommits -eq $metadataCount -and !$approval.sourceFeatureCommits -and !$approval.backendBranchPush -and !$approval.deployment -and !$approval.productionAcceptance) 'Exact acceptance/authority differs.'
  if ($null -ne $checkpoint) {Assert-Coordination ($binding.id -ceq 'ai_domain_batch_20261028' -and $binding.state -ceq 'founder_authorized_2026_10_28') 'Correct current batch identity required; no stale Profile or History binding.'}
  Assert-Coordination ((Get-Sha256 (Join-Path $root 'docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md')) -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $record.backendAdmission.originalProviderTestAddendum.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $approval.originalProviderTestAdmission.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22') 'Exact original-provider test boundary changed.'
@@ -1215,7 +1219,7 @@ function Invoke-AiDomainBatchAdmission {
  $inc.uiFounderReview.acceptedScopes=@($inc.uiFounderReview.acceptedScopes)+@([pscustomobject]@{id='assistant.domains';uiCommit=$base;contractPath=$contract;contractSha256=$hash})
  $actual=Get-Content -Raw (Join-Path $root 'config/cross-agent-incremental-ticket-gate.json')|ConvertFrom-Json
  Assert-Coordination (($actual|ConvertTo-Json -Depth 100 -Compress) -ceq ($inc|ConvertTo-Json -Depth 100 -Compress)) 'Unrelated incremental gate changed.'
- Assert-Coordination ($ExpectedRegistryEntryCount -eq 4624 -and $ExpectedRegistrySha256 -ceq $(if($null -ne $quoteRecurrence){'C67831B680E27B5A85096539A4E95D7D3333C5D4DC242A3D479319143BAA52D7'}else{'4B3DF3778AC782C95C287D209493C91052F7497C92CEB700FAC40ABF0DA30F2A'}) -and (Get-Sha256 (Join-Path $root 'config/codex-development-regression-registry.json')) -ceq $ExpectedRegistrySha256) 'Regression pin changed.'
+ Assert-Coordination ($ExpectedRegistryEntryCount -eq 4624 -and $ExpectedRegistrySha256 -ceq $(if($null -ne $quoteRecurrence){'99877C81D4B09BA26DDF2C24E307D027A258E9A26C87E0C0BE9A499B2981842B'}else{'4B3DF3778AC782C95C287D209493C91052F7497C92CEB700FAC40ABF0DA30F2A'}) -and (Get-Sha256 (Join-Path $root 'config/codex-development-regression-registry.json')) -ceq $ExpectedRegistrySha256) 'Regression pin changed.'
  $head=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))[0];Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$base,$head)|Out-Null
  $commits=@(Get-OctoberCompatibilityGitLines @('rev-list',"$base..$head"))
  if($null -ne $middle){
@@ -1241,7 +1245,7 @@ function Invoke-AiDomainBatchAdmission {
  if($null -ne $publicationReadyCheckpoint){Assert-Coordination ($null -ne $storeSettingsCheckpoint -and (Test-AiDomainStorePublicationReadyCheckpoint $publicationReadyCheckpoint)) 'Exact prior Store-details checkpoint and qualified publication-ready correction required.'}
  if($null -ne $purchaseReferenceCheckpoint){Assert-Coordination ($null -ne $publicationReadyCheckpoint -and (Test-AiDomainPurchaseReferenceCheckpoint $purchaseReferenceCheckpoint)) 'Exact prior publication-ready checkpoint and qualified purchase-reference integration required.'}
  if($null -ne $cartClearCheckpoint){Assert-Coordination ($null -ne $purchaseReferenceCheckpoint -and (Test-AiDomainCartClearCheckpoint $cartClearCheckpoint)) 'Exact prior reference checkpoint and qualified original Cart clearing required.'}
- $maximumCommits = if($null -ne $quoteRecurrence){57} elseif($null -ne $cartClearCheckpoint){56} elseif($null -ne $purchaseReferenceCheckpoint){53} elseif($null -ne $publicationReadyCheckpoint){50} elseif($null -ne $storeSettingsCheckpoint){47} elseif($null -ne $storeReportsCheckpoint){44} elseif($null -ne $storeCouponsCheckpoint){41} elseif($null -ne $storeOperationsCheckpoint){38} elseif($null -ne $originalReceivingCheckpoint){35} elseif($null -ne $purchaseRootCheckpoint){32} elseif($null -ne $supplierDraftCheckpoint){29} elseif($null -ne $privateStarsCheckpoint){26} elseif($null -ne $privateStarsAdmission){23} elseif($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
+ $maximumCommits = if($null -ne $quoteRecurrence){58} elseif($null -ne $cartClearCheckpoint){56} elseif($null -ne $purchaseReferenceCheckpoint){53} elseif($null -ne $publicationReadyCheckpoint){50} elseif($null -ne $storeSettingsCheckpoint){47} elseif($null -ne $storeReportsCheckpoint){44} elseif($null -ne $storeCouponsCheckpoint){41} elseif($null -ne $storeOperationsCheckpoint){38} elseif($null -ne $originalReceivingCheckpoint){35} elseif($null -ne $purchaseRootCheckpoint){32} elseif($null -ne $supplierDraftCheckpoint){29} elseif($null -ne $privateStarsCheckpoint){26} elseif($null -ne $privateStarsAdmission){23} elseif($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
  Assert-Coordination ($commits.Count -le $maximumCommits -and @(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$base..$head")).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('ls-files','-v')|Where-Object {$_ -cmatch '^[a-zS] '}).Count -eq 0) 'Only exact admitted checkpoint history; no history/index overrides.'
  $changed=@(@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base))+@(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')))|Sort-Object -Unique
  Assert-AiDomainBatchOwners $changed $owners

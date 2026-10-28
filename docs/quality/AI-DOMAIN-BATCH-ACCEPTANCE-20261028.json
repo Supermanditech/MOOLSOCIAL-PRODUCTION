@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 25,
+  "localMetadataCommits": 26,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -6213,7 +6213,7 @@
     "metadataCommitSubject": "coordination(ai-domain-batch-20261028): record retained quote implementation regression recurrence",
     "registryCount": 4624,
     "registryBeforeSha256": "4B3DF3778AC782C95C287D209493C91052F7497C92CEB700FAC40ABF0DA30F2A",
-    "registryAfterSha256": "C67831B680E27B5A85096539A4E95D7D3333C5D4DC242A3D479319143BAA52D7",
+    "registryAfterSha256": "99877C81D4B09BA26DDF2C24E307D027A258E9A26C87E0C0BE9A499B2981842B",
     "owners": [
       "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
       "config/codex-development-regression-registry.json",
@@ -6257,6 +6257,19 @@
     "newPolicyOrBusinessRule": false,
     "runtimeOwnerExpansion": false,
     "sourceOrProductionAcceptanceClaimed": false,
-    "oneLocalMetadataCommitAuthorizedByStandingScope": true
+    "oneLocalMetadataCommitAuthorizedByStandingScope": true,
+    "evidencePathCorrection": {
+      "before": "C67831B680E27B5A85096539A4E95D7D3333C5D4DC242A3D479319143BAA52D7",
+      "after": "99877C81D4B09BA26DDF2C24E307D027A258E9A26C87E0C0BE9A499B2981842B",
+      "count": 4624,
+      "replacements": 4,
+      "existingEntries": 2,
+      "scope": "Correct literal repository evidence file references only; section remains in pinned admission object",
+      "runtimeChanged": false,
+      "oppoRestartBlockedBeforeDispatch": true,
+      "log": "oppo-scope05-retained-quotes-v1/oppo-restart-gate.log",
+      "baseline": "600a05992dea066d73cb1c108357b58d1039bef7",
+      "metadataCommitSubject": "coordination(ai-domain-batch-20261028): correct existing regression evidence file references"
+    }
   }
 }
