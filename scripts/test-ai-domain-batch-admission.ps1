@@ -164,4 +164,32 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,4),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainAddressCacheStageOwners $row[0] $cacheSeal).Count -eq $row[1]) "cache checkpoint exact stage $($row[0]) owner count"
 }
+$orderSeal=$approval.scope09OrderOriginalCheckpoint
+Check (Test-AiDomainOrderOriginalCheckpoint $orderSeal) 'exact qualified original-order checkpoint'
+Check (@(Get-AiDomainOrderOriginalSealOwners).Count -eq 3) 'only three existing metadata owners for original-order seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($orderSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainOrderOriginalCheckpoint $bad)) "reject changed original-order seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($orderSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainOrderOriginalCheckpoint $bad)) "reject changed original-order qualified source $property"
+}
+$bad=($orderSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainOrderOriginalCheckpoint $bad)) 'reject original-order source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($orderSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainOrderOriginalCheckpoint $bad)) "reject expanded original-order qualification $property"
+}
+$bad=($orderSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAgentJourneyQualified=$true
+Check (!(Test-AiDomainOrderOriginalCheckpoint $bad)) 'reject fabricated original-order device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($orderSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainOrderOriginalCheckpoint $bad)) "reject changed original-order evidence $property"
+}
+foreach($row in @(@(0,3),@(1,12),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainOrderOriginalStageOwners $row[0] $orderSeal).Count -eq $row[1]) "original-order checkpoint exact stage $($row[0]) owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."
