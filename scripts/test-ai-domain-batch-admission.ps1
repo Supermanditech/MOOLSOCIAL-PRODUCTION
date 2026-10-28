@@ -294,4 +294,32 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,8),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainPurchaseRootStageOwners $row[0] $purchaseSeal).Count -eq $row[1]) "purchase-root checkpoint exact stage $($row[0]) owner count"
 }
+$receivingSeal=$approval.scope13OriginalReceivingCheckpoint
+Check (Test-AiDomainOriginalReceivingCheckpoint $receivingSeal) 'exact qualified original-receiving checkpoint'
+Check (@(Get-AiDomainOriginalReceivingSealOwners).Count -eq 3) 'only three existing metadata owners for original-receiving seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($receivingSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainOriginalReceivingCheckpoint $bad)) "reject changed original-receiving seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($receivingSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainOriginalReceivingCheckpoint $bad)) "reject changed original-receiving qualified source $property"
+}
+$bad=($receivingSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainOriginalReceivingCheckpoint $bad)) 'reject original-receiving source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($receivingSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainOriginalReceivingCheckpoint $bad)) "reject expanded original-receiving qualification $property"
+}
+$bad=($receivingSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAgentJourneyQualified=$true
+Check (!(Test-AiDomainOriginalReceivingCheckpoint $bad)) 'reject fabricated original-receiving device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($receivingSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainOriginalReceivingCheckpoint $bad)) "reject changed original-receiving evidence $property"
+}
+foreach($row in @(@(0,3),@(1,13),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainOriginalReceivingStageOwners $row[0] $receivingSeal).Count -eq $row[1]) "original-receiving checkpoint exact stage $($row[0]) owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."
