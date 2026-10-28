@@ -232,5 +232,22 @@
       "scope": "Existing original reviewed-product acknowledgement and typed canonical-to-native identity mapping only. No new source, master or business effect.",
       "authority": "Original20-scope EXECUTE and standing exact necessary admissions; not separate founder hash review."
     }
+  },
+  "scope03Through07SourceCheckpoint": {
+    "baseline": "e9083ed57476a51a3a50e4f1d4dbb06dd99aaea7",
+    "manifestIdentitySha256": "5D6CB7245B2189B39610EEE7739E1D542F545908084F519AD38C832DB93F91AF",
+    "qualifiedRuntimeOwners": 33,
+    "changedRuntimeOwners": 21,
+    "scopes": [
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "state": "partial_current_tree_integration_recovery_checkpoint",
+    "authority": "Existing founder standing exact source/evidence admission and named batch branch push; not new policy, blanket source authority, or founder production acceptance",
+    "originalBuyCacheOwnerAdmissionStillPending": true,
+    "noDeploymentOrApk": true
   }
 }

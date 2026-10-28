@@ -75,4 +75,41 @@ foreach($row in @(@(0,3),@(1,22),@(2,3),@(3,1),@(4,0))) {
  $stageOwners=@(Get-AiDomainScopeTwoStageOwners $row[0] $approval.scope02Checkpoint)
  Check ($stageOwners.Count -eq $row[1]) "product checkpoint stage $($row[0]) retains exact array owner count"
 }
+$middle=$approval.scope03Through07Checkpoint
+Check (Test-AiDomainMiddleCheckpoint $middle) 'exact tested partial integration recovery checkpoint'
+Check (@(Get-AiDomainMiddleSealOwners).Count -eq 4) 'only four existing metadata owners for current partial checkpoint'
+foreach($property in @('scope','baseline','branch','identitySha256')) {
+ $bad=($middle.manifest|ConvertTo-Json -Depth 40)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainMiddleManifest $bad)) "reject changed middle manifest $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($middle.manifest|ConvertTo-Json -Depth 40)|ConvertFrom-Json
+ $bad.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainMiddleManifest $bad)) "reject changed middle source $property"
+}
+$bad=($middle.manifest|ConvertTo-Json -Depth 40)|ConvertFrom-Json;$bad.changedOwners[0]='backend/functions/src/foreign.ts'
+Check (!(Test-AiDomainMiddleManifest $bad)) 'reject expanded middle source owner'
+$bad=($middle.manifest|ConvertTo-Json -Depth 40)|ConvertFrom-Json;$bad.owners=@($bad.owners)+@($bad.owners[0])
+Check (!(Test-AiDomainMiddleManifest $bad)) 'reject duplicate middle owner'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($middle|ConvertTo-Json -Depth 50)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainMiddleCheckpoint $bad)) "reject changed middle checkpoint $property"
+}
+foreach($property in @('noWholeScopeCompletionClaimed','noProductionAcceptance','noLiveEffectsOrCloudOrApk','goalRemainsActive')) {
+ $bad=($middle|ConvertTo-Json -Depth 50)|ConvertFrom-Json;$bad.disposition.$property=$false
+ Check (!(Test-AiDomainMiddleCheckpoint $bad)) "reject changed partial qualification limit $property"
+}
+$bad=($middle|ConvertTo-Json -Depth 50)|ConvertFrom-Json;$bad.disposition.oppo.populatedAgentRequestsVerified=$true
+Check (!(Test-AiDomainMiddleCheckpoint $bad)) 'reject fabricated populated device qualification'
+$bad=($middle|ConvertTo-Json -Depth 50)|ConvertFrom-Json;$bad.disposition.hostEvidence.nativeWork=999
+Check (!(Test-AiDomainMiddleCheckpoint $bad)) 'reject changed host test count'
+foreach($property in @('path','sha256')) {
+ $bad=($middle|ConvertTo-Json -Depth 50)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainMiddleCheckpoint $bad)) "reject changed qualified evidence $property"
+}
+foreach($row in @(@(0,4),@(1,21),@(2,1),@(3,0))) {
+ $stageOwners=@(Get-AiDomainMiddleStageOwners $row[0] $middle)
+ Check ($stageOwners.Count -eq $row[1]) "middle checkpoint stage $($row[0]) retains exact array owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."

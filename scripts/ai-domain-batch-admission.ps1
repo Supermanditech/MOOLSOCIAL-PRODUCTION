@@ -155,7 +155,7 @@ function Test-AiDomainScopeTwoManifest($Manifest) {
   return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($lines -join "`n")))) -ceq '1126F62DA12DBD0FA717DB4C69303DE709B1CCDA520F4C9E5C51A2D96840C3F4'
  } catch {return $false}
 }
-function Invoke-AiDomainScopeTwoCheckpoint($Checkpoint,[string]$Head,[string]$Phase) {
+function Invoke-AiDomainScopeTwoCheckpoint($Checkpoint,[string]$Head,[string]$Phase,[switch]$Continuation) {
  $base='9aa3c913876aa53e3f3da5559b5c7b9de43d6331';$approvalOwner='docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json'
  $metadata=@(Get-AiDomainScopeTwoSealOwners)
  Assert-Coordination ($Checkpoint.sequence -eq 2 -and $Checkpoint.namedBranchPushAuthorized -eq $true -and
@@ -190,12 +190,85 @@ function Invoke-AiDomainScopeTwoCheckpoint($Checkpoint,[string]$Head,[string]$Ph
   else {Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($chain[1]):$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Committed product source differs from tested manifest.'}
  }
  foreach($owner in @(Get-AiDomainBatchMetadataOwners)) {
+  if($Continuation){continue}
   if(($chain.Count -cin @(0,2) -and $owner -cin $metadata) -or ($chain.Count -eq 3 -and $Phase -ceq 'pre_commit' -and $owner -ceq $approvalOwner)){continue}
   Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
  }
  if($Phase -ceq 'pre_commit') {
   $expected=@(Get-AiDomainScopeTwoStageOwners $chain.Count $Checkpoint)
   Assert-Coordination ($expected.Count -gt 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Only exact qualified product checkpoint owners may be staged.'
+ }
+}
+function Get-AiDomainMiddleSealOwners {
+ @('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json','docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json',
+   'scripts/ai-domain-batch-admission.ps1','scripts/test-ai-domain-batch-admission.ps1')
+}
+function Get-AiDomainMiddleStageOwners([int]$Count,$Checkpoint) {
+ switch($Count){0 {Get-AiDomainMiddleSealOwners} 1 {$Checkpoint.manifest.changedOwners} 2 {'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json'} default {@()}}
+}
+function Test-AiDomainMiddleManifest($Manifest) {
+ try {
+  if($null -eq $Manifest -or $Manifest.scope -cne '03-through07' -or
+    $Manifest.baseline -cne 'e9083ed57476a51a3a50e4f1d4dbb06dd99aaea7' -or
+    $Manifest.branch -cne 'work/codex-backend/ai-domain-batch-20261028' -or
+    @($Manifest.owners).Count -ne 33 -or @($Manifest.changedOwners).Count -ne 21 -or
+    (@($Manifest.owners.path)-join '|') -cne (@(Get-AiDomainBatchRuntimeOwners)-join '|')){return $false}
+  $lines=@('scope03-through07',[string]$Manifest.baseline,[string]$Manifest.branch)
+  foreach($row in $Manifest.owners){
+   if($row.bytes -le 0 -or $row.sha256 -cnotmatch '^[A-F0-9]{64}$' -or $row.gitBlobOid -cnotmatch '^[a-f0-9]{40}$'){return $false}
+   $lines+=('{0}|{1}|{2}|{3}' -f $row.path,$row.bytes,$row.sha256,$row.gitBlobOid)
+  }
+  $lines+=@($Manifest.changedOwners)
+  $hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($lines-join "`n"))))
+  return $hash -ceq '5D6CB7245B2189B39610EEE7739E1D542F545908084F519AD38C832DB93F91AF' -and $Manifest.identitySha256 -ceq $hash
+ }catch{return $false}
+}
+function Test-AiDomainMiddleCheckpoint($Checkpoint) {
+ try {
+  return $null -ne $Checkpoint -and $Checkpoint.sequence -ceq '03-through07' -and
+   $Checkpoint.baseline -ceq 'e9083ed57476a51a3a50e4f1d4dbb06dd99aaea7' -and
+   $Checkpoint.namedBranchPushAuthorized -eq $true -and $Checkpoint.productionAcceptance -eq $false -and
+   (Test-AiDomainMiddleManifest $Checkpoint.manifest) -and
+   [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($Checkpoint.disposition|ConvertTo-Json -Depth 40 -Compress)))) -ceq '163300F88FC0EC94A91E4A40FC90641A039DA4205F2DEE31DFED613689C47227' -and
+   [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($Checkpoint.evidence|ConvertTo-Json -Depth 20 -Compress)))) -ceq '2027583CBB86F5F31189AC265E58BC770C279E3D894BC4D2D3C77B7BDB9C366E'
+ }catch{return $false}
+}
+function Invoke-AiDomainMiddleCheckpoint($Checkpoint,[string]$Head,[string]$Phase) {
+ $base='e9083ed57476a51a3a50e4f1d4dbb06dd99aaea7';$approvalOwner='docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json'
+ Assert-Coordination (Test-AiDomainMiddleCheckpoint $Checkpoint) 'Only the exact tested partial integration/recovery checkpoint is admitted.'
+ $chain=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"${base}..${Head}"))
+ Assert-Coordination ($chain.Count -le 3) 'Only exact middle-checkpoint metadata, source and evidence commits are admitted.'
+ $subjects=@('coordination(ai-domain-batch-20261028): admit exact partial integration checkpoint',
+   'feat(ai-domain-batch-20261028): connect original product stock restock and cart reviews',
+   'test(ai-domain-batch-20261028): record partial integration qualification and limits')
+ for($i=0;$i -lt $chain.Count;$i++){
+  $parent=if($i -eq 0){$base}else{$chain[$i-1]};$expected=@(Get-AiDomainMiddleStageOwners $i $Checkpoint)
+  Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$chain[$i]))[0]) -ceq $parent -and
+   (@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$chain[$i]))[0]) -ceq $subjects[$i] -and
+   (@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$parent,$chain[$i])|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Middle checkpoint parent, subject or exact staged owners changed.'
+ }
+ if($chain.Count -gt 0){
+  $sealed=((@(Get-OctoberCompatibilityGitLines @('show',"$($chain[0]):$approvalOwner")))-join "`n")|ConvertFrom-Json
+  Assert-Coordination (($sealed.scope03Through07Checkpoint.manifest|ConvertTo-Json -Depth 40 -Compress) -ceq ($Checkpoint.manifest|ConvertTo-Json -Depth 40 -Compress) -and
+   ($sealed.scope03Through07Checkpoint.disposition|ConvertTo-Json -Depth 40 -Compress) -ceq ($Checkpoint.disposition|ConvertTo-Json -Depth 40 -Compress)) 'Qualified middle source or partial dispositions changed after admission.'
+ }
+ foreach($row in $Checkpoint.manifest.owners){
+  if($chain.Count -lt 2){Assert-Coordination ((Get-Sha256 (Join-Path $root $row.path)) -ceq $row.sha256 -and
+    (@(Get-OctoberCompatibilityGitLines @('hash-object',"--path=$($row.path)",$row.path))[0]) -ceq $row.gitBlobOid) 'Working middle source differs from qualification.'}
+  else{Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($chain[1]):$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Committed middle source differs from qualification.'}
+ }
+ foreach($owner in @(Get-AiDomainBatchMetadataOwners)){
+  if(($chain.Count -eq 0 -and $owner -cin @(Get-AiDomainMiddleSealOwners)) -or
+    ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit' -and $owner -ceq $approvalOwner)){continue}
+  Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
+ }
+ if($chain.Count -eq 3){Assert-Coordination ($Checkpoint.sourceCommit -ceq $chain[1]) 'Middle evidence must name the original qualified source commit.'}
+ if($Phase -ceq 'pre_commit'){
+  $expected=@(Get-AiDomainMiddleStageOwners $chain.Count $Checkpoint)
+  Assert-Coordination ($expected.Count -gt 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Only the exact middle-checkpoint stage may be committed.'
+  if($chain.Count -eq 1){foreach($row in $Checkpoint.manifest.owners){
+   Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',":$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Staged middle source differs from qualification.'
+  }}
  }
 }
 function Invoke-AiDomainBatchAdmission {
@@ -210,7 +283,8 @@ function Invoke-AiDomainBatchAdmission {
  $checkpoint = $approval.scope01Checkpoint
  $scopeTwo = $approval.scope02Admission
  $scopeTwoCheckpoint = $approval.scope02Checkpoint
- $metadataCount = if ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
+ $middle=if($approval.PSObject.Properties.Name -ccontains 'scope03Through07Checkpoint'){$approval.scope03Through07Checkpoint}else{$null}
+ $metadataCount = if($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
  Assert-Coordination ($approval.acceptedUiCommit -ceq $base -and $approval.uiContractSha256 -ceq $hash -and $approval.founderAnswer -ceq 'EXECUTE' -and $approval.localMetadataCommits -eq $metadataCount -and !$approval.sourceFeatureCommits -and !$approval.backendBranchPush -and !$approval.deployment -and !$approval.productionAcceptance) 'Exact acceptance/authority differs.'
  if ($null -ne $checkpoint) {Assert-Coordination ($binding.id -ceq 'ai_domain_batch_20261028' -and $binding.state -ceq 'founder_authorized_2026_10_28') 'Correct current batch identity required; no stale Profile or History binding.'}
  Assert-Coordination ((Get-Sha256 (Join-Path $root 'docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md')) -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $record.backendAdmission.originalProviderTestAddendum.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $approval.originalProviderTestAdmission.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22') 'Exact original-provider test boundary changed.'
@@ -227,7 +301,16 @@ function Invoke-AiDomainBatchAdmission {
  Assert-Coordination ($ExpectedRegistryEntryCount -eq 4624 -and $ExpectedRegistrySha256 -ceq '4B3DF3778AC782C95C287D209493C91052F7497C92CEB700FAC40ABF0DA30F2A' -and (Get-Sha256 (Join-Path $root 'config/codex-development-regression-registry.json')) -ceq $ExpectedRegistrySha256) 'Regression pin changed.'
  $head=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))[0];Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$base,$head)|Out-Null
  $commits=@(Get-OctoberCompatibilityGitLines @('rev-list',"$base..$head"))
- $maximumCommits = if ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
+ if($null -ne $middle){
+  Assert-Coordination (Test-AiDomainMiddleCheckpoint $middle) 'Exact middle checkpoint is required before any later history is admitted.'
+  Assert-Coordination ($record.scope03Through07SourceCheckpoint.baseline -ceq 'e9083ed57476a51a3a50e4f1d4dbb06dd99aaea7' -and
+   $record.scope03Through07SourceCheckpoint.manifestIdentitySha256 -ceq $middle.manifest.identitySha256 -and
+   $record.scope03Through07SourceCheckpoint.qualifiedRuntimeOwners -eq 33 -and
+   $record.scope03Through07SourceCheckpoint.changedRuntimeOwners -eq 21 -and
+   $record.scope03Through07SourceCheckpoint.originalBuyCacheOwnerAdmissionStillPending -eq $true -and
+   $record.scope03Through07SourceCheckpoint.noDeploymentOrApk -eq $true) 'Current source-record binding or qualification boundary changed.'
+ }
+ $maximumCommits = if($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
  Assert-Coordination ($commits.Count -le $maximumCommits -and @(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$base..$head")).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('ls-files','-v')|Where-Object {$_ -cmatch '^[a-zS] '}).Count -eq 0) 'Only exact admitted checkpoint history; no history/index overrides.'
  $changed=@(@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base))+@(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')))|Sort-Object -Unique
  Assert-AiDomainBatchOwners $changed $owners
@@ -257,7 +340,10 @@ function Invoke-AiDomainBatchAdmission {
      if ($null -ne $scopeTwo) {
       if($null -ne $scopeTwoCheckpoint) {
        Invoke-AiDomainScopeTwoAdmission $scopeTwo '9aa3c913876aa53e3f3da5559b5c7b9de43d6331' 'implementation' -Continuation
-       Invoke-AiDomainScopeTwoCheckpoint $scopeTwoCheckpoint $head $ProductionPhase
+       if($null -ne $middle){
+        Invoke-AiDomainScopeTwoCheckpoint $scopeTwoCheckpoint 'e9083ed57476a51a3a50e4f1d4dbb06dd99aaea7' 'implementation' -Continuation
+        Invoke-AiDomainMiddleCheckpoint $middle $head $ProductionPhase
+       }else{Invoke-AiDomainScopeTwoCheckpoint $scopeTwoCheckpoint $head $ProductionPhase}
       } else {Invoke-AiDomainScopeTwoAdmission $scopeTwo $head $ProductionPhase}
       Invoke-AiDomainScopeOneCheckpoint $checkpoint '785d375a6170e585d575d57c567e17573655e02f' 'implementation' -Continuation
      }
