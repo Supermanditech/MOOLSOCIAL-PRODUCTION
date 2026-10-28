@@ -71,4 +71,8 @@ foreach($property in @('path','bytes','sha256','gitBlobOid')) {
 }
 $bad=($productManifest|ConvertTo-Json -Depth 40)|ConvertFrom-Json;$bad.changedOwners[0]='backend/functions/src/foreign.ts'
 Check (!(Test-AiDomainScopeTwoManifest $bad)) 'reject unrelated product source owner'
+foreach($row in @(@(0,3),@(1,22),@(2,3),@(3,1),@(4,0))) {
+ $stageOwners=@(Get-AiDomainScopeTwoStageOwners $row[0] $approval.scope02Checkpoint)
+ Check ($stageOwners.Count -eq $row[1]) "product checkpoint stage $($row[0]) retains exact array owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."

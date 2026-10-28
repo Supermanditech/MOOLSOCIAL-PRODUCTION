@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 7,
+  "localMetadataCommits": 8,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -751,6 +751,63 @@
     },
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
-    "authority": "Existing EXECUTE/standing exact necessary source and sanitized evidence checkpoints, not separate founder hash review."
+    "authority": "Existing EXECUTE/standing exact necessary source and sanitized evidence checkpoints, not separate founder hash review.",
+    "sourceCommit": "a4ded6cae505eccadc8cb7935b810ad4958e379b",
+    "evidence": [
+      {
+        "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-batch-20261028-v1\\scope02-owned-products-original-v13-tests.log",
+        "sha256": "5591936068B441E51068EF307B39A043842E939D9B81664204CF8D87C2AB3239"
+      },
+      {
+        "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-batch-20261028-v1\\scope02-backend-combined-v17-tests.log",
+        "sha256": "CA5F26FC8DFF5726F6D49A28529AFE48143B40A8BB6C5C40D191CCA13F0D2D5D"
+      },
+      {
+        "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-batch-20261028-v1\\scope02-mobile-source-contract-v17-tests.log",
+        "sha256": "DA2E069013822343D9181EDD3FE147B1C93B4F0B6253F7746BFFF51E2936CA43"
+      },
+      {
+        "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-batch-20261028-v1\\scope02-native-product-v17-tests.log",
+        "sha256": "E5ED1E519BE0410C4F2B6462B5BFF4AB4733DAF4968A8C38CC52590ADCF12CEC"
+      },
+      {
+        "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-batch-20261028-v1\\scope02-dart-analysis-v17.log",
+        "sha256": "E305804B141D9B013107169B9B328A4ADA61A2E2348255F06BEDC0775A718989"
+      },
+      {
+        "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-batch-20261028-v1\\scope02-local-firestore-qualification.json",
+        "sha256": "483BA0DDF0D094900773CEDDCE30508E7401600AD6A2D2ECF9CD3C74838694D1"
+      },
+      {
+        "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-batch-20261028-v1\\scope02-capacity-v17-qualification.json",
+        "sha256": "7AF20EE99A9FDC096C440EF5288EE5688200E1445485A7ADC049790DDFB85D5F"
+      },
+      {
+        "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-batch-20261028-v1\\oppo-scope02-v4\\QUALIFICATION.json",
+        "sha256": "93E36AAB631C143CA0D74346A611B59FF1C188722B941E9ABC82BA540DD8F4B4"
+      },
+      {
+        "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-batch-20261028-v1\\oppo-scope02-v4\\VM-SOURCE-VERIFICATION.json",
+        "sha256": "20B4394A037BAF9F51D9400D13974B9BC3F1D7FE599D9BD46111BFBA61F41078"
+      }
+    ],
+    "sourceCheckpointRecorded": {
+      "sourceCommit": "a4ded6cae505eccadc8cb7935b810ad4958e379b",
+      "sourceOwners": 22,
+      "qualifiedRuntimeOwners": 33,
+      "partialScope": true,
+      "goalStillActive": true,
+      "remainingGoal": "All20 scopes require final evidenced dispositions; this is not live agent/production acceptance.",
+      "phoneLimits": "Only reachable evaluation UI; genuine Store/model/domain requests remain unverified."
+    },
+    "metadataTypeCorrection": {
+      "reason": "PowerShell strict-mode scalar Count on one-file evidence stage; preserve explicit owner arrays and qualified runtime manifest. Forward correction, no amended/rebased history.",
+      "runtimeSourceChanged": false,
+      "exactOwners": [
+        "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+        "scripts/ai-domain-batch-admission.ps1",
+        "scripts/test-ai-domain-batch-admission.ps1"
+      ]
+    }
   }
 }
