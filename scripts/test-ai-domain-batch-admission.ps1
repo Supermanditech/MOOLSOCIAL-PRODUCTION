@@ -462,4 +462,32 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,2),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainStorePublicationReadyStageOwners $row[0] $publicationReadySeal).Count -eq $row[1]) "publication-ready checkpoint exact stage $($row[0]) owner count"
 }
+$purchaseReferenceSeal=$approval.scope05PurchaseReferenceCheckpoint
+Check (Test-AiDomainPurchaseReferenceCheckpoint $purchaseReferenceSeal) 'exact qualified purchase-reference checkpoint'
+Check (@(Get-AiDomainPurchaseReferenceSealOwners).Count -eq 3) 'only three existing metadata owners for purchase-reference seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($purchaseReferenceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainPurchaseReferenceCheckpoint $bad)) "reject changed purchase-reference seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($purchaseReferenceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainPurchaseReferenceCheckpoint $bad)) "reject changed purchase-reference qualified source $property"
+}
+$bad=($purchaseReferenceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainPurchaseReferenceCheckpoint $bad)) 'reject purchase-reference source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($purchaseReferenceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainPurchaseReferenceCheckpoint $bad)) "reject expanded purchase-reference qualification $property"
+}
+$bad=($purchaseReferenceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedPurchaseReferenceAiDeviceQualified=$true
+Check (!(Test-AiDomainPurchaseReferenceCheckpoint $bad)) 'reject fabricated purchase-reference device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($purchaseReferenceSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainPurchaseReferenceCheckpoint $bad)) "reject changed purchase-reference evidence $property"
+}
+foreach($row in @(@(0,3),@(1,4),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainPurchaseReferenceStageOwners $row[0] $purchaseReferenceSeal).Count -eq $row[1]) "purchase-reference checkpoint exact stage $($row[0]) owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."
