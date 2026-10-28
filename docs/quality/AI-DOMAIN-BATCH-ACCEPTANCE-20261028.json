@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 29,
+  "localMetadataCommits": 30,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -7285,5 +7285,45 @@
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
     "sourceCommit": "dded763331b9c6b935432d499d34f8a82a85fb9b"
+  },
+  "aggregate02SourceAdmission": {
+    "schemaVersion": 1,
+    "goal": "AI-DOMAIN-AGGREGATE-10",
+    "ticket": "AI-AGG-02",
+    "baseline": "cd500dc93dc0cb8dacb12a021c574b4ede793009",
+    "branch": "work/codex-backend/ai-domain-batch-20261028",
+    "contract": {
+      "path": "AGG02-CONTRACT-v1.md",
+      "sha256": "20255A681EAF84BFF86D404E847DB013DF8D9DDF48DC1E39D6713BAFC0D750CA",
+      "source": "# AI-AGG-02: authoritative catalogue import and owned unpublished preview\n\nBaseline: `cd500dc93dc0cb8dacb12a021c574b4ede793009`, clean and remote-exact. This is aggregate02 of the already activated ten-ticket goal. Standing narrow implementation/admission authority applies. Preserve approved forms and normal manual controls; no new business feature or approval process.\n\n## Original master lookup\n\nUse the current configured canonical catalogue and its existing review state, not published supplier offers or bundled examples. Hydrate descriptive content/pack from the immutable Store submission revision pinned by the exact producer receipt for its proposal audit event. Check realm, tenant/catalogue, product/pack, review state, current approved content version, source revision/fingerprint and exact content/descriptor hashes. Missing or inconsistent original payload is unavailable, not invented text or an empty catalogue.\n\nAdd an owner-authorized read-only `readStoreMasterCatalogue` operation, using existing approved Store owner/membership checks. Return bounded paged verified product/pack identities, normalized original codes, original descriptive facts, source fingerprints and honest page/coverage state. Bind cursors to actor/Store/realm/query and catalogue snapshot; reject stale or foreign continuations. Search must support names and exact original barcode/code matches, preserve ambiguous packs and never infer canonical identity from typed/scanned text. No creator's selling/purchase prices, Stock, buyer/contact details or submitted private intent may leak into the master response.\n\nReuse the native Add product catalogue search and editor. Production never falls back to bundled examples. Review-mode labelled data stays separate. Preserve canonical product and verified pack origin through selection, actual editable form and accepted private Save readback. Only original descriptive source values prefill; the owner supplies their own prices/quantities. No zero/default is advertised as an actual offer or counted Stock. Existing final Save/Submit/Publish controls retain their meaning. Unmatched or ambiguous codes do not silently select another product; manual entry remains an explicit existing choice.\n\nSource images are Store/SKU-bound. Do not copy foreign media ownership or silently remove media and claim the same full content hash. If descriptive projection excludes images, carry a distinct projection fingerprint and exact full source-content fingerprint; image adoption/upload stays deferred. Selected catalogue origin records the verified source, not approval of subsequently edited owner content. Existing publication checks remain unchanged.\n\n## Authenticated private saved drafts\n\nThe audit found three distinct originals: verified-but-unlisted StoreSku records; privately submitted products awaiting review; and standalone native Saves currently persisted only on device. Keep those states distinct. `readProductSubmission` is read-only but cannot stand for an unsubmitted Save. Never change a Save into Submit or manufacture verified IDs.\n\nAdd narrowly scoped private saved-draft persistence/readback using existing owner checks, SKU, normalization/hash, expected revision and idempotent receipt/reconcile patterns. Use `saveStoreProductDraft`, `readStoreProductDraft`, `listStoreProductDrafts` and `reconcileStoreProductDraft`. Store drafts and pending client journals in separate namespaces from product submissions, public listings and Stock records. Persist the original pending request before dispatch. Preserve exact account/Store/realm/SKU and authored fingerprint; source changes, unknown outcomes and app/backend restart must recover without duplicate writes. Preview reads never retry a write. Cancellation never erases an uncertain committed request.\n\nPreserve native local Save and its existing validation. The submission codec is stricter and must not reject previously valid text-only packs. Private draft representation must retain pack label and explicit unknown structured measurements; never invent pack quantity, global canonical identity or verified pack ID. Do not sync financial Stock/cost/ledger data as part of this presentation draft. Missing backend service keeps local data and a truthful pending/unavailable sync state; it does not claim server confirmation. `onDraftReviewed`, import-correction and other preparation-only branches must not dispatch a saved-draft write. Submit/review/publication stays a separate original final action.\n\nAccepted catalogue import readback must identify the same Store SKU and selected original product/pack/proof. If the owner edits source facts, preserve origin as provenance without claiming that their edited content is reviewed or published.\n\n## Original customer presentation\n\nFor230, resolve a real owned source and channel before opening. Bind current actor, approved Store, exact SKU/revision/fingerprint and request lifetime. Re-read original source; reject missing, foreign, changed, unsynced or uncertain records. Published products continue through the unchanged original public reader. Unlisted or draft content remains private and visibly unpublished.\n\nUse the existing BuyV2 product screen and a shared original-source product/content projection. No cloned marketing page or debug provider in production. Preserve all source-supported Retail/Wholesale/Bulk details. Do not surface local-only badges, “Updated by store,” calculated unit price, return-policy/purchase-protection claims or Stock/delivery eligibility absent from the original source. Unknown facts remain unknown. Use one compact preview context rather than a second large header. Disable ordering and unrelated customer effects; route-local state must never overwrite the buyer's real Cart, recovery holds, saved products or account/Store context. Account/Store/revision changes retire the preview.\n\n## Exact source ownership and qualification\n\nReuse already admitted domain context/contracts/index, WorkSession, dashboard, BuyV2Screen, source gateway and native/AI tests as needed. Additional necessary owners are listed in the adjacent exact admission plan: original WorkspaceCatalogueService, Work catalogue gateway, Work secure services, native Add product sheet, their existing gateway/sheet tests and one focused saved-draft test. No unrelated owner, UI redesign, policy/governance feature or new approval mechanism is authorized.\n\nTests must exercise actual production planners/immutable originals, original handlers and gateway decoders; identity/code ambiguity; page/snapshot boundaries; own prices; edited/missing facts; nullable pack measurements; cross-actor/Store/realm; revoked access; stale source; duplicate Save; unknown outcome; timeout/restart/recovery; no write during read/Preview; and unchanged Submit/publication. Add actual form/source parity cases at normal/narrow/enlarged text and keyboard states. Host fixtures must be labelled and isolated. Inspect reachable current source on OPPO and preserve all protected saved-data fingerprints; unavailable authenticated/model/hardware states remain unqualified. Close with tested scoped Git source/evidence commits, clean worktree and exact normal branch remote readback. A partial source slice does not close the whole aggregate.\n\nPayment integration, Google activation/deployment, live model/API, private media/OCR/voice activation, admin UI, live publication/transactions and APK remain deferred. No new pricing, approval, accounting or billing rules.\n"
+    },
+    "additionalOwners": [
+      "backend/functions/src/workspace/workspace_catalogue_service.ts",
+      "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+      "apps/mobile/lib/features/work/work_services.dart",
+      "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+      "apps/mobile/test/work_catalogue_gateway_test.dart",
+      "apps/mobile/test/store_add_product_sheet_test.dart",
+      "apps/mobile/test/work_saved_product_draft_test.dart"
+    ],
+    "metadataOwners": [
+      "docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json",
+      "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "config/codex-subagent-coordination-policy.json",
+      "scripts/ai-domain-batch-admission.ps1",
+      "scripts/test-ai-domain-batch-admission.ps1"
+    ],
+    "admissionCommitSubject": "coordination(ai-domain-batch-20261028): admit exact original catalogue and owned-draft source owners",
+    "standingNarrowApproval": true,
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "newScope": false,
+    "productionAcceptance": false,
+    "deployment": false,
+    "paymentIntegration": false,
+    "admin": false,
+    "mediaActivation": false,
+    "apk": false,
+    "policyDevelopment": false
   }
 }

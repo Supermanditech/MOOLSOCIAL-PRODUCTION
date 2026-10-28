@@ -602,6 +602,25 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,6),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainExpiredPriceStageOwners $row[0] $expiredPriceSeal).Count -eq $row[1]) "expired-price checkpoint exact stage $($row[0]) owner count"
 }
+
+$aggregateTwoSourceAdmission=$approval.aggregate02SourceAdmission
+Check (Test-AiDomainAggregateTwoSourceAdmission $aggregateTwoSourceAdmission) 'exact original catalogue and owned-draft source admission'
+Check (@($aggregateTwoSourceAdmission.additionalOwners).Count -eq 7) 'only seven necessary additional runtime/test owners'
+Check (@($aggregateTwoSourceAdmission.metadataOwners).Count -eq 5) 'only five existing metadata admission owners'
+foreach($property in @('baseline','branch','goal','ticket','standingNarrowApproval','sourceFeatureCommitsAuthorized','backendBranchPushAuthorized','newScope','productionAcceptance','deployment','paymentIntegration','admin','mediaActivation','apk','policyDevelopment')){
+ $bad=($aggregateTwoSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'standingNarrowApproval'){$false}elseif($bad.$property -is [bool]){$true}else{'foreign'}
+ Check (!(Test-AiDomainAggregateTwoSourceAdmission $bad)) "reject changed original source admission $property"
+}
+foreach($property in @('additionalOwners','metadataOwners')){
+ $bad=($aggregateTwoSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.$property+=@('backend/functions/src/foreign.ts')
+ Check (!(Test-AiDomainAggregateTwoSourceAdmission $bad)) "reject expanded original source $property"
+}
+foreach($property in @('sha256','source')){
+ $bad=($aggregateTwoSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.contract.$property='foreign'
+ Check (!(Test-AiDomainAggregateTwoSourceAdmission $bad)) "reject changed original interaction contract $property"
+}
+
 $quoteRecurrence=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).quoteImplementationRecurrence20261029
 Check (Test-AiDomainQuoteRecurrenceAdmission $quoteRecurrence) 'exact registered quote implementation recurrence'
 Check (!(Test-AiDomainQuoteRecurrenceAdmission $null)) 'reject absent quote recurrence'
