@@ -19,6 +19,7 @@ import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/ui_v2/assistant/profile_context_adapter.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart' show BuyShopReviewNativeAdapter;
 import 'account_profile_gateway_test.dart' show Rig, profile, receipt, receiptFor, ProfileIdentity, sessionFixture, CustomerStore, Credentials, Journal;
 
 
@@ -249,7 +250,7 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
   });
   for(final changedAddress in [false,true]) {
-    test('Domain saved address capture withholds stale native cache, address changed $changedAddress, without refreshing or saving',()async{
+    test('Domain saved address capture qualifies only unchanged native cache, address changed $changedAddress, without refreshing or saving',()async{
       final rig=Rig();
       // Keep every Profile read on the same explicit host source.
       final source=_AddressChoiceIdentity(rig),session=sessionFixture(source);await session.start();
@@ -264,17 +265,155 @@ void main() {
         rig.transport.responses.add(saved(0,'HOST original street'));
         expect(await buy.refreshAccountProfileAddresses(preparationOnly:true),isTrue);
         final cache=store.saved,address=buy.addresses.single;
+        var notifications=0;buy.addListener(()=>notifications++);
         rig.transport.responses.add(saved(1,changedAddress?'HOST changed street':'HOST original street'));
         final context=MoolAssistantContext(accountScope:session.authenticatedBuyPersistenceIdentity,
           authenticationRevision:session.navigationAuthenticationGeneration);
         final reader=AssistantOriginalContextReader(session:session,work:work,buy:buy,rootCurrent:()=>true);
         final captured=await reader.read(context,()=>true);
         expect(source.metadata!.reads,1);expect(session.accountProfileGateway!.snapshot!.revision,1);
-        expect(captured.revisions.keys.where((key)=>assistantDomainAddressContextActions.contains(key.$1)),isEmpty);
+        final addressKeys=captured.revisions.keys.where((key)=>assistantDomainAddressContextActions.contains(key.$1));
+        expect(addressKeys,changedAddress?isEmpty:unorderedEquals([
+          ('AI-ACT-024','address-one'),('AI-ACT-027','address-one')]));
         expect(identical(buy.addresses.single,address),isTrue);expect(identical(store.saved,cache),isTrue);
         expect(buy.addresses.single.line,'HOST original street');expect(buy.selectedAddressId,'address-one');
         expect(rig.transport.calls.every((call)=>call['operation']=='read'),isTrue);expect(rig.journal.values,isEmpty);
+        expect(notifications,0);
+        final gateway=session.accountProfileGateway!,snapshot=session.accountProfileGateway!.snapshot!;
+        expect(buy.qualifyAccountProfileAddressSnapshotForPreparation(rig.newGateway(),snapshot),isFalse);
+        expect(buy.qualifyAccountProfileAddressSnapshotForPreparation(gateway,snapshot),!changedAddress);
+        expect(notifications,0);expect(identical(store.saved,cache),isTrue);
+        final before=rig.transport.calls.length;
+        if(changedAddress){
+          expect(await buy.removeAddressConfirmed('address-one'),isFalse);
+          expect(rig.transport.calls.length,before);
+        }else{
+          // Only the existing native final confirmation saves the delivery list.
+          final change=<String,Object?>{'kind':'delivery','addresses':<Object?>[],'selectedAddressId':null};
+          final confirmed=profile(revision:2);
+          rig.transport.responses.addAll([{
+            ...receiptFor(change,confirmed),
+            'fingerprint':crypto.sha256.convert(utf8.encode(jsonEncode({'expectedRevision':1,'change':change}))).toString(),
+          },confirmed]);
+          expect(await buy.removeAddressConfirmed('address-one'),isTrue);
+          expect(buy.addresses,isEmpty);expect(buy.selectedAddressId,isNull);
+          final writes=rig.transport.calls.where((call)=>call['operation']=='save').toList();
+          expect(writes,hasLength(1));expect((writes.single['payload'] as Map)['expectedRevision'],1);
+          expect(rig.journal.values,isEmpty);
+          final after=rig.transport.calls.length;
+          expect(await buy.removeAddressConfirmed('address-one'),isFalse);
+          expect(rig.transport.calls.length,after);
+        }
       }finally{buy.dispose();core.dispose();work.dispose();session.dispose();await source.changes.close();}
+    });
+  }
+  for(final field in ['recipient','phone','line','area','pinCode','landmark','label','kind','selectedAddressId']){
+    test('Domain native address coherence rejects changed $field without side effects',()async{
+      final rig=Rig(),core=BuySession();
+      final store=CustomerStore(rig.gateway.ownerScope);
+      final buy=BuyV2Session(core:core,reviewDataEnabled:false,customerStateStore:store);
+      buy.synchronizeAccountProfile(rig.gateway);
+      final row=<String,Object?>{'id':'address-one','kind':'home','label':'Home','recipient':'HOST recipient',
+        'phone':'9999999999','line':'HOST street','area':'Jodhpur','pinCode':'342001','landmark':''};
+      try{
+        rig.transport.responses.add({...profile(),'addresses':[row],'selectedAddressId':'address-one'});
+        expect(await buy.refreshAccountProfileAddresses(preparationOnly:true),isTrue);
+        final cached=store.saved,native=buy.addresses.single;
+        final changed=Map<String,Object?>.of(row);
+        if(field!='selectedAddressId')changed[field]=switch(field){
+          'phone'=>'8888888888','pinCode'=>'342002','kind'=>'work',_=>'HOST changed'};
+        rig.transport.responses.add({...profile(revision:1),'addresses':[changed],
+          'selectedAddressId':field=='selectedAddressId'?null:'address-one'});
+        final confirmed=await rig.gateway.readForPreparation();
+        var notifications=0;buy.addListener(()=>notifications++);
+        expect(buy.qualifyAccountProfileAddressSnapshotForPreparation(rig.gateway,confirmed),isFalse);
+        expect(identical(buy.addresses.single,native),isTrue);
+        expect(identical(store.saved,cached),isTrue);expect(buy.selectedAddressId,'address-one');
+        expect(notifications,0);expect(rig.journal.values,isEmpty);
+        expect(rig.transport.calls.every((call)=>call['operation']=='read'),isTrue);
+      }finally{buy.dispose();core.dispose();}
+    });
+  }
+  test('Domain native address coherence rejects superseded snapshots and revoked ownership',()async{
+    final rig=Rig(),core=BuySession();
+    final store=CustomerStore(rig.gateway.ownerScope);
+    final buy=BuyV2Session(core:core,reviewDataEnabled:false,customerStateStore:store);
+    buy.synchronizeAccountProfile(rig.gateway);
+    try{
+      rig.transport.responses.add(profile());
+      expect(await buy.refreshAccountProfileAddresses(preparationOnly:true),isTrue);
+      final old=rig.gateway.snapshot!;
+      rig.transport.responses.add(profile(revision:1));
+      final confirmed=await rig.gateway.readForPreparation();
+      expect(buy.qualifyAccountProfileAddressSnapshotForPreparation(rig.gateway,old),isFalse);
+      expect(buy.qualifyAccountProfileAddressSnapshotForPreparation(rig.gateway,confirmed),isTrue);
+      rig.current=false;
+      expect(buy.qualifyAccountProfileAddressSnapshotForPreparation(rig.gateway,confirmed),isFalse);
+      rig.current=true;buy.synchronizeAccountProfile(null);
+      expect(buy.qualifyAccountProfileAddressSnapshotForPreparation(rig.gateway,confirmed),isFalse);
+    }finally{buy.dispose();core.dispose();}
+  });
+  for(final action in ['AI-ACT-024','AI-ACT-027']){
+    testWidgets('Domain $action capture all addresses can review first middle and last without token churn',(tester)async{
+      final rig=Rig();
+      // One isolated original account source owns both Profile and native cache.
+      final identity=ProfileIdentity(rig),session=sessionFixture(identity);await session.start();
+      final core=BuySession(),navigator=GlobalKey<NavigatorState>();
+      final store=CustomerStore(session.accountProfileGateway!.ownerScope);
+      final buy=BuyV2Session(core:core,reviewDataEnabled:false,customerStateStore:store);
+      buy.synchronizeAccountProfile(session.accountProfileGateway);
+      AssistantProfileContextGuard? guard;
+      MoolAssistantContext context()=>MoolAssistantContext(accountScope:session.authenticatedBuyPersistenceIdentity,
+        authenticationRevision:session.navigationAuthenticationGeneration);
+      try{
+        final ids=['address-one','address-two','address-three'];
+        rig.transport.responses.add({...profile(revision:1),'selectedAddressId':ids.first,
+          'addresses':[for(final id in ids){'id':id,'kind':'home','label':'HOST $id','recipient':'HOST recipient',
+            'phone':'9999999999','line':'HOST $id street','area':'Jodhpur','pinCode':'342001','landmark':''}]});
+        expect(await buy.refreshAccountProfileAddresses(preparationOnly:true),isTrue);
+        final cache=store.saved;
+        await tester.pumpWidget(MaterialApp(navigatorKey:navigator,home:const Scaffold(body:Text('HOST address review'))));
+        await tester.pumpAndSettle();
+        final native=BuyShopReviewNativeAdapter(actionId:action,session:buy,navigator:navigator.currentState!,
+          currentContext:context,isRootCurrent:()=>navigator.currentState?.mounted==true,scopeOwner:buy,
+          accountIdentity:()=>identity.identity,accountAuthenticated:()=>session.isAuthenticated);
+        guard=AssistantProfileContextGuard(readContext:context,ownerChanges:buy,nativeAdapters:[native],canonicalActions:{action},
+          readCanonical:(c,valid)async=>AssistantCanonicalContextSnapshot(binding:c.binding,
+            revisions:{for(final id in ids)(action,id):'profile:1'},validUntil:DateTime.now().add(const Duration(minutes:1))));
+        await guard.capture(context(),()=>true);
+        final snapshots=[for(final id in ids)await native.snapshot(context(),id)];
+        final oldProposals=<MoolAssistantProposal>[];
+        for(var index=0;index<ids.length;index++){
+          expect((await native.snapshot(context(),ids[index]))!.sourceRevision,snapshots[index]!.sourceRevision);
+          final proposal=MoolAssistantProposal(id:'host-multi-$index',actionId:action,entityId:ids[index],
+            binding:context().binding,requestRevision:1,entitlementRevision:'host-paid',sourceRevision:'profile:1',
+            validUntil:DateTime.now().add(const Duration(minutes:1)),title:'Review address',summary:'HOST fixture',fields:const {});
+          oldProposals.add(proposal);
+          final opened=guard.adapters.single.openReview(proposal,()=>true);
+          await tester.pumpAndSettle();
+          expect(find.text('Review delivery details'),findsOneWidget);
+          expect(find.textContaining('HOST ${ids[index]} street'),findsOneWidget);
+          navigator.currentState!.pop(false);await tester.pumpAndSettle();
+          expect(await opened,MoolAssistantReviewResult.opened);
+          expect(identical(store.saved,cache),isTrue);
+          expect(rig.transport.calls.every((call)=>call['operation']=='read'),isTrue);
+        }
+        // A genuine original refresh changes shared source data. Refreshing the
+        // last entity must not make any earlier proposal current again.
+        rig.transport.responses.add({...profile(revision:2),'selectedAddressId':ids.first,
+          'addresses':[for(final id in ids){'id':id,'kind':'home','label':'HOST $id','recipient':'HOST recipient',
+            'phone':'9999999999','line':'HOST changed $id street','area':'Jodhpur','pinCode':'342001','landmark':''}]});
+        expect(await buy.refreshAccountProfileAddresses(preparationOnly:true),isTrue);
+        final refreshed=await native.snapshot(context(),ids.last);
+        expect(refreshed!.sourceRevision,isNot(snapshots.last!.sourceRevision));
+        for(final proposal in oldProposals){
+          expect(await guard.adapters.single.openReview(proposal,()=>true),MoolAssistantReviewResult.stale);
+        }
+        expect(rig.journal.values,isEmpty);expect(tester.takeException(),isNull);
+      }finally{
+        guard?.dispose();await tester.pumpWidget(const SizedBox.shrink());await tester.pumpAndSettle();
+        buy.dispose();core.dispose();session.dispose();await identity.changes.close();
+      }
     });
   }
   test('THIN-B03 read-only Profile refresh calls only original read and accepts canonical revision', () async {

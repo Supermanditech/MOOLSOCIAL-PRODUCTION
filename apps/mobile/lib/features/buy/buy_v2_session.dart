@@ -6160,6 +6160,27 @@ class BuyV2Session extends ChangeNotifier {
   bool get accountProfileAddressesEnabled => _accountProfileGateway != null;
   String _profileAddressSignature(Iterable<BuyV2Address> addresses) => jsonEncode(
     addresses.map((a)=>[a.id,a.kind.name,a.label,a.recipient,a.phone,a.line,a.area,a.pinCode,a.landmark]).toList());
+  /// Qualify an unchanged native address cache against the original confirmed
+  /// Profile read. Preparation must never restore, replace or persist addresses,
+  /// change the selected address, notify listeners or refresh Cart pricing.
+  bool qualifyAccountProfileAddressSnapshotForPreparation(
+      AccountProfileGateway expectedGateway, AccountProfileSnapshot source) {
+    final gateway = _accountProfileGateway;
+    if (_collectionDisposed || isStoreProcurement || gateway == null ||
+        !identical(gateway, expectedGateway) ||
+        !gateway.isCurrent() || gateway.ownerScope == null ||
+        gateway.ownerScope != customerStateStore?.ownerScope ||
+        gateway.owner.userId != source.ownerUid ||
+        !identical(gateway.snapshot, source) || _profileAddressesBusy ||
+        customerStateRecoveryPending || cartChangesBlocked ||
+        (_profileAddressRevision != null && _profileAddressRevision! > source.revision) ||
+        _selectedAddressId != source.selectedAddressId ||
+        _profileAddressSignature(_addresses) != _profileAddressSignature(source.deliveryAddresses)) {
+      return false;
+    }
+    _profileAddressRevision = source.revision;
+    return true;
+  }
   void _applyProfileAddresses(AccountProfileSnapshot saved) {
     _profileAddressRevision=saved.revision;
     if (_selectedAddressId == saved.selectedAddressId &&

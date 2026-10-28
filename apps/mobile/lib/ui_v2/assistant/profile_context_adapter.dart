@@ -31,6 +31,7 @@ class AssistantOriginalContextReader {
         session.navigationAuthenticationGeneration == generation && context.accountScope == owner;
     if (!alive()) throw const AssistantModelFailure('account_scope_mismatch');
     final revisions = <AssistantContextKey, String>{};
+    bool Function(String) addressSourceReady = (_) => false;
     var until = DateTime.now().toUtc().add(const Duration(seconds: 60));
     if (!context.inWorkspace) {
       final gateway = session.accountProfileGateway;
@@ -38,6 +39,11 @@ class AssistantOriginalContextReader {
       final profile = await gateway.readForPreparation();
       if (!alive() || profile.ownerUid != owner!.userId) throw const AssistantModelFailure('stale_preparation');
       final revision = 'profile:${profile.revision}';
+      addressSourceReady = (sourceRevision) => alive() && buy != null &&
+          !buy!.isStoreProcurement &&
+          !buyV2AddressFormOpen(buy!) && !buyV2AddressRequestFormOpen(buy!) &&
+          sourceRevision == revision &&
+          buy!.qualifyAccountProfileAddressSnapshotForPreparation(gateway, profile);
       for (final action in assistantProfileContextActions.where((id) => id != 'AI-ACT-026')) {
         revisions[(action, null)] = revision;
       }
@@ -113,12 +119,10 @@ class AssistantOriginalContextReader {
         final acknowledged = work.workspaceAssistantAcknowledgedProducts(productProofs, current: alive);
         if (!alive()) throw const AssistantModelFailure('stale_preparation');
         for (final entry in domain.revisions.entries) {
-          // These server choices are authentic, but the native address cache
-          // has a separate private revision. Do not anchor an old same-ID
-          // address to a fresh Profile proof. The original Buy session needs
-          // its read-only coherence contract before these handoffs can qualify;
-          // refreshAccountProfileAddresses can persist state and reprice Cart.
-          if (assistantDomainAddressContextActions.contains(entry.key.$1)) continue;
+          // Accept only an unchanged original native cache. Explicit refresh,
+          // persistence and native final confirmation remain separate actions.
+          if (assistantDomainAddressContextActions.contains(entry.key.$1) &&
+              !addressSourceReady(entry.value)) continue;
           if(assistantStoreRestockOwnerContextActions.contains(entry.key.$1)&&
               !RegExp(r'^store-restock-source:[a-f0-9]{64}$').hasMatch(entry.value))continue;
           final submissionRoot=entry.key.$1=='AI-ACT-223'&&entry.key.$2==null;

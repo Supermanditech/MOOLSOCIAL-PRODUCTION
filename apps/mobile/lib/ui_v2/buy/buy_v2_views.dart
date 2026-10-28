@@ -973,7 +973,8 @@ class BuyShopReviewNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter
   final AuthenticatedAccountIdentity? Function() accountIdentity;
   final bool Function() accountAuthenticated;
   Object? _snapshotOwner, _binding;
-  String? _signature, _entity;
+  String? _signature;
+  final _entityVersions = <String?, int>{};
   int _version = 0;
   bool _actor(Object binding) => navigator.mounted && isRootCurrent() &&
     accountAuthenticated() && accountIdentity()?.firebasePrincipal != null &&
@@ -1035,8 +1036,9 @@ class BuyShopReviewNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter
       change.previousPromise, change.previousPromisedByLabel, change.currentPromise, change.currentPromisedByLabel]],
   ]);
   bool _same(Object binding, String? entity) => _actor(binding) && _binding == binding &&
-    _entity == entity && _snapshotOwner == _owner && _signature == _source() && _available(entity);
-  String get _revision => 'buy-native-review:$actionId:$_version';
+    _entityVersions.containsKey(entity) && _snapshotOwner == _owner && _signature == _source() && _available(entity);
+  String? _revision(String? entity) => _entityVersions.containsKey(entity)
+    ? 'buy-native-review:$actionId:${_entityVersions[entity]}' : null;
   @override Set<String> get allowedFields => BuyShopReviewInitialData.fieldsFor(actionId);
   @override String? validateFields(Map<String, Object?> fields) {
     try { BuyShopReviewInitialData.fromFields(actionId, fields); return null; }
@@ -1045,19 +1047,20 @@ class BuyShopReviewNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter
   @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context, String? entityId) async {
     if (!_actor(context.binding) || !_available(entityId) || _buyNativeReviews[session] == true ||
         buyV2AddressFormOpen(session) || buyV2AddressRequestFormOpen(session)) return null;
-    if (!_same(context.binding, entityId)) {
-      _binding = context.binding; _entity = entityId; _snapshotOwner = _owner;
-      _signature = _source(); _version++;
+    if (_binding != context.binding || _snapshotOwner != _owner || _signature != _source()) {
+      _entityVersions.clear();
+      _binding = context.binding; _snapshotOwner = _owner; _signature = _source();
     }
+    _entityVersions.putIfAbsent(entityId, () => ++_version);
     return MoolAssistantNativeSnapshot(binding: context.binding, permitted: true,
-      entityId: entityId, sourceRevision: _revision);
+      entityId: entityId, sourceRevision: _revision(entityId)!);
   }
   @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) =>
     openOwnedReview(proposal,isCurrent:isCurrent,ownerChanges:scopeOwner);
   @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
       {required bool Function() isCurrent,required Listenable ownerChanges}) async {
     if (!isCurrent() || !proposal.validUntil.isAfter(DateTime.now()) || proposal.actionId != actionId || validateFields(proposal.fields) != null ||
-        proposal.sourceRevision != _revision || !_same(proposal.binding, proposal.entityId) ||
+        proposal.sourceRevision != _revision(proposal.entityId) || !_same(proposal.binding, proposal.entityId) ||
         _buyNativeReviews[session] == true || buyV2AddressFormOpen(session) || buyV2AddressRequestFormOpen(session)) {
       return MoolAssistantReviewResult.stale;
     }
