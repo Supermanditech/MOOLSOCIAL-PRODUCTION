@@ -44,12 +44,14 @@ function contextBinding(c: PreparationContext): string {
     ...(c.nativeTargets === undefined ? {} : {nativeTargets: c.nativeTargets})});
 }
 function selectedNativeModelReference(context: PreparationContext, tools: PreparationContext['tools'],
-  targets: readonly {actionId: string; entityId: string | null}[]): PreparationContext['modelContext'] {
+  targets: readonly {actionId: string; entityId: string | null}[],couponSkus?:ReadonlySet<string>): PreparationContext['modelContext'] {
   const skus = new Set<string>();
   const orders = new Set(targets.filter(target=>target.actionId==='AI-ACT-274'&&target.entityId!==null).map(target=>target.entityId!));
   const operationalOrders=new Set(targets.filter(target=>['AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285'].includes(target.actionId)&&target.entityId!==null).map(target=>target.entityId!));
   const receivingOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-243'&&target.entityId!==null).map(target=>target.entityId!));
   const privateStarsOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-055'&&target.entityId!==null).map(target=>target.entityId!));
+  const coupons=new Set(targets.filter(target=>['AI-ACT-309','AI-ACT-310'].includes(target.actionId)&&target.entityId!==null).map(target=>target.entityId!));
+  const couponEditor=tools.some(tool=>tool.actionId==='AI-ACT-309');
   for(const tool of tools){
     if(!storeProductActions.has(tool.actionId))continue;
     const selected=new Set(targets.filter(target=>target.actionId===tool.actionId&&target.entityId!==null).map(target=>target.entityId!));
@@ -69,6 +71,14 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
         const orderId=object(row).orderId;if(typeof orderId!=='string')return fail('context_unavailable');
         return privateStarsOrders.has(orderId);
       })};
+    }
+    if(value.sourceKind==='original-store-coupons-v1'){
+      if(!Array.isArray(value.coupons)||!Array.isArray(value.products))return fail('context_unavailable');
+      return {...value,coupons:value.coupons.filter(raw=>coupons.has(id(object(raw).couponId))),
+        products:!couponEditor?[]:value.products.flatMap(raw=>{
+          const row=object(raw),sku=id(row.skuId);if(couponSkus!==undefined&&!couponSkus.has(sku))return [];
+          const {sourceRevision:_proof,...reference}=row;return [reference];
+        })};
     }
     if(value.sourceKind==='original-store-receiving-v1'){
       if(!Array.isArray(value.orders))return fail('context_unavailable');
@@ -106,6 +116,67 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
   }
   return project(context.modelContext);
 }
+function couponModelProductProofs(value:PreparationContext['modelContext']):Map<string,string>{
+  const result=new Map<string,string>();
+  function visit(source:PreparationContext['modelContext']){
+    if(source===undefined)return;
+    if(source.sourceKind==='composite-original-context-v1'){
+      if(!Array.isArray(source.sources))return fail('context_unavailable');
+      for(const child of source.sources)if(child!==null)visit(object(child));
+    }else if(source.sourceKind==='original-store-coupons-v1'){
+      if(!Array.isArray(source.products))return fail('context_unavailable');
+      for(const raw of source.products){const row=object(raw),sku=id(row.skuId);
+        if(typeof row.sourceRevision!=='string'||result.has(sku)&&result.get(sku)!==row.sourceRevision)return fail('context_unavailable');
+        result.set(sku,row.sourceRevision);}
+    }
+  }
+  visit(value);return result;
+}
+function couponNativeProductSelection(context:PreparationContext,maskContext:PreparationContext,
+  hints:readonly {actionId:string;entityId:string|null}[]):ReadonlySet<string>{
+  const selected=new Set(hints.map(row=>canonical([row.actionId,row.entityId]))),proofs=couponModelProductProofs(context.modelContext),ready=new Set<string>();
+  for(const target of maskContext.nativeTargets??maskContext.tools){
+    if(storeProductActions.has(target.actionId)&&target.entityId!==null&&proofs.get(target.entityId)===target.sourceRevision&&
+      selected.has(canonical([target.actionId,target.entityId])))ready.add(target.entityId);
+  }
+  return ready;
+}
+function narrowCouponProductFields(tool:PreparationContext['tools'][number],ready:ReadonlySet<string>):PreparationContext['tools'][number]{
+  if(tool.actionId!=='AI-ACT-309')return tool;
+  const properties={...object(tool.parameters.properties)};
+  if(properties.skuIds!==undefined){const field=object(properties.skuIds),items=object(field.items);
+    if(!Array.isArray(items.enum))return fail('context_unavailable');
+    const values=items.enum.filter(v=>typeof v==='string'&&ready.has(v));
+    if(values.length)properties.skuIds={...field,items:{...items,enum:values}};else delete properties.skuIds;
+  }
+  if(properties.rewardSkuId!==undefined){const field=object(properties.rewardSkuId);
+    if(!Array.isArray(field.enum))return fail('context_unavailable');
+    const values=field.enum.filter(v=>typeof v==='string'&&ready.has(v));
+    if(values.length)properties.rewardSkuId={...field,enum:values};else delete properties.rewardSkuId;
+  }
+  if(!ready.size){
+    for(const key of ['tiers','buyQuantity','rewardQuantity'])delete properties[key];
+    if(properties.kind!==undefined){const field=object(properties.kind);if(!Array.isArray(field.enum))return fail('context_unavailable');
+      properties.kind={...field,enum:field.enum.filter(v=>!['productDiscount','quantityPrice','extraQuantity'].includes(v as string))};}
+  }
+  if(properties.apply!==undefined){const field=object(properties.apply),items=object(field.items);
+    if(!Array.isArray(items.enum))return fail('context_unavailable');
+    properties.apply={...field,items:{...items,enum:items.enum.filter(key=>typeof key==='string'&&key!=='apply'&&Object.hasOwn(properties,key))}};
+  }
+  const allowed=(fields:Readonly<Record<string,unknown>>)=>Object.keys(fields).every(key=>Object.hasOwn(properties,key))&&
+    (fields.skuIds===undefined||Array.isArray(fields.skuIds)&&fields.skuIds.every(v=>typeof v==='string'&&ready.has(v)))&&
+    (fields.rewardSkuId===undefined||typeof fields.rewardSkuId==='string'&&ready.has(fields.rewardSkuId))&&
+    (ready.size>0||!['productDiscount','quantityPrice','extraQuantity'].includes(fields.kind as string));
+  return {...tool,parameters:{...tool.parameters,properties,
+    required:Array.isArray(tool.parameters.required)?tool.parameters.required.filter(key=>typeof key==='string'&&Object.hasOwn(properties,key)):tool.parameters.required},
+    validate:fields=>allowed(fields)&&tool.validate(fields),
+    ...(tool.decodeFields?{decodeFields:(args:Readonly<Record<string,unknown>>)=>{
+      const fields=tool.decodeFields!(args);if(!allowed(fields))return fail('invalid_model_result');return fields;
+    }}:{}),
+    ...(tool.resolveTarget?{resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
+      const resolved=tool.resolveTarget!(args);if(!allowed(resolved.fields))return fail('invalid_model_result');return resolved;
+    }}:{})};
+}
 function privateStarsModelLines(value:PreparationContext['modelContext'],orders:ReadonlySet<string>):string[]{
   const lines=new Set<string>();
   function visit(source:PreparationContext['modelContext']){
@@ -138,7 +209,9 @@ function nativeContext(actor: AccountProfileActor, context: PreparationContext, 
       return fail("stale_preparation", 409);
     }
   }
-  const selected = [...nativeTargetSelection(request.nativeTargets ?? []), ...maskedNativeHints(actor, maskContext, request)]
+  const allSelected=[...nativeTargetSelection(request.nativeTargets ?? []), ...maskedNativeHints(actor, maskContext, request)];
+  const couponSkus=couponNativeProductSelection(context,maskContext,allSelected);
+  const selected = allSelected
     .filter(target => request.nativeTargetMask === undefined ||
       (request.actionId === null || target.actionId === request.actionId) && (request.entityId === null || target.entityId === request.entityId));
   const hints = new Set(selected.map(value => canonical([value.actionId, value.entityId])));
@@ -147,9 +220,10 @@ function nativeContext(actor: AccountProfileActor, context: PreparationContext, 
   const tools = context.tools.flatMap(tool => {
     if (tool.targetSelector === undefined) return hints.has(canonical([tool.actionId, tool.entityId])) ? [tool] : [];
     const properties = object(tool.parameters.properties), selector = object(properties[tool.targetSelector]);
-    if (!tool.resolveTarget || !Array.isArray(selector.enum) || selector.enum.some(value => typeof value !== "string")) return fail("context_unavailable");
-    const permitted = new Set(nativeTargets.filter(target => target.actionId === tool.actionId && target.entityId !== null).map(target => target.entityId));
-    const values = selector.enum.filter(value => permitted.has(value as string));
+    const couponRoot=tool.actionId==='AI-ACT-309'&&tool.targetSelector==='couponId'&&Array.isArray(selector.type)&&selector.type.includes('null');
+    if (!tool.resolveTarget || !Array.isArray(selector.enum) || selector.enum.some(value => typeof value !== "string"&&!(couponRoot&&value===null))) return fail("context_unavailable");
+    const permitted = new Set(nativeTargets.filter(target => target.actionId === tool.actionId && (target.entityId !== null||couponRoot)).map(target => target.entityId));
+    const values = selector.enum.filter(value => permitted.has(value as string|null));
     if (!values.length) return [];
     const privateLines=tool.actionId==='AI-ACT-055'&&tool.targetSelector==='orderId'
       ?privateStarsModelLines(context.modelContext,new Set(values as string[])):null;
@@ -157,9 +231,9 @@ function nativeContext(actor: AccountProfileActor, context: PreparationContext, 
     return [{...tool, parameters: {...tool.parameters, properties: {...properties,
       ...(privateLines===null?{}:{lineId:{...object(properties.lineId),enum:privateLines}}),
       [tool.targetSelector]: {...selector, enum: values}}}}];
-  });
+  }).map(tool=>narrowCouponProductFields(tool,couponSkus));
   return {...context, tools, nativeTargets,
-    ...(context.modelContext === undefined ? {} : {modelContext: selectedNativeModelReference(context, tools, nativeTargets)!})};
+    ...(context.modelContext === undefined ? {} : {modelContext: selectedNativeModelReference(context, tools, nativeTargets,couponSkus)!})};
 }
 export class AssistantPreparationService {
   private readonly cancellations = new Map<string, AbortController>();

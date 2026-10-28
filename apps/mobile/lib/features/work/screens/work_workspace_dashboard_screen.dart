@@ -42,7 +42,7 @@ import '../widgets/store_settings_widgets.dart';
 import '../widgets/store_publication_settings.dart';
 import '../widgets/store_payment_terms.dart';
 import '../widgets/store_product_promotions.dart';
-import '../work_product_promotions.dart' show encodeStoreCouponCampaigns;
+import '../work_product_promotions.dart' show encodeStoreCouponCampaigns, decodeStoreCouponCampaigns;
 import '../widgets/store_customer_feedback.dart';
 import '../work_customer_feedback.dart';
 import '../widgets/workspace_purchase_originals.dart';
@@ -8899,11 +8899,12 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
     [for (final item in source.workspaceCatalogueItems) item.toInventoryJson()],
     [for (final buyer in source.workspaceCustomerBook) [buyer.id, buyer.name, buyer.mobile]],
   ]))).toString();
-  String _couponNativeSource(WorkSession source, String action, String? entity) {
-    final campaign = source.workspaceStoreCouponCampaigns.where((value) => value.id == entity).singleOrNull;
-    final publisher = action == 'AI-ACT-310' ? source.workspaceStoreCoupons : null;
+  String _couponNativeSource(WorkSession source, String action, String? entity, {Map<String,String>? draft}) {
+    final values=draft??source.workspaceAssistantCouponDraft;
+    final campaign = entity==null?null:decodeStoreCouponCampaigns(values['storeCouponCampaignsV1'],source.activeWorkspace?.id??'').where((value) => value.id == entity).singleOrNull;
+    final publisher = action == 'AI-ACT-310' ? source.workspaceAssistantLoadedCouponController : null;
     return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
-      action, entity, source.navigationScopeRevision, source.workspaceOfferDraft,
+      action, entity, source.navigationScopeRevision, values,
       if (campaign != null) campaign.toJson(),
       if (action == 'AI-ACT-309') _couponNativeReferences(source),
       if (publisher != null) [publisher.active, publisher.pending?.fingerprint,
@@ -8920,22 +8921,21 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
     if (!current() || action == 'AI-ACT-308' && entity != null) return null;
     final store = source.activeWorkspace?.id;
     if (store == null) return null;
-    final loaded = await source.loadWorkspaceOfferDraft(expectedStoreId: store);
-    if (!current() || action != 'AI-ACT-308' && (!loaded || source.workspaceOfferDraftSaving || source.workspaceStoreCouponRecoveryRequired)) return null;
-    if (entity != null && source.workspaceStoreCouponCampaigns.where((value) => value.id == entity).length != 1 ||
+    final draft=action=='AI-ACT-308'?source.workspaceAssistantCouponDraft:
+      await source.readWorkspaceAssistantCouponDraft(expectedStoreId:store,inputCurrent:current);
+    if (!current() || draft==null) return null;
+    final campaigns=decodeStoreCouponCampaigns(draft['storeCouponCampaignsV1'],store);
+    if (entity != null && campaigns.where((value) => value.id == entity).length != 1 ||
         action == 'AI-ACT-310' && entity == null) return null;
     if (action == 'AI-ACT-310') {
-      final publisher = source.workspaceStoreCoupons;
-      if (publisher != null && (!await publisher.restore() || !current() || publisher.busy ||
+      final publisher = source.workspaceAssistantLoadedCouponController;
+      if (publisher != null && (publisher.busy ||
           publisher.pending != null && publisher.pending!.couponId != entity)) return null;
-      // Actual accepted lookup only. A held original is never replaced/retried.
-      if (publisher != null && publisher.pending == null) {
-        await publisher.refresh(entity!, inputCurrent: current);
-        if (!current()) return null;
-      }
+      // Peek only. Explicit native Review retains the original guarded reads
+      // and exact pending recovery; capture never adopts another coupon head.
     }
     if (!current()) return null;
-    return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: _couponNativeSource(source, action, entity),
+    return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: _couponNativeSource(source, action, entity,draft:draft),
       permitted: true, entityId: entity);
   }
   Future<MoolAssistantReviewResult> _openCouponNative(BuildContext hostContext, MoolAssistantProposal proposal,
@@ -8950,7 +8950,17 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       router.state.uri == uri && router.state.pageKey == page &&
       _financePermitted(ctx) && _financeAssistantContext(hostContext)?.binding == ctx.binding && reviewCurrent();
     if (!owner() || ctx!.binding != proposal.binding || _couponsSheetOpen || _financeSheetOpen ||
-        storeCouponNativeEditorOpen(source) || proposal.sourceRevision != _couponNativeSource(source, proposal.actionId, proposal.entityId)) return MoolAssistantReviewResult.stale;
+        storeCouponNativeEditorOpen(source)) return MoolAssistantReviewResult.stale;
+    final store=source.activeWorkspace?.id;
+    if(store==null)return MoolAssistantReviewResult.stale;
+    final draft=proposal.actionId=='AI-ACT-308'?source.workspaceAssistantCouponDraft:
+      await source.readWorkspaceAssistantCouponDraft(expectedStoreId:store,inputCurrent:owner);
+    if(!owner()||draft==null||proposal.sourceRevision!=_couponNativeSource(source,proposal.actionId,proposal.entityId,draft:draft))return MoolAssistantReviewResult.stale;
+    if(proposal.actionId!='AI-ACT-308'){
+      // Hydration belongs to the explicit native Review, never preparation.
+      if(!await source.loadWorkspaceOfferDraft(expectedStoreId:store)||!owner()||
+        proposal.sourceRevision!=_couponNativeSource(source,proposal.actionId,proposal.entityId))return MoolAssistantReviewResult.stale;
+    }
     final campaign = source.workspaceStoreCouponCampaigns.where((value) => value.id == proposal.entityId).singleOrNull;
     if (proposal.entityId != null && campaign == null || proposal.actionId == 'AI-ACT-310' && campaign == null) return MoolAssistantReviewResult.unavailable;
     final initial = proposal.actionId == 'AI-ACT-309' ? StoreCouponReviewInitial.fromFields(proposal.fields) : null;

@@ -2,10 +2,11 @@ import type {AccountPlansService, PlansReadback} from "../account/plans_service.
 import type {AccountProfileActor} from "../account/profile_service.js";
 import type {WorkspaceCatalogueService, StoreSkuRecord} from "../workspace/workspace_catalogue_service.js";
 import type {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, PurchaseReference, ProductFeedbackTarget} from "../workspace/workspace_purchase_projection_service.js";
+import type {WorkspacePromotionService,StoreCouponRecord} from '../workspace/workspace_promotion_service.js';
 import type {PreparationContextSource} from "./model_service.js";
 import {AssistantModelError, canonical, digest, fail, id, object,
   catalogueListingSelection, preparationNativeTargetLimit, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
-import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeOperationalActions,storeOrderBoardActions,storeSupplierDraftActions,storePurchaseRootActions,storeReceivingOriginalActions, searchSuggestion} from "./domain_context_contract.js";
+import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeOperationalActions,storeOrderBoardActions,storeSupplierDraftActions,storePurchaseRootActions,storeReceivingOriginalActions,storeCouponActions, searchSuggestion} from "./domain_context_contract.js";
 
 const paidRevision = (p: PlansReadback) => canonical([p.owner, p.scope, p.catalogueRevision, p.subscriptionRevision]);
 const searchSchema = {type: "object", properties: {query: {type: "string"}},
@@ -956,6 +957,220 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
   }
 }
 
+/** Original coupon configuration only. Private edits and all effects stay native. */
+export class OriginalStoreCouponPreparationContext implements PreparationContextSource {
+  constructor(private readonly deps:{projectId:string;realm:'evaluation'|'production';authority:PreparationContextSource;
+    promotions:Pick<WorkspacePromotionService,'handleOperation'>;couponReadsEnabled:boolean;
+    products?:Pick<OriginalStoreProductPreparationContext,'read'>;now?:()=>Date}){}
+  private now(){return (this.deps.now?.()??new Date()).getTime();}
+  private input(row:Readonly<Record<string,unknown>>){return Object.fromEntries([
+    'name','percentage','discount','minimumSpendMinor','maximumSavingMinor','startsAt','endsAt','totalUses','usesPerCustomer','active'
+  ].map(key=>[key,row[key]]));}
+  private record(value:unknown,store:string):StoreCouponRecord {
+    const row=object(value),integer=(v:unknown,min:number,max:number)=>Number.isSafeInteger(v)&&(v as number)>=min&&(v as number)<=max;
+    if(row.schemaVersion!==1||row.realm!==this.deps.realm||row.storeId!==store||typeof row.name!=='string'||
+      !row.name||row.name!==row.name.trim()||row.name.length>80||/[\u0000-\u001f\u007f]/u.test(row.name)||
+      typeof row.percentage!=='boolean'||typeof row.active!=='boolean'||!integer(row.revision,1,1_000_000_000)||
+      !integer(row.discount,1,row.percentage?10000:9_000_000_000_000)||!integer(row.minimumSpendMinor,0,9_000_000_000_000)||
+      !integer(row.maximumSavingMinor,1,9_000_000_000_000)||!row.percentage&&row.maximumSavingMinor!==row.discount||
+      !integer(row.totalUses,1,1_000_000_000)||!integer(row.usesPerCustomer,1,row.totalUses as number))return fail('context_unavailable');
+    for(const key of ['startsAt','endsAt','observedAt']){
+      const v=row[key];if(typeof v!=='string'||!Number.isFinite(Date.parse(v))||new Date(v).toISOString()!==v)return fail('context_unavailable');
+    }
+    if(Date.parse(row.endsAt as string)<=Date.parse(row.startsAt as string)||Date.parse(row.observedAt as string)>this.now())return fail('context_unavailable');
+    id(row.couponId);return row as unknown as StoreCouponRecord;
+  }
+  private proof(actor:AccountProfileActor,row:StoreCouponRecord){
+    return 'store-coupon-original:'+this.deps.realm+':'+digest([this.deps.realm,actor.uid,row.storeId,row.couponId,row.revision,
+      this.input(row as unknown as Record<string,unknown>)]);
+  }
+  private async snapshot(actor:AccountProfileActor,input:PreparationRequest,deadline:number){
+    const store=input.scope.storeId!,records:StoreCouponRecord[]=[],seen=new Set<string>(),cursors=new Set<string>();
+    let available=this.deps.couponReadsEnabled,cursor:string|null=null;
+    if(available)do{
+      if(this.now()>=deadline)return fail('stale_preparation',409);
+      let raw:unknown;
+      try{raw=await this.deps.promotions.handleOperation(actor.uid,input.entityId===null?'listStoreCoupons':'readStoreCoupon',
+        {storeCouponTermsVersion:1,storeId:store,...(input.entityId===null?{limit:20,...(cursor===null?{}:{after:cursor})}:{couponId:input.entityId})});}
+      catch(error){
+        const status=error!==null&&typeof error==='object'&&'httpStatus' in error?error.httpStatus:null;
+        if(status===401||status===403||status===404)return fail('workspace_access_unavailable',403);
+        if(status===503&&records.length===0){available=false;break;}
+        return fail('context_unavailable');
+      }
+      if(this.now()>=deadline)return fail('stale_preparation',409);
+      const page=object(raw);
+      if(page.schemaVersion!==1||page.storeCouponTermsVersion!==1||page.realm!==this.deps.realm||page.storeId!==store||
+        page.orderingAvailable!==false||page.redemptionAvailable!==false||page.publicationConfirmed!==false)return fail('context_unavailable');
+      const values=input.entityId===null?page.items:page.record===null?[]:[page.record];
+      if(!Array.isArray(values)||values.length>20)return fail('context_unavailable');
+      for(const value of values){const row=this.record(value,store);
+        if(seen.has(row.couponId)||input.entityId!==null&&row.couponId!==input.entityId)return fail('context_unavailable');
+        seen.add(row.couponId);records.push(row);
+        if(records.length*2+2>preparationNativeTargetLimit)return fail('context_unavailable');}
+      if(input.entityId!==null)break;
+      if(page.nextCursor!==null&&(typeof page.nextCursor!=='string'||!page.nextCursor||cursors.has(page.nextCursor)||
+        values.length!==20||page.nextCursor!==records.at(-1)?.couponId))return fail('context_unavailable');
+      cursor=page.nextCursor as string|null;if(cursor!==null)cursors.add(cursor);
+    }while(cursor!==null);
+    let productsAvailable=false,productRevision:string|null=null,products:Readonly<Record<string,unknown>>[]=[];
+    if(this.deps.products){
+      let source:PreparationContext|undefined;
+      try{source=await this.deps.products.read(actor,{...input,actionId:null,entityId:null});}
+      catch(error){if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable')throw error;}
+      if(source){
+        if(this.now()>=deadline)return fail('stale_preparation',409);
+        if(source.modelContext?.sourceKind!=='original-store-owned-skus-v1'||!Array.isArray(source.modelContext.products))return fail('context_unavailable');
+        const targets=source.nativeTargets??source.tools;
+        products=source.modelContext.products.flatMap(value=>{const row=object(value);id(row.skuId);
+          const original=targets.find(t=>storeProductActions.has(t.actionId)&&t.entityId===row.skuId);
+          return original?[{skuId:row.skuId,title:row.title,variant:row.variant,pack:row.pack,sourceRevision:original.sourceRevision}]:[];});
+        productsAvailable=true;productRevision=source.revision;
+      }
+    }
+    records.sort((a,b)=>a.couponId<b.couponId?-1:a.couponId>b.couponId?1:0);
+    return {available,records,productsAvailable,productRevision,products};
+  }
+  async readPrepared(actor:AccountProfileActor,input:PreparationRequest,
+    proposal:Extract<PreparationReply['outcome'],{kind:'proposal'}>):Promise<PreparationContext>{
+    if(input.actionId!==proposal.actionId||input.entityId!==proposal.entityId||!storeCouponActions.has(proposal.actionId))return fail('stale_preparation',409);
+    const context=await this.read(actor,input);
+    if(proposal.actionId==='AI-ACT-309'&&proposal.entityId===null){
+      const target=context.nativeTargets?.find(t=>t.actionId==='AI-ACT-309'&&t.entityId===null),tool=context.tools.find(t=>t.actionId==='AI-ACT-309');
+      if(!target||!tool||target.sourceRevision!==proposal.sourceRevision||!tool.validate(proposal.fields))return fail('stale_preparation',409);
+      const {targetSelector:_selector,resolveTarget:_resolve,...original}=tool;
+      const {couponId:_id,...properties}=object(tool.parameters.properties);
+      return {...context,tools:[{...original,sourceRevision:target.sourceRevision,parameters:{type:'object',properties,required:Object.keys(properties),additionalProperties:false}}],nativeTargets:[target]};
+    }
+    if(!context.tools.some(t=>t.actionId===proposal.actionId&&t.entityId===proposal.entityId&&t.sourceRevision===proposal.sourceRevision&&t.validate(proposal.fields)))return fail('stale_preparation',409);
+    return context;
+  }
+  async read(actor:AccountProfileActor,input:PreparationRequest):Promise<PreparationContext>{
+    return this.prepare(actor,input);
+  }
+  private nativeFields(skuIds:readonly string[]){
+    const skus=new Set(skuIds),kinds=skus.size?['billDiscount','productDiscount','quantityPrice','nextPurchase','dealerIntro','extraQuantity']:
+      ['billDiscount','nextPurchase','dealerIntro'];
+    const money=['discount','minimumSpend','maximumSaving'],whole=['totalUses','usesPerCustomer','buyQuantity','rewardQuantity','nextPurchaseDays'];
+    const properties:Record<string,unknown>={name:{type:'string',minLength:1,maxLength:80},kind:{type:'string',enum:kinds},
+      percentage:{type:'boolean'},allProducts:{type:'boolean'},channels:{type:'array',items:{type:'string',enum:['retail','wholesale','bulk']},minItems:1,maxItems:3,uniqueItems:true},
+      ...Object.fromEntries(money.map(key=>[key,{type:'string',pattern:'^[0-9]{1,11}(\\.[0-9]{1,2})?$'}])),
+      ...Object.fromEntries(whole.map(key=>[key,{type:'string',pattern:'^[0-9]{1,10}$'}])),
+      startsAt:{type:'string',description:'Exact supplied date/time with Z or UTC offset; ask if timezone is unclear.'},
+      endsAt:{type:'string',description:'Exact supplied date/time with Z or UTC offset; never invent validity.'},
+      ...(skus.size?{skuIds:{type:'array',items:{type:'string',enum:skuIds},maxItems:1000,uniqueItems:true},
+        rewardSkuId:{type:'string',enum:skuIds},tiers:{type:'array',minItems:1,maxItems:100,items:{type:'object',
+          properties:{minimumQuantity:{type:'integer',minimum:1,maximum:1_000_000_000},priceMinor:{type:'integer',minimum:1,maximum:9_000_000_000_000}},
+          required:['minimumQuantity','priceMinor'],additionalProperties:false}}}:{})};
+    const amount=(raw:string)=>{const parts=raw.trim().split('.');return BigInt(parts[0]!)*100n+BigInt((parts[1]??'').padEnd(2,'0'));};
+    const date=(value:unknown)=>{
+      if(typeof value!=='string')return null;
+      const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/u.exec(value);
+      if(!m||!Number.isFinite(Date.parse(value))||Number(m[4])>23||Number(m[5])>59||Number(m[6]??'0')>59)return null;
+      const calendar=new Date(Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3])));
+      return calendar.getUTCFullYear()===Number(m[1])&&calendar.getUTCMonth()+1===Number(m[2])&&calendar.getUTCDate()===Number(m[3])?Date.parse(value):null;
+    };
+    const validate=(fields:Readonly<Record<string,unknown>>)=>{
+      if(!Object.keys(fields).length||Object.keys(fields).some(key=>!Object.hasOwn(properties,key)))return false;
+      for(const [key,value] of Object.entries(fields)){
+        if(key==='percentage'||key==='allProducts'){if(typeof value!=='boolean')return false;}
+        else if(key==='channels'||key==='skuIds'){
+          if(!Array.isArray(value)||value.length>(key==='channels'?3:1000)||new Set(value).size!==value.length||
+            key==='channels'&&!value.length||value.some(v=>typeof v!=='string'||(key==='channels'?!['retail','wholesale','bulk'].includes(v):!skus.has(v))))return false;
+        }else if(key==='tiers'){
+          if(!Array.isArray(value)||!value.length||value.length>100)return false;let previous=0;
+          for(const entry of value){if(entry===null||typeof entry!=='object'||Array.isArray(entry))return false;
+            const tier=entry as Record<string,unknown>;
+            if(Object.keys(tier).length!==2||!Number.isSafeInteger(tier.minimumQuantity)||!Number.isSafeInteger(tier.priceMinor)||
+              (tier.minimumQuantity as number)<=previous||(tier.minimumQuantity as number)>1_000_000_000||
+              (tier.priceMinor as number)<1||(tier.priceMinor as number)>9_000_000_000_000)return false;
+            previous=tier.minimumQuantity as number;}
+        }else{
+          if(typeof value!=='string'||!value.trim()||Buffer.from(value,'utf8').toString('utf8')!==value)return false;
+          if(key==='name'&&(value.trim().length>80||/[\u0000-\u001f\u007f]/u.test(value)))return false;
+          if(key==='kind'&&!kinds.includes(value)||key==='rewardSkuId'&&!skus.has(value))return false;
+          if(money.includes(key)&&(!/^\d{1,11}(\.\d{1,2})?$/u.test(value.trim())||amount(value)>9_000_000_000_000n||
+            amount(value)<(key==='minimumSpend'?0n:1n)))return false;
+          if(whole.includes(key)&&(!/^\d{1,10}$/u.test(value.trim())||BigInt(value.trim())<1n||BigInt(value.trim())>BigInt(key==='nextPurchaseDays'?365:1_000_000_000)))return false;
+          if((key==='startsAt'||key==='endsAt')&&date(value)===null)return false;
+        }
+      }
+      if(fields.startsAt!==undefined&&fields.endsAt!==undefined&&date(fields.endsAt)!<=date(fields.startsAt)!)return false;
+      if(typeof fields.totalUses==='string'&&typeof fields.usesPerCustomer==='string'&&BigInt(fields.usesPerCustomer.trim())>BigInt(fields.totalUses.trim()))return false;
+      if(fields.percentage===true&&typeof fields.discount==='string'&&amount(fields.discount)>10000n)return false;
+      if(fields.allProducts===true&&(fields.skuIds!==undefined||['productDiscount','quantityPrice','extraQuantity'].includes(fields.kind as string)))return false;
+      if(fields.kind!==undefined){const kind=fields.kind;
+        if((kind==='quantityPrice'||kind==='extraQuantity')&&['percentage','discount','maximumSaving'].some(key=>fields[key]!==undefined)||
+          fields.tiers!==undefined&&kind!=='quantityPrice'||['buyQuantity','rewardSkuId','rewardQuantity'].some(key=>fields[key]!==undefined)&&kind!=='extraQuantity'||
+          fields.nextPurchaseDays!==undefined&&kind!=='nextPurchase')return false;}
+      return true;
+    };
+    return {properties,validate};
+  }
+  private async prepare(actor:AccountProfileActor,input:PreparationRequest):Promise<PreparationContext>{
+    if(actor.projectId!==this.deps.projectId||!actor.uid||actor.tenantId!==undefined)return fail('account_scope_mismatch',403);
+    if(input.scope.audience!=='workspace'||!input.scope.storeId||input.catalogueListingIds!==undefined||
+      input.actionId!==null&&!storeCouponActions.has(input.actionId)||input.entityId!==null&&(input.actionId===null||input.actionId==='AI-ACT-308'))return fail('context_unavailable');
+    const started=this.now(),before=await approvedWorkspacePreparationAuthority(this.deps.authority,actor,input,started);
+    const deadline=Math.min(started+60_000,Date.parse(before.validUntil)),first=await this.snapshot(actor,input,deadline),
+      second=await this.snapshot(actor,input,deadline),after=await approvedWorkspacePreparationAuthority(this.deps.authority,actor,input,this.now());
+    if(before.revision!==after.revision||canonical(first)!==canonical(second))return fail('stale_preparation',409);
+    const until=Math.min(deadline,Date.parse(after.validUntil));if(until<=this.now())return fail('stale_preparation',409);
+    if(input.entityId!==null&&!second.records.length)return fail('context_unavailable');
+    const revision='store-coupon-context:'+digest([actor.projectId,actor.uid,input.scope.storeId,after.revision,second]);
+    const root='store-coupon-authoring-owner:'+this.deps.realm+':'+digest([actor.projectId,actor.uid,input.scope.storeId,after.revision,second.productRevision]);
+    const fields=this.nativeFields(second.products.map(row=>row.skuId as string)),tools:PreparationTool[]=[],nativeTargets:NonNullable<PreparationContext['nativeTargets']>[number][]=[];
+    if(input.entityId===null&&(input.actionId===null||input.actionId==='AI-ACT-308')){
+      const validate=(f:Readonly<Record<string,unknown>>)=>Object.keys(f).every(key=>key==='query')&&
+        (f.query===undefined||typeof f.query==='string'&&f.query.length<=2000&&!/[\u0000-\u001f\u007f]/u.test(f.query)&&Buffer.from(f.query,'utf8').toString('utf8')===f.query);
+      tools.push({name:'store_review_coupon_manager',actionId:'AI-ACT-308',entityId:null,sourceRevision:root,
+        description:'Open the original Store coupon manager with only a supplied query. This is not publication or proof of buyer eligibility; private rows are read by the original native manager.',
+        parameters:{type:'object',properties:{query:{type:'string',maxLength:2000}},required:['query'],additionalProperties:false},validate});
+      nativeTargets.push({actionId:'AI-ACT-308',entityId:null,sourceRevision:root});
+    }
+    if(input.entityId===null&&(input.actionId===null||input.actionId==='AI-ACT-309')){
+      nativeTargets.push({actionId:'AI-ACT-309',entityId:null,sourceRevision:root});
+    }
+    for(const action of ['AI-ACT-309','AI-ACT-310']){
+      if(input.actionId!==null&&input.actionId!==action)continue;
+      const rows=second.records,allowNew=action==='AI-ACT-309'&&input.entityId===null;if(!rows.length&&!allowNew)continue;
+      const dynamic=input.entityId===null;
+      const validate=(f:Readonly<Record<string,unknown>>,row:StoreCouponRecord)=>action==='AI-ACT-309'?fields.validate(f):
+        Object.keys(f).length===1&&(f.operation==='publish'||f.operation==='pause'&&row.active);
+      tools.push({name:action==='AI-ACT-309'?'store_prepare_coupon_draft':'store_review_original_coupon_publication',
+        actionId:action,entityId:input.entityId,sourceRevision:dynamic?revision:this.proof(actor,rows[0]!),
+        description:action==='AI-ACT-309'?'Prepare supplied fields in the original private coupon editor. apply lists ONLY user-supplied fields to change; other schema values are ignored. couponId:null means a NEW draft; an exact listed original couponId edits its matching private draft. Preserve unselected fields; server terms do not replace unsaved input. Ask for missing/ambiguous saving, product or validity details; use supplied dates with timezone. Never invent terms or buyer eligibility. No save or publication; buyer-specific references and v2 publishing are unavailable.':
+          'Review Publish/update or Pause for the exact original coupon. This reads configured terms only, not actual publication, funding, eligibility, usage remaining or checkout savings. The matching native private draft, original authoritative read, funding checkbox and final confirmation remain mandatory. Never retry or reconcile a pending update from this tool; structured v2 publishing is unavailable.',
+        parameters:{type:'object',properties:{...(dynamic?{couponId:{type:allowNew?['string','null']:'string',enum:[...(allowNew?[null]:[]),...rows.map(row=>row.couponId)]}}:{}),
+          ...(action==='AI-ACT-309'?{apply:{type:'array',items:{type:'string',enum:Object.keys(fields.properties)},minItems:1,uniqueItems:true},...fields.properties}:{operation:{type:'string',enum:['publish',...(rows.some(row=>row.active)?['pause']:[])]}})},
+          required:[...(dynamic?['couponId']:[]),...(action==='AI-ACT-309'?['apply',...Object.keys(fields.properties)]:['operation'])],additionalProperties:false},
+        validate:f=>action==='AI-ACT-309'?fields.validate(f):dynamic?rows.some(row=>validate(f,row)):validate(f,rows[0]!),
+        ...(action==='AI-ACT-309'?{decodeFields:(args:Readonly<Record<string,unknown>>)=>{
+          if(!Array.isArray(args.apply)||!args.apply.length||new Set(args.apply).size!==args.apply.length||
+            args.apply.some(key=>typeof key!=='string'||!Object.hasOwn(fields.properties,key)))return fail('invalid_model_result');
+          const values=Object.fromEntries(args.apply.map(key=>[String(key),args[String(key)]]));
+          if(!fields.validate(values))return fail('invalid_model_result');return values;
+        }}:{}),
+        ...(dynamic?{targetSelector:'couponId',resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
+          const row=rows.find(row=>row.couponId===args.couponId),{couponId:_id,apply:_apply,...raw}=args;
+          let values:Readonly<Record<string,unknown>>=raw;
+          if(action==='AI-ACT-309'){
+            if(!Array.isArray(args.apply)||!args.apply.length||new Set(args.apply).size!==args.apply.length||
+              args.apply.some(key=>typeof key!=='string'||!Object.hasOwn(fields.properties,key)))return fail('invalid_model_result');
+            values=Object.fromEntries(args.apply.map(key=>[String(key),args[String(key)]]));
+          }
+          if(args.couponId===null&&allowNew&&fields.validate(values))return {entityId:null,sourceRevision:root,fields:values};
+          if(!row||!validate(values,row))return fail('invalid_model_result');
+          return {entityId:row.couponId,sourceRevision:this.proof(actor,row),fields:values};}}:{})});
+      nativeTargets.push(...rows.map(row=>({actionId:action,entityId:row.couponId,sourceRevision:this.proof(actor,row)})));
+    }
+    return {revision,validUntil:new Date(until).toISOString(),tools,nativeTargets,modelContext:{sourceKind:'original-store-coupons-v1',storeId:input.scope.storeId,
+      couponSourceAvailable:second.available,productSourceAvailable:second.productsAvailable,buyerSourceAvailable:false,structuredPublishingSupported:false,
+      purpose:'Original configured v1 terms only; unavailable is not empty. Native private revisions/edits are separate. No confirmed publication, funding, redemption, actual savings or remaining uses is inferred.',
+      products:second.products,coupons:second.records.map(row=>({couponId:row.couponId,revision:row.revision,...this.input(row as unknown as Record<string,unknown>)}))}};
+  }
+}
+
 /** Compose source readers; preserve the qualified original Profile path. */
 /** Indexed immutable purchase facts only: never tracking, payment or invoice bytes. */
 export class OriginalStoreOrderPreparationContext implements PreparationContextSource {
@@ -1398,6 +1613,7 @@ export class CompositePreparationContext implements PreparationContextSource {
     catalogue?: OriginalCataloguePreparationContext; storeProducts?: OriginalStoreProductPreparationContext;
     storeOrders?: OriginalStoreOrderPreparationContext;
     storeOperational?: OriginalStoreOperationalPreparationContext;
+    storeCoupons?: OriginalStoreCouponPreparationContext;
     storeReceiving?: OriginalStoreReceivingPreparationContext;
     privateStars?: OriginalPurchasedStarsPreparationContext;
     nativePreferencesEnabled?: boolean; nativeBuyerFormsEnabled?: boolean; nativeSupplierFormsEnabled?: boolean;
@@ -1573,6 +1789,10 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
     proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
+    if(storeCouponActions.has(proposal.actionId)){
+      if(!this.deps.storeCoupons)return fail('context_unavailable');
+      return this.deps.storeCoupons.readPrepared(actor,input,proposal);
+    }
     if (storePurchaseRootActions.has(proposal.actionId)) {
       if (proposal.actionId !== input.actionId || proposal.entityId !== null || input.entityId !== null) return fail('stale_preparation', 409);
       const source = await this.readPurchaseRoots(actor, input);
@@ -1633,6 +1853,10 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (input.actionId !== null) {
+      if(storeCouponActions.has(input.actionId)){
+        if(!this.deps.storeCoupons)return fail('context_unavailable');
+        return this.deps.storeCoupons.read(actor,input);
+      }
       if (storePurchaseRootActions.has(input.actionId)) return this.readPurchaseRoots(actor, input);
       if (storeSupplierDraftActions.has(input.actionId)) return this.readSupplierDrafts(actor, input);
       if(storeOrderBoardActions.has(input.actionId))return this.readOrderBoard(actor,input);
@@ -1723,6 +1947,11 @@ export class CompositePreparationContext implements PreparationContextSource {
     }
     if(this.deps.storeOperational&&input.scope.audience==='workspace'){
       try{const value=await this.deps.storeOperational.read(actor,input);
+        canonicalContextProjection(actor,input.scope,this.combine([...values,value]),1);values.push(value);
+      }catch(error){if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;}
+    }
+    if(this.deps.storeCoupons&&input.scope.audience==='workspace'){
+      try{const value=await this.deps.storeCoupons.read(actor,input);
         canonicalContextProjection(actor,input.scope,this.combine([...values,value]),1);values.push(value);
       }catch(error){if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;}
     }

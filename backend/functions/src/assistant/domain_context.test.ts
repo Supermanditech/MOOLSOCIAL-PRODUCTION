@@ -2,9 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {WorkspaceProfileError} from '../workspace/workspace_profile_service.js';
 import {AccountPlansService} from "../account/plans_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext, OriginalStoreOperationalPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext} from "./domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext, OriginalStoreOperationalPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext,OriginalStoreCouponPreparationContext} from "./domain_context.js";
 import type {PurchaseReferencePage,PurchaseProjection,ProductFeedbackTarget,ProductFeedbackTargetPage,OperationalOrderSnapshot} from "../workspace/workspace_purchase_projection_service.js";
-import {AssistantModelError, digest, type PreparationContext, type PreparationRequest} from "./model_contract.js";
+import {AssistantModelError, assertStrictSchema, digest, type PreparationContext, type PreparationRequest} from "./model_contract.js";
 import {canonicalContextProjection, storeProductActions} from "./domain_context_contract.js";
 
 const actor = {uid: "domain-host-a", projectId: "domain-host-project"};
@@ -186,6 +186,96 @@ test('Private stars proof includes original saved-rating revision and never conf
   f.ratingUnavailable();await assert.rejects(f.source.read(actor,f.input),/context_unavailable/u);
   const changed=privateStarsFixture();changed.mutate((page,call)=>{if(call===4)changed.rate();return page;});
   await assert.rejects(changed.source.read(actor,changed.input),/stale_preparation/u);
+});
+
+/** Explicit isolated read ports; actual original coupon service is qualified separately. */
+function couponOriginalFixture(enabled=true,count=2){
+  const store='HOST-coupon-store',calls:string[]=[],sku='HOST-original-sku',skuProof='store-owned-product:evaluation:1:'+'a'.repeat(64);
+  let clock=new Date(at),owner=1,denied=false,reads=0,productRevision=1;
+  const rows=Array.from({length:count},(_,i)=>({schemaVersion:1,realm:'evaluation',storeId:store,
+    couponId:'HOST-coupon-'+String(i).padStart(3,'0'),revision:1,observedAt:at.toISOString(),name:'HOST होली બચત '+i,
+    percentage:false,discount:100,minimumSpendMinor:0,maximumSavingMinor:100,startsAt:'2026-10-27T08:00:00.000Z',
+    endsAt:'2026-11-27T08:00:00.000Z',totalUses:100,usesPerCustomer:1,active:i%2===0}));
+  let change=(page:Record<string,unknown>,_read:number)=>page;
+  const authority={async read(){if(denied)throw new AssistantModelError('workspace_access_unavailable',403);
+    return {revision:`HOST-coupon-owner-${owner}`,validUntil:'2026-10-28T08:01:00.000Z',modelContext:{audience:'workspace',current:{id:store}},
+      tools:[{name:'HOST_coupon_owner',actionId:'AI-ACT-317',entityId:store,sourceRevision:'HOST-member',description:'Host',parameters:{},validate:()=>true}]};}};
+  const source=new OriginalStoreCouponPreparationContext({projectId:actor.projectId,realm:'evaluation',authority,couponReadsEnabled:enabled,now:()=>clock,
+    promotions:{async handleOperation(uid,operation,body){assert.equal(uid,actor.uid);assert.equal(body.storeId,store);assert.equal(body.storeCouponTermsVersion,1);
+      assert(['listStoreCoupons','readStoreCoupon'].includes(operation),'Preparation cannot issue a coupon command');calls.push(operation);
+      const page:Record<string,unknown>={schemaVersion:1,storeCouponTermsVersion:1,realm:'evaluation',storeId:store,orderingAvailable:false,redemptionAvailable:false,publicationConfirmed:false};
+      if(operation==='readStoreCoupon')page.record=rows.find(row=>row.couponId===body.couponId)??null;
+      else {const found=rows.filter(row=>body.after===undefined||row.couponId>(body.after as string)).slice(0,body.limit as number);
+        page.items=structuredClone(found);page.nextCursor=found.length===body.limit?found.at(-1)!.couponId:null;}
+      return change(structuredClone(page),++reads);}},
+    products:{async read(){return {revision:`HOST-products-${productRevision}`,validUntil:'2026-10-28T08:01:00.000Z',tools:[],
+      nativeTargets:[{actionId:'AI-ACT-214',entityId:sku,sourceRevision:skuProof}],
+      modelContext:{sourceKind:'original-store-owned-skus-v1',products:[{skuId:sku,title:'HOST original product',variant:'1 kg',pack:{label:'1 kg'}}]}};}}});
+  const input:PreparationRequest={...request,scope:{audience:'workspace',storeId:store},actionId:null};
+  return {source,input,rows,calls,sku,skuProof,change:(fn:typeof change)=>{change=fn;},deny:()=>{denied=true;},
+    changeOwner:()=>{owner++;},changeProducts:()=>{productRevision++;},advance:(ms:number)=>{clock=new Date(clock.getTime()+ms);}};
+}
+test('Coupon original configuration reads every page and never issues or claims publication',async()=>{
+  const f=couponOriginalFixture(true,23),context=await f.source.read(actor,f.input);
+  assert.deepEqual(f.calls,['listStoreCoupons','listStoreCoupons','listStoreCoupons','listStoreCoupons']);
+  assert.equal(context.nativeTargets!.length,48);assert.equal(context.modelContext!.structuredPublishingSupported,false);
+  assert.equal((context.modelContext!.coupons as unknown[]).length,23);
+  assert.equal(context.tools.filter(tool=>tool.actionId==='AI-ACT-309').length,1);
+  for(const tool of context.tools)assert.doesNotThrow(()=>assertStrictSchema(tool.parameters));
+});
+test('Coupon typed draft fields preserve supplied Unicode, units and exact verified references',async()=>{
+  const f=couponOriginalFixture(),context=await f.source.read(actor,f.input),tool=context.tools.find(t=>t.name==='store_prepare_coupon_draft')!;
+  const target=tool.resolveTarget!({couponId:null,apply:['name'],name:'HOST new draft',discount:'999'});assert.equal(target.entityId,null);
+  assert.deepEqual(target.fields,{name:'HOST new draft'});
+  for(const apply of [[],['name','name'],['funding'],['couponId']])assert.throws(()=>tool.resolveTarget!({couponId:null,apply,name:'HOST'}),/invalid_model_result/u);
+  const fixed=await f.source.read(actor,{...f.input,actionId:'AI-ACT-309',entityId:f.rows[0]!.couponId});
+  assert.deepEqual(fixed.tools[0]!.decodeFields!({apply:['name'],name:'HOST edited',discount:'999'}),{name:'HOST edited'});
+  assert.doesNotThrow(()=>assertStrictSchema(fixed.tools[0]!.parameters));
+  const proposal={kind:'proposal' as const,id:'HOST-new-coupon-proposal',actionId:'AI-ACT-309',...target,title:'Review',summary:'Host'};
+  const recovered=await f.source.readPrepared(actor,{...f.input,actionId:'AI-ACT-309'},proposal);
+  assert.equal(recovered.tools.length,1);assert.equal(recovered.tools[0]!.sourceRevision,target.sourceRevision);assert.equal(recovered.tools[0]!.targetSelector,undefined);
+  assert.doesNotThrow(()=>assertStrictSchema(recovered.tools[0]!.parameters));
+  assert(tool.validate({name:'होली દિવાળી',percentage:true,discount:'12.50',minimumSpend:'0',maximumSaving:'100.00',
+    startsAt:'2026-10-28T13:30:00+05:30',endsAt:'2026-11-28T13:30:00+05:30',totalUses:'100',usesPerCustomer:'2'}));
+  assert(tool.validate({name:'HOST slabs',kind:'quantityPrice',skuIds:[f.sku],channels:['wholesale'],
+    tiers:[{minimumQuantity:10,priceMinor:100},{minimumQuantity:20,priceMinor:90}]}));
+  assert(tool.validate({kind:'extraQuantity',buyQuantity:'10',rewardQuantity:'1',rewardSkuId:f.sku}));
+  for(const fields of [{},{funding:true},{publish:true},{couponId:f.rows[0]!.couponId},{revision:999},{discount:'१२.५०'},
+    {discount:'1.001'},{discount:1},{discount:'0'},{kind:'buyerDiscount'},{buyerIds:['invented']},{skuIds:['foreign']},
+    {rewardSkuId:'foreign'},{skuIds:[f.sku,f.sku]},{channels:['retail','retail']},{allProducts:true,skuIds:[f.sku]},
+    {kind:'quantityPrice',discount:'1'},{kind:'billDiscount',buyQuantity:'2'},{tiers:[{minimumQuantity:2,priceMinor:100},{minimumQuantity:1,priceMinor:50}]},
+    {startsAt:'2026-02-31T00:00:00Z'},{startsAt:'2026-10-28T08:00:00'},{startsAt:'2026-11-28T08:00:00Z',endsAt:'2026-10-28T08:00:00Z'},
+    {totalUses:'1',usesPerCustomer:'2'},{nextPurchaseDays:'366'},{percentage:true,discount:'100.01'}])assert.equal(tool.validate(fields),false,JSON.stringify(fields));
+});
+test('Coupon original selectors bind each server revision and allowed native publish or pause operation',async()=>{
+  const f=couponOriginalFixture(),context=await f.source.read(actor,f.input),tool=context.tools.find(t=>t.actionId==='AI-ACT-310')!;
+  const target=tool.resolveTarget!({couponId:f.rows[0]!.couponId,operation:'pause'});
+  assert.equal(target.entityId,f.rows[0]!.couponId);
+  assert.throws(()=>tool.resolveTarget!({couponId:f.rows[1]!.couponId,operation:'pause'}),/invalid_model_result/u);
+  for(const fields of [{couponId:'foreign',operation:'publish'},{couponId:f.rows[0]!.couponId,operation:'retry'},
+    {couponId:f.rows[0]!.couponId,operation:['pause']},{couponId:f.rows[0]!.couponId,operation:'pause',funding:true}])assert.throws(()=>tool.resolveTarget!(fields),/invalid_model_result/u);
+  const proposal={kind:'proposal' as const,id:'HOST-coupon-proposal',actionId:'AI-ACT-310',...target,title:'Review',summary:'Host'};
+  const input={...f.input,actionId:proposal.actionId,entityId:proposal.entityId};
+  await f.source.readPrepared(actor,input,proposal);
+  f.rows[0]!.revision++;await assert.rejects(f.source.readPrepared(actor,input,proposal),/stale_preparation/u);
+});
+test('Unavailable coupon v1 service preserves private authoring roots without inventing an empty or published source',async()=>{
+  const f=couponOriginalFixture(false),context=await f.source.read(actor,f.input);
+  assert.equal(f.calls.length,0);assert.equal(context.modelContext!.couponSourceAvailable,false);
+  assert.deepEqual(context.nativeTargets!.map(t=>[t.actionId,t.entityId]),[['AI-ACT-308',null],['AI-ACT-309',null]]);
+  await assert.rejects(f.source.read(actor,{...f.input,actionId:'AI-ACT-310',entityId:'missing'}),/context_unavailable/u);
+});
+test('Coupon original malformed scope, source versions, forward cursor and changed revisions fail closed',async()=>{
+  for(const key of ['realm','storeId','storeCouponTermsVersion','orderingAvailable','publicationConfirmed']){
+    const f=couponOriginalFixture();f.change(page=>({...page,[key]:key==='storeCouponTermsVersion'?2:key==='orderingAvailable'||key==='publicationConfirmed'?true:'foreign'}));
+    await assert.rejects(f.source.read(actor,f.input),/context_unavailable/u);
+  }
+  const cursor=couponOriginalFixture();cursor.change(page=>({...page,nextCursor:'invented-skip'}));await assert.rejects(cursor.source.read(actor,cursor.input),/context_unavailable/u);
+  const changed=couponOriginalFixture();changed.change((page,n)=>{if(n===2)((page.items as Record<string,unknown>[])[0]!).revision=2;return page;});
+  await assert.rejects(changed.source.read(actor,changed.input),/stale_preparation/u);
+  const owner=couponOriginalFixture();owner.change(page=>{owner.changeOwner();return page;});await assert.rejects(owner.source.read(actor,owner.input),/stale_preparation/u);
+  const expired=couponOriginalFixture();expired.change(page=>{expired.advance(61_000);return page;});await assert.rejects(expired.source.read(actor,expired.input),/stale_preparation/u);
+  const denied=couponOriginalFixture();denied.deny();await assert.rejects(denied.source.read(actor,denied.input),/workspace_access_unavailable/u);
 });
 
 function orderBoardFixture(enabled=true){

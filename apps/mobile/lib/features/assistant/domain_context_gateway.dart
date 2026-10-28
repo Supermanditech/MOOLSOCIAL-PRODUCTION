@@ -23,11 +23,12 @@ const assistantStoreOrderBoardContextActions={'AI-ACT-273'};
 const assistantStoreSupplierDraftContextActions={'AI-ACT-235','AI-ACT-236'};
 const assistantStorePurchaseRootContextActions={'AI-ACT-253','AI-ACT-269'};
 const assistantStoreReceivingOriginalContextActions={'AI-ACT-243'};
+const assistantStoreCouponContextActions={'AI-ACT-308','AI-ACT-309','AI-ACT-310'};
 const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions,...assistantStoreSupplierDraftContextActions,...assistantStorePurchaseRootContextActions,...assistantStoreOrderBoardContextActions};
 const assistantDomainContextActions = {'AI-ACT-001', 'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
   ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions,
   ...assistantDomainAddressContextActions,...assistantPrivateStarsContextActions,
-  ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreOperationalContextActions,...assistantStoreReceivingOriginalContextActions};
+  ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreOperationalContextActions,...assistantStoreReceivingOriginalContextActions,...assistantStoreCouponContextActions};
 
 abstract interface class AssistantDomainContextGatewaySource {
   AssistantDomainContextGateway? assistantDomainContextGateway(
@@ -116,7 +117,7 @@ class AssistantDomainContextGateway {
     final rows = List<Object?>.of(data['revisions'] as List);
     final masked = <AssistantContextKey, String>{};
     String? selectionFingerprint;
-    const maskActions = {...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreOperationalContextActions,...assistantStoreReceivingOriginalContextActions};
+    const maskActions = {...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreOperationalContextActions,...assistantStoreReceivingOriginalContextActions,...assistantStoreCouponContextActions};
     if (compact) {
       final selected = _map(data['nativeSelection'], {'version', 'fingerprint', 'groups'});
       if (selected['version'] != 1 || selected['fingerprint'] is! String ||
@@ -156,6 +157,9 @@ class AssistantDomainContextGateway {
       if (assistantStoreProductContextActions.contains(action) && (!context.inWorkspace ||
           entity == null && !(action=='AI-ACT-223'&&RegExp(r'^store-product-submission-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))) _invalid();
       if (assistantStoreOwnerContextActions.contains(action) && (!context.inWorkspace || entity != null)) _invalid();
+      if(assistantStoreCouponContextActions.contains(action)&&(!context.workspaceApproved||!context.storeWorkspace||
+        (entity==null?!const {'AI-ACT-308','AI-ACT-309'}.contains(action)||!RegExp(r'^store-coupon-authoring-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision):
+        !const {'AI-ACT-309','AI-ACT-310'}.contains(action)||!RegExp(r'^store-coupon-original:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))))_invalid();
       if (assistantStoreSupplierDraftContextActions.contains(action) &&
           (!context.workspaceApproved || !context.storeWorkspace ||
            !RegExp(r'^store-supplier-draft-owner:[a-f0-9]{64}$').hasMatch(revision))) _invalid();

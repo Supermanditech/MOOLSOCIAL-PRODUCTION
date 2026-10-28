@@ -6,6 +6,7 @@ import type {PreparationContext, PreparationRequest} from "./model_contract.js";
 import type {ModelPreparation} from "./responses_transport.js";
 import {ResponsesPreparationModel} from "./responses_transport.js";
 import {InMemoryWorkspaceProfileRepository,WorkspaceProfileService,type WorkspaceProfileRecord} from "../workspace/workspace_profile_service.js";
+import {storeNativeSelection} from './domain_context_contract.js';
 const actor = {uid: "fixture-owner", projectId: "fixture-project"};
 const request: PreparationRequest = {scope: {audience: "personal", storeId: null}, requestId: "fixture-request", requestRevision: 4,
   message: "ચોખા શોધો / chawal dhoondo", language: "Auto", expectedEntitlementRevision: "personal:null:1:1", history: [], actionId: null, entityId: null};
@@ -145,6 +146,52 @@ for(const action of ['AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285'])for(co
   const payload={...request,actionId:action,nativeTargets:available?[{actionId:action,entityId:selected}]:[]};
   if(available){const result=await service.handle(actor,{operation:'prepare',payload});assert.equal(result.state,'ready');assert.equal(calls,1);}
   else{await assert.rejects(service.handle(actor,{operation:'prepare',payload}),/context_unavailable/u);assert.equal(calls,0);}
+});
+
+for(const mode of ['ready','zero-ready','stale-same-id','forged-excluded'])test(`Coupon model fields and references use exact native SKU witness ${mode}`,async()=>{
+  const f=fixture(),scope={audience:'workspace' as const,storeId:'fixture-store'},a='HOST-sku-a',b='HOST-sku-b',couponA='HOST-coupon-a',couponB='HOST-coupon-b';
+  const repository=new InMemoryWorkspaceProfileRepository();
+  const profile:WorkspaceProfileRecord={schemaVersion:1,caseId:'HOST-coupon-case',ownerUserId:actor.uid,familyId:'products-trade',profileId:'retailer-grocery',
+    name:'HOST coupon Store',area:'HOST area',primaryActivity:'HOST',proofReferences:{},alternateMobileVerified:false,idempotencyKey:'HOST-coupon-key',
+    requestFingerprint:'HOST-coupon-fingerprint',status:'approved',plan:'free',createdAt:'2026-10-26T00:00:00.000Z',updatedAt:'2026-10-26T00:00:00.000Z',workspaceId:scope.storeId};
+  await repository.createOrRead(profile);
+  const workspaces=new WorkspaceProfileService(repository,f.deps.now,undefined,{async readAccount(accountId){return [{schemaVersion:1,
+    membershipId:'HOST-coupon-member',accountId,workspaceId:scope.storeId,workspaceProfileId:profile.profileId,state:'active',version:1,grantedAt:'2026-10-26T00:00:00.000Z'}];}});
+  const plans=new AccountPlansService({async read(){return {ownerUid:actor.uid,accountStatus:'ACTIVE',subscription:{...(f.row.subscription as object),scope},
+    catalogue:{audience:'workspace',state:'approved',revision:1,offers:[]}};}},{projectId:actor.projectId,now:f.deps.now,readWorkspaces:who=>workspaces.listWorkspaces(who.uid)});
+  const properties={name:{type:'string'},kind:{type:'string',enum:['billDiscount','productDiscount','quantityPrice','extraQuantity']},
+    skuIds:{type:'array',items:{type:'string',enum:[a,b]}},rewardSkuId:{type:'string',enum:[a,b]},tiers:{type:'array',items:{type:'integer'}}};
+  Object.assign(f.context,{nativeTargets:[{actionId:'AI-ACT-309',entityId:null,sourceRevision:'HOST-new-coupon'},
+    ...[couponA,couponB].flatMap(entityId=>['AI-ACT-309','AI-ACT-310'].map(actionId=>({actionId,entityId,sourceRevision:'HOST-'+entityId}))),
+    ...[a,b].map(entityId=>({actionId:'AI-ACT-214',entityId,sourceRevision:'HOST-proof-'+entityId}))],
+    modelContext:{sourceKind:'original-store-coupons-v1',products:[{skuId:a,title:'HOST A',sourceRevision:mode==='stale-same-id'?'HOST-stale-product':'HOST-proof-'+a},
+      {skuId:b,title:'HOST B',sourceRevision:'HOST-proof-'+b}],coupons:[{couponId:couponA,name:'HOST selected coupon'},{couponId:couponB,name:'HOST private excluded coupon'}]},
+    tools:[{name:'HOST_coupon_draft',actionId:'AI-ACT-309',entityId:null,sourceRevision:'HOST-coupon-index',description:'HOST original private draft selector',targetSelector:'couponId',
+        parameters:{type:'object',properties:{...properties,couponId:{type:['string','null'],enum:[null,couponA,couponB]}},required:['couponId',...Object.keys(properties)],additionalProperties:false},
+        validate:()=>true,resolveTarget:(args:Readonly<Record<string,unknown>>)=>{const {couponId,...fields}=args;return {entityId:couponId as string|null,sourceRevision:couponId===null?'HOST-new-coupon':'HOST-'+couponId,fields};}}]});
+  const selection=storeNativeSelection(actor,scope,f.context),bits=Buffer.alloc(Math.ceil(selection.targets.length/8));
+  selection.targets.forEach((target,i)=>{if(target.actionId==='AI-ACT-309'&&(target.entityId===null||target.entityId===couponA)||
+    target.actionId==='AI-ACT-214'&&target.entityId===a&&mode!=='zero-ready')bits[i>>3]!|=1<<(i%8);});
+  let calls=0;
+  const service=new AssistantPreparationService({...f.deps,plans,model:{async prepare(_input,tools,_signal,reference){
+    calls++;const root=tools.find(t=>t.name==='HOST_coupon_draft')!,edit=root;
+    const ready=mode==='ready'||mode==='forged-excluded',p=root.parameters.properties as Record<string,any>;
+    assert.deepEqual((reference!.products as {skuId:string}[]).map(row=>row.skuId),ready?[a]:[]);
+    assert.deepEqual((reference!.coupons as {couponId:string}[]).map(row=>row.couponId),[couponA]);
+    assert(!JSON.stringify(reference).includes('sourceRevision'));assert(!JSON.stringify(reference).includes('HOST private excluded coupon'));
+    assert.deepEqual((edit.parameters.properties as Record<string,any>).couponId.enum,[null,couponA]);
+    if(ready){assert.deepEqual(p.skuIds.items.enum,[a]);assert.deepEqual(p.rewardSkuId.enum,[a]);}
+    else{assert.equal(p.skuIds,undefined);assert.equal(p.rewardSkuId,undefined);assert.equal(p.tiers,undefined);
+      assert.deepEqual(p.kind.enum,['billDiscount']);assert.equal(root.validate({kind:'quantityPrice'}),false);}
+    assert.equal(root.validate({skuIds:[b]}),false);assert.equal(root.validate({rewardSkuId:b}),false);
+    assert.throws(()=>edit.resolveTarget!({couponId:couponA,skuIds:[b]}),/invalid_model_result/u);
+    return {kind:'tool',name:'HOST_coupon_draft',arguments:{couponId:null,name:'HOST user supplied coupon',...(mode==='forged-excluded'?{skuIds:[b]}:ready?{skuIds:[a]}:{})}};
+  }}});
+  const payload={...request,scope,expectedEntitlementRevision:'workspace:fixture-store:1:1',actionId:'AI-ACT-309',
+    nativeTargetMask:{version:1 as const,fingerprint:selection.fingerprint,bits:bits.toString('base64url')}};
+  if(mode==='forged-excluded')await assert.rejects(service.handle(actor,{operation:'prepare',payload}),/invalid_model_result/u);
+  else assert.equal((await service.handle(actor,{operation:'prepare',payload})).state,'ready');
+  assert.equal(calls,1);
 });
 
 test("AI-B01 actual paid service prepares a typed native proposal without domain execution", async () => {

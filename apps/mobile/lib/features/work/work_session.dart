@@ -1173,6 +1173,70 @@ class WorkSession extends ChangeNotifier {
   final StoreCouponPendingStore Function(StorePromotionScope scope)? storeCouponPendingStoreFactory;
   final Map<StorePromotionScope, StorePromotionController> _productPromotions = {};
   final Map<StorePromotionScope, StoreCouponController> _storeCoupons = {};
+  /// Preparation may inspect an existing original controller, never construct,
+  /// restore or refresh one to make a proposed action appear ready.
+  StoreCouponController? get workspaceAssistantLoadedCouponController {
+    final account=_contactAccountScope,store=activeWorkspace?.id;
+    if(_disposed||account==null||store==null||!workspaceStoreAuthoringAvailable)return null;
+    final matches=_storeCoupons.entries.where((entry)=>entry.key.account==account&&entry.key.store==store&&
+      const {'evaluation','production'}.contains(entry.key.realm)&&entry.value.active).toList();
+    return matches.length==1?matches.single.value:null;
+  }
+  static String workspaceAssistantOriginalCouponSourceProof(StoreCouponRecord record,String accountUserId){
+    Object? canonical(Object? value)=>value is List?value.map(canonical).toList():value is Map?
+      {for(final key in value.keys.cast<String>().toList()..sort())key:canonical(value[key])}:value;
+    return 'store-coupon-original:${record.scope.realm}:${crypto.sha256.convert(utf8.encode(jsonEncode(canonical([
+      record.scope.realm,accountUserId,record.scope.store,record.couponId,record.revision,record.input.toJson()]))))}';
+  }
+  Future<Set<(String,String)>> readWorkspaceAssistantOriginalCoupons(Map<(String,String),String> expected,
+      {required String accountUserId,required bool Function() inputCurrent,required DateTime validUntil}) async {
+    if(expected.isEmpty)return const {};
+    final store=activeWorkspace?.id,account=_contactAccountScope,owner=publicationPreferencesContext;
+    final navigation=navigationScopeRevision,catalogue=catalogueGateway;
+    StorePromotionGateway? connection=productPromotionGateway;
+    if(connection==null&&account!=null&&catalogue is AuthenticatedWorkspaceCatalogueGateway&&
+      gateway is! ReviewWorkGateway&&catalogue.storeCouponTermsSupported){
+      connection=AuthenticatedStorePromotionGateway(endpoint:catalogue.endpoint,credentials:catalogue.credentials,
+        transport:catalogue.transport,ownerAccountId:account,realm:catalogue.realm,storeCouponTermsSupported:true);
+    }
+    if(store==null||account==null||accountUserId.isEmpty||connection is! AuthenticatedStorePromotionGateway||
+      connection.ownerAccountId!=account||!connection.storeCouponTermsSupported||!workspaceRequiresMembershipReadback||
+      catalogue is! AuthenticatedWorkspaceCatalogueGateway||catalogue.realm!=connection.realm||
+      productPromotionRealm!=null&&productPromotionRealm!=connection.realm||
+      expected.keys.any((key)=>!const {'AI-ACT-309','AI-ACT-310'}.contains(key.$1)))return const {};
+    final reader=connection,scope=(account:account,store:store,realm:reader.realm);
+    bool current()=>!_disposed&&inputCurrent()&&DateTime.now().isBefore(validUntil)&&
+      _contactAccountScope==account&&activeWorkspace?.id==store&&publicationPreferencesContext==owner&&
+      navigationScopeRevision==navigation&&_currentWorkspaceAccess(store,activeWorkspace?.profileId)&&
+      workspaceAssistantLoadedCouponController?.busy!=true&&workspaceAssistantLoadedCouponController?.pending==null;
+    if(!current())return const {};
+    try{
+      final draft=await readWorkspaceAssistantCouponDraft(expectedStoreId:store,inputCurrent:current);
+      if(draft==null||!current())return const {};
+      final campaigns=decodeStoreCouponCampaigns(draft[_couponCampaignField],store);
+      final pending=storeCouponPendingStoreFactory?.call(scope)??SecureStoreCouponPendingStore();
+      if(await pending.read(scope).timeout(const Duration(seconds:25))!=null||!current())return const {};
+      final ready=<(String,String)>{};
+      for(final couponId in expected.keys.map((key)=>key.$2).toSet()){
+        final matches=campaigns.where((row)=>row.id==couponId).toList();
+        if(matches.length!=1)continue;
+        final record=await reader.readCoupon(scope,couponId,current).timeout(const Duration(seconds:25));
+        if(!current())return const {};
+        if(record==null||record.scope!=scope||record.couponId!=couponId||record.input.structured)continue;
+        final proof=workspaceAssistantOriginalCouponSourceProof(record,accountUserId);
+        for(final entry in expected.entries.where((entry)=>entry.key.$2==couponId)){
+          if(entry.value!=proof)continue;
+          // Private rich drafts remain editable, but v1 cannot publish them.
+          if(entry.key.$1=='AI-ACT-310'&&StoreCouponInput.fromCampaign(matches.single,active:true).structured)continue;
+          ready.add(entry.key);
+        }
+      }
+      final after=await readWorkspaceAssistantCouponDraft(expectedStoreId:store,inputCurrent:current);
+      if(!current()||after==null||jsonEncode(after)!=jsonEncode(draft)||
+        await pending.read(scope).timeout(const Duration(seconds:25))!=null||!current())return const {};
+      return Set.unmodifiable(ready);
+    }catch(_){return const {};}
+  }
   StoreCouponController? get workspaceStoreCoupons {
     final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
     StorePromotionGateway? connection = productPromotionGateway;
@@ -11188,6 +11252,44 @@ class WorkSession extends ChangeNotifier {
   String? get workspaceOfferDraftError => _offerDraftRecovery.error;
   bool get workspaceOfferDraftSaving => _offerDraftRecovery.saving;
   bool get workspaceStoreCouponRecoveryRequired => _offerDraftRecovery.couponReadbackRequired;
+  bool get workspaceAssistantCouponDraftReady {
+    final draft=_storeData.offerDraftsByAccount[_contactAccountScope];
+    return !_disposed&&draft!=null&&draft.loaded&&!draft.saving&&!draft.couponReadbackRequired&&draft.error==null;
+  }
+  Map<String,String> get workspaceAssistantCouponDraft =>
+    Map.unmodifiable(_storeData.offerDraftsByAccount[_contactAccountScope]?.values??const <String,String>{});
+
+  /// Detached original read. Capture must not hydrate the editor or consume
+  /// uncertain-save recovery merely to make an AI proposal available.
+  Future<Map<String,String>?> readWorkspaceAssistantCouponDraft({required String expectedStoreId,
+      required bool Function() inputCurrent}) async {
+    final data=_storeData,account=_contactAccountScope,navigation=navigationScopeRevision;
+    final draft=data.offerDraftsByAccount[account],before=Map<String,String>.from(draft?.values??const {});
+    final loaded=draft?.loaded??false;
+    bool current()=>!_disposed&&inputCurrent()&&identical(data,_storeData)&&account!=null&&
+      _contactAccountScope==account&&activeWorkspace?.id==expectedStoreId&&navigationScopeRevision==navigation&&
+      identical(draft,data.offerDraftsByAccount[account])&&
+      (draft?.loaded??false)==loaded&&draft?.saving!=true&&draft?.couponReadbackRequired!=true&&draft?.error==null&&
+      jsonEncode(draft?.values??const <String,String>{})==jsonEncode(before);
+    if(!current()||!workspaceStoreAuthoringAvailable||!_validOfferDraftFields(before,expectedStoreId))return null;
+    if(loaded)return Map.unmodifiable(before);
+    try{
+      final store=_offerDraftStore(expectedStoreId);
+      if(store==null||store.accountScope!=account)return null;
+      final saved=await store.read(account!).timeout(const Duration(seconds:25));
+      if(!current())return null;
+      final fields=saved?['fields'];
+      if(saved!=null&&(saved['schemaVersion']!=1||saved['storeId']!=expectedStoreId||
+        fields is! Map||!_validOfferDraftFields(fields,expectedStoreId)))return null;
+      if(fields is Map){
+        if(before.isEmpty){before.addAll(Map<String,String>.from(fields));}
+        else if(!before.containsKey(_couponCampaignField)&&fields.containsKey(_couponCampaignField)){
+          before[_couponCampaignField]=fields[_couponCampaignField] as String;
+        }
+      }
+      return Map.unmodifiable(before);
+    }catch(_){return null;}
+  }
 
   // No accepted publisher is connected. Valid draft fields are not capability.
   bool get workspaceOfferPublishingAvailable => false;

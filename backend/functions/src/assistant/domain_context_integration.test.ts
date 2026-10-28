@@ -4,8 +4,9 @@ import {AccountPlansService} from "../account/plans_service.js";
 import {AccountProfileService} from "../account/profile_service.js";
 import {ProfileWorkspacePreparationContext} from "./profile_context.js";
 import {WorkspaceCatalogueService, type WorkspaceCatalogueRepository} from "../workspace/workspace_catalogue_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext,OriginalStoreOperationalPreparationContext,OriginalPurchasedStarsPreparationContext,OriginalStoreReceivingPreparationContext} from "./domain_context.js";
-import {digest} from './model_contract.js';
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext,OriginalStoreOperationalPreparationContext,OriginalPurchasedStarsPreparationContext,OriginalStoreReceivingPreparationContext,OriginalStoreCouponPreparationContext} from "./domain_context.js";
+import {digest,assertStrictSchema} from './model_contract.js';
+import {FirestorePromotionRepository,WorkspacePromotionService} from '../workspace/workspace_promotion_service.js';
 import {initializeApp, deleteApp} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
 import {randomUUID} from 'node:crypto';
@@ -162,6 +163,61 @@ test('Supplier recovery rechecks current authority and exact source proof withou
     changed.onRead(count => {if (count === 4) {if (kind === 'stale') changed.bump(); else if (kind === 'expired') changed.advance(); else changed.member(false);}});
     await assert.rejects(changed.source.read(actor, changed.input), Error, kind);
   }
+});
+
+test('Coupon originals actual loopback SDK pagination, metadata and proposal recovery preserve original state',{
+  skip:!process.env.FIRESTORE_EMULATOR_HOST,timeout:120000,
+},async()=>{
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!,/^127\.0\.0\.1:\d+$/u);
+  const f=supplierDraftFixture(),storeId=f.input.scope.storeId,caseId='HOST-coupon-original-case';
+  const app=initializeApp({projectId:`demo-ai-coupons-${randomUUID().slice(0,8)}`},`host-coupons-${randomUUID()}`),db=getFirestore(app);
+  db.settings({gaxServerStreamingRetries:true});
+  const open=()=>new WorkspacePromotionService(new FirestorePromotionRepository(db,'evaluation',()=>at),
+    {publicCatalogue:async()=>{throw Error('Original Store-wide coupon reads must not invent or read SKU fixtures');}},()=>at,{storeCouponTermsSupported:true});
+  const root=db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc(storeId);
+  try{
+    await db.collection('workspaceProfiles').doc(caseId).create({schemaVersion:1,caseId,workspaceId:storeId,ownerUserId:actor.uid,
+      familyId:'products-trade',profileId:'retailer-grocery',name:'HOST coupon Store',status:'live',shopEnabled:true});
+    for(let i=0;i<23;i++)await open().handleOperation(actor.uid,'saveStoreCoupon',{
+      storeCouponTermsVersion:1,storeId,couponId:`HOST-coupon-${String(i).padStart(2,'0')}`,expectedRevision:0,
+      idempotencyKey:`HOST-original-${i}`,fundingAcknowledged:true,coupon:{name:`HOST होली coupon ${i}`,percentage:false,
+        discount:1050,minimumSpendMinor:10000,maximumSavingMinor:1050,startsAt:'2026-10-27T08:00:00.000Z',
+        endsAt:'2026-11-28T08:00:00.000Z',totalUses:100,usesPerCustomer:1,active:true}});
+    const couponSource=()=>new OriginalStoreCouponPreparationContext({projectId:actor.projectId,realm:'evaluation',authority:f.original,
+      promotions:open(),couponReadsEnabled:true,now:()=>at});
+    const source=()=>new CompositePreparationContext({original:f.original,storeCoupons:couponSource(),now:()=>at});
+    const input={...f.input,actionId:null,message:'Rename the exact saved coupon'};
+    const before=await root.collection('storeCoupons').get(),receipts=await root.collection('storeCouponReceipts').get();
+    const context=await couponSource().read(actor,input);
+    assert.equal((context.modelContext!.coupons as unknown[]).length,23);assert.equal(context.nativeTargets!.length,48);
+    for(const tool of context.tools)assertStrictSchema(tool.parameters);
+    const tool=context.tools.find(tool=>tool.actionId==='AI-ACT-309')!,couponId='HOST-coupon-00';
+    const target=tool.resolveTarget!({couponId,apply:['name'],name:'HOST नया नाम',discount:'999'});
+    assert.deepEqual(target.fields,{name:'HOST नया नाम'});assert.equal(target.entityId,couponId);
+    const proposal={kind:'proposal' as const,id:'HOST-original-coupon-proposal',actionId:'AI-ACT-309',...target,title:'Review',summary:'Host'};
+    await couponSource().readPrepared(actor,{...input,actionId:'AI-ACT-309',entityId:couponId},proposal);
+    const metadata=await handleAssistantCanonicalContextRequest({method:'POST',headers:{authorization:'Bearer HOST-only','x-firebase-appcheck':'HOST-only'},
+      bodyBytes:100,body:{operation:'read',payload:{scope:input.scope,nativeSelectionVersion:1}}},
+      {projectId:actor.projectId,enabled:true,context:source(),now:()=>at,async verifyIdToken(){return actor;},async verifyAppCheck(){return {};}});
+    assert.equal(metadata.status,200);assert(metadata.body.ok);assert(JSON.stringify(metadata.body).includes(target.sourceRevision));
+    assert(!JSON.stringify(metadata.body).includes('HOST होली'));
+    assert.deepEqual((await root.collection('storeCoupons').get()).docs.map(doc=>doc.data()),before.docs.map(doc=>doc.data()));
+    assert.equal((await root.collection('storeCouponReceipts').get()).size,receipts.size);
+    assert.equal((await root.collection('skus').get()).size,0);assert.equal((await root.collection('promotions').get()).size,0);
+    if(process.env.AI_DOMAIN_COUPON_ORIGINAL_EXPORT_PATH){const path=process.env.AI_DOMAIN_COUPON_ORIGINAL_EXPORT_PATH;assert(isAbsolute(path));
+      writeFileSync(path,JSON.stringify({kind:'isolated-host-original-coupon-service-contract',ownerUid:actor.uid,storeId,
+        checkedAt:at.toISOString(),records:before.docs.map(doc=>doc.data()),couponId,proof:target.sourceRevision,
+        fields:target.fields,metadata:metadata.body},null,2)+'\n',{flag:'wx'});}
+    // Change through the actual original command with its accepted input only.
+    const original=(await open().handleOperation(actor.uid,'readStoreCoupon',{storeCouponTermsVersion:1,storeId,couponId}) as any).record;
+    const coupon=Object.fromEntries(['name','percentage','discount','minimumSpendMinor','maximumSavingMinor','startsAt','endsAt','totalUses','usesPerCustomer','active'].map(key=>[key,original[key]]));
+    await open().handleOperation(actor.uid,'saveStoreCoupon',{storeCouponTermsVersion:1,storeId,couponId,expectedRevision:original.revision,
+      idempotencyKey:'HOST-explicit-original-update',fundingAcknowledged:true,coupon:{...coupon,name:'HOST changed original'}});
+    await assert.rejects(couponSource().readPrepared(actor,{...input,actionId:'AI-ACT-309',entityId:couponId},proposal),/stale_preparation/u);
+    f.member(false);await assert.rejects(couponSource().read(actor,input));f.member(true);
+    await db.collection('workspaceProfiles').doc(caseId).update({ownerUserId:'HOST-other-owner'});
+    await assert.rejects(couponSource().read(actor,input),/workspace_access_unavailable/u);
+  }finally{await db.terminate();await deleteApp(app);}
 });
 
 test('Operational originals actual loopback SDK preparation leaves original state unchanged and native command owns the transition',{

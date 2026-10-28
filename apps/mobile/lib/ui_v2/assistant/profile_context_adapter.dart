@@ -9,7 +9,7 @@ import '../../features/buy/buy_v2_session.dart';
 import '../../features/buy/buy_v2_models.dart' show BuyV2View;
 import '../../features/journey01/journey_session.dart';
 import '../../features/work/work_session.dart';
-import '../../features/work/work_catalogue_gateway.dart' show WorkspaceCatalogueOwnerGateway;
+import '../../features/work/work_catalogue_gateway.dart' show WorkspaceCatalogueOwnerGateway,AuthenticatedWorkspaceCatalogueGateway;
 import '../buy/buy_v2_views.dart';
 import '../profile/global_personal_profile_v2.dart';
 
@@ -125,10 +125,15 @@ class AssistantOriginalContextReader {
           for (final entry in domain.revisions.entries.where((entry) =>
             assistantStoreReceivingOriginalContextActions.contains(entry.key.$1) && entry.key.$2 != null)) entry.key.$2!: entry.value,
         }, inputCurrent: alive, validUntil: domain.validUntil);
+        final originalCoupons=await work.readWorkspaceAssistantOriginalCoupons({
+          for(final entry in domain.revisions.entries.where((entry)=>
+            assistantStoreCouponContextActions.contains(entry.key.$1)&&entry.key.$2!=null))
+              (entry.key.$1,entry.key.$2!):entry.value,
+        },accountUserId:owner!.userId,inputCurrent:alive,validUntil:domain.validUntil);
         final privateStars=buy==null?<String>{}:await buy!.readAssistantPrivateStarsOriginals({
           for(final entry in domain.revisions.entries.where((entry)=>
             assistantPrivateStarsContextActions.contains(entry.key.$1)&&entry.key.$2!=null))entry.key.$2!:entry.value,
-        },accountUserId:owner!.userId,binding:context.binding,inputCurrent:alive,validUntil:domain.validUntil);
+        },accountUserId:owner.userId,binding:context.binding,inputCurrent:alive,validUntil:domain.validUntil);
         if (!alive()) throw const AssistantModelFailure('stale_preparation');
         for (final entry in domain.revisions.entries) {
           // Accept only an unchanged original native cache. Explicit refresh,
@@ -138,6 +143,13 @@ class AssistantOriginalContextReader {
           if(assistantStoreOrderOriginalContextActions.contains(entry.key.$1)&&!originalOrders.contains(entry.key.$2))continue;
           if(assistantStoreOperationalContextActions.contains(entry.key.$1)&&
             (entry.key.$2==null||work.workspaceAssistantOperationalOrderProof(entry.key.$1,entry.key.$2!)!=entry.value))continue;
+          if(assistantStoreCouponContextActions.contains(entry.key.$1)){
+            if(entry.key.$2==null){
+              final realm=RegExp(r'^store-coupon-authoring-owner:(evaluation|production):[a-f0-9]{64}$').firstMatch(entry.value)?.group(1);
+              final gateway=work.catalogueGateway;
+              if(gateway is! AuthenticatedWorkspaceCatalogueGateway||realm==null||gateway.realm!=realm)continue;
+            }else if(!originalCoupons.contains((entry.key.$1,entry.key.$2!)))continue;
+          }
           if(assistantStoreReceivingOriginalContextActions.contains(entry.key.$1)&&!originalReceiving.contains(entry.key.$2))continue;
           if(assistantPrivateStarsContextActions.contains(entry.key.$1)&&!privateStars.contains(entry.key.$2))continue;
           if(assistantStoreRestockOwnerContextActions.contains(entry.key.$1)&&

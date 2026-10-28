@@ -2,6 +2,7 @@ import 'package:moolsocial/features/work/work_customer_feedback.dart' as sales02
 import 'package:moolsocial/features/work/screens/work_onboarding_screens.dart' as work_setup;
 import 'dart:async';
 import 'package:moolsocial/features/assistant/mool_assistant.dart' as scope_contract;
+import 'package:moolsocial/features/assistant/domain_context_gateway.dart' show AssistantDomainContextGateway;
 import 'package:moolsocial/features/assistant/profile_context.dart' as assistant_guard;
 import 'package:moolsocial/ui_v2/assistant/mool_assistant_v2.dart'
     show MoolAssistantHost, MoolAssistantWorkspaceScope, MoolAssistantNativeScope, MoolAssistantPage, MoolAssistantNativeMediaPicker, MoolAssistantRouteBoundNativeAdapter;
@@ -4136,8 +4137,11 @@ class _OfferHostGateway extends promotion_fixture.Provider implements StoreStruc
   final couponWrites = <StoreCouponIntent>[];
   StoreCouponRecord? head;
   bool unknown = false;
-  @override Future<StoreCouponRecord?> readCoupon(StorePromotionScope scope, String id, bool Function() current) async =>
-    current() && head?.couponId == id ? head : null;
+  int couponReads = 0;
+  @override Future<StoreCouponRecord?> readCoupon(StorePromotionScope scope, String id, bool Function() current) async {
+    couponReads++;
+    return current() && head?.couponId == id ? head : null;
+  }
   @override Future<StoreCouponPage> listCoupons(StorePromotionScope scope, bool Function() current, {String? after, int limit = 20}) async => StoreCouponPage([], null);
   @override Future<StoreCouponResult> saveCoupon(StoreCouponIntent original, bool Function() current) async {
     if (!current()) return const StoreCouponResult(StorePromotionResultState.notSent);
@@ -4182,7 +4186,7 @@ class _OfferHostHarness {
   scope_contract.MoolAssistantController? controller;
   late final StoreCouponCampaign campaign;
   Object get writes => (native.writes, draft.saves, gateway.couponWrites.length);
-  Future<void> ready(WidgetTester tester, {bool customers = false}) async {
+  Future<void> ready(WidgetTester tester, {bool customers = false, bool publisherReady = true}) async {
     await native.ready();
     if (customers) { expect(native.work.loadStoreReviewSeed(12), isTrue); native.work.workspaceId = native.work.activeWorkspace!.id; }
     expect(await native.work.loadWorkspaceInventory(retry: true), isTrue);
@@ -4195,6 +4199,10 @@ class _OfferHostHarness {
       maximumSavingMinor: 100, startsAt: now.subtract(const Duration(days: 1)),
       endsAt: now.add(const Duration(days: 7)), totalUses: 100, usesPerCustomer: 1);
     expect(await native.work.saveWorkspaceStoreCouponCampaign(campaign, expectedStoreId: store), isTrue);
+    if(connected&&publisherReady){
+      final publisher=native.work.workspaceStoreCoupons!;
+      expect(await publisher.refresh(campaign.id),isTrue);
+    }
     await tester.pumpWidget(native.app); await tester.pumpAndSettle();
     final adapters = native.adapters(tester);
     expect(adapters.map((a) => a.actionId), containsAll(['AI-ACT-308','AI-ACT-309','AI-ACT-310']));
@@ -4225,7 +4233,179 @@ class _OfferHostHarness {
   }
 }
 
+// Isolated original-gateway contract fixture; never registered on OPPO.
+class _CouponOriginalHost {
+  final pending=promotion_fixture.CouponPending();
+  final operations=<String>[];
+  final records=<String,Map<String,dynamic>>{};
+  late _AuthenticatedNativeScopeFixture native;
+  late _OfferHostDraft draft;
+  late StorePromotionScope scope;
+  Future<void> Function()? beforeRead;
+  bool revoked=false,nativeReady=false;
+  Future<void> ready()async{
+    final endpoint=Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
+    final transport=catalogue_fixture.OwnerTransport((body)async{
+      final operation=body['operation'] as String;operations.add(operation);
+      if(operation=='listWorkspaces'){
+        final checked=DateTime.now().toUtc().subtract(const Duration(seconds:1));
+        return SocialContentResponse(statusCode:200,body:jsonEncode({'ok':true,'data':{'workspaces':revoked?[]:[{
+          'caseId':'WP-240701','status':'live','plan':'free','workspaceId':'WK-510001','profileId':'retailer-grocery',
+          'name':'HOST original coupon Store','area':'HOST','primaryActivity':'Groceries',
+          'access':{'schemaVersion':1,'state':'active','accountId':'host-native-scope-user','caseId':'WP-240701',
+            'workspaceId':'WK-510001','profileId':'retailer-grocery','applicationUpdatedAt':checked.subtract(const Duration(seconds:10)).toIso8601String(),
+            'checkedAt':checked.toIso8601String(),'membership':{'schemaVersion':1,'state':'active','membershipId':'HOST-coupon-member',
+              'workspaceId':'WK-510001','workspaceProfileId':'retailer-grocery','version':1,
+              'effectiveFrom':checked.subtract(const Duration(days:1)).toIso8601String(),'expiresAt':checked.add(const Duration(hours:1)).toIso8601String()}}}]}}));
+      }
+      expect(operation,'readStoreCoupon');expect(body['storeId'],scope.store);expect(body['storeCouponTermsVersion'],1);
+      await beforeRead?.call();
+      return SocialContentResponse(statusCode:200,body:jsonEncode({'ok':true,'data':{
+        'schemaVersion':1,'storeCouponTermsVersion':1,'realm':'evaluation','storeId':scope.store,
+        'orderingAvailable':false,'redemptionAvailable':false,'publicationConfirmed':false,'record':records[body['couponId']]}}));
+    });
+    native=_AuthenticatedNativeScopeFixture(connectedPrincipal:true,makeWork:(contact,purchase,inventory,trading){
+      draft=_OfferHostDraft(contact.accountScope);
+      return WorkSession(gateway:AuthenticatedWorkGateway(endpoint:endpoint,credentials:catalogue_fixture.Credentials(),transport:transport),
+        catalogueGateway:AuthenticatedWorkspaceCatalogueGateway(endpoint:endpoint,realm:'evaluation',
+          credentials:catalogue_fixture.Credentials(),transport:transport,storeCouponTermsSupported:true),
+        productPromotionGateway:AuthenticatedStorePromotionGateway(endpoint:endpoint,credentials:catalogue_fixture.Credentials(),transport:transport,
+          ownerAccountId:contact.accountScope,realm:'evaluation',storeCouponTermsSupported:true),
+        productPromotionRealm:'evaluation',contactDraftStore:contact,purchaseEntryStore:purchase,inventoryStore:inventory,
+        tradingPreferencesStoreFactory:(_)=>trading,offerDraftStoreFactory:(_)=>draft,storeCouponPendingStoreFactory:(_)=>pending,
+        catalogueReference:workspaceMasterCatalogue);
+    });
+    await native.ready();nativeReady=true;scope=(account:native.contact.accountScope,store:native.work.activeWorkspace!.id,realm:'evaluation');
+    final at=DateTime.now().toUtc().subtract(const Duration(seconds:1));
+    final campaigns=<StoreCouponCampaign>[];
+    for(var i=1;i<=2;i++){
+      final campaign=StoreCouponCampaign(id:'HOST-original-coupon-$i',storeId:scope.store,revision:1,name:'HOST original coupon $i',
+        percentage:false,discount:100,minimumSpendMinor:0,maximumSavingMinor:100,startsAt:at.subtract(const Duration(days:1)),
+        endsAt:at.add(const Duration(days:7)),totalUses:100,usesPerCustomer:1);
+      campaigns.add(campaign);records[campaign.id]={...StoreCouponInput.fromCampaign(campaign,active:true).toJson(),
+        'schemaVersion':1,'realm':scope.realm,'storeId':scope.store,'couponId':campaign.id,'revision':i+2,'observedAt':at.toIso8601String()};
+    }
+    await draft.save(scope.account,{'schemaVersion':1,'storeId':scope.store,'fields':{'storeCouponCampaignsV1':encodeStoreCouponCampaigns(campaigns)}});
+  }
+  Map<(String,String),String> get expected=>{
+    for(final row in records.values)for(final action in ['AI-ACT-309','AI-ACT-310'])
+      (action,row['couponId'] as String):WorkSession.workspaceAssistantOriginalCouponSourceProof(
+        StoreCouponRecord.decode(row,scope,DateTime.now()),scope.account)};
+  Future<Set<(String,String)>> read({Map<(String,String),String>? proofs,bool Function()? current})=>
+    native.work.readWorkspaceAssistantOriginalCoupons(proofs??expected,accountUserId:scope.account,inputCurrent:current??()=>true,
+      validUntil:DateTime.now().add(const Duration(minutes:1)));
+  Future<void> dispose()async{
+    if(nativeReady){await native.dispose();return;}
+    native.work.dispose();native.journey.dispose();native.core.dispose();native.mode.dispose();await native.principal.changes.close();
+  }
+}
+
 void registerOfferNativeTests() {
+  test('SCOPE18 actual original SDK metadata and coupon proof decode without client-authored authority',()async{
+    final exported=jsonDecode(File(Platform.environment['AI_DOMAIN_COUPON_ORIGINAL_EXPORT_PATH']!).readAsStringSync()) as Map<String,dynamic>;
+    expect(exported['kind'],'isolated-host-original-coupon-service-contract');
+    final owner=(environment:'firebase-service',projectId:'host-domain-project',tenantId:null,userId:exported['ownerUid'] as String);
+    final ctx=scope_contract.MoolAssistantContext(accountScope:owner,authenticationRevision:1).withWorkspace(
+      scope_contract.MoolAssistantWorkspace(id:exported['storeId'] as String,name:'HOST original Store',profile:'retailer-grocery',
+        revision:1,isStore:true,approved:true,approvalAccountScope:owner));
+    final wire=catalogue_fixture.OwnerTransport((body)async{
+      expect(body['operation'],'read');expect((body['payload'] as Map)['nativeSelectionVersion'],1);
+      return SocialContentResponse(statusCode:200,body:jsonEncode(exported['metadata']));
+    });
+    final source=AssistantDomainContextGateway(owner:owner,isCurrent:()=>true,credentials:catalogue_fixture.Credentials(),
+      transport:wire,clock:()=>DateTime.parse(exported['checkedAt'] as String),compactStoreSelection:true);
+    try{
+      final metadata=await source.read(ctx,()=>true);
+      expect(metadata.revisions[('AI-ACT-309',exported['couponId'] as String)],exported['proof']);
+      final record=(exported['records'] as List).cast<Map>().singleWhere((row)=>row['couponId']==exported['couponId']);
+      final scope=(account:owner.userId,store:exported['storeId'] as String,realm:'evaluation');
+      final decoded=StoreCouponRecord.decode(record,scope,DateTime.parse(exported['checkedAt'] as String));
+      expect(WorkSession.workspaceAssistantOriginalCouponSourceProof(decoded,owner.userId),exported['proof']);
+      expect(WorkSession.workspaceAssistantOriginalCouponSourceProof(decoded,'HOST-foreign-account'),isNot(exported['proof']));
+      final changed=StoreCouponRecord.decode(<String,dynamic>{...Map<String,dynamic>.from(record),'revision':decoded.revision+1},scope,DateTime.parse(exported['checkedAt'] as String));
+      expect(WorkSession.workspaceAssistantOriginalCouponSourceProof(changed,owner.userId),isNot(exported['proof']));
+      expect(wire.calls,1);
+    }finally{source.dispose();}
+  },skip:Platform.environment['AI_DOMAIN_COUPON_ORIGINAL_EXPORT_PATH']==null);
+  test('SCOPE18 original coupon bridge reads multiple records without manual publisher or private adoption',()async{
+    final h=_CouponOriginalHost();try{await h.ready();final writes=h.native.writes,saves=h.draft.saves;
+      expect(await h.read(),h.expected.keys.toSet());
+      expect(h.operations.where((op)=>op=='readStoreCoupon').length,2);
+      expect(h.native.work.workspaceAssistantLoadedCouponController,isNull);
+      expect(h.native.work.workspaceAssistantCouponDraftReady,isFalse);expect(h.native.work.workspaceAssistantCouponDraft,isEmpty);
+      expect(h.native.writes,writes);expect(h.draft.saves,saves);expect(h.pending.original,isNull);
+    }finally{await h.dispose();}});
+  for(final fault in ['stale proof','missing private','pending original','retired source','revoked membership']){
+    test('SCOPE18 original coupon bridge rejects $fault without recovery writes',()async{
+      final h=_CouponOriginalHost();try{await h.ready();final proofs=h.expected,writes=h.native.writes,saves=h.draft.saves;
+        var current=true;
+        if(fault=='stale proof')proofs.updateAll((key,value)=>value.replaceAll(RegExp(r'[a-f0-9]{64}$'),'0'*64));
+        if(fault=='missing private')h.draft.value={'schemaVersion':1,'storeId':h.scope.store,'fields':<String,String>{}};
+        if(fault=='pending original'){
+          final row=h.records.values.first;
+          h.pending.original=StoreCouponIntent(scope:h.scope,couponId:row['couponId'] as String,expectedRevision:row['revision'] as int,
+            idempotencyKey:'HOST-held-coupon',input:StoreCouponInput.fromJson({for(final key in ['name','percentage','discount','minimumSpendMinor','maximumSavingMinor','startsAt','endsAt','totalUses','usesPerCustomer','active'])key:row[key]}),fundingAcknowledged:true);
+        }
+        if(fault=='retired source')h.beforeRead=()async{current=false;};
+        if(fault=='revoked membership'){h.revoked=true;await h.native.work.refreshFeed();}
+        final pending=h.pending.original;
+        expect(await h.read(proofs:proofs,current:()=>current),isEmpty);
+        expect(h.pending.original,same(pending));expect(h.native.writes,writes);expect(h.draft.saves,saves);
+        expect(h.native.work.workspaceAssistantLoadedCouponController,isNull);
+      }finally{await h.dispose();}});
+  }
+  testWidgets('SCOPE18 preparation does not create a missing coupon publisher',(tester)async{
+    final h=_OfferHostHarness();try{await h.ready(tester,publisherReady:false);
+      expect(h.native.work.workspaceAssistantLoadedCouponController,isNull);
+      final before=h.writes,reads=h.gateway.couponReads;
+      final adapter=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-310');
+      await adapter.snapshot(h.controller!.context,h.campaign.id);
+      expect(h.native.work.workspaceAssistantLoadedCouponController,isNull);expect(h.gateway.couponReads,reads);expect(h.writes,before);
+    }finally{await h.dispose(tester);}});
+  testWidgets('SCOPE18 unloaded private coupon draft remains unadopted during capture',(tester)async{
+    final h=_OfferHostHarness();try{await h.native.ready();await tester.pumpWidget(h.native.app);await tester.pumpAndSettle();
+      expect(h.native.work.workspaceAssistantCouponDraftReady,isFalse);final before=h.writes;
+      final adapter=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-309');
+      expect(await adapter.snapshot(h.native.readContext(),null),isNotNull);
+      expect(h.native.work.workspaceAssistantCouponDraftReady,isFalse);expect(h.native.work.workspaceAssistantCouponDraft,isEmpty);
+      expect(h.native.work.workspaceAssistantLoadedCouponController,isNull);expect(h.gateway.couponReads,0);expect(h.writes,before);
+    }finally{await h.dispose(tester);}});
+  testWidgets('SCOPE18 detached saved coupon witness hydrates only after explicit Review',(tester)async{
+    final h=_OfferHostHarness();try{
+      await h.native.ready();
+      final store=h.native.work.activeWorkspace!.id,at=DateTime.now();
+      final saved=StoreCouponCampaign(id:'HOST-detached-coupon',storeId:store,revision:1,name:'HOST saved coupon',
+        percentage:false,discount:100,minimumSpendMinor:0,maximumSavingMinor:100,startsAt:at.subtract(const Duration(days:1)),
+        endsAt:at.add(const Duration(days:7)),totalUses:100,usesPerCustomer:1);
+      await h.draft.save(h.draft.accountScope,{'schemaVersion':1,'storeId':store,
+        'fields':{'storeCouponCampaignsV1':encodeStoreCouponCampaigns([saved])}});
+      await tester.pumpWidget(h.native.app);await tester.pumpAndSettle();
+      final adapters=h.native.adapters(tester),adapter=adapters.singleWhere((a)=>a.actionId=='AI-ACT-309');
+      final ctx=h.native.readContext(),writes=h.writes;
+      final snapshot=await adapter.snapshot(ctx,saved.id);
+      expect(snapshot,isNotNull);expect(h.native.work.workspaceAssistantCouponDraftReady,isFalse);
+      expect(h.native.work.workspaceAssistantCouponDraft,isEmpty);expect(h.writes,writes);
+      h.controller=scope_contract.MoolAssistantController(currentContext:h.native.readContext,
+        contextChanges:Listenable.merge([h.native.work,h.native.journey,h.native.mode]),entitlements:h.access,nativeAdapters:adapters);
+      await h.controller!.refreshAccess();h.controller!.setDraft('Rename the saved coupon');
+      await h.open(tester,'AI-ACT-309',entity:saved.id,fields:{'name':'HOST renamed coupon'});
+      expect(h.native.work.workspaceAssistantCouponDraftReady,isTrue);
+      expect(find.text('HOST renamed coupon'),findsOneWidget);expect(h.writes,writes);
+      await h.retire(tester,'cancel');
+      expect(find.byKey(const Key('work-coupon-name')),findsNothing);
+    }finally{await h.dispose(tester);}});
+  testWidgets('SCOPE18 preparation peeks loaded original coupon without refreshing its shared publisher',(tester)async{
+    final h=_OfferHostHarness();try{await h.ready(tester);
+      final publisher=h.native.work.workspaceStoreCoupons!;
+      expect(await publisher.refresh(h.campaign.id),isTrue);
+      final reads=h.gateway.couponReads,record=publisher.currentRecord,pending=publisher.pending,writes=h.writes;
+      final adapter=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-310');
+      expect(await adapter.snapshot(h.controller!.context,h.campaign.id),isNotNull);
+      expect(await adapter.snapshot(h.controller!.context,h.campaign.id),isNotNull);
+      expect(h.gateway.couponReads,reads);
+      expect(identical(publisher.currentRecord,record),isTrue);expect(identical(publisher.pending,pending),isTrue);
+      expect(h.writes,writes);
+    }finally{await h.dispose(tester);}});
   test('FE-OFFER typed raw fields preserve Unicode and reject effect/identity injection', () {
     expect(StoreCouponReviewInitial.fromFields({'name': 'होली બચત', 'discount': '12.50'}).values['name'], 'होली બચત');
     for (final fields in <Map<String, Object?>>[{}, {'campaignId': 'invented'}, {'revision': 999}, {'funding': true},
@@ -4385,6 +4565,7 @@ void registerOfferNativeTests() {
           expect(await publisher.refresh(h.campaign.id), isTrue);
           expect((await publisher.submit(h.campaign.id, StoreCouponInput.fromCampaign(h.campaign, active: true),
             fundingAcknowledged: true, inputCurrent: () => true)).state, StorePromotionResultState.saved);
+          expect(await publisher.refresh(h.campaign.id),isTrue,reason:'The original caller admits the acknowledged head; AI capture never refreshes it.');
         }
         final before = h.gateway.couponWrites.length;
         await h.open(tester, 'AI-ACT-310', entity: h.campaign.id, fields: {'operation': operation});
