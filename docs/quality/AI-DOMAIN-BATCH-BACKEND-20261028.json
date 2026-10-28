@@ -198,7 +198,8 @@
       "apps/mobile/lib/features/assistant/mool_assistant.dart",
       "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
       "apps/mobile/lib/features/work/work_session.dart",
-      "apps/mobile/test/work_workspace_layout_safety_test.dart"
+      "apps/mobile/test/work_workspace_layout_safety_test.dart",
+      "apps/mobile/lib/features/buy/buy_v2_session.dart"
     ],
     "acceptedUiCommit": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
     "contractSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382",
@@ -249,5 +250,25 @@
     "authority": "Existing founder standing exact source/evidence admission and named batch branch push; not new policy, blanket source authority, or founder production acceptance",
     "originalBuyCacheOwnerAdmissionStillPending": true,
     "noDeploymentOrApk": true
+  },
+  "scope07AddressCacheAdmission": {
+    "sequence": "07-address-cache",
+    "baseline": "1e34cdf9a2f643920b5cb9c421becb3e3f667080",
+    "newOwners": [
+      "apps/mobile/lib/features/buy/buy_v2_session.dart"
+    ],
+    "unchangedOwner": {
+      "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+      "bytes": 863064,
+      "sha256": "7447F305311647689F6BC9AE6EAD6C76B8E152A93B78A772840390B1260FF1F3",
+      "gitBlobOid": "3a858b6bb4f4569ad18adcc69236293e5a2c797c"
+    },
+    "contract": "Scope07 original Buy address-cache coherence only. Add a synchronous original BuyV2Session qualification method against its identical current owned AccountProfileGateway snapshot. Require current personal account, exact owner scope, no recovery or busy/held Cart, exact full address-list and selected-ID equality, and nondecreasing revision. It may advance only the private cache revision tag when content/selection is unchanged. No address/selection replacement, restoration, persistence, pricing, notification, server request, automatic save or draft rewrite. Existing admitted AssistantOriginalContextReader uses it only for authenticated024/027 capture/Review, outside open address forms, and requires matching canonical Profile revision. Changed cache stays unavailable until the original explicit refresh. Preserve native choose/removal confirmations, B01 stale/idempotent/recovery protection and all other manual/UI behavior. Tests remain in existing admitted profile-context owners; Google, billing, APK, new business rules and broader source/push authority remain excluded.",
+    "contractSha256": "3FBF2343E201F542BAB65B2BC395820E4B261DD747CA1919FD32905468D3F17A",
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "productionAcceptance": false,
+    "newMasterOrMigration": false,
+    "authority": "Standing exact necessary existing-owner admission under AI-DOMAIN-BATCH-20; no separate founder hash review claimed."
   }
 }

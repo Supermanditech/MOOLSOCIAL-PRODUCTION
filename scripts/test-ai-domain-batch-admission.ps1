@@ -112,4 +112,28 @@ foreach($row in @(@(0,4),@(1,21),@(2,1),@(3,0))) {
  $stageOwners=@(Get-AiDomainMiddleStageOwners $row[0] $middle)
  Check ($stageOwners.Count -eq $row[1]) "middle checkpoint stage $($row[0]) retains exact array owner count"
 }
+$cache=$approval.scope07AddressCacheAdmission
+Check (Test-AiDomainAddressCacheAdmission $cache) 'exact original address-cache owner admission'
+Check (@(Get-AiDomainCurrentRuntimeOwners $cache).Count -eq 34) 'only one new current owner; historical33 remains unchanged'
+Check (@(Get-AiDomainAddressCacheAdmissionOwners).Count -eq 5) 'only five existing metadata owners for cache admission'
+foreach($property in @('sequence','baseline','contract','contractSha256')) {
+ $bad=($cache|ConvertTo-Json -Depth 20)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainAddressCacheAdmission $bad)) "reject changed cache admission $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($cache|ConvertTo-Json -Depth 20)|ConvertFrom-Json
+ $bad.unchangedOwner.$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainAddressCacheAdmission $bad)) "reject changed cache baseline $property"
+}
+foreach($property in @('sourceFeatureCommitsAuthorized','backendBranchPushAuthorized','productionAcceptance','newMasterOrMigration')) {
+ $bad=($cache|ConvertTo-Json -Depth 20)|ConvertFrom-Json;$bad.$property=$true
+ Check (!(Test-AiDomainAddressCacheAdmission $bad)) "reject cache expanded $property"
+ $bad.$property=$null
+ Check (!(Test-AiDomainAddressCacheAdmission $bad)) "reject cache missing $property"
+}
+$bad=($cache|ConvertTo-Json -Depth 20)|ConvertFrom-Json;$bad.newOwners=@($bad.newOwners)+@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainAddressCacheAdmission $bad)) 'reject unrelated cache owner'
+$rejected=$false
+try {Get-AiDomainCurrentRuntimeOwners $bad|Out-Null}catch{$rejected=$true}
+Check $rejected 'current owner getter rejects invalid admission'
 Write-Output "AI domain batch admission checks passed: $n."

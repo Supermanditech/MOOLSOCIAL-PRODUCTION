@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 9,
+  "localMetadataCommits": 10,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -1171,5 +1171,25 @@
       "noProductionAcceptance": true,
       "remoteReadback": "Normal named-branch push and exact independent readback follow this evidence commit; recorded externally to avoid self-referential commit identity."
     }
+  },
+  "scope07AddressCacheAdmission": {
+    "sequence": "07-address-cache",
+    "baseline": "1e34cdf9a2f643920b5cb9c421becb3e3f667080",
+    "newOwners": [
+      "apps/mobile/lib/features/buy/buy_v2_session.dart"
+    ],
+    "unchangedOwner": {
+      "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+      "bytes": 863064,
+      "sha256": "7447F305311647689F6BC9AE6EAD6C76B8E152A93B78A772840390B1260FF1F3",
+      "gitBlobOid": "3a858b6bb4f4569ad18adcc69236293e5a2c797c"
+    },
+    "contract": "Scope07 original Buy address-cache coherence only. Add a synchronous original BuyV2Session qualification method against its identical current owned AccountProfileGateway snapshot. Require current personal account, exact owner scope, no recovery or busy/held Cart, exact full address-list and selected-ID equality, and nondecreasing revision. It may advance only the private cache revision tag when content/selection is unchanged. No address/selection replacement, restoration, persistence, pricing, notification, server request, automatic save or draft rewrite. Existing admitted AssistantOriginalContextReader uses it only for authenticated024/027 capture/Review, outside open address forms, and requires matching canonical Profile revision. Changed cache stays unavailable until the original explicit refresh. Preserve native choose/removal confirmations, B01 stale/idempotent/recovery protection and all other manual/UI behavior. Tests remain in existing admitted profile-context owners; Google, billing, APK, new business rules and broader source/push authority remain excluded.",
+    "contractSha256": "3FBF2343E201F542BAB65B2BC395820E4B261DD747CA1919FD32905468D3F17A",
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "productionAcceptance": false,
+    "newMasterOrMigration": false,
+    "authority": "Standing exact necessary existing-owner admission under AI-DOMAIN-BATCH-20; no separate founder hash review claimed."
   }
 }
