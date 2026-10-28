@@ -18,7 +18,8 @@ const assistantStoreOwnerReadContextActions = {'AI-ACT-213', 'AI-ACT-215', 'AI-A
 const assistantStoreStockOwnerContextActions={'AI-ACT-231','AI-ACT-232','AI-ACT-233','AI-ACT-407','AI-ACT-408'};
 const assistantStoreRestockOwnerContextActions={'AI-ACT-234'};
 const assistantStoreOrderOriginalContextActions={'AI-ACT-274'};
-const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions};
+const assistantStoreSupplierDraftContextActions={'AI-ACT-235','AI-ACT-236'};
+const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions,...assistantStoreSupplierDraftContextActions};
 const assistantDomainContextActions = {'AI-ACT-001', 'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
   ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions,
   ...assistantDomainAddressContextActions,...assistantPrivateStarsContextActions,
@@ -151,6 +152,9 @@ class AssistantDomainContextGateway {
       if (assistantStoreProductContextActions.contains(action) && (!context.inWorkspace ||
           entity == null && !(action=='AI-ACT-223'&&RegExp(r'^store-product-submission-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))) _invalid();
       if (assistantStoreOwnerContextActions.contains(action) && (!context.inWorkspace || entity != null)) _invalid();
+      if (assistantStoreSupplierDraftContextActions.contains(action) &&
+          (!context.workspaceApproved || !context.storeWorkspace ||
+           !RegExp(r'^store-supplier-draft-owner:[a-f0-9]{64}$').hasMatch(revision))) _invalid();
       if (assistantStoreOrderOriginalContextActions.contains(action) && (!context.inWorkspace ||
           !context.storeWorkspace || !context.workspaceApproved || entity == null ||
           !RegExp(r'^store-order-original:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))) _invalid();

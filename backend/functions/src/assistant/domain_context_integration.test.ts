@@ -17,6 +17,125 @@ import {AssistantPreparationService, type PreparationRequestStore, type Preparat
 const actor = {uid: "host-domain-owner", projectId: "host-domain-project"};
 const at = new Date("2026-10-28T08:00:00.000Z");
 
+// Existing Plans/Workspace services, isolated repository ports. No supplier
+// master, model call, runtime provider or phone record is created by this fixture.
+function supplierDraftFixture() {
+  const storeId = 'WK-510001', caseId = 'HOST-supplier-case';
+  let paid = true, approved = true, member = true, version = 1, clock = new Date(at), reads = 0;
+  let onRead = (_count: number) => {};
+  const workspaces = async (owner: {uid: string}) => {
+    reads++; onRead(reads);
+    if (owner.uid !== actor.uid) return {workspaces: []};
+    return {workspaces: [{caseId, status: approved ? 'live' : 'pending', workspaceId: storeId,
+      profileId: 'retailer-grocery', name: 'HOST private Store', access: {schemaVersion: 1, state: member ? 'active' : 'revoked',
+        accountId: actor.uid, caseId, workspaceId: storeId, profileId: 'retailer-grocery', checkedAt: at.toISOString(),
+        applicationUpdatedAt: '2026-10-27T08:00:00.000Z', membership: {schemaVersion: 1, state: member ? 'active' : 'revoked',
+          membershipId: 'HOST-supplier-member', workspaceId: storeId, workspaceProfileId: 'retailer-grocery', version,
+          effectiveFrom: '2026-10-27T00:00:00.000Z', expiresAt: '2026-10-29T00:00:00.000Z'}}}]};
+  };
+  const plans = new AccountPlansService({async read(uid, scope) { return {ownerUid: uid, accountStatus: 'ACTIVE',
+    catalogue: {audience: scope.audience, revision: 1, state: 'approved', offers: []},
+    subscription: {ownerUid: uid, scope, revision: 1, planId: 'host-paid-plan', planVersion: 'v1', name: 'Host fixture only',
+      state: paid ? 'active' : 'expired', validFrom: '2026-10-27T00:00:00.000Z', validUntil: '2026-10-29T00:00:00.000Z', featureIds: ['mool_ai']}};
+  }}, {projectId: actor.projectId, now: () => clock, readWorkspaces: workspaces});
+  const original = new ProfileWorkspacePreparationContext({profile: {async read() { throw Error('No personal or supplier master read'); }},
+    plans, workspaces, now: () => clock});
+  const source = new CompositePreparationContext({original, nativeSupplierFormsEnabled: true, now: () => clock});
+  const input = {scope: {audience: 'workspace' as const, storeId}, requestId: 'HOST-supplier-preparation', requestRevision: 1,
+    expectedEntitlementRevision: `workspace:${storeId}:1:1`, message: 'Add the supplier I named', language: 'Hindi', history: [],
+    actionId: 'AI-ACT-235', entityId: null};
+  return {source, input, original, plans, onRead: (fn: typeof onRead) => {onRead = fn;},
+    paid: (value: boolean) => {paid = value;}, approved: (value: boolean) => {approved = value;},
+    member: (value: boolean) => {member = value;}, bump: () => {version++;}, advance: () => {clock = new Date(clock.getTime() + 60_001);}};
+}
+
+test('Supplier drafts actual approved paid authority prepares only user text and original native query', async () => {
+  const f = supplierDraftFixture(), context = await f.source.read(actor, f.input), tool = context.tools[0]!;
+  assert.equal(tool.actionId, 'AI-ACT-235'); assert.equal(tool.entityId, null);
+  assert.match(tool.sourceRevision, /^store-supplier-draft-owner:[a-f0-9]{64}$/u);
+  const fields = {name: '  HOST મૂળ સપ્લાયર  ', phone: '+91 (98765) 43210', address: 'HOST shop 4\nMarket Road\nPune', gstin: '  27abcde1234f1z5  '};
+  const target = tool.resolveTarget!(fields);
+  assert.deepEqual(target.fields, fields); assert.equal(target.entityId, null);
+  assert.equal(tool.validate(fields), true);
+  const minimal = tool.resolveTarget!({name: fields.name, phone: null, address: null, gstin: null});
+  assert.deepEqual(minimal.fields, {name: fields.name});
+  assert.equal(JSON.stringify(context.modelContext).includes(fields.name), false);
+  const search = await f.source.read(actor, {...f.input, actionId: 'AI-ACT-236'});
+  assert.deepEqual(search.tools[0]!.resolveTarget!({query: 'મૂળ સપ્લાયર'}).fields, {query: 'મૂળ સપ્લાયર'});
+  const metadata = await handleAssistantCanonicalContextRequest({method: 'POST', headers: {authorization: 'Bearer HOST-only', 'x-firebase-appcheck': 'HOST-only'},
+    bodyBytes: 100, body: {operation: 'read', payload: {scope: f.input.scope, nativeSelectionVersion: 1}}},
+  {projectId: actor.projectId, enabled: true, context: f.source, now: () => at, async verifyIdToken() {return actor;}, async verifyAppCheck() {return {};}});
+  assert.equal(metadata.status, 200); assert(metadata.body.ok);
+  assert(JSON.stringify(metadata.body).includes('AI-ACT-235')); assert(JSON.stringify(metadata.body).includes('AI-ACT-236'));
+  assert(!JSON.stringify(metadata.body).includes(fields.name)); assert(!JSON.stringify(metadata.body).includes('AI-ACT-237'));
+  if (process.env.AI_DOMAIN_SUPPLIER_DRAFT_EXPORT_PATH) {
+    const path = process.env.AI_DOMAIN_SUPPLIER_DRAFT_EXPORT_PATH; assert(isAbsolute(path));
+    writeFileSync(path, JSON.stringify({kind: 'isolated-host-original-authority-draft-contract', fields: target.fields,
+      query: '91 111', entityId: target.entityId, sourceRevision: target.sourceRevision, metadata: metadata.body}, null, 2) + '\n', {flag: 'wx'});
+  }
+});
+
+test('Supplier optional root does not break catalogue-selected combined contexts', async () => {
+  const f = supplierDraftFixture();
+  for (const selection of [{catalogueListingIds: ['HOST-listing']}]) {
+    const source = await f.source.read(actor, {...f.input, actionId: null, ...selection});
+    assert(source.tools.some(tool => tool.actionId === 'AI-ACT-317'));
+    assert(!source.tools.some(tool => ['AI-ACT-235', 'AI-ACT-236'].includes(tool.actionId)));
+  }
+});
+
+for (const actionId of ['AI-ACT-235', 'AI-ACT-236']) test(`Supplier generic composer ${actionId} actual preparation and status survive service restart without duplicate usage`, async () => {
+  const f = supplierDraftFixture(), requests = new HostRequests(); let models = 0, reservations = 0;
+  const service = () => new AssistantPreparationService({projectId: actor.projectId, plans: f.plans, context: f.source, requests, now: () => at,
+    usage: {async reserve() {reservations++; return {id: 'HOST-supplier-permit', validUntil: '2026-10-28T08:01:00.000Z'};}, async settle() {}},
+    model: {async prepare(_input, tools) {models++; assert.equal(tools.length, 1); assert.equal(tools[0]!.actionId, actionId);
+      return {kind: 'tool', name: tools[0]!.name, arguments: actionId === 'AI-ACT-235'
+        ? {name: 'HOST supplied supplier', phone: null, address: null, gstin: null} : {query: 'HOST supplied query'}};}}});
+  const payload = {...f.input, actionId: null, nativeTargets: [{actionId, entityId: null}]};
+  const result = await service().handle(actor, {operation: 'prepare', payload});
+  assert.equal(result.state, 'ready');
+  assert.deepEqual(await service().handle(actor, {operation: 'status', payload: {scope: payload.scope, requestId: payload.requestId}}), result);
+  assert.deepEqual(await service().handle(actor, {operation: 'prepare', payload}), result);
+  assert.equal(models, 1); assert.equal(reservations, 1);
+  f.member(false); await assert.rejects(service().handle(actor, {operation: 'status', payload: {scope: payload.scope, requestId: payload.requestId}}));
+});
+
+test('Supplier draft rejects invented identity unknown fields invalid inputs and specific-record joins', async () => {
+  const f = supplierDraftFixture(), tool = (await f.source.read(actor, f.input)).tools[0]!;
+  for (const bad of [{name: ''}, {name: 'HOST', id: 'invented'}, {name: 'HOST', gstin: 'short'},
+    {name: 'HOST', phone: 'invalid'}, {name: 'HOST', address: 'x'.repeat(501)}, {name: 'HOST\u0000'}]) assert.equal(tool.validate(bad), false);
+  for (const bad of [{name: 'HOST'}, {name: 'HOST', phone: null, address: null, gstin: null, id: 'invented'}]) assert.throws(() => tool.resolveTarget!(bad));
+  await assert.rejects(f.source.read(actor, {...f.input, entityId: 'invented'}));
+  await assert.rejects(f.source.read(actor, {...f.input, catalogueListingIds: []}));
+  await assert.rejects(f.source.read(actor, {...f.input, actionId: 'AI-ACT-237', entityId: 'invented'}));
+  await assert.rejects(new CompositePreparationContext({original: f.original}).read(actor, f.input));
+});
+
+test('Supplier draft ownership rejects wrong account project tenant Store pending revoked and unpaid states', async () => {
+  for (const fault of ['account', 'project', 'tenant', 'store', 'personal', 'pending', 'revoked', 'unpaid']) {
+    const f = supplierDraftFixture();
+    if (fault === 'pending') f.approved(false); if (fault === 'revoked') f.member(false); if (fault === 'unpaid') f.paid(false);
+    const who = fault === 'account' ? {...actor, uid: 'foreign'} : fault === 'project' ? {...actor, projectId: 'foreign-project'} : fault === 'tenant' ? {...actor, tenantId: 'foreign'} : actor;
+    const input = fault === 'store' ? {...f.input, scope: {...f.input.scope, storeId: 'foreign-store'}} : fault === 'personal' ? {...f.input, scope: {audience: 'personal' as const, storeId: null}} : f.input;
+    await assert.rejects(f.source.read(who, input), Error, fault);
+  }
+});
+
+test('Supplier recovery rechecks current authority and exact source proof without replaying an effect', async () => {
+  const f = supplierDraftFixture(), tool = (await f.source.read(actor, f.input)).tools[0]!, target = tool.resolveTarget!({name: 'HOST supplier', phone: null, address: null, gstin: null});
+  const proposal = {kind: 'proposal' as const, id: 'HOST-stored-draft', actionId: 'AI-ACT-235', entityId: null,
+    sourceRevision: target.sourceRevision, fields: target.fields, title: 'Review supplier', summary: 'Host fixture'};
+  assert.equal((await f.source.readPrepared(actor, f.input, proposal)).tools[0]!.sourceRevision, target.sourceRevision);
+  await assert.rejects(f.source.readPrepared(actor, f.input, {...proposal, sourceRevision: 'forged'}));
+  await assert.rejects(f.source.readPrepared(actor, f.input, {...proposal, fields: {...target.fields, id: 'invented'}}));
+  f.bump(); await assert.rejects(f.source.readPrepared(actor, f.input, proposal));
+  for (const kind of ['stale', 'expired', 'revoked']) {
+    const changed = supplierDraftFixture();
+    changed.onRead(count => {if (count === 4) {if (kind === 'stale') changed.bump(); else if (kind === 'expired') changed.advance(); else changed.member(false);}});
+    await assert.rejects(changed.source.read(actor, changed.input), Error, kind);
+  }
+});
+
 test('Order originals actual loopback SDK projection service to authorised AI metadata preserves all indexed references',{
   skip:!process.env.FIRESTORE_EMULATOR_HOST,timeout:120000,
 },async()=>{

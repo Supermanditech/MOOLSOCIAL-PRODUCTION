@@ -27182,6 +27182,36 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
     } finally { await tester.pumpWidget(const SizedBox.shrink()); work.dispose(); }
   });
 
+  testWidgets('SCOPE11 original authority export fills actual native supplier form without saving or selecting', (tester) async {
+    const exportPath = String.fromEnvironment('AI_DOMAIN_SUPPLIER_DRAFT_EXPORT_PATH');
+    final contract = jsonDecode(File(exportPath).readAsStringSync()) as Map<String, dynamic>;
+    expect(contract['kind'], 'isolated-host-original-authority-draft-contract');
+    expect(contract['entityId'], isNull);
+    expect(contract['sourceRevision'], matches(RegExp(r'^store-supplier-draft-owner:[a-f0-9]{64}$')));
+    final initial = StoreSupplierInitialData.fromFields(Map<String, Object?>.from(contract['fields'] as Map));
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _SupplierPrefillStore();
+    // Use the existing original private directory fixture, never a phone/provider.
+    final source = postingOpeningFixture(entry, _LedgerCheckpointFixtureStore());
+    try {
+      seedSupplierPrefillBook(entry, source); expect(await source.loadWorkspaceSuppliers(retry: true), isTrue);
+      final scope = source.workspaceSupplierScope!, revision = source.workspacePurchaseEntryRevision;
+      final before = jsonEncode(entry.value!.toJson());
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(builder: (context) => Scaffold(
+        body: TextButton(key: const Key('scope11-native-add'), onPressed: () async {
+          await showStoreSupplierAddReview(context, source, initialData: initial, expectedScope: scope,
+            expectedRevision: revision, isCurrent: () => true);
+        }, child: const Text('Host original Add'))))));
+      await tester.tap(find.byKey(const Key('scope11-native-add'))); await tester.pumpAndSettle();
+      for (final field in {'name': initial.name, 'phone': initial.phone, 'address': initial.address, 'gstin': initial.gstin}.entries) {
+        expect(tester.widget<TextFormField>(find.byKey(Key('work-add-supplier-${field.key}'))).controller!.text, field.value);
+      }
+      expect(entry.saveAttempts, 0); expect(jsonEncode(entry.value!.toJson()), before);
+      expect(source.workspacePurchaseEntryDraft!.supplierId, 'host-original-supplier');
+      expect(tester.takeException(), isNull);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); source.dispose();}
+  }, skip: const String.fromEnvironment('AI_DOMAIN_SUPPLIER_DRAFT_EXPORT_PATH') == '');
+
   testWidgets('FE-SUPPLIER-01 prefill opens existing Add without writes or selection', (tester) async {
     FlutterSecureStorage.setMockInitialValues({});
     final entry = _SupplierPrefillStore();

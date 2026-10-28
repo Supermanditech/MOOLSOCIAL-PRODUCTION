@@ -42,6 +42,33 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
+  for (final compact in [false, true]) {
+    test('Supplier draft metadata needs paid-source proof approved Store and root target compact$compact', () async {
+      final store = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'Host Store', profile: 'retailer-grocery',
+        revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
+      final proof = 'store-supplier-draft-owner:${'a' * 64}';
+      final data = <String, Object?>{..._data(),
+        'ownerKey': sha256.convert(utf8.encode(jsonEncode(['fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString(),
+        'scope': {'audience': 'workspace', 'storeId': 'store-one'},
+        'revisions': compact ? <Object?>[] : [for (final action in ['AI-ACT-235', 'AI-ACT-236'])
+          {'actionId': action, 'entityId': null, 'sourceRevision': proof}],
+        if (compact) 'nativeSelection': {'version': 1, 'fingerprint': 'b' * 64, 'groups': [
+          {'entityId': null, 'sourceRevision': proof, 'actionIds': ['AI-ACT-235', 'AI-ACT-236']}]} };
+      final result = await _source(_Wire(() => _ok(data)), compact: compact).read(store, () => true);
+      expect(result.revisions, {('AI-ACT-235', null): proof, ('AI-ACT-236', null): proof});
+      if (compact) expect(result.nativeSelection!.proofs, result.revisions);
+      for (final fault in ['record-id', 'wrong-proof', 'edit-action', 'personal']) {
+        final changed = jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
+        final rows = compact ? changed['nativeSelection']['groups'] as List : changed['revisions'] as List;
+        final row = rows.first as Map;
+        if (fault == 'record-id') row['entityId'] = 'invented-supplier';
+        if (fault == 'wrong-proof') row['sourceRevision'] = 'store-product-defaults-owner:${'a' * 64}';
+        if (fault == 'edit-action') {if (compact) {row['actionIds'] = ['AI-ACT-237'];} else {row['actionId'] = 'AI-ACT-237';}}
+        await expectLater(_source(_Wire(() => _ok(changed)), compact: compact).read(fault == 'personal' ? _context : store, () => true),
+          throwsA(isA<AssistantModelFailure>()));
+      }
+    });
+  }
   for(final compact in [false,true]){
     test('Original Store order metadata requires exact owned order proof compact$compact',()async{
       final store=_context.withWorkspace(const MoolAssistantWorkspace(id:'store-one',name:'Host Store',profile:'retailer-grocery',
@@ -146,7 +173,8 @@ void main() {
     final data = {..._data(), 'ownerKey': sha256.convert(utf8.encode(jsonEncode([
       'fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString(),
       'scope': {'audience': 'workspace', 'storeId': 'store-one'}, 'revisions': [
-        {'actionId': action, 'entityId': null, 'sourceRevision': 'native-owned-defaults-owner-proof'},
+        {'actionId': action, 'entityId': null, 'sourceRevision': assistantStoreSupplierDraftContextActions.contains(action)
+          ? 'store-supplier-draft-owner:${'a' * 64}' : 'native-owned-defaults-owner-proof'},
       ]};
     final value = await _source(_Wire(() => _ok(data))).read(store, () => true);
     expect(value.revisions.keys.single, (action, null));

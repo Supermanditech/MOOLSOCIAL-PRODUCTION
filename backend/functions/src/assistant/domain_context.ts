@@ -5,7 +5,7 @@ import type {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService
 import type {PreparationContextSource} from "./model_service.js";
 import {AssistantModelError, canonical, digest, fail, id, object,
   catalogueListingSelection, preparationNativeTargetLimit, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
-import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions, searchSuggestion} from "./domain_context_contract.js";
+import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeSupplierDraftActions, searchSuggestion} from "./domain_context_contract.js";
 
 const paidRevision = (p: PlansReadback) => canonical([p.owner, p.scope, p.catalogueRevision, p.subscriptionRevision]);
 const searchSchema = {type: "object", properties: {query: {type: "string"}},
@@ -1154,7 +1154,56 @@ export class CompositePreparationContext implements PreparationContextSource {
     catalogue?: OriginalCataloguePreparationContext; storeProducts?: OriginalStoreProductPreparationContext;
     storeOrders?: OriginalStoreOrderPreparationContext;
     privateStars?: OriginalPurchasedStarsPreparationContext;
-    nativePreferencesEnabled?: boolean; nativeBuyerFormsEnabled?: boolean}) {}
+    nativePreferencesEnabled?: boolean; nativeBuyerFormsEnabled?: boolean; nativeSupplierFormsEnabled?: boolean; now?: () => Date}) {}
+  private async readSupplierDrafts(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
+    if (!this.deps.original || !this.deps.nativeSupplierFormsEnabled || actor.tenantId !== undefined ||
+        !actor.uid || !actor.projectId || input.scope.audience !== 'workspace' || !input.scope.storeId ||
+        input.entityId !== null || input.catalogueListingIds !== undefined ||
+        input.actionId !== null && !storeSupplierDraftActions.has(input.actionId)) return fail('context_unavailable');
+    const now = () => (this.deps.now?.() ?? new Date()).getTime(), started = now();
+    const before = await approvedWorkspacePreparationAuthority(this.deps.original, actor, input, started);
+    const after = await approvedWorkspacePreparationAuthority(this.deps.original, actor, input, now());
+    if (before.revision !== after.revision) return fail('stale_preparation', 409);
+    const until = Math.min(started + 60_000, Date.parse(before.validUntil), Date.parse(after.validUntil));
+    if (until <= now()) return fail('stale_preparation', 409);
+    // This proves approved paid preparation ownership, never a supplier master,
+    // saved directory, duplicate result or verified GST registration.
+    const revision = 'store-supplier-draft-owner:' + digest([actor.projectId, actor.uid, input.scope.storeId, after.revision]);
+    const clean = (value: unknown, max: number, multiline = false): value is string => typeof value === 'string' && value.length <= 2000 && value.trim().length <= max &&
+      !(multiline ? /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u : /[\u0000-\u001f\u007f]/u).test(value) &&
+      Buffer.from(value, 'utf8').toString('utf8') === value;
+    const supplierFields = ['name', 'phone', 'address', 'gstin'];
+    const validateAdd = (fields: Readonly<Record<string, unknown>>) =>
+      Object.keys(fields).every(key => supplierFields.includes(key)) && clean(fields.name, 120) && fields.name.trim().length > 0 &&
+      (!Object.hasOwn(fields, 'phone') || clean(fields.phone, 2000) &&
+        (fields.phone.trim() === '' || /^\+?[0-9]{7,15}$/u.test(fields.phone.trim().replace(/[\s()-]/gu, '')))) &&
+      (!Object.hasOwn(fields, 'address') || clean(fields.address, 500, true)) &&
+      (!Object.hasOwn(fields, 'gstin') || clean(fields.gstin, 15) &&
+        (fields.gstin.trim() === '' || /^[0-9A-Z]{15}$/u.test(fields.gstin.trim().toUpperCase())));
+    const validateSearch = (fields: Readonly<Record<string, unknown>>) => Object.keys(fields).length === 1 && clean(fields.query, 2000);
+    const tools: PreparationTool[] = [
+      {name: 'store_prepare_supplier_draft', actionId: 'AI-ACT-235', entityId: null, sourceRevision: revision,
+        description: 'Prepare only explicitly supplied supplier name, phone, billing address and GSTIN text in the existing unsaved Add supplier form. Ask for a missing name. Never invent supplier identity, contact, tax registration or duplicate status. Native review and final Save are required; this tool does not register a backend supplier or create a purchase.',
+        parameters: {type: 'object', properties: {name: {type: 'string'}, phone: {type: ['string', 'null']},
+          address: {type: ['string', 'null']}, gstin: {type: ['string', 'null']}}, required: supplierFields, additionalProperties: false},
+        validate: validateAdd, resolveTarget: args => {
+          if (Object.keys(args).length !== supplierFields.length || !supplierFields.every(key => Object.hasOwn(args, key))) return fail('invalid_model_result');
+          const fields = Object.fromEntries(Object.entries(args).filter(([, value]) => value !== null));
+          if (!validateAdd(fields)) return fail('invalid_model_result');
+          return {entityId: null, sourceRevision: revision, fields, title: 'Review supplier details', summary: 'Check the supplied details before saving the supplier.'};
+        }},
+      {name: 'store_prepare_supplier_search', actionId: 'AI-ACT-236', entityId: null, sourceRevision: revision,
+        description: 'Open the original current Store supplier search with the user-supplied query. The native directory is the sole source of results; no supplier is selected or inferred. No shared master, duplicate check or account balance is read here.',
+        parameters: {type: 'object', properties: {query: {type: 'string'}}, required: ['query'], additionalProperties: false},
+        validate: validateSearch, resolveTarget: args => {
+          if (!validateSearch(args)) return fail('invalid_model_result');
+          return {entityId: null, sourceRevision: revision, fields: args, title: 'Search suppliers', summary: 'Review matching suppliers in your Store.'};
+        }},
+    ];
+    return {revision, validUntil: new Date(until).toISOString(), tools: tools.filter(tool => input.actionId === null || tool.actionId === input.actionId), modelContext: {audience: 'workspace',
+      storeId: input.scope.storeId, sourceKind: 'native-supplier-draft-owner-v1',
+      purpose: 'Unsaved user-supplied draft or query only. No supplier records, identities, GST verification or duplicate results have been read. The current account/Store native directory and final confirmation remain authoritative.'}};
+  }
   private deliveryAddresses(input: PreparationRequest, original: PreparationContext): PreparationContext {
     if (!this.deps.nativeBuyerFormsEnabled || input.scope.audience !== 'personal' ||
         original.modelContext?.audience !== 'personal' || !Array.isArray(original.modelContext.deliveryChoices)) return fail('context_unavailable');
@@ -1222,6 +1271,12 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
     proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
+    if (storeSupplierDraftActions.has(proposal.actionId)) {
+      if (proposal.actionId !== input.actionId || proposal.entityId !== null || input.entityId !== null) return fail('stale_preparation', 409);
+      const source = await this.readSupplierDrafts(actor, input);
+      if (!source.tools.some(tool => tool.actionId === proposal.actionId && tool.sourceRevision === proposal.sourceRevision && tool.validate(proposal.fields))) return fail('stale_preparation', 409);
+      return source;
+    }
     if(proposal.actionId==='AI-ACT-055'){
       if(!this.deps.privateStars)return fail('context_unavailable');
       return this.deps.privateStars.readPrepared(actor,input,proposal);
@@ -1256,6 +1311,7 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (input.actionId !== null) {
+      if (storeSupplierDraftActions.has(input.actionId)) return this.readSupplierDrafts(actor, input);
       if(input.actionId==='AI-ACT-055'){
         if(!this.deps.privateStars)return fail('context_unavailable');
         return this.deps.privateStars.read(actor,input);
@@ -1301,6 +1357,10 @@ export class CompositePreparationContext implements PreparationContextSource {
       catch (error) {
         if (!(error instanceof AssistantModelError) || error.code !== "context_unavailable" || !values.length) throw error;
       }
+    }
+    if (this.deps.nativeSupplierFormsEnabled && input.scope.audience === 'workspace' &&
+        input.entityId === null && input.catalogueListingIds === undefined) {
+      values.push(await this.readSupplierDrafts(actor, input));
     }
     if (this.deps.storeOrders && input.scope.audience === 'workspace') {
       try {

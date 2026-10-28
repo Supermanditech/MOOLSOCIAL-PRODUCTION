@@ -2625,6 +2625,7 @@ function assistantOriginalContextSource(projectId: string) {
   return new CompositePreparationContext({
     nativePreferencesEnabled: profile && catalogue,
     nativeBuyerFormsEnabled: profile && catalogue,
+    nativeSupplierFormsEnabled: profile && catalogue,
     ...(original ? {original} : {}),
     ...(original && catalogue ? {storeProducts: new OriginalStoreProductPreparationContext({
       projectId, authority: original, catalogue: workspaceCatalogueService()})} : {}),
