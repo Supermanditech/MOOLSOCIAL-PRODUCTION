@@ -546,6 +546,34 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,11),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainRetainedQuoteStageOwners $row[0] $retainedQuoteSeal).Count -eq $row[1]) "retained-quote checkpoint exact stage $($row[0]) owner count"
 }
+$selectedRestockSeal=$approval.scope05SelectedRestockCheckpoint
+Check (Test-AiDomainSelectedRestockCheckpoint $selectedRestockSeal) 'exact qualified selected-restock checkpoint'
+Check (@(Get-AiDomainSelectedRestockSealOwners).Count -eq 3) 'only three existing metadata owners for selected-restock seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($selectedRestockSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainSelectedRestockCheckpoint $bad)) "reject changed selected-restock seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($selectedRestockSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainSelectedRestockCheckpoint $bad)) "reject changed selected-restock qualified source $property"
+}
+$bad=($selectedRestockSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainSelectedRestockCheckpoint $bad)) 'reject selected-restock source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($selectedRestockSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainSelectedRestockCheckpoint $bad)) "reject expanded selected-restock qualification $property"
+}
+$bad=($selectedRestockSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAuthenticatedRestockAgentJourneyQualified=$true
+Check (!(Test-AiDomainSelectedRestockCheckpoint $bad)) 'reject fabricated selected-restock device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($selectedRestockSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainSelectedRestockCheckpoint $bad)) "reject changed selected-restock evidence $property"
+}
+foreach($row in @(@(0,3),@(1,9),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainSelectedRestockStageOwners $row[0] $selectedRestockSeal).Count -eq $row[1]) "selected-restock checkpoint exact stage $($row[0]) owner count"
+}
 $quoteRecurrence=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).quoteImplementationRecurrence20261029
 Check (Test-AiDomainQuoteRecurrenceAdmission $quoteRecurrence) 'exact registered quote implementation recurrence'
 Check (!(Test-AiDomainQuoteRecurrenceAdmission $null)) 'reject absent quote recurrence'
