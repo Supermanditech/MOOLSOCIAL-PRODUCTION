@@ -1841,7 +1841,7 @@
     ],
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
-    "sourceCommit": null,
+    "sourceCommit": "e8f92cba6d9d4ee4b36527e3a00b184d456f24f1",
     "authority": "Existing standing exact source/evidence checkpoint authority for named batch branch only."
   }
 }
