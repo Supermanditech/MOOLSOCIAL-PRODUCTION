@@ -6,7 +6,7 @@ import type {WorkspacePromotionService,StoreCouponRecord} from '../workspace/wor
 import type {PreparationContextSource} from "./model_service.js";
 import {AssistantModelError, canonical, digest, fail, id, object,
   catalogueListingSelection, preparationNativeTargetLimit, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
-import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeOperationalActions,storeOrderBoardActions,storeSupplierDraftActions,storePurchaseRootActions,storeReceivingOriginalActions,storeCouponActions, searchSuggestion} from "./domain_context_contract.js";
+import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeOperationalActions,storeOrderBoardActions,storeSupplierDraftActions,storePurchaseRootActions,storeReceivingOriginalActions,storeCouponActions,storeReportOwnerActions, searchSuggestion} from "./domain_context_contract.js";
 
 const paidRevision = (p: PlansReadback) => canonical([p.owner, p.scope, p.catalogueRevision, p.subscriptionRevision]);
 const searchSchema = {type: "object", properties: {query: {type: "string"}},
@@ -1617,7 +1617,48 @@ export class CompositePreparationContext implements PreparationContextSource {
     storeReceiving?: OriginalStoreReceivingPreparationContext;
     privateStars?: OriginalPurchasedStarsPreparationContext;
     nativePreferencesEnabled?: boolean; nativeBuyerFormsEnabled?: boolean; nativeSupplierFormsEnabled?: boolean;
-    nativePurchaseFormsEnabled?: boolean; nativeOrderBoardEnabled?: boolean; now?: () => Date}) {}
+    nativePurchaseFormsEnabled?: boolean; nativeOrderBoardEnabled?: boolean;
+    nativeReports?:{realm:'evaluation'|'production';public:boolean;journey:boolean};now?: () => Date}) {}
+  private async readReportControls(actor:AccountProfileActor,input:PreparationRequest):Promise<PreparationContext>{
+    const feeds=this.deps.nativeReports;
+    if(!this.deps.original||!feeds||actor.tenantId!==undefined||!actor.uid||!actor.projectId||!['evaluation','production'].includes(feeds.realm)||
+      typeof feeds.public!=='boolean'||typeof feeds.journey!=='boolean'||!feeds.public&&!feeds.journey||
+      input.scope.audience!=='workspace'||!input.scope.storeId||input.entityId!==null||input.catalogueListingIds!==undefined||
+      input.actionId!==null&&!storeReportOwnerActions.has(input.actionId))return fail('context_unavailable');
+    const now=()=> (this.deps.now?.()??new Date()).getTime(),started=now();
+    const before=await approvedWorkspacePreparationAuthority(this.deps.original,actor,input,started),
+      after=await approvedWorkspacePreparationAuthority(this.deps.original,actor,input,now());
+    if(before.revision!==after.revision)return fail('stale_preparation',409);
+    const until=Math.min(started+60_000,Date.parse(before.validUntil),Date.parse(after.validUntil));
+    if(until<=now())return fail('stale_preparation',409);
+    const sections=[...(feeds.public?['public']:[]),...(feeds.journey?['journey']:[])],days=[1,7,30];
+    const revision='store-report-owner:'+feeds.realm+':'+digest([actor.projectId,actor.uid,input.scope.storeId,after.revision,sections]);
+    const tools:PreparationTool[]=[];
+    for(const action of storeReportOwnerActions){
+      if(input.actionId!==null&&input.actionId!==action)continue;
+      const period=action!=='AI-ACT-312',section=action==='AI-ACT-411';
+      const properties:Record<string,unknown>={...(section?{sectionId:{type:'string',enum:sections}}:{}),
+        ...(period?{periodDays:{type:action==='AI-ACT-313'?'integer':['integer','null'],enum:action==='AI-ACT-313'?days:[null,...days]}}:{})};
+      const validate=(fields:Readonly<Record<string,unknown>>)=>Object.keys(fields).every(key=>Object.hasOwn(properties,key))&&
+        (!section||typeof fields.sectionId==='string'&&sections.includes(fields.sectionId))&&
+        (fields.periodDays===undefined?action!=='AI-ACT-313':typeof fields.periodDays==='number'&&days.includes(fields.periodDays));
+      const description=action==='AI-ACT-312'?'Open the original Store Reports view. No figures have been read here; its original readers supply current values or unavailable coverage. Do not answer with invented sales, balances or complete report coverage.':
+        action==='AI-ACT-313'?'Set the original report period to the user requested Today (1), Last 7 days (7) or Last 30 days (30). Ask when a requested date range cannot be represented; never silently drop custom dates. No report figures or financial outcomes are inferred.':
+        action==='AI-ACT-314'?'Review the original analytics report download. periodDays:null preserves the existing period; use only an explicitly requested supported period. The user retains the original Download control. No file, figures or successful export is claimed here.':
+        'Open the requested original Public or Journey analytics section. Choose only the listed original enabled-feed sections; other operational or financial report sources are unavailable to this tool. periodDays:null preserves the current native period. Do not claim figures or actual coverage.';
+      tools.push({name:action==='AI-ACT-312'?'store_review_reports':action==='AI-ACT-313'?'store_prepare_report_period':
+        action==='AI-ACT-314'?'store_review_analytics_download':'store_prepare_report_section',
+        actionId:action,entityId:null,sourceRevision:revision,description,
+        parameters:{type:'object',properties,required:Object.keys(properties),additionalProperties:false},validate,
+        decodeFields:args=>{
+          const fields=Object.fromEntries(Object.entries(args).filter(([key,value])=>key!=='periodDays'||value!==null));
+          if(!validate(fields))return fail('invalid_model_result');return fields;
+        }});
+    }
+    return {revision,validUntil:new Date(until).toISOString(),tools,
+      modelContext:{sourceKind:'native-store-report-controls-v1',storeId:input.scope.storeId,sections,periodDays:days,
+        purpose:'Preparation ownership and existing original filter controls only. No analytics figures, private ledger, customer statement, report original, downloaded file or canonical sharing URL has been read or fabricated. Native report readers and final export/print controls remain original.'}};
+  }
   private async readOrderBoard(actor:AccountProfileActor,input:PreparationRequest):Promise<PreparationContext>{
     if(!this.deps.original||!this.deps.storeOrders||!this.deps.nativeOrderBoardEnabled||actor.tenantId!==undefined||!actor.uid||!actor.projectId||
       input.scope.audience!=='workspace'||!input.scope.storeId||input.entityId!==null||input.catalogueListingIds!==undefined||
@@ -1789,6 +1830,12 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
     proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
+    if(storeReportOwnerActions.has(proposal.actionId)){
+      if(input.actionId!==proposal.actionId||input.entityId!==null||proposal.entityId!==null)return fail('stale_preparation',409);
+      const context=await this.readReportControls(actor,input);
+      if(!context.tools.some(tool=>tool.sourceRevision===proposal.sourceRevision&&tool.validate(proposal.fields)))return fail('stale_preparation',409);
+      return context;
+    }
     if(storeCouponActions.has(proposal.actionId)){
       if(!this.deps.storeCoupons)return fail('context_unavailable');
       return this.deps.storeCoupons.readPrepared(actor,input,proposal);
@@ -1853,6 +1900,7 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (input.actionId !== null) {
+      if(storeReportOwnerActions.has(input.actionId))return this.readReportControls(actor,input);
       if(storeCouponActions.has(input.actionId)){
         if(!this.deps.storeCoupons)return fail('context_unavailable');
         return this.deps.storeCoupons.read(actor,input);
@@ -1954,6 +2002,10 @@ export class CompositePreparationContext implements PreparationContextSource {
       try{const value=await this.deps.storeCoupons.read(actor,input);
         canonicalContextProjection(actor,input.scope,this.combine([...values,value]),1);values.push(value);
       }catch(error){if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;}
+    }
+    if(this.deps.nativeReports&&input.scope.audience==='workspace'&&input.entityId===null&&input.catalogueListingIds===undefined){
+      try{values.push(await this.readReportControls(actor,input));}
+      catch(error){if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;}
     }
     if(this.deps.privateStars&&input.scope.audience==='personal'){
       try{

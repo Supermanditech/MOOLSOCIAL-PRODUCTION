@@ -165,6 +165,51 @@ test('Supplier recovery rechecks current authority and exact source proof withou
   }
 });
 
+test('Report controls preserve exact existing periods/sections without fabricating analytics or financial authority',async()=>{
+  const f=supplierDraftFixture(),feeds={realm:'evaluation' as const,public:true,journey:true};
+  const source=new CompositePreparationContext({original:f.original,nativeReports:feeds,now:()=>at});
+  const context=await source.read(actor,{...f.input,actionId:null});
+  const reports=context.tools.filter(tool=>['AI-ACT-312','AI-ACT-313','AI-ACT-314','AI-ACT-411'].includes(tool.actionId));
+  assert.equal(reports.length,4);
+  for(const tool of reports){assert.equal(tool.entityId,null);assert.match(tool.sourceRevision,/^store-report-owner:evaluation:[a-f0-9]{64}$/u);assertStrictSchema(tool.parameters);}
+  assert(!context.tools.some(tool=>['AI-ACT-315','AI-ACT-409','AI-ACT-410','AI-ACT-412'].includes(tool.actionId)));
+  for(const actionId of ['AI-ACT-312','AI-ACT-313','AI-ACT-314','AI-ACT-411']){
+    const current=await source.read(actor,{...f.input,actionId}),tool=current.tools[0]!;
+    const args=actionId==='AI-ACT-312'?{}:actionId==='AI-ACT-411'?{sectionId:'journey',periodDays:null}:{periodDays:7};
+    const fields=tool.decodeFields!(args);assert(tool.validate(fields));
+    assert.deepEqual(fields,actionId==='AI-ACT-312'?{}:actionId==='AI-ACT-411'?{sectionId:'journey'}:{periodDays:7});
+    for(const invalid of [{amount:100},{customerId:'HOST-customer'},{periodDays:90},{periodDays:'7'},
+      {sectionId:'money'},{from:'2026-10-01',to:'2026-10-28'}])assert.equal(tool.validate(invalid),false,JSON.stringify(invalid));
+    const proposal={kind:'proposal' as const,id:'HOST-report-'+actionId,actionId,entityId:null,sourceRevision:tool.sourceRevision,title:'Review',summary:'Host',fields};
+    await source.readPrepared(actor,{...f.input,actionId},proposal);
+    await assert.rejects(source.readPrepared(actor,{...f.input,actionId,entityId:'HOST-forged-report'},proposal),/stale_preparation/u);
+  }
+  const sections=reports.find(tool=>tool.actionId==='AI-ACT-411')!.parameters.properties as Record<string,any>;
+  assert.deepEqual(sections.sectionId.enum,['public','journey']);
+  for(const period of [1,7,30])assert(reports.find(tool=>tool.actionId==='AI-ACT-313')!.validate({periodDays:period}));
+  assert(!reports.find(tool=>tool.actionId==='AI-ACT-313')!.validate({}));
+  assert(reports.find(tool=>tool.actionId==='AI-ACT-314')!.validate({}));
+  feeds.public=false;
+  const changed=await source.read(actor,{...f.input,actionId:'AI-ACT-411'}),props=changed.tools[0]!.parameters.properties as Record<string,any>;
+  assert.deepEqual(props.sectionId.enum,['journey']);assert(!changed.tools[0]!.validate({sectionId:'public'}));
+  assert.notEqual(changed.tools[0]!.sourceRevision,reports[0]!.sourceRevision);
+  feeds.journey=false;await assert.rejects(source.read(actor,{...f.input,actionId:'AI-ACT-312'}),/context_unavailable/u);
+});
+
+for(const fault of ['paid','approval','membership','changed source','deadline','foreign Store','foreign entity','listing selection','personal'])
+test(`Report preparation owner fails closed for ${fault}`,async()=>{
+  const f=supplierDraftFixture();let clock=at;
+  const source=new CompositePreparationContext({original:f.original,nativeReports:{realm:'evaluation',public:true,journey:false},now:()=>clock});
+  const input={...f.input,actionId:'AI-ACT-313'};
+  if(fault==='paid')f.paid(false);if(fault==='approval')f.approved(false);if(fault==='membership')f.member(false);
+  if(fault==='changed source')f.onRead(count=>{if(count===4)f.bump();});
+  if(fault==='deadline')f.onRead(count=>{if(count===4)clock=new Date(at.getTime()+60_001);});
+  const selected=fault==='foreign Store'?{...input,scope:{audience:'workspace' as const,storeId:'HOST-other-store'}}:
+    fault==='foreign entity'?{...input,entityId:'HOST-report'}:fault==='listing selection'?{...input,catalogueListingIds:['HOST-listing']}:
+    fault==='personal'?{...input,scope:{audience:'personal' as const,storeId:null}}:input;
+  await assert.rejects(source.read(actor,selected));
+});
+
 test('Coupon originals actual loopback SDK pagination, metadata and proposal recovery preserve original state',{
   skip:!process.env.FIRESTORE_EMULATOR_HOST,timeout:120000,
 },async()=>{

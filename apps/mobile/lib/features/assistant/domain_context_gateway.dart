@@ -24,7 +24,8 @@ const assistantStoreSupplierDraftContextActions={'AI-ACT-235','AI-ACT-236'};
 const assistantStorePurchaseRootContextActions={'AI-ACT-253','AI-ACT-269'};
 const assistantStoreReceivingOriginalContextActions={'AI-ACT-243'};
 const assistantStoreCouponContextActions={'AI-ACT-308','AI-ACT-309','AI-ACT-310'};
-const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions,...assistantStoreSupplierDraftContextActions,...assistantStorePurchaseRootContextActions,...assistantStoreOrderBoardContextActions};
+const assistantStoreReportOwnerContextActions={'AI-ACT-312','AI-ACT-313','AI-ACT-314','AI-ACT-411'};
+const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions,...assistantStoreSupplierDraftContextActions,...assistantStorePurchaseRootContextActions,...assistantStoreOrderBoardContextActions,...assistantStoreReportOwnerContextActions};
 const assistantDomainContextActions = {'AI-ACT-001', 'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
   ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions,
   ...assistantDomainAddressContextActions,...assistantPrivateStarsContextActions,
@@ -157,6 +158,8 @@ class AssistantDomainContextGateway {
       if (assistantStoreProductContextActions.contains(action) && (!context.inWorkspace ||
           entity == null && !(action=='AI-ACT-223'&&RegExp(r'^store-product-submission-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))) _invalid();
       if (assistantStoreOwnerContextActions.contains(action) && (!context.inWorkspace || entity != null)) _invalid();
+      if(assistantStoreReportOwnerContextActions.contains(action)&&(!context.workspaceApproved||!context.storeWorkspace||
+        !RegExp(r'^store-report-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))_invalid();
       if(assistantStoreCouponContextActions.contains(action)&&(!context.workspaceApproved||!context.storeWorkspace||
         (entity==null?!const {'AI-ACT-308','AI-ACT-309'}.contains(action)||!RegExp(r'^store-coupon-authoring-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision):
         !const {'AI-ACT-309','AI-ACT-310'}.contains(action)||!RegExp(r'^store-coupon-original:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))))_invalid();

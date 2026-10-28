@@ -2276,6 +2276,18 @@ class WorkSession extends ChangeNotifier {
   final WorkspaceAnalyticsReader? analyticsReader;
   WorkspaceProductPresentationGateway? _productPresentationReader;
   Object? get workspaceAnalyticsReaderIdentity => analyticsReader ?? _productPresentationReader;
+  bool workspaceAssistantReportSourceReady(String realm,{String? section}) {
+    final reader=_productPresentationReader,account=_contactAccountScope,store=activeWorkspace?.id;
+    if(_disposed||analyticsReader!=null||reader==null||account==null||store==null||
+      !workspaceRequiresMembershipReadback||!_currentWorkspaceAccess(store,activeWorkspace?.profileId)||
+      !workspaceStoreAuthoringAvailable||reader.gateway.ownerAccountId!=account||reader.gateway.realm!=realm)return false;
+    try{
+      if(!reader.current())return false;
+      final public=reader.productPresentationsEnabled||reader.storePresentationsEnabled,
+        journey=reader.cartAdditionsEnabled||reader.checkoutEntriesEnabled;
+      return section==null?public||journey:section=='public'?public:section=='journey'&&journey;
+    }catch(_){return false;}
+  }
   bool get hasAnalyticsReader => analyticsReader != null || _productPresentationReader != null;
   void bindProductPresentationReader(WorkspaceProductPresentationGateway? reader) {
     // A supplied integration retains ownership. Auth-root replacements must

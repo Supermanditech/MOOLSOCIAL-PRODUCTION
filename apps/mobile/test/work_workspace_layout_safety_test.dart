@@ -9404,6 +9404,70 @@ void main() {
   registerReceiving251ReadOnlyTests();
   _settlementNativeTests();
   _work02NativeTests();
+  testWidgets('AI-REPORT canonical reader readiness uses current original membership realm and enabled section', (tester) async {
+    final endpoint = Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
+    var calls = 0, revoked = false, current = true;
+    final transport = catalogue_fixture.OwnerTransport((body) async {
+      calls++;
+      if (body['operation'] != 'listWorkspaces') return const SocialContentResponse(statusCode: 503, body: '{}');
+      final checked = DateTime.now().toUtc().subtract(const Duration(seconds: 1));
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {'workspaces': revoked ? [] : [{
+        'caseId': 'WP-240701', 'status': 'live', 'plan': 'free', 'workspaceId': 'WK-510001', 'profileId': 'retailer-grocery',
+        'name': 'HOST original reports Store', 'area': 'HOST', 'primaryActivity': 'Groceries',
+        'access': {'schemaVersion': 1, 'state': 'active', 'accountId': 'host-native-scope-user', 'caseId': 'WP-240701',
+          'workspaceId': 'WK-510001', 'profileId': 'retailer-grocery', 'checkedAt': checked.toIso8601String(),
+          'applicationUpdatedAt': checked.subtract(const Duration(seconds: 10)).toIso8601String(),
+          'membership': {'schemaVersion': 1, 'state': 'active', 'membershipId': 'HOST-report-member',
+            'workspaceId': 'WK-510001', 'workspaceProfileId': 'retailer-grocery', 'version': 1,
+            'effectiveFrom': checked.subtract(const Duration(days: 1)).toIso8601String(),
+            'expiresAt': checked.add(const Duration(hours: 1)).toIso8601String()}}}]}}));
+    });
+    final f = _AuthenticatedNativeScopeFixture(connectedPrincipal: true, makeWork: (contact, purchase, inventory, trading) =>
+      WorkSession(gateway: AuthenticatedWorkGateway(endpoint: endpoint, credentials: catalogue_fixture.Credentials(), transport: transport),
+        contactDraftStore: contact, purchaseEntryStore: purchase, inventoryStore: inventory,
+        tradingPreferencesStoreFactory: (_) => trading, catalogueReference: workspaceMasterCatalogue));
+    await f.ready(); addTearDown(f.dispose);
+    WorkspaceProductPresentationGateway reader({String account = 'host-native-scope-user', String realm = 'evaluation',
+      bool public = true, bool journey = false}) => WorkspaceProductPresentationGateway(
+        gateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: endpoint, credentials: catalogue_fixture.Credentials(),
+          transport: transport, realm: realm, ownerAccountId: account), current: () => current, displayed: (_) => null,
+        productPresentationsEnabled: public, cartAdditionsEnabled: journey);
+    expect(f.work.workspaceAssistantReportSourceReady('evaluation'), isFalse);
+    f.work.bindProductPresentationReader(reader());
+    final reads = calls, writes = f.writes;
+    expect(f.work.workspaceAssistantReportSourceReady('evaluation'), isTrue);
+    expect(f.work.workspaceAssistantReportSourceReady('evaluation', section: 'public'), isTrue);
+    expect(f.work.workspaceAssistantReportSourceReady('evaluation', section: 'journey'), isFalse);
+    expect(f.work.workspaceAssistantReportSourceReady('evaluation', section: 'money'), isFalse);
+    expect(f.work.workspaceAssistantReportSourceReady('production'), isFalse);
+    current = false; expect(f.work.workspaceAssistantReportSourceReady('evaluation'), isFalse); current = true;
+    f.work.bindProductPresentationReader(reader(account: 'other-account'));
+    expect(f.work.workspaceAssistantReportSourceReady('evaluation'), isFalse);
+    f.work.bindProductPresentationReader(reader(public: false, journey: true));
+    expect(f.work.workspaceAssistantReportSourceReady('evaluation', section: 'journey'), isTrue);
+    expect(f.work.workspaceAssistantReportSourceReady('evaluation', section: 'public'), isFalse);
+    f.work.bindProductPresentationReader(reader(public: false));
+    expect(f.work.workspaceAssistantReportSourceReady('evaluation'), isFalse);
+    expect(calls, reads); expect(f.writes, writes, reason: 'Readiness cannot load analytics or write a record.');
+    f.work.bindProductPresentationReader(reader(public: false, journey: true));
+    await tester.pumpWidget(f.app); await tester.pumpAndSettle();
+    final nativeWrites = f.writes;
+    final proposal = await stockAssistantProposal(tester, f, 'AI-ACT-313', fields: {'periodDays': 7});
+    final adapter = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-313');
+    final opened = adapter.openReview(proposal, () => true); await tester.pumpAndSettle();
+    final dynamic analytics = tester.widget(find.byWidgetPredicate((widget) => widget.runtimeType.toString() == '_StoreAnalyticsPresentation').last);
+    expect(analytics.periodDays, 7);
+    await tester.tap(find.byTooltip('Close reports')); await tester.pumpAndSettle(); await opened;
+    final unsupported = await stockAssistantProposal(tester, f, 'AI-ACT-411', fields: {'sectionId': 'public', 'periodDays': 7});
+    final sections = f.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-411');
+    expect(await sections.openReview(unsupported, () => true), scope_contract.MoolAssistantReviewResult.unavailable);
+    expect(f.writes, nativeWrites);
+    f.work.bindProductPresentationReader(reader()); revoked = true; await f.work.refreshFeed();
+    expect(f.work.workspaceAssistantReportSourceReady('evaluation'), isFalse);
+    expect(f.writes, nativeWrites);
+  }, skip: const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL') !=
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
+
   for (final row in <(String, Map<String, Object?>)>[
     ('AI-ACT-312', {}), ('AI-ACT-313', {'periodDays': 7}),
     ('AI-ACT-314', {'periodDays': 30}), ('AI-ACT-411', {'sectionId': 'money', 'periodDays': 7}),

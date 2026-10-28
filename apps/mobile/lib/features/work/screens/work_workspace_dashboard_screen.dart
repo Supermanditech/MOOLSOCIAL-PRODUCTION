@@ -5644,6 +5644,13 @@ class _WorkWorkspaceDashboardScreenState
     final snapshot = await _reportSnapshot(host, source, proposal.actionId, ctx, proposal.entityId);
     if (!requestCurrent() || snapshot == null || snapshot.sourceRevision != proposal.sourceRevision) return MoolAssistantReviewResult.stale;
     final initial = StoreReportInitialData.fromFields(proposal.actionId, proposal.fields);
+    final reader=source.workspaceAnalyticsReaderIdentity;
+    if(const {'AI-ACT-312','AI-ACT-313','AI-ACT-314','AI-ACT-411'}.contains(proposal.actionId)&&
+      reader is WorkspaceProductPresentationGateway&&!source.workspaceAssistantReportSourceReady(reader.gateway.realm,
+        section:proposal.actionId=='AI-ACT-411'?initial.fields['sectionId'] as String?:null)){
+      source.showError('This report is unavailable. Reopen Reports to check your available reports.');
+      return MoolAssistantReviewResult.unavailable;
+    }
     if (proposal.actionId == 'AI-ACT-315' && (initial.fields['statementKind'] ?? 'sales') == 'sales' && proposal.entityId != null) return MoolAssistantReviewResult.unavailable;
     final fields = initial.fields, navigation = source.navigationScopeRevision,
       nativeContext = source.publicationPreferencesContext, fingerprint = _reportSource(source);

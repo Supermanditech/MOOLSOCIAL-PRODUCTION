@@ -2625,6 +2625,8 @@ function assistantOriginalContextSource(projectId: string) {
   const storeProducts=original&&catalogue?new OriginalStoreProductPreparationContext({
     projectId,authority:original,catalogue:workspaceCatalogueService()}):undefined;
   const couponRealm=process.env.MOOLSOCIAL_CATALOGUE_REALM;
+  const reportPublic=process.env.MOOLSOCIAL_PRODUCT_PRESENTATIONS_V1==='true'||process.env.MOOLSOCIAL_STORE_PRESENTATIONS_V1==='true',
+    reportJourney=process.env.MOOLSOCIAL_CART_ADDITIONS_V1==='true'||process.env.MOOLSOCIAL_CHECKOUT_ENTRIES_V1==='true';
   return new CompositePreparationContext({
     nativePreferencesEnabled: profile && catalogue,
     nativeBuyerFormsEnabled: profile && catalogue,
@@ -2632,6 +2634,8 @@ function assistantOriginalContextSource(projectId: string) {
     nativePurchaseFormsEnabled: profile && catalogue,
     ...(original ? {original} : {}),
     ...(storeProducts?{storeProducts}:{}),
+    ...(original&&catalogue&&(couponRealm==='evaluation'||couponRealm==='production')&&(reportPublic||reportJourney)?{
+      nativeReports:{realm:couponRealm,public:reportPublic,journey:reportJourney}}:{}),
     ...(original&&storeProducts&&(couponRealm==='evaluation'||couponRealm==='production')?{
       storeCoupons:new OriginalStoreCouponPreparationContext({projectId,realm:couponRealm,authority:original,products:storeProducts,
         promotions:{handleOperation:(userId,operation,body)=>workspacePromotionService().handleOperation(userId,operation,body)},

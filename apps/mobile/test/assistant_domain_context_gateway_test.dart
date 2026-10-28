@@ -42,6 +42,36 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
+  for (final compact in [false, true]) {
+    test('Report control metadata preserves exact approved namespace compact$compact', () async {
+      final store = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'Host Store',
+        profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
+      final proof = 'store-report-owner:evaluation:${'a' * 64}';
+      final actions = assistantStoreReportOwnerContextActions;
+      final data = <String, Object?>{..._data(),
+        'ownerKey': sha256.convert(utf8.encode(jsonEncode(['fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString(),
+        'scope': {'audience': 'workspace', 'storeId': 'store-one'},
+        'revisions': compact ? <Object?>[] : [for (final action in actions)
+          {'actionId': action, 'entityId': null, 'sourceRevision': proof}],
+        if (compact) 'nativeSelection': {'version': 1, 'fingerprint': 'b' * 64, 'groups': [
+          {'entityId': null, 'sourceRevision': proof, 'actionIds': actions.toList()}]}};
+      final result = await _source(_Wire(() => _ok(data)), compact: compact).read(store, () => true);
+      expect(result.revisions, {for (final action in actions) (action, null): proof});
+      for (final fault in ['entity', 'realm', 'proof', 'personal', 'unapproved']) {
+        final changed = jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
+        final rows = compact ? changed['nativeSelection']['groups'] as List : changed['revisions'] as List;
+        final row = rows.first as Map;
+        if (fault == 'entity') row['entityId'] = 'invented-report';
+        if (fault == 'realm') row['sourceRevision'] = 'store-report-owner:unknown:${'a' * 64}';
+        if (fault == 'proof') row['sourceRevision'] = 'store-order-board-owner:${'a' * 64}';
+        final context = fault == 'personal' ? _context : fault == 'unapproved'
+          ? _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'Host Store',
+              profile: 'retailer-grocery', revision: 1, isStore: true, approved: false, approvalAccountScope: _owner)) : store;
+        await expectLater(_source(_Wire(() => _ok(changed)), compact: compact).read(context, () => true),
+          throwsA(isA<AssistantModelFailure>()));
+      }
+    });
+  }
   for (final actions in [assistantStoreSupplierDraftContextActions, assistantStorePurchaseRootContextActions, assistantStoreOrderBoardContextActions]) {
   for (final compact in [false, true]) {
     test('Store roots ${actions.first} metadata needs exact proof approved Store and root target compact$compact', () async {
@@ -178,7 +208,8 @@ void main() {
         {'actionId': action, 'entityId': null, 'sourceRevision': assistantStoreSupplierDraftContextActions.contains(action)
           ? 'store-supplier-draft-owner:${'a' * 64}' : assistantStorePurchaseRootContextActions.contains(action)
           ? 'store-purchase-root-owner:${'a' * 64}' : assistantStoreOrderBoardContextActions.contains(action)
-          ? 'store-order-board-owner:${'a' * 64}' : 'native-owned-defaults-owner-proof'},
+          ? 'store-order-board-owner:${'a' * 64}' : assistantStoreReportOwnerContextActions.contains(action)
+          ? 'store-report-owner:evaluation:${'a' * 64}' : 'native-owned-defaults-owner-proof'},
       ]};
     final value = await _source(_Wire(() => _ok(data))).read(store, () => true);
     expect(value.revisions.keys.single, (action, null));

@@ -143,6 +143,10 @@ class AssistantOriginalContextReader {
           if(assistantStoreOrderOriginalContextActions.contains(entry.key.$1)&&!originalOrders.contains(entry.key.$2))continue;
           if(assistantStoreOperationalContextActions.contains(entry.key.$1)&&
             (entry.key.$2==null||work.workspaceAssistantOperationalOrderProof(entry.key.$1,entry.key.$2!)!=entry.value))continue;
+          if(assistantStoreReportOwnerContextActions.contains(entry.key.$1)){
+            final realm=RegExp(r'^store-report-owner:(evaluation|production):[a-f0-9]{64}$').firstMatch(entry.value)?.group(1);
+            if(realm==null||!work.workspaceAssistantReportSourceReady(realm))continue;
+          }
           if(assistantStoreCouponContextActions.contains(entry.key.$1)){
             if(entry.key.$2==null){
               final realm=RegExp(r'^store-coupon-authoring-owner:(evaluation|production):[a-f0-9]{64}$').firstMatch(entry.value)?.group(1);
