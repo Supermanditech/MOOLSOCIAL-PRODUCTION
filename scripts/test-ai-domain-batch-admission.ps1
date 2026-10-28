@@ -518,6 +518,34 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,4),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainCartClearStageOwners $row[0] $cartClearSeal).Count -eq $row[1]) "cart-clear checkpoint exact stage $($row[0]) owner count"
 }
+$retainedQuoteSeal=$approval.scope05RetainedQuoteCheckpoint
+Check (Test-AiDomainRetainedQuoteCheckpoint $retainedQuoteSeal) 'exact qualified retained-quote checkpoint'
+Check (@(Get-AiDomainRetainedQuoteSealOwners).Count -eq 3) 'only three existing metadata owners for retained-quote seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($retainedQuoteSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainRetainedQuoteCheckpoint $bad)) "reject changed retained-quote seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($retainedQuoteSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainRetainedQuoteCheckpoint $bad)) "reject changed retained-quote qualified source $property"
+}
+$bad=($retainedQuoteSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainRetainedQuoteCheckpoint $bad)) 'reject retained-quote source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($retainedQuoteSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainRetainedQuoteCheckpoint $bad)) "reject expanded retained-quote qualification $property"
+}
+$bad=($retainedQuoteSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAgentJourneyQualified=$true
+Check (!(Test-AiDomainRetainedQuoteCheckpoint $bad)) 'reject fabricated retained-quote device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($retainedQuoteSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainRetainedQuoteCheckpoint $bad)) "reject changed retained-quote evidence $property"
+}
+foreach($row in @(@(0,3),@(1,11),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainRetainedQuoteStageOwners $row[0] $retainedQuoteSeal).Count -eq $row[1]) "retained-quote checkpoint exact stage $($row[0]) owner count"
+}
 $quoteRecurrence=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).quoteImplementationRecurrence20261029
 Check (Test-AiDomainQuoteRecurrenceAdmission $quoteRecurrence) 'exact registered quote implementation recurrence'
 Check (!(Test-AiDomainQuoteRecurrenceAdmission $null)) 'reject absent quote recurrence'
