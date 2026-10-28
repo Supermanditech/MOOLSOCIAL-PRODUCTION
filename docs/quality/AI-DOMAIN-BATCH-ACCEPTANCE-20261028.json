@@ -1154,6 +1154,22 @@
         "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-batch-20261028-v1\\oppo-scope07-v1\\VM-SOURCE-VERIFICATION.json",
         "sha256": "B4CEBCF4B1E5EB5506EB5B1D7F16E1D46B1CD0EB9BC1C69519DEBFC3ED24DE72"
       }
-    ]
+    ],
+    "sourceCommit": "0d8ea7a9f09c00bbd0bff4768c017c87c1159983",
+    "sealChecks": {
+      "admissionChecksPassed": 99,
+      "qualifiedRuntimeOwners": 33,
+      "changedSourceOwners": 21,
+      "sourceBlobsMatchedBeforeCommit": true,
+      "sourceCommit": "0d8ea7a9f09c00bbd0bff4768c017c87c1159983",
+      "metadataAdmissionCommit": "d353b2fbf12e69ee1aae573c945256d684575d0d",
+      "nativeCases": 263,
+      "oppoCheckpoint": "oppo-scope07-v1",
+      "partialScope": true,
+      "addressCacheCoherenceStillPending": true,
+      "all20ScopesNotClosed": true,
+      "noProductionAcceptance": true,
+      "remoteReadback": "Normal named-branch push and exact independent readback follow this evidence commit; recorded externally to avoid self-referential commit identity."
+    }
   }
 }
