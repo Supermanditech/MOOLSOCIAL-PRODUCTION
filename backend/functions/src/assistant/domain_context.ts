@@ -1815,6 +1815,28 @@ export class CompositePreparationContext implements PreparationContextSource {
       storeId: input.scope.storeId, sourceKind: 'native-supplier-draft-owner-v1',
       purpose: 'Unsaved user-supplied draft or query only. No supplier records, identities, GST verification or duplicate results have been read. The current account/Store native directory and final confirmation remain authoritative.'}};
   }
+  private purchaseReference(actor: AccountProfileActor, input: PreparationRequest, original: PreparationContext): PreparationContext {
+    if (!this.deps.nativeBuyerFormsEnabled || actor.tenantId !== undefined || input.scope.audience !== 'personal' ||
+        input.entityId !== null || original.modelContext?.audience !== 'personal' ||
+        input.actionId !== null && input.actionId !== 'AI-ACT-032') return fail('context_unavailable');
+    // Permission-only proof, not a Cart revision. The original account-owned
+    // native snapshot independently binds the Cart, recovery state and edits.
+    const revision = 'buy-reference-owner:' + digest([actor.projectId, actor.uid, original.revision]);
+    const validate = (fields: Readonly<Record<string, unknown>>) => Object.keys(fields).length === 1 &&
+      typeof fields.reference === 'string' && fields.reference.length <= 2000;
+    return {revision, validUntil: original.validUntil, tools: [{name: 'buy_prepare_purchase_reference',
+      actionId: 'AI-ACT-032', entityId: null, sourceRevision: revision,
+      description: 'Prefill only the purchase-order reference explicitly supplied by the user in the original current purchase form. Preserve the exact text, including Unicode. An explicitly requested empty reference clears it only after native Save. Do not invent a reference, issue a purchase order, change Cart items or infer payment terms. The current account-owned native Cart snapshot and original Save reference control remain required.',
+      parameters: {type: 'object', properties: {reference: {type: 'string'}}, required: ['reference'], additionalProperties: false},
+      validate}], modelContext: {audience: 'personal', sourceKind: 'native-purchase-reference-owner-v1',
+        purpose: 'Only original account and paid-AI authority has been read. No Cart, reference, quote, amount or payment terms are read or inferred. Supplied text is reviewed in the existing form without a save.'}};
+  }
+  private async readPurchaseReference(actor: AccountProfileActor, input: PreparationRequest) {
+    if (!this.deps.original || !this.deps.nativeBuyerFormsEnabled || actor.tenantId !== undefined ||
+        input.scope.audience !== 'personal' || input.entityId !== null) return fail('context_unavailable');
+    const original = await this.deps.original.read(actor, {...input, actionId: null, entityId: null});
+    return this.purchaseReference(actor, input, original);
+  }
   private deliveryAddresses(input: PreparationRequest, original: PreparationContext): PreparationContext {
     if (!this.deps.nativeBuyerFormsEnabled || input.scope.audience !== 'personal' ||
         original.modelContext?.audience !== 'personal' || !Array.isArray(original.modelContext.deliveryChoices)) return fail('context_unavailable');
@@ -1882,6 +1904,12 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
     proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
+    if (proposal.actionId === 'AI-ACT-032') {
+      if (input.actionId !== proposal.actionId || input.entityId !== null || proposal.entityId !== null) return fail('stale_preparation', 409);
+      const context = await this.readPurchaseReference(actor, input);
+      if (!context.tools.some(tool => tool.sourceRevision === proposal.sourceRevision && tool.validate(proposal.fields))) return fail('stale_preparation', 409);
+      return context;
+    }
     if(storePublicDetailsActions.has(proposal.actionId)){
       if(input.actionId!==proposal.actionId||input.entityId!==null||proposal.entityId!==null)return fail('stale_preparation',409);
       const context=await this.readStorePublicDetails(actor,input);
@@ -1958,6 +1986,7 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (input.actionId !== null) {
+      if (input.actionId === 'AI-ACT-032') return this.readPurchaseReference(actor, input);
       if(storePublicDetailsActions.has(input.actionId))return this.readStorePublicDetails(actor,input);
       if(storeReportOwnerActions.has(input.actionId))return this.readReportControls(actor,input);
       if(storeCouponActions.has(input.actionId)){
@@ -2005,6 +2034,7 @@ export class CompositePreparationContext implements PreparationContextSource {
       const original = await this.deps.original.read(actor, input);
       values.push(original);
       if (this.deps.nativeBuyerFormsEnabled && input.scope.audience === 'personal') values.push(this.deliveryAddresses(input, original));
+      if (this.deps.nativeBuyerFormsEnabled && input.scope.audience === 'personal') values.push(this.purchaseReference(actor, input, original));
       if (this.deps.nativePreferencesEnabled && input.scope.audience === "personal") values.push(this.preferences(actor, input, original));
     }
     if (this.deps.catalogue) {

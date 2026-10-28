@@ -760,6 +760,68 @@ class HostRequests implements PreparationRequestStore {
   }
 }
 
+function purchaseReferenceFixture() {
+  const f = fixture(); let revision = 3, writes = 0, onRead = () => {};
+  const profile = new AccountProfileService({async readAccount() {onRead();
+    return {uid: actor.uid, status: 'ACTIVE', profile: {ownerUid: actor.uid, revision, updatedAt: '2026-10-27T00:00:00.000Z',
+      displayName: 'HOST private name', selectedAddressId: null, invoiceProfiles: [], addresses: []}};
+  }, async readReceipt() {return undefined;}, async commit() {writes++; throw Error('No reference preparation write');}}, actor.projectId, () => at);
+  const original = new ProfileWorkspacePreparationContext({profile, plans: f.plans, workspaces: async () => [], now: () => at});
+  const source = new CompositePreparationContext({original, nativeBuyerFormsEnabled: true});
+  const input = {scope: {audience: 'personal' as const, storeId: null}, requestId: 'HOST-reference-preparation', requestRevision: 1,
+    message: 'Use my reference PO-મૂળ-नमस्ते 12.50', language: 'Hindi', history: [], expectedEntitlementRevision: 'personal:null:1:1',
+    actionId: 'AI-ACT-032', entityId: null};
+  return {f, source, original, input, writes: () => writes, bump: () => {revision++;}, onRead: (fn: () => void) => {onRead = fn;}};
+}
+test('Purchase reference uses original paid account proof and raw supplied text; duplicate/status recovery never writes', async () => {
+  const f = purchaseReferenceFixture(), raw = '  PO-મૂળ-नमस्ते 12.50  ', context = await f.source.read(actor, f.input), tool = context.tools[0]!;
+  assert.equal(context.tools.length, 1); assert.equal(tool.actionId, 'AI-ACT-032'); assert.equal(tool.entityId, null);
+  assert.match(tool.sourceRevision, /^buy-reference-owner:[a-f0-9]{64}$/u); assertStrictSchema(tool.parameters);
+  assert.equal(tool.validate({reference: raw}), true); assert.equal(tool.validate({reference: ''}), true);
+  for (const fields of [{}, {reference: 50}, {reference: raw, total: 123}, {reference: 'x'.repeat(2001)}]) assert.equal(tool.validate(fields), false);
+  assert.ok(!JSON.stringify(context.modelContext).includes('HOST private name'));
+  const metadata = await handleAssistantCanonicalContextRequest(f.f.input, {...f.f.deps, context: f.source});
+  assert.equal(metadata.status, 200);
+  if (!metadata.body.ok) assert.fail('Expected original metadata');
+  assert.ok(metadata.body.data.revisions.some(row => row.actionId === 'AI-ACT-032' && row.entityId === null && row.sourceRevision === tool.sourceRevision));
+  if (process.env.AI_DOMAIN_PURCHASE_REFERENCE_EXPORT_PATH) {
+    const path = process.env.AI_DOMAIN_PURCHASE_REFERENCE_EXPORT_PATH; assert(isAbsolute(path));
+    writeFileSync(path, JSON.stringify({hostOnly: true, actor, metadata: metadata.body}, null, 2) + '\n', {flag: 'wx'});
+  }
+  const requests = new HostRequests(); let models = 0;
+  const service = () => new AssistantPreparationService({projectId: actor.projectId, plans: f.f.plans, context: f.source, requests, now: () => at,
+    usage: {async reserve() {return {id: 'HOST-reference-permit', validUntil: '2026-10-28T08:01:00.000Z'};}, async settle() {}},
+    model: {async prepare() {models++; return {kind: 'tool', name: tool.name, arguments: {reference: raw}};}}});
+  const payload = {...f.input, nativeTargets: [{actionId: f.input.actionId, entityId: null}]};
+  const prepared = await service().handle(actor, {operation: 'prepare', payload});
+  assert.equal(prepared.state, 'ready');
+  if (prepared.state !== 'ready' || prepared.reply.outcome.kind !== 'proposal') assert.fail('Expected reference prefill');
+  assert.deepEqual(prepared.reply.outcome.fields, {reference: raw});
+  assert.deepEqual(await service().handle(actor, {operation: 'prepare', payload}), prepared);
+  assert.deepEqual(await service().handle(actor, {operation: 'status', payload: {scope: f.input.scope, requestId: f.input.requestId}}), prepared);
+  assert.equal(models, 1); assert.equal(f.writes(), 0);
+  f.bump(); await assert.rejects(service().handle(actor, {operation: 'status', payload: {scope: f.input.scope, requestId: f.input.requestId}}));
+  assert.equal(f.writes(), 0);
+});
+test('Purchase reference rejects foreign scope/entity/account, missing registration, revoked access and stale proposal proof', async () => {
+  const f = purchaseReferenceFixture(), context = await f.source.read(actor, f.input), tool = context.tools[0]!;
+  for (const input of [{...f.input, entityId: 'other-cart'}, {...f.input, scope: {audience: 'workspace' as const, storeId: 'other-store'}}]) {
+    await assert.rejects(f.source.read(actor, input));
+  }
+  await assert.rejects(f.source.read({...actor, uid: 'other-user'}, f.input));
+  await assert.rejects(f.source.read({...actor, tenantId: 'other-tenant'}, f.input));
+  await assert.rejects(new CompositePreparationContext({original: f.original}).read(actor, f.input));
+  const proposal = {kind: 'proposal' as const, id: 'HOST-reference-proposal', actionId: f.input.actionId, entityId: null, sourceRevision: tool.sourceRevision,
+    fields: {reference: 'PO-original'}, title: 'Review reference', summary: 'User supplied reference'};
+  await f.source.readPrepared(actor, f.input, proposal);
+  await assert.rejects(f.source.readPrepared(actor, f.input, {...proposal, fields: {reference: 12}}));
+  await assert.rejects(f.source.readPrepared(actor, f.input, {...proposal, entityId: 'other-cart'}));
+  f.bump(); await assert.rejects(f.source.readPrepared(actor, f.input, proposal), /stale_preparation/u);
+  f.onRead(() => f.f.deny()); await assert.rejects(f.source.read(actor, f.input), /stale_preparation/u);
+  f.onRead(() => {}); await assert.rejects(f.source.read(actor, f.input), /ai_access_required/u);
+  assert.equal(f.writes(), 0);
+});
+
 for (const actionId of ['AI-ACT-024', 'AI-ACT-027']) test(`Domain original Profile address ${actionId} prepares only an owned choice and recovers without a write`, async () => {
   const f = fixture(); let writes = 0, revision = 3, changes = false;
   const profile = new AccountProfileService({async readAccount() {if (changes) revision++;
