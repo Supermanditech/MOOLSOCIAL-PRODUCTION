@@ -96456,6 +96456,105 @@ class _OrderEffectAccess extends _ReceivingAssistantAccess{
     revision:active?'HOST-order-active':'HOST-order-revoked',validUntil:DateTime.now().add(const Duration(hours:1)));
 }
 void registerOrderEffectNativeTests(){
+  for(final connected in [true,false])testWidgets('SCOPE17 operational original proof and native confirmation connected$connected',(tester)async{
+    final f=_Receiving251Fixture(connected:connected),owner=ValueNotifier(true);
+    _OrderEffectGateway? activeBridge;
+    try{
+      await f.start();f.work.forbidAdmission=false;await tester.pumpWidget(f.native.app);await tester.pumpAndSettle();
+      f.work.bindOriginalPurchaseReader(f.reader,'evaluation');f.work.forbidAdmission=true;
+      final account=f.work.contactDraftStore!.accountScope!,store=f.work.activeWorkspace!.id;
+      final exportPath=Platform.environment['AI_DOMAIN_OPERATIONAL_ORIGINAL_EXPORT_PATH'];
+      final exported=connected&&exportPath!=null?jsonDecode(File(exportPath).readAsStringSync()) as Map<String,dynamic>:null;
+      final raw=exported==null?purchase_fixture.operationalResponse(role:'seller'):Map<String,dynamic>.from(exported['snapshot'] as Map);
+      if(exported==null){raw['viewerUserId']=account;raw['storeId']=store;raw['orderId']='HOST-original-operations-order';
+      final rehash=<String,dynamic>{'factsVersion':2,'storeId':store,'orderId':raw['orderId'],'original':raw['original']};
+      purchase_fixture.rehashPurchaseOrder(rehash);raw['originalFingerprint']=rehash['originalFingerprint'];
+      final now=DateTime.fromMillisecondsSinceEpoch(DateTime.now().millisecondsSinceEpoch,isUtc:true);raw['placedAt']=now.subtract(const Duration(minutes:1)).toIso8601String();
+      raw['acceptanceDeadline']=now.add(const Duration(minutes:5)).toIso8601String();
+      raw['fulfilmentDeadline']=now.add(const Duration(hours:1)).toIso8601String();
+      raw['stage']='Confirmed';raw['permittedActions']=['accept','reject'];
+      }else{expect(exported['kind'],'isolated-host-original-operational-service-contract');expect(exported['ownerUid'],account);expect(exported['storeId'],store);}
+      f.wire.respond=(body){if(body['operation']!='readStoreOperationalOrder')throw StateError('HOST refused unexpected operation');return raw;};
+      final reference=WorkspacePurchaseReference(purchaseId:raw['purchaseId'],storeId:store,orderId:raw['orderId'],
+        originalFingerprint:raw['originalFingerprint'],sourceRevision:raw['sourceRevision']);
+      final bridge=_OrderEffectGateway(gateway:AuthenticatedWorkspaceOrderOperationsGateway(f.reader),accountScope:account,workspaceId:store);
+      activeBridge=bridge;
+      final journal=_OrderEffectJournal(),operations=WorkOrderOperations(accountScope:account,workspaceId:store,gateway:bridge,pendingStore:journal);
+      expect(await operations.restore(),isTrue);expect(f.reader.isCurrent,isTrue);expect(reference.valid,isTrue);
+      final read=await bridge.read(reference);expect(read,isNotNull);
+      operations.observe(read!);expect(f.work.bindWorkspaceOrderOperations(operations),isTrue);await tester.pumpAndSettle();
+      final proof=f.work.workspaceAssistantOperationalOrderProof('AI-ACT-275',reference.orderId);
+      if(!connected){expect(proof,isNull);expect(f.work.workspaceAssistantOperationalOrderProof('AI-ACT-285',reference.orderId),isNull);expect(bridge.submitted,isEmpty);expect(journal.saves,0);return;}
+      expect(proof,WorkSession.workspaceAssistantOperationalSourceProof(read.order!.operational!));
+      expect(f.work.workspaceAssistantOperationalOrderProof('AI-ACT-285',reference.orderId),proof);
+      if(exported!=null)expect(proof,exported['proof'],reason:'Proof must match actual backend-service bytes.');
+      final before=await f.fingerprint(),admissions=f.work.admissions;
+      final adapter=f.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-275'),context=f.native.readContext();
+      expect((await adapter.snapshot(context,reference.orderId))!.sourceRevision,proof);
+      expect((await adapter.snapshot(context,reference.orderId))!.sourceRevision,proof);
+      expect(await f.fingerprint(),before);expect(f.work.admissions,admissions);expect(journal.saves,0);
+      final proposal=scope_contract.MoolAssistantProposal(id:'HOST-op-native-review',actionId:'AI-ACT-275',binding:context.binding,
+        entityId:reference.orderId,requestRevision:1,entitlementRevision:'HOST-paid',sourceRevision:proof!,
+        validUntil:DateTime.now().add(const Duration(minutes:1)),fields:const {'operation':'accept'},title:'Review order',summary:'Host original');
+      final opened=(adapter as scope_contract.MoolAssistantOwnerAwareNativeAdapter).openOwnedReview(proposal,
+        isCurrent:()=>owner.value,ownerChanges:owner);await tester.pumpAndSettle();
+      expect(bridge.submitted,isEmpty);expect(journal.saves,0);expect(f.work.admissions,admissions);
+      final accept=find.byKey(Key('work-operational-accept-${reference.orderId}'));expect(accept,findsOneWidget);
+      await tester.ensureVisible(accept);await tester.tap(accept);await tester.pumpAndSettle();
+      expect(bridge.submitted,hasLength(1));expect(journal.saves,1);
+      expect(f.work.workspaceAssistantOperationalOrderProof('AI-ACT-275',reference.orderId),isNull);
+      expect(f.work.workspaceAssistantOperationalOrderProof('AI-ACT-281',reference.orderId),isNull);
+      expect(f.work.workspaceAssistantOperationalOrderProof('AI-ACT-285',reference.orderId),isNull);
+      if(exported==null){raw['stage']='Preparing';raw['revision']=2;raw['permittedActions']=['ready'];}
+      else{raw..clear()..addAll(Map<String,dynamic>.from(exported['acknowledgedSnapshot'] as Map));}
+      final next=await bridge.read(reference);expect(next,isNotNull);
+      bridge.responses.single.complete(WorkOrderReply(accountScope:account,workspaceId:store,orderId:reference.orderId,
+        operationId:bridge.submitted.single.operationId,revision:2,state:WorkOrderReplyState.applied,order:next!.order));
+      await tester.pumpAndSettle();await opened;
+      expect(operations.pending(reference.orderId),isNull);expect(operations.state(reference.orderId),isNull);
+      expect(f.work.workspaceAssistantOperationalOrderProof('AI-ACT-275',reference.orderId),isNull);
+      expect(f.work.workspaceAssistantOperationalOrderProof('AI-ACT-285',reference.orderId),isNull);
+      final ready=f.work.workspaceAssistantOperationalOrderProof('AI-ACT-281',reference.orderId);
+      expect(ready,WorkSession.workspaceAssistantOperationalSourceProof(next.order!.operational!));expect(ready,isNot(proof));
+      expect(f.work.workspaceAssistantOperationalOrderProof('AI-ACT-280',reference.orderId),ready);
+      if(exported!=null)expect(ready,exported['readyProof']);
+      expect(bridge.reconciled,isEmpty);expect(bridge.submitted,hasLength(1));
+      f.lifetime=Object();expect(f.work.workspaceAssistantOperationalOrderProof('AI-ACT-281',reference.orderId),isNull);
+    }finally{
+      for(final pending in [...?activeBridge?.responses,...?activeBridge?.replies]){if(!pending.isCompleted)pending.completeError(StateError('HOST ended pending original operation'));}
+      await tester.pumpAndSettle();await tester.pumpWidget(const SizedBox.shrink());await f.close();owner.dispose();
+    }
+  },skip:connected&&const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL')!='https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
+  testWidgets('FE-ORDER275 independent original orders keep stable proposal revisions',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester);
+      final first=h.original;
+      h.raw=Map<String,dynamic>.from(h.raw)..['orderId']='HOST-second-operational-order';
+      final rehash=<String,dynamic>{'factsVersion':2,'storeId':h.raw['storeId'],'orderId':h.raw['orderId'],'original':h.raw['original']};
+      purchase_fixture.rehashPurchaseOrder(rehash);h.raw['originalFingerprint']=rehash['originalFingerprint'];
+      final second=await h.record('Confirmed');h.operations.observe(h.reply(second));await tester.pumpAndSettle();
+      final adapter=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-275');
+      final a=await adapter.snapshot(h.controller.context,first.id);
+      final b=await adapter.snapshot(h.controller.context,second.id);
+      final again=await adapter.snapshot(h.controller.context,first.id);
+      expect(a,isNotNull);expect(b,isNotNull);expect(again!.sourceRevision,a!.sourceRevision);
+      expect((await adapter.snapshot(h.controller.context,second.id))!.sourceRevision,b!.sourceRevision);
+      expect(h.gateway.submitted,isEmpty);expect(h.gateway.reconciled,isEmpty);expect(h.journal.saves,0);
+    }finally{await h.dispose(tester);}});
+  for(final action in ['AI-ACT-280','AI-ACT-285'])testWidgets('SCOPE17 $action independent originals keep stable native revisions',(tester)async{
+    final h=_OrderEffectHost();try{await h.ready(tester);
+      final stage=action=='AI-ACT-280'?'Preparing':'Confirmed';
+      final first=await h.record(stage,revision:2);h.operations.observe(h.reply(first));await tester.pumpAndSettle();
+      h.raw=Map<String,dynamic>.from(h.raw)..['orderId']='HOST-second-followup-order';
+      final rehash=<String,dynamic>{'factsVersion':2,'storeId':h.raw['storeId'],'orderId':h.raw['orderId'],'original':h.raw['original']};
+      purchase_fixture.rehashPurchaseOrder(rehash);h.raw['originalFingerprint']=rehash['originalFingerprint'];
+      final second=await h.record(stage);h.operations.observe(h.reply(second));await tester.pumpAndSettle();
+      final adapter=h.native.adapters(tester).singleWhere((a)=>a.actionId==action);
+      final a=await adapter.snapshot(h.controller.context,first.id),b=await adapter.snapshot(h.controller.context,second.id);
+      expect(a,isNotNull);expect(b,isNotNull);
+      expect((await adapter.snapshot(h.controller.context,first.id))!.sourceRevision,a!.sourceRevision);
+      expect((await adapter.snapshot(h.controller.context,second.id))!.sourceRevision,b!.sourceRevision);
+      expect(h.gateway.submitted,isEmpty);expect(h.gateway.reconciled,isEmpty);expect(h.journal.saves,0);
+    }finally{await h.dispose(tester);}});
   testWidgets('FE-ORDER275 original Accept only dispatches once after native tap and preserves acknowledged exact order',(tester)async{
     final h=_OrderEffectHost();try{await h.ready(tester);final before=h.effects,selected=h.native.work.currentWorkspaceOrderId;
       final opened=await h.open(tester);expect(h.effects,before);expect(h.native.work.currentWorkspaceOrderId,selected);

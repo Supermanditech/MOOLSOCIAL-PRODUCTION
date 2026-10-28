@@ -3165,7 +3165,7 @@ void main() {
   );
 
   test(
-    'AI-VISUAL-03 Workspace approval reads existing reviewed owner state',
+    'AI-VISUAL-03 production Workspace requires verified membership beyond local review labels',
     () {
       const account = (
         environment: 'host',
@@ -3203,7 +3203,7 @@ void main() {
         expect(session.workspaceApprovalMatchesAccount(account), isFalse);
       }
       session.remoteReviewStatus = WorkRemoteReviewStatus.approved;
-      expect(session.workspaceApprovalMatchesAccount(account), isTrue);
+      expect(session.workspaceApprovalMatchesAccount(account), isFalse);
       final buyer = MoolAssistantContext(
         accountScope: account,
         authenticationRevision: 1,
@@ -3217,7 +3217,7 @@ void main() {
         approved: session.workspaceApprovalMatchesAccount(account),
         approvalAccountScope: account,
       );
-      expect(buyer.withWorkspace(proof).inWorkspace, isTrue);
+      expect(buyer.withWorkspace(proof).inWorkspace, isFalse);
       expect(
         MoolAssistantContext(
           accountScope: foreign,
@@ -3238,7 +3238,7 @@ void main() {
       expect(session.workspaceApprovalMatchesAccount(account), isFalse);
       session.reviewStage = WorkReviewStage.live;
       session.remoteReviewStatus = WorkRemoteReviewStatus.live;
-      expect(session.workspaceApprovalMatchesAccount(account), isTrue);
+      expect(session.workspaceApprovalMatchesAccount(account), isFalse);
     },
   );
 

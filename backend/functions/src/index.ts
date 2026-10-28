@@ -25,7 +25,7 @@ import {handleAssistantModelRequest} from "./assistant/model_http.js";
 import {AssistantHistoryService} from "./assistant/history_service.js";
 import {DataConnectHistoryRepository} from "./assistant/history_dataconnect_store.js";
 import {handleAssistantHistoryRequest} from "./assistant/history_http.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreProductPreparationContext, OriginalStoreOrderPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext} from "./assistant/domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreProductPreparationContext, OriginalStoreOrderPreparationContext, OriginalStoreOperationalPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext} from "./assistant/domain_context.js";
 import {handleAssistantCanonicalContextRequest} from "./assistant/domain_context_http.js";
 
 import {
@@ -2631,7 +2631,9 @@ function assistantOriginalContextSource(projectId: string) {
     ...(original && catalogue ? {storeProducts: new OriginalStoreProductPreparationContext({
       projectId, authority: original, catalogue: workspaceCatalogueService()})} : {}),
     ...(original && ['evaluation','production'].includes(process.env.MOOLSOCIAL_PURCHASE_REALM ?? '') ? {
+      nativeOrderBoardEnabled: true,
       storeOrders: new OriginalStoreOrderPreparationContext({projectId,authority:original,purchases:workspacePurchaseProjectionService()}),
+      storeOperational: new OriginalStoreOperationalPreparationContext({projectId,authority:original,purchases:workspacePurchaseProjectionService(),operations:workspaceOrderOperationsService()}),
       storeReceiving: new OriginalStoreReceivingPreparationContext({projectId,authority:original,purchases:workspacePurchaseProjectionService()}),
       privateStars: new OriginalPurchasedStarsPreparationContext({projectId,authority:original,operations:workspaceOrderOperationsService()})} : {}),
     ...(catalogue ? {catalogue: new OriginalCataloguePreparationContext({projectId,

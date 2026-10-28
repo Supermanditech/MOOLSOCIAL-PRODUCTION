@@ -8263,7 +8263,8 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
         'factsVersion':exact.original.factsVersion,'lines':exact.original.lines.map((line)=>line.toJson()).toList(),'totals':exact.original.totals}};
   }
 
-  Object? _orderEffectOwner;String? _orderEffectFingerprint;int _orderEffectRevision=0;bool _orderEffectOpen=false;
+  Object? _orderEffectOwner;int _orderEffectRevision=0;bool _orderEffectOpen=false;
+  final _orderEffectAnchors=<(String,String),({String fingerprint,int revision})>{};
   WorkspaceOrderRecord? _orderEffectTarget(WorkSession source,String? entity)=>
     entity==null?null:source.workspaceOrders.where((row)=>row.id==entity).singleOrNull;
   bool _orderEffectAvailable(WorkSession source,String action,WorkspaceOrderRecord? order){
@@ -8280,10 +8281,17 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       action=='AI-ACT-281'&&exact.stage=='Preparing'&&source.workspaceOrderCanAct(order.id,WorkOrderAction.ready);
   }
   String _orderEffectVersion(WorkSession source,MoolAssistantContext ctx,String action,WorkspaceOrderRecord order){
-    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision,action,order.id);
+    final original=source.workspaceAssistantOperationalOrderProof(action,order.id);
+    if(original!=null)return original;
+    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision);
+    if(_orderEffectOwner!=owner){_orderEffectOwner=owner;_orderEffectAnchors.clear();}
+    final key=(action,order.id);
     final fingerprint=jsonEncode([_orderEffectFacts(order),source.workspaceOrderOperationState(order.id)?.name]);
-    if(_orderEffectOwner!=owner||_orderEffectFingerprint!=fingerprint){_orderEffectOwner=owner;_orderEffectFingerprint=fingerprint;_orderEffectRevision++;}
-    return 'native-order-action:$_orderEffectRevision';
+    var anchor=_orderEffectAnchors[key];
+    if(anchor==null||anchor.fingerprint!=fingerprint){
+      anchor=(fingerprint:fingerprint,revision:++_orderEffectRevision);_orderEffectAnchors[key]=anchor;
+    }
+    return 'native-order-action:${anchor.revision}';
   }
   MoolAssistantNativeSnapshot? _orderEffectSnapshot(BuildContext host,WorkSession source,String action,MoolAssistantContext ctx,String? entity){
     final order=_orderEffectTarget(source,entity);
@@ -8448,16 +8456,19 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
     }finally{_orderPhysicalOpen=false;}
   }
 
-  Object? _packingSnapshotOwner;String? _packingSnapshotFacts;int _packingSnapshotRevision=0;bool _packingNativeOpen=false;
+  Object? _packingSnapshotOwner;int _packingSnapshotRevision=0;bool _packingNativeOpen=false;
+  final Map<String,({String fingerprint,int revision})> _packingSnapshotAnchors={};
   MoolAssistantNativeSnapshot? _orderPackingSnapshot(BuildContext host,WorkSession source,MoolAssistantContext ctx,String? entity){
     final order=_orderEffectTarget(source,entity);
     if(!mounted||!host.mounted||!identical(widget.session,source)||_packingNativeOpen||!_stockAssistantNavigationReady||
       !_financePermitted(ctx)||_financeAssistantContext(host)?.binding!=ctx.binding||order==null||order.stage!='Preparing'||order.isCustomerCollection||
       source.workspacePackingLinesForOrder(order).isEmpty||source.workspaceOrderOperationState(order.id)!=null)return null;
-    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision,order.id);
+    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision);
+    if(_packingSnapshotOwner!=owner){_packingSnapshotOwner=owner;_packingSnapshotAnchors.clear();}
     final facts=jsonEncode([_orderEffectFacts(order),source.workspacePackingLinesForOrder(order).map((line)=>[line.id,line.quantity,line.packed]).toList()]);
-    if(_packingSnapshotOwner!=owner||_packingSnapshotFacts!=facts){_packingSnapshotOwner=owner;_packingSnapshotFacts=facts;_packingSnapshotRevision++;}
-    return MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:entity,permitted:true,sourceRevision:'native-order-packing:$_packingSnapshotRevision');
+    var anchor=_packingSnapshotAnchors[order.id];
+    if(anchor==null||anchor.fingerprint!=facts){anchor=(fingerprint:facts,revision:++_packingSnapshotRevision);_packingSnapshotAnchors[order.id]=anchor;}
+    return MoolAssistantNativeSnapshot(binding:ctx.binding,entityId:entity,permitted:true,sourceRevision:'native-order-packing:${anchor.revision}');
   }
   Future<MoolAssistantReviewResult> _openOrderPackingNative(BuildContext host,WorkSession source,MoolAssistantProposal p,
     bool Function() requestCurrent,Listenable? authorityChanges)async{
@@ -8483,7 +8494,8 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
     }finally{_packingNativeOpen=false;}
   }
 
-  Object? _orderFollowupOwner;String? _orderFollowupFacts;int _orderFollowupRevision=0;bool _orderFollowupOpen=false;
+  Object? _orderFollowupOwner;int _orderFollowupRevision=0;bool _orderFollowupOpen=false;
+  final Map<(String,String),({String fingerprint,int revision})> _orderFollowupAnchors={};
   Object? _orderPendingFacts(WorkOrderCommand? value)=>value==null?null:[value.accountScope,value.workspaceId,value.orderId,value.operationId,
     value.expectedRevision,value.action.name,value.reason,value.additionalMinutes,value.expectedAcceptanceDeadline?.toUtc().toIso8601String(),
     value.version,value.purchaseReference?.toJson(),value.purchaseRealm];
@@ -8499,13 +8511,15 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       _=>false};
   }
   String _orderFollowupVersion(WorkSession source,MoolAssistantContext ctx,String action,WorkspaceOrderRecord order){
-    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision,action,order.id);
+    final owner=(source,widget.accountIdentity,ctx.binding,source.navigationScopeRevision);
+    if(_orderFollowupOwner!=owner){_orderFollowupOwner=owner;_orderFollowupAnchors.clear();}
     final assignment=source.workspaceDeliveryAssignmentForOrder(order.id);
     final facts=jsonEncode([_orderEffectFacts(order),source.workspaceOrderOperationState(order.id)?.name,_orderPendingFacts(source.workspacePendingOrderCommand(order.id)),
       assignment==null?null:[assignment.orderId,assignment.stage,assignment.eta.toUtc().toIso8601String(),assignment.partnerName,assignment.vehicleLabel],
       action=='AI-ACT-287'?source.workspaceCatalogueItems.map((item)=>item.toInventoryJson()).toList():null]);
-    if(_orderFollowupOwner!=owner||_orderFollowupFacts!=facts){_orderFollowupOwner=owner;_orderFollowupFacts=facts;_orderFollowupRevision++;}
-    return 'native-order-followup:$_orderFollowupRevision';
+    final key=(action,order.id);var anchor=_orderFollowupAnchors[key];
+    if(anchor==null||anchor.fingerprint!=facts){anchor=(fingerprint:facts,revision:++_orderFollowupRevision);_orderFollowupAnchors[key]=anchor;}
+    return 'native-order-followup:${anchor.revision}';
   }
   MoolAssistantNativeSnapshot? _orderFollowupSnapshot(BuildContext host,WorkSession source,String action,MoolAssistantContext ctx,String? entity){
     final order=_orderEffectTarget(source,entity);

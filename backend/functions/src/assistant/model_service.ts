@@ -47,6 +47,7 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
   targets: readonly {actionId: string; entityId: string | null}[]): PreparationContext['modelContext'] {
   const skus = new Set<string>();
   const orders = new Set(targets.filter(target=>target.actionId==='AI-ACT-274'&&target.entityId!==null).map(target=>target.entityId!));
+  const operationalOrders=new Set(targets.filter(target=>['AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285'].includes(target.actionId)&&target.entityId!==null).map(target=>target.entityId!));
   const receivingOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-243'&&target.entityId!==null).map(target=>target.entityId!));
   const privateStarsOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-055'&&target.entityId!==null).map(target=>target.entityId!));
   for(const tool of tools){
@@ -74,6 +75,13 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
       return {...value,orders:value.orders.filter(row=>{
         const orderId=object(row).orderId;if(typeof orderId!=='string')return fail('context_unavailable');
         return receivingOrders.has(orderId);
+      })};
+    }
+    if(value.sourceKind==='original-store-operational-v1'){
+      if(!Array.isArray(value.orders))return fail('context_unavailable');
+      return {...value,orders:value.orders.filter(row=>{
+        const orderId=object(row).orderId;if(typeof orderId!=='string')return fail('context_unavailable');
+        return operationalOrders.has(orderId);
       })};
     }
     if(value.sourceKind==='original-store-order-facts-v1'){

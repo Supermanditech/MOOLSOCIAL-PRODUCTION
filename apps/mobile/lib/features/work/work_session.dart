@@ -747,6 +747,38 @@ class WorkSession extends ChangeNotifier {
   WorkspacePurchaseReference? workspaceAssistantOriginalOrderReference(String orderId) =>
       _assistantOriginalReferencesCurrent?.call() == true ? _assistantOriginalReferences[orderId] : null;
 
+  /// Exact original operational proof; no controller restore/observe, journal
+  /// recovery, persistence or command dispatch is performed during AI capture.
+  static String workspaceAssistantOperationalSourceProof(WorkspaceOperationalOrderSnapshot source) {
+    Object? canonical(Object? value) => value is List ? value.map(canonical).toList() : value is Map
+      ? {for (final key in value.keys.cast<String>().toList()..sort()) key: canonical(value[key])} : value;
+    return 'store-order-operational:${source.realm}:${crypto.sha256.convert(utf8.encode(jsonEncode(canonical([
+      source.realm, source.viewerUserId, source.reference.storeId, source.reference.toJson(),
+      source.operationalSourceRevision, source.revision, source.stage, source.fulfilment,
+      source.placedAt.toUtc().toIso8601String(), source.acceptanceDeadline?.toUtc().toIso8601String(),
+      source.fulfilmentDeadline?.toUtc().toIso8601String(), source.permittedActions.toList()..sort()]))))}';
+  }
+  String? workspaceAssistantOperationalOrderProof(String action, String orderId) {
+    final reader=originalPurchaseReader,operations=_scopedOrderOperations,store=activeWorkspace?.id;
+    if(!const {'AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285'}.contains(action)||reader==null||store==null||
+      !workspaceRequiresMembershipReadback||!_currentWorkspaceAccess(store,activeWorkspace?.profileId)||
+      workspaceAccountRecoveryPending||workspaceAccountRecoveryFailed||
+      operations==null||!operations.recoveryReady||operations.gateway is! WorkspaceOperationalOrderCommandGateway||
+      operations.pending(orderId)!=null||operations.state(orderId)!=null)return null;
+    final bridge=operations.gateway as WorkspaceOperationalOrderCommandGateway;
+    if(!bridge.isCurrent||!identical(bridge.gateway.identity,reader)||bridge.realm!=originalPurchaseRealm||
+      bridge.accountScope!=_contactAccountScope||bridge.workspaceId!=store)return null;
+    final orders=workspaceOrders.where((row)=>row.id==orderId).toList();
+    if(orders.length!=1)return null;
+    final exact=orders.single.operational,admitted=operations.order(orderId)?.order?.operational;
+    if(exact==null||!identical(exact,admitted)||exact.viewerRole!=WorkspaceOrderIdentityRole.seller||
+      exact.viewerUserId!=reader.accountUserId||exact.reference.storeId!=store||exact.realm!=bridge.realm)return null;
+    final permitted=action=='AI-ACT-281'||action=='AI-ACT-280'?workspaceOrderCanAct(orderId,WorkOrderAction.ready):
+      action=='AI-ACT-285'?!hasPendingOrderTime&&workspaceOrderCanAct(orderId,WorkOrderAction.reject):
+      workspaceOrderCanAct(orderId,WorkOrderAction.accept)||workspaceOrderCanAct(orderId,WorkOrderAction.reject);
+    return permitted?workspaceAssistantOperationalSourceProof(exact):null;
+  }
+
   Map<String, WorkspaceGoodsReceivingRead> _assistantReceivingOriginals = const {};
   bool Function()? _assistantReceivingOriginalsCurrent;
   int _assistantReceivingOriginalsGeneration = 0;

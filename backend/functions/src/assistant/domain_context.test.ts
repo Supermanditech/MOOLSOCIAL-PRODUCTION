@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {WorkspaceProfileError} from '../workspace/workspace_profile_service.js';
 import {AccountPlansService} from "../account/plans_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext} from "./domain_context.js";
-import type {PurchaseReferencePage,PurchaseProjection,ProductFeedbackTarget,ProductFeedbackTargetPage} from "../workspace/workspace_purchase_projection_service.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext, OriginalStoreOperationalPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext} from "./domain_context.js";
+import type {PurchaseReferencePage,PurchaseProjection,ProductFeedbackTarget,ProductFeedbackTargetPage,OperationalOrderSnapshot} from "../workspace/workspace_purchase_projection_service.js";
 import {AssistantModelError, digest, type PreparationContext, type PreparationRequest} from "./model_contract.js";
 import {canonicalContextProjection, storeProductActions} from "./domain_context_contract.js";
 
@@ -185,6 +186,168 @@ test('Private stars proof includes original saved-rating revision and never conf
   f.ratingUnavailable();await assert.rejects(f.source.read(actor,f.input),/context_unavailable/u);
   const changed=privateStarsFixture();changed.mutate((page,call)=>{if(call===4)changed.rate();return page;});
   await assert.rejects(changed.source.read(actor,changed.input),/stale_preparation/u);
+});
+
+function orderBoardFixture(enabled=true){
+  let reads=0,revision=1,denied=false,change=false;const store='HOST-board-store';
+  const original={async read(){reads++;if(denied)throw new AssistantModelError('workspace_access_unavailable',403);
+    if(change&&reads%2===0)revision++;
+    return {revision:`HOST-board-owner-${revision}`,validUntil:'2026-10-28T08:01:00.000Z',modelContext:{audience:'workspace',current:{id:store}},
+      tools:[{name:'HOST_board_owner',actionId:'AI-ACT-317',entityId:store,sourceRevision:'HOST-member',description:'Host',parameters:{},validate:()=>true}]};}};
+  const orders=new OriginalStoreOrderPreparationContext({projectId:actor.projectId,authority:original,
+    purchases:{async listStore(){throw Error('Root filter preparation must not read or fabricate orders');}},now:()=>at});
+  const source=new CompositePreparationContext({original,storeOrders:orders,nativeOrderBoardEnabled:enabled,now:()=>at});
+  const input:PreparationRequest={...request,scope:{audience:'workspace',storeId:store},actionId:'AI-ACT-273'};
+  return {source,input,reads:()=>reads,deny:()=>{denied=true;},change:()=>{change=true;}};
+}
+test('Original Store status root fills only an exact existing status with no order reads',async()=>{
+  const f=orderBoardFixture(),context=await f.source.read(actor,f.input),tool=context.tools[0]!;
+  assert.equal(f.reads(),2);assert.equal(tool.actionId,'AI-ACT-273');assert.equal(tool.entityId,null);
+  assert.deepEqual(context.nativeTargets,[{actionId:'AI-ACT-273',entityId:null,sourceRevision:tool.sourceRevision}]);
+  for(const status of ['Live','New','Packing','Ready','Delivery','Attention','Done'])assert.deepEqual(tool.resolveTarget!({status}).fields,{status});
+  for(const fields of [{},{status:['New']},{status:'Paid'},{status:'New',from:'2026-10-28'},{status:'New',orderId:'invented'}])
+    assert.throws(()=>tool.resolveTarget!(fields),/invalid_model_result/u);
+});
+test('Original Store status root recovery preserves field and owner revision',async()=>{
+  const f=orderBoardFixture(),context=await f.source.read(actor,f.input),tool=context.tools[0]!;
+  const p={kind:'proposal' as const,id:'HOST-board-proposal',actionId:'AI-ACT-273',entityId:null,sourceRevision:tool.sourceRevision,
+    fields:{status:'Packing'},title:'Filter',summary:'Host'};
+  assert.equal((await f.source.readPrepared(actor,f.input,p)).tools[0]!.sourceRevision,tool.sourceRevision);
+  await assert.rejects(f.source.readPrepared(actor,f.input,{...p,fields:{status:'Packing',period:'today'}}),/stale_preparation/u);
+  await assert.rejects(f.source.read(actor,{...f.input,entityId:'invented-order'}),/context_unavailable/u);
+  f.change();await assert.rejects(f.source.read(actor,f.input),/stale_preparation/u);
+});
+test('Original Store status root requires registered source and current approved ownership',async()=>{
+  const missing=orderBoardFixture(false);await assert.rejects(missing.source.read(actor,missing.input),/context_unavailable/u);assert.equal(missing.reads(),0);
+  const f=orderBoardFixture();await assert.rejects(f.source.read(actor,{...f.input,scope}),/context_unavailable/u);
+  f.deny();await assert.rejects(f.source.read(actor,f.input),/workspace_access_unavailable/u);
+});
+
+/** Isolated context ports only; original service/receipt behavior is qualified separately. */
+function operationalOriginalFixture(){
+  const store='HOST-operational-store',calls:string[]=[];
+  let clock=new Date(at),owner=1,denied=false,reads=0;
+  let change=(row:OperationalOrderSnapshot,_read:number)=>row;
+  const rows=Array.from({length:3},(_,i)=>({purchaseId:`HOST-op-purchase-${i}`,storeId:store,orderId:`HOST-op-order-${i}`,
+    originalFingerprint:'a'.repeat(64),sourceRevision:'HOST-original-v1'}));
+  const source=new OriginalStoreOperationalPreparationContext({projectId:actor.projectId,now:()=>clock,
+    authority:{async read(){if(denied)throw new AssistantModelError('workspace_access_unavailable',403);
+      return {revision:`HOST-owner-${owner}`,validUntil:'2026-10-28T08:01:00.000Z',
+        tools:[{name:'HOST-current-Store',actionId:'AI-ACT-317',entityId:store,sourceRevision:'HOST-member',description:'Host',parameters:{},validate:()=>true}],
+        modelContext:{audience:'workspace',current:{id:store}}};}},
+    purchases:{async listStore(uid,body){calls.push('list');assert.equal(uid,actor.uid);assert.equal(body.storeId,store);
+      return {schemaVersion:2,realm:'evaluation',authNamespace:'firebase-default',viewerRole:'seller',viewerUserId:uid,
+        storeId:store,coverage:'indexed_original_facts',references:rows,nextCursor:null};}},
+    operations:{async read(uid,role,body){calls.push('read');assert.equal(uid,actor.uid);assert.equal(role,'seller');
+      const reference=rows.find(r=>r.orderId===body.orderId)!;
+      const i=rows.indexOf(reference),stage=i===2?'Preparing':'Confirmed';
+      return change({schemaVersion:1,realm:'evaluation',authNamespace:'firebase-default',viewerRole:'seller',viewerUserId:uid,
+        ...reference,original:{lines:[{lineId:`HOST-line-${i}`,name:'HOST original product',packLabel:'1 kg',quantityMilli:2000,quantityUnit:'pack'}]} as OperationalOrderSnapshot['original'],operationalSourceRevision:'HOST-operation-v1',revision:1,stage,
+        fulfilment:'delivery',placedAt:'2026-10-28T07:00:00.000Z',acceptanceDeadline:'2026-10-28T08:30:00.000Z',
+        fulfilmentDeadline:'2026-10-28T09:00:00.000Z',permittedActions:i===2?['ready']:i===0?['accept']:['reject'],
+        paymentVerification:'not_supplied',stockVerification:'not_supplied',rejectionReason:null},++reads);
+    }}});
+  const input:PreparationRequest={...request,scope:{audience:'workspace',storeId:store},actionId:null};
+  return {source,input,rows,calls,change:(fn:typeof change)=>{change=fn;},deny:()=>{denied=true;},changeOwner:()=>{owner++;},
+    advance:(ms:number)=>{clock=new Date(clock.getTime()+ms);}};
+}
+test('Operational originals prepare only each order actual action with no command or recovery',async()=>{
+  const f=operationalOriginalFixture(),value=await f.source.read(actor,f.input);
+  assert.deepEqual(f.calls,['list','read','read','read','list','read','read','read']);
+  assert.equal(value.tools.length,4);assert.equal(value.nativeTargets!.length,5);
+  const respond=value.tools.find(t=>t.actionId==='AI-ACT-275')!,ready=value.tools.find(t=>t.actionId==='AI-ACT-281')!;
+  assert.equal(respond.resolveTarget!({orderId:f.rows[0]!.orderId,operation:'accept'}).entityId,f.rows[0]!.orderId);
+  assert.throws(()=>respond.resolveTarget!({orderId:f.rows[0]!.orderId,operation:'reject'}),/invalid_model_result/u);
+  assert.throws(()=>respond.resolveTarget!({orderId:f.rows[1]!.orderId,operation:'accept'}),/invalid_model_result/u);
+  assert.throws(()=>ready.resolveTarget!({orderId:f.rows[2]!.orderId,packed:true}),/invalid_model_result/u);
+  assert.deepEqual(ready.resolveTarget!({orderId:f.rows[2]!.orderId}).fields,{});
+  assert(!JSON.stringify(value.modelContext).includes('originalFingerprint'));
+});
+test('Operational cancellation targets only rejectable originals and preserves native reason choices',async()=>{
+  const f=operationalOriginalFixture(),value=await f.source.read(actor,f.input);
+  const cancel=value.tools.find(t=>t.actionId==='AI-ACT-285')!;
+  const orderId=f.rows[1]!.orderId;
+  assert.deepEqual(cancel.resolveTarget!({orderId}).fields,{});
+  for(const reason of ['Product unavailable','Cannot meet requested time','Delivery unavailable','Customer requested cancellation']){
+    const target=cancel.resolveTarget!({orderId,reason});
+    const proposal={kind:'proposal' as const,id:'HOST-cancel-proposal',actionId:'AI-ACT-285',...target,title:'Review',summary:'Host'};
+    assert.equal((await f.source.readPrepared(actor,{...f.input,actionId:proposal.actionId,entityId:orderId},proposal)).tools[0]!.sourceRevision,target.sourceRevision);
+  }
+  for(const fields of [{orderId:f.rows[0]!.orderId},{orderId:f.rows[2]!.orderId},{orderId,reason:['Product unavailable']},
+    {orderId,reason:'Invented reason'},{orderId,operation:'reject'},{orderId,cancelled:true}])
+    assert.throws(()=>cancel.resolveTarget!(fields),/invalid_model_result/u);
+  f.change(row=>({...row,stage:'Rejected',permittedActions:[]}));
+  const after=await f.source.read(actor,f.input);assert(!after.tools.some(t=>t.actionId==='AI-ACT-285'));
+});
+test('Operational packing binds each original line and full native quantity without inferring physical status',async()=>{
+  const f=operationalOriginalFixture(),context=await f.source.read(actor,f.input);
+  const tool=context.tools.find(t=>t.actionId==='AI-ACT-280')!,orderId=f.rows[2]!.orderId;
+  const rows=context.modelContext!.orders as {orderId:string;packingLines:unknown[]}[];
+  assert.deepEqual(rows.find(row=>row.orderId===orderId)!.packingLines,[{lineId:'HOST-line-2',quantity:2000,quantityScale:1000,unit:'pack',name:'HOST original product',packLabel:'1 kg'}]);
+  const fields={lineId:'HOST-line-2',quantity:2000,packed:true};
+  const target=tool.resolveTarget!({orderId,...fields});assert.deepEqual(target.fields,fields);
+  assert.deepEqual(tool.resolveTarget!({orderId,...fields,packed:false}).fields,{...fields,packed:false});
+  const proposal={kind:'proposal' as const,id:'HOST-packing-proposal',actionId:'AI-ACT-280',...target,title:'Review',summary:'Host'};
+  await f.source.readPrepared(actor,{...f.input,actionId:proposal.actionId,entityId:orderId},proposal);
+  for(const args of [{orderId,...fields,quantity:2},{orderId,...fields,lineId:'HOST-line-0'},{orderId,...fields,packed:'true'},
+    {orderId:f.rows[0]!.orderId,...fields},{orderId,...fields,quantity:1000},{orderId,...fields,stockAdjusted:true}])
+    assert.throws(()=>tool.resolveTarget!(args),/invalid_model_result/u);
+  f.change(row=>row.orderId===orderId?{...row,original:{...row.original,lines:[{...row.original.lines[0]!,quantityMilli:3000}]}}:row);
+  await assert.rejects(f.source.readPrepared(actor,{...f.input,actionId:proposal.actionId,entityId:orderId},proposal),/stale_preparation/u);
+});
+test('Operational original resolver and recovery refuse coerced non-string operations',async()=>{
+  const f=operationalOriginalFixture(),value=await f.source.read(actor,f.input),tool=value.tools.find(t=>t.actionId==='AI-ACT-275')!;
+  const target=tool.resolveTarget!({orderId:f.rows[0]!.orderId,operation:'accept'});
+  for(const operation of [['accept'],{toString:'accept'},null,1]){
+    assert.throws(()=>tool.resolveTarget!({orderId:f.rows[0]!.orderId,operation}),/invalid_model_result/u);
+    await assert.rejects(f.source.readPrepared(actor,{...f.input,actionId:'AI-ACT-275',entityId:target.entityId},
+      {kind:'proposal',id:'HOST-invalid-op',actionId:'AI-ACT-275',...target,title:'Review',summary:'Host',fields:{operation}}),/stale_preparation/u);
+  }
+});
+for(const status of [404,503])test(`Operational actual httpStatus${status} omits only the unavailable original record`,async()=>{
+  const f=operationalOriginalFixture();f.change(row=>{
+    if(row.orderId===f.rows[0]!.orderId)throw new WorkspaceProfileError(status===404?'not_found':'service_unavailable','HOST unavailable',status);
+    return row;
+  });const value=await f.source.read(actor,f.input);assert.equal(value.nativeTargets!.length,4);
+  assert(!value.nativeTargets!.some(t=>t.entityId===f.rows[0]!.orderId));
+});
+for(const status of [401,403])test(`Operational actual httpStatus${status} retains access denial classification`,async()=>{
+  const f=operationalOriginalFixture();f.change(()=>{throw new WorkspaceProfileError('forbidden','HOST denied',status);});
+  await assert.rejects(f.source.read(actor,f.input),/workspace_access_unavailable/u);
+});
+test('Operational original exact recovery binds revision and chosen operation',async()=>{
+  const f=operationalOriginalFixture(),value=await f.source.read(actor,f.input);
+  const target=value.tools.find(t=>t.actionId==='AI-ACT-275')!.resolveTarget!({orderId:f.rows[0]!.orderId,operation:'accept'});
+  const proposal={kind:'proposal' as const,id:'HOST-op-proposal',actionId:'AI-ACT-275',...target,title:'Review',summary:'Host'};
+  const input={...f.input,actionId:proposal.actionId,entityId:proposal.entityId};
+  assert.equal((await f.source.readPrepared(actor,input,proposal)).tools[0]!.sourceRevision,target.sourceRevision);
+  await assert.rejects(f.source.readPrepared(actor,input,{...proposal,fields:{operation:'reject'}}),/stale_preparation/u);
+  f.change(row=>({...row,revision:2}));
+  await assert.rejects(f.source.readPrepared(actor,input,proposal),/stale_preparation/u);
+});
+for(const fault of ['actor','store','reference','revision','stage','permission','deadline','stock'])test(`Operational original rejects malformed ${fault}`,async()=>{
+  const f=operationalOriginalFixture();f.change(row=>{
+    if(fault==='actor')return {...row,viewerUserId:'HOST-other'};
+    if(fault==='store')return {...row,storeId:'HOST-other'};
+    if(fault==='reference')return {...row,originalFingerprint:'b'.repeat(64)};
+    if(fault==='revision')return {...row,revision:0};
+    if(fault==='stage')return {...row,stage:'Ready',permittedActions:['accept']};
+    if(fault==='permission')return {...row,permittedActions:['accept','accept']};
+    if(fault==='deadline')return {...row,acceptanceDeadline:'2026-10-28T07:59:59.000Z'};
+    return {...row,stockVerification:'verified'} as unknown as OperationalOrderSnapshot;
+  });await assert.rejects(f.source.read(actor,f.input),/context_unavailable/u);
+});
+test('Operational source changes or expiry during reads cannot produce a proposal',async()=>{
+  const changed=operationalOriginalFixture();changed.change((row,n)=>n===4?{...row,revision:2}:row);
+  await assert.rejects(changed.source.read(actor,changed.input),/stale_preparation/u);
+  const late=operationalOriginalFixture();late.change(row=>{late.advance(61_000);return row;});
+  await assert.rejects(late.source.read(actor,late.input),/stale_preparation/u);
+  const owner=operationalOriginalFixture();owner.change(row=>{owner.changeOwner();return row;});
+  await assert.rejects(owner.source.read(actor,owner.input),/stale_preparation/u);
+});
+test('Operational source rejects foreign or revoked Workspace before private reads',async()=>{
+  const f=operationalOriginalFixture();await assert.rejects(f.source.read({...actor,projectId:'HOST-other-project'},f.input),/account_scope_mismatch/u);
+  f.deny();await assert.rejects(f.source.read(actor,f.input),/workspace_access_unavailable/u);assert.equal(f.calls.length,0);
 });
 
 /** Isolated original-reader contract port; never installed as a runtime source. */

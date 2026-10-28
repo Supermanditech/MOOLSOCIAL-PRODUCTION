@@ -18,14 +18,16 @@ const assistantStoreOwnerReadContextActions = {'AI-ACT-213', 'AI-ACT-215', 'AI-A
 const assistantStoreStockOwnerContextActions={'AI-ACT-231','AI-ACT-232','AI-ACT-233','AI-ACT-407','AI-ACT-408'};
 const assistantStoreRestockOwnerContextActions={'AI-ACT-234'};
 const assistantStoreOrderOriginalContextActions={'AI-ACT-274'};
+const assistantStoreOperationalContextActions={'AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285'};
+const assistantStoreOrderBoardContextActions={'AI-ACT-273'};
 const assistantStoreSupplierDraftContextActions={'AI-ACT-235','AI-ACT-236'};
 const assistantStorePurchaseRootContextActions={'AI-ACT-253','AI-ACT-269'};
 const assistantStoreReceivingOriginalContextActions={'AI-ACT-243'};
-const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions,...assistantStoreSupplierDraftContextActions,...assistantStorePurchaseRootContextActions};
+const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions,...assistantStoreSupplierDraftContextActions,...assistantStorePurchaseRootContextActions,...assistantStoreOrderBoardContextActions};
 const assistantDomainContextActions = {'AI-ACT-001', 'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
   ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions,
   ...assistantDomainAddressContextActions,...assistantPrivateStarsContextActions,
-  ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreReceivingOriginalContextActions};
+  ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreOperationalContextActions,...assistantStoreReceivingOriginalContextActions};
 
 abstract interface class AssistantDomainContextGatewaySource {
   AssistantDomainContextGateway? assistantDomainContextGateway(
@@ -114,7 +116,7 @@ class AssistantDomainContextGateway {
     final rows = List<Object?>.of(data['revisions'] as List);
     final masked = <AssistantContextKey, String>{};
     String? selectionFingerprint;
-    const maskActions = {...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreReceivingOriginalContextActions};
+    const maskActions = {...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreOperationalContextActions,...assistantStoreReceivingOriginalContextActions};
     if (compact) {
       final selected = _map(data['nativeSelection'], {'version', 'fingerprint', 'groups'});
       if (selected['version'] != 1 || selected['fingerprint'] is! String ||
@@ -160,9 +162,15 @@ class AssistantDomainContextGateway {
       if (assistantStorePurchaseRootContextActions.contains(action) &&
           (!context.workspaceApproved || !context.storeWorkspace ||
            !RegExp(r'^store-purchase-root-owner:[a-f0-9]{64}$').hasMatch(revision))) _invalid();
+      if (assistantStoreOrderBoardContextActions.contains(action) &&
+          (!context.workspaceApproved || !context.storeWorkspace ||
+           !RegExp(r'^store-order-board-owner:[a-f0-9]{64}$').hasMatch(revision))) _invalid();
       if (assistantStoreOrderOriginalContextActions.contains(action) && (!context.inWorkspace ||
           !context.storeWorkspace || !context.workspaceApproved || entity == null ||
           !RegExp(r'^store-order-original:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))) _invalid();
+      if (assistantStoreOperationalContextActions.contains(action) && (!context.inWorkspace ||
+          !context.storeWorkspace || !context.workspaceApproved || entity == null ||
+          !RegExp(r'^store-order-operational:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))) _invalid();
       if (assistantStoreReceivingOriginalContextActions.contains(action) && (!context.inWorkspace ||
           !context.storeWorkspace || !context.workspaceApproved || entity == null ||
           !RegExp(r'^store-receiving-original:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))) _invalid();

@@ -126,6 +126,27 @@ for (const available of [true, false]) test(`Receiving native selection filters 
     assert.equal(modelCalls, 0);
   }
 });
+for(const action of ['AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285'])for(const available of [true,false])test(`Operational ${action} model references contain only ready native originals available${available}`,async()=>{
+  const f=fixture(),selected='HOST-operational-selected',excluded='HOST-operational-excluded';
+  const fields=action==='AI-ACT-275'?{operation:'accept'}:{};
+  Object.assign(f.context,{nativeTargets:[selected,excluded].map(entityId=>({actionId:action,entityId,sourceRevision:`HOST-proof-${entityId}`})),
+    modelContext:{sourceKind:'composite-original-context-v1',sources:[{sourceKind:'original-store-operational-v1',
+      orders:[{orderId:selected,stage:'Confirmed'},{orderId:excluded,stage:'Confirmed'}]}]},
+    tools:[{name:'HOST_operational_review',actionId:action,entityId:null,sourceRevision:'HOST-operational-root',description:'Host original read port',
+      targetSelector:'orderId',parameters:{type:'object',properties:{orderId:{type:'string',enum:[selected,excluded]}},required:['orderId'],additionalProperties:false},
+      validate:(value:Readonly<Record<string,unknown>>)=>JSON.stringify(value)===JSON.stringify(fields),
+      resolveTarget:(args:Readonly<Record<string,unknown>>)=>{assert.deepEqual(args,{orderId:selected});return {entityId:selected,sourceRevision:`HOST-proof-${selected}`,fields};}}]});
+  let calls=0;
+  const service=new AssistantPreparationService({...f.deps,model:{async prepare(_input,tools,_signal,reference){
+    calls++;assert.deepEqual((tools[0]!.parameters.properties as Record<string,{enum:string[]}>).orderId!.enum,[selected]);
+    assert(JSON.stringify(reference).includes(selected));assert(!JSON.stringify(reference).includes(excluded));
+    return {kind:'tool',name:'HOST_operational_review',arguments:{orderId:selected}};
+  }}});
+  const payload={...request,actionId:action,nativeTargets:available?[{actionId:action,entityId:selected}]:[]};
+  if(available){const result=await service.handle(actor,{operation:'prepare',payload});assert.equal(result.state,'ready');assert.equal(calls,1);}
+  else{await assert.rejects(service.handle(actor,{operation:'prepare',payload}),/context_unavailable/u);assert.equal(calls,0);}
+});
+
 test("AI-B01 actual paid service prepares a typed native proposal without domain execution", async () => {
   const f = fixture(); const result = await f.service.handle(actor, {operation: "prepare", payload: request});
   assert.equal(result.state, "ready"); if (result.state !== "ready") return;

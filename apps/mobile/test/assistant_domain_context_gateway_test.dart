@@ -42,12 +42,12 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
-  for (final actions in [assistantStoreSupplierDraftContextActions, assistantStorePurchaseRootContextActions]) {
+  for (final actions in [assistantStoreSupplierDraftContextActions, assistantStorePurchaseRootContextActions, assistantStoreOrderBoardContextActions]) {
   for (final compact in [false, true]) {
     test('Store roots ${actions.first} metadata needs exact proof approved Store and root target compact$compact', () async {
       final store = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'Host Store', profile: 'retailer-grocery',
         revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
-      final proof = '${actions.contains('AI-ACT-253') ? 'store-purchase-root-owner' : 'store-supplier-draft-owner'}:${'a' * 64}';
+      final proof = '${actions.contains('AI-ACT-253') ? 'store-purchase-root-owner' : actions.contains('AI-ACT-273') ? 'store-order-board-owner' : 'store-supplier-draft-owner'}:${'a' * 64}';
       final data = <String, Object?>{..._data(),
         'ownerKey': sha256.convert(utf8.encode(jsonEncode(['fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString(),
         'scope': {'audience': 'workspace', 'storeId': 'store-one'},
@@ -71,11 +71,11 @@ void main() {
     });
   }
   }
-  for(final compact in [false,true]) for (final action in ['AI-ACT-274','AI-ACT-243']) {
+  for(final compact in [false,true]) for (final action in ['AI-ACT-274','AI-ACT-243','AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285']) {
     test('Original Store $action metadata requires exact owned order proof compact$compact',()async{
       final store=_context.withWorkspace(const MoolAssistantWorkspace(id:'store-one',name:'Host Store',profile:'retailer-grocery',
         revision:1,isStore:true,approved:true,approvalAccountScope:_owner));
-      final proof='${action == 'AI-ACT-274' ? 'store-order-original' : 'store-receiving-original'}:evaluation:${'a'*64}';
+      final proof='${action == 'AI-ACT-274' ? 'store-order-original' : action == 'AI-ACT-243' ? 'store-receiving-original' : 'store-order-operational'}:evaluation:${'a'*64}';
       final data=<String,Object?>{..._data(),'ownerKey':sha256.convert(utf8.encode(jsonEncode([
         'fixture-project','domain-host-a','workspace','store-one']))).toString(),
         'scope':{'audience':'workspace','storeId':'store-one'},'revisions':compact?<Object?>[]:[
@@ -177,7 +177,8 @@ void main() {
       'scope': {'audience': 'workspace', 'storeId': 'store-one'}, 'revisions': [
         {'actionId': action, 'entityId': null, 'sourceRevision': assistantStoreSupplierDraftContextActions.contains(action)
           ? 'store-supplier-draft-owner:${'a' * 64}' : assistantStorePurchaseRootContextActions.contains(action)
-          ? 'store-purchase-root-owner:${'a' * 64}' : 'native-owned-defaults-owner-proof'},
+          ? 'store-purchase-root-owner:${'a' * 64}' : assistantStoreOrderBoardContextActions.contains(action)
+          ? 'store-order-board-owner:${'a' * 64}' : 'native-owned-defaults-owner-proof'},
       ]};
     final value = await _source(_Wire(() => _ok(data))).read(store, () => true);
     expect(value.revisions.keys.single, (action, null));

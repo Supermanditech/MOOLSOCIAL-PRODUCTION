@@ -5,7 +5,7 @@ import type {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService
 import type {PreparationContextSource} from "./model_service.js";
 import {AssistantModelError, canonical, digest, fail, id, object,
   catalogueListingSelection, preparationNativeTargetLimit, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
-import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeSupplierDraftActions,storePurchaseRootActions,storeReceivingOriginalActions, searchSuggestion} from "./domain_context_contract.js";
+import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeOperationalActions,storeOrderBoardActions,storeSupplierDraftActions,storePurchaseRootActions,storeReceivingOriginalActions, searchSuggestion} from "./domain_context_contract.js";
 
 const paidRevision = (p: PlansReadback) => canonical([p.owner, p.scope, p.catalogueRevision, p.subscriptionRevision]);
 const searchSchema = {type: "object", properties: {query: {type: "string"}},
@@ -959,10 +959,10 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
 /** Compose source readers; preserve the qualified original Profile path. */
 /** Indexed immutable purchase facts only: never tracking, payment or invoice bytes. */
 export class OriginalStoreOrderPreparationContext implements PreparationContextSource {
-  constructor(private readonly deps: {projectId: string; authority: PreparationContextSource;
+  constructor(protected readonly deps: {projectId: string; authority: PreparationContextSource;
     purchases: Pick<WorkspacePurchaseProjectionService, "listStore">; now?: () => Date}) {}
   private now() {return (this.deps.now?.() ?? new Date()).getTime();}
-  private async snapshot(actor: AccountProfileActor, storeId: string, selected: string | null, deadline: number) {
+  protected async snapshot(actor: AccountProfileActor, storeId: string, selected: string | null, deadline: number) {
     const references: PurchaseReference[] = [], ids = new Set<string>(), cursors = new Set<string>();
     let cursor: string | null = null, realm: string | null = null;
     do {
@@ -970,7 +970,7 @@ export class OriginalStoreOrderPreparationContext implements PreparationContextS
       let raw: unknown;
       try {raw = await this.deps.purchases.listStore(actor.uid, {storeId, limit: 5, cursor});}
       catch (error) {
-        const status = error !== null && typeof error === 'object' && 'status' in error ? error.status : null;
+        const status = error !== null && typeof error === 'object' && 'httpStatus' in error ? error.httpStatus : null;
         if (status === 401 || status === 403 || status === 404) return fail('workspace_access_unavailable', 403);
         return fail('context_unavailable');
       }
@@ -1037,6 +1037,135 @@ export class OriginalStoreOrderPreparationContext implements PreparationContextS
   }
 }
 /** Existing private purchased-item stars only; never public review eligibility. */
+/** Read-only operational preparation over the existing original order service. */
+export class OriginalStoreOperationalPreparationContext extends OriginalStoreOrderPreparationContext {
+  private readonly operations: Pick<WorkspaceOrderOperationsService, 'read'>;
+  constructor(deps: {projectId: string; authority: PreparationContextSource;
+    purchases: Pick<WorkspacePurchaseProjectionService, 'listStore'>;
+    operations: Pick<WorkspaceOrderOperationsService, 'read'>; now?: () => Date}) {
+    super(deps); this.operations=deps.operations;
+  }
+  private clock() {return (this.deps.now?.()??new Date()).getTime();}
+  private async operational(actor: AccountProfileActor, input: PreparationRequest, deadline: number) {
+    const index=await this.snapshot(actor,input.scope.storeId!,input.entityId,deadline);
+    const rows: Array<{orderId:string; proof:string; stage:string; permitted:string[]; acceptanceDeadline:string|null;
+      lines:{lineId:string;quantity:number;unit:string;name:string|null;packLabel:string|null}[]}> = [];
+    for(const reference of index.references){
+      if(this.clock()>=deadline)return fail('stale_preparation',409);
+      let value: unknown;
+      try {value=await this.operations.read(actor.uid,'seller',{
+        purchaseId:reference.purchaseId,storeId:reference.storeId,orderId:reference.orderId});}
+      catch(error){
+        const status=error!==null&&typeof error==='object'&&'httpStatus' in error?error.httpStatus:null;
+        if(status===401||status===403)return fail('workspace_access_unavailable',403);
+        // A saved original need not have an operational record. Do not create it.
+        if(status===404||status===503&&error!==null&&typeof error==='object'&&'code' in error&&error.code==='service_unavailable')continue;
+        return fail('context_unavailable');
+      }
+      if(this.clock()>=deadline)return fail('stale_preparation',409);
+      const row=object(value);
+      const stamp=(v:unknown):string|null=>{
+        if(v===null)return null;
+        if(typeof v!=='string'||!Number.isFinite(Date.parse(v)))return fail('context_unavailable');
+        return new Date(v).toISOString();
+      };
+      if(row.schemaVersion!==1||row.realm!==index.realm||row.authNamespace!=='firebase-default'||
+        row.viewerRole!=='seller'||row.viewerUserId!==actor.uid||row.storeId!==input.scope.storeId||
+        row.purchaseId!==reference.purchaseId||row.orderId!==reference.orderId||
+        row.sourceRevision!==reference.sourceRevision||row.originalFingerprint!==reference.originalFingerprint||
+        typeof row.operationalSourceRevision!=='string'||!row.operationalSourceRevision||
+        !Number.isSafeInteger(row.revision)||(row.revision as number)<1||
+        typeof row.stage!=='string'||!['Confirmed','Preparing','Ready','Rejected'].includes(row.stage)||
+        typeof row.fulfilment!=='string'||!['delivery','collection'].includes(row.fulfilment)||
+        row.paymentVerification!=='not_supplied'||row.stockVerification!=='not_supplied'||
+        !Array.isArray(row.permittedActions)||new Set(row.permittedActions).size!==row.permittedActions.length||
+        row.permittedActions.some(a=>typeof a!=='string'||!['accept','reject','ready'].includes(a)))return fail('context_unavailable');
+      id(row.operationalSourceRevision);
+      const placed=stamp(row.placedAt),acceptance=stamp(row.acceptanceDeadline),fulfilment=stamp(row.fulfilmentDeadline);
+      if(placed===null)return fail('context_unavailable');
+      const permitted=(row.permittedActions as string[]).slice().sort();
+      if(permitted.some(a=>row.fulfilment==='collection'||(a==='ready'?row.stage!=='Preparing':
+        row.stage!=='Confirmed'||acceptance===null||Date.parse(acceptance)<=this.clock())))return fail('context_unavailable');
+      const proof='store-order-operational:'+index.realm+':'+digest([index.realm,actor.uid,input.scope.storeId,
+        reference,row.operationalSourceRevision,row.revision,row.stage,row.fulfilment,placed,acceptance,fulfilment,permitted]);
+      const lines:{lineId:string;quantity:number;unit:string;name:string|null;packLabel:string|null}[]=[];
+      if(row.stage==='Preparing'&&permitted.includes('ready')){
+        const original=object(row.original);
+        if(!Array.isArray(original.lines)||original.lines.length===0||original.lines.length>5000)return fail('context_unavailable');
+        const seen=new Set<string>();
+        for(const value of original.lines){
+          const line=object(value),lineId=id(line.lineId);
+          if(seen.has(lineId)||!Number.isSafeInteger(line.quantityMilli)||(line.quantityMilli as number)<1||
+            (line.quantityMilli as number)>1_000_000_000||typeof line.quantityUnit!=='string'||!line.quantityUnit||line.quantityUnit.length>80)return fail('context_unavailable');
+          const name=typeof line.name==='string'&&line.name.length<=512?line.name:null;
+          const packLabel=typeof line.packLabel==='string'&&line.packLabel.length<=512?line.packLabel:null;
+          seen.add(lineId);lines.push({lineId,quantity:line.quantityMilli as number,unit:line.quantityUnit,name,packLabel});
+        }
+      }
+      rows.push({orderId:reference.orderId,proof,stage:String(row.stage),permitted,acceptanceDeadline:acceptance,lines});
+    }
+    return rows;
+  }
+  override async readPrepared(actor: AccountProfileActor,input: PreparationRequest,
+    proposal: Extract<PreparationReply['outcome'],{kind:'proposal'}>): Promise<PreparationContext> {
+    if(!storeOperationalActions.has(proposal.actionId)||input.actionId!==proposal.actionId||input.entityId!==proposal.entityId)
+      return fail('stale_preparation',409);
+    const result=await this.read(actor,input);
+    if(!result.tools.some(t=>t.actionId===proposal.actionId&&t.entityId===proposal.entityId&&
+      t.sourceRevision===proposal.sourceRevision&&t.validate(proposal.fields)))return fail('stale_preparation',409);
+    return result;
+  }
+  override async read(actor: AccountProfileActor,input: PreparationRequest): Promise<PreparationContext> {
+    if(actor.projectId!==this.deps.projectId||!actor.uid||actor.tenantId!==undefined)return fail('account_scope_mismatch',403);
+    if(input.scope.audience!=='workspace'||!input.scope.storeId||input.catalogueListingIds?.length||
+      input.actionId!==null&&!storeOperationalActions.has(input.actionId)||input.entityId!==null&&input.actionId===null)
+      return fail('context_unavailable');
+    const started=this.clock(),before=await approvedWorkspacePreparationAuthority(this.deps.authority,actor,input,started);
+    const deadline=Math.min(started+60_000,Date.parse(before.validUntil));
+    const first=await this.operational(actor,input,deadline),second=await this.operational(actor,input,deadline);
+    const after=await approvedWorkspacePreparationAuthority(this.deps.authority,actor,input,this.clock());
+    if(before.revision!==after.revision||canonical(first)!==canonical(second))return fail('stale_preparation',409);
+    const until=Math.min(deadline,Date.parse(after.validUntil));
+    if(until<=this.clock()||input.entityId!==null&&!second.some(r=>r.orderId===input.entityId))return fail('context_unavailable');
+    const revision='store-order-operational-context:'+digest([actor.projectId,actor.uid,input.scope.storeId,after.revision,second]);
+    const tools: PreparationTool[]=[],nativeTargets: NonNullable<PreparationContext['nativeTargets']>[number][]=[];
+    const cancellationReasons=['Product unavailable','Cannot meet requested time','Delivery unavailable','Customer requested cancellation'];
+    for(const action of ['AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285']){
+      if(input.actionId!==null&&input.actionId!==action)continue;
+      const rows=second.filter(r=>action==='AI-ACT-281'||action==='AI-ACT-280'?r.permitted.includes('ready'):action==='AI-ACT-285'?r.permitted.includes('reject'):
+        r.permitted.includes('accept')||r.permitted.includes('reject'));
+      if(!rows.length)continue;
+      const dynamic=input.entityId===null;
+      const validate=(fields:Readonly<Record<string,unknown>>,row:typeof rows[number])=>
+        action==='AI-ACT-281'?Object.keys(fields).length===0:action==='AI-ACT-280'?
+        Object.keys(fields).length===3&&Object.keys(fields).every(key=>['lineId','quantity','packed'].includes(key))&&
+        typeof fields.packed==='boolean'&&row.lines.some(line=>line.lineId===fields.lineId&&line.quantity===fields.quantity):action==='AI-ACT-285'?
+        Object.keys(fields).every(key=>key==='reason')&&(fields.reason===undefined||typeof fields.reason==='string'&&cancellationReasons.includes(fields.reason)):
+        Object.keys(fields).length===1&&typeof fields.operation==='string'&&['accept','reject'].includes(fields.operation)&&row.permitted.includes(fields.operation);
+      const tool: PreparationTool={name:action==='AI-ACT-275'?'store_prepare_original_order_response':action==='AI-ACT-280'?'store_prepare_original_order_packing':action==='AI-ACT-285'?'store_prepare_original_order_cancellation':'store_prepare_original_order_ready',
+        actionId:action,entityId:input.entityId,sourceRevision:dynamic?revision:rows[0]!.proof,
+        description:action==='AI-ACT-275'?'Prepare the chosen permitted accept or reject action for the exact original Store order. Native review and final confirmation remain required; rejection reason is entered in its original confirmation.':action==='AI-ACT-280'?'Review one original packing line. Copy its exact lineId and integer quantity from the original reference; quantity is in thousandths of its unit. packed must reflect the user supplied physical packing instruction, never inferred from ordered quantity. Native review and the original checkbox confirmation remain required; no stock or delivery outcome is implied.':action==='AI-ACT-285'?'Review cancellation of the exact original order only while its original service permits rejection. Use a supplied reason from the existing choices, or leave it for native review. Never claim cancellation before the original confirmation and response.':'Review the original Mark ready control. Never infer packing or quantities; existing native packing and original confirmation remain required.',
+        parameters:{type:'object',properties:{...(dynamic?{orderId:{type:'string',enum:rows.map(r=>r.orderId)}}:{}),
+          ...(action==='AI-ACT-275'?{operation:{type:'string',enum:['accept','reject']}}:{}),
+          ...(action==='AI-ACT-280'?{lineId:{type:'string',enum:[...new Set(rows.flatMap(row=>row.lines.map(line=>line.lineId)))]},quantity:{type:'integer',minimum:1,maximum:1_000_000_000},packed:{type:'boolean'}}:{}),
+          ...(action==='AI-ACT-285'?{reason:{type:'string',enum:cancellationReasons}}:{})},
+          required:[...(dynamic?['orderId']:[]),...(action==='AI-ACT-275'?['operation']:[]),...(action==='AI-ACT-280'?['lineId','quantity','packed']:[])],additionalProperties:false},
+        validate:fields=>dynamic?rows.some(row=>validate(fields,row)):validate(fields,rows[0]!),
+        ...(dynamic?{targetSelector:'orderId',resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
+          const row=rows.find(r=>r.orderId===args.orderId),{orderId:_id,...fields}=args;
+          if(!row||!validate(fields,row))return fail('invalid_model_result');
+          return {entityId:row.orderId,sourceRevision:row.proof,fields};
+        }}:{})};
+      tools.push(tool);nativeTargets.push(...rows.map(r=>({actionId:action,entityId:r.orderId,sourceRevision:r.proof})));
+    }
+    return {revision,validUntil:new Date(until).toISOString(),tools,nativeTargets,
+      modelContext:{sourceKind:'original-store-operational-v1',orders:second.map(r=>({orderId:r.orderId,
+        stage:r.stage,permittedActions:r.permitted,acceptanceDeadline:r.acceptanceDeadline,
+        packingLines:r.lines.map(line=>({lineId:line.lineId,quantity:line.quantity,quantityScale:1000,unit:line.unit,
+          name:line.name,packLabel:line.packLabel}))}))}};
+  }
+}
+
 export class OriginalPurchasedStarsPreparationContext implements PreparationContextSource {
   constructor(private readonly deps:{projectId:string;authority:PreparationContextSource;
     operations:Pick<WorkspaceOrderOperationsService,'listBuyerProductFeedbackTargets'|'readBuyerProductStars'>;now?:()=>Date}){}
@@ -1268,10 +1397,35 @@ export class CompositePreparationContext implements PreparationContextSource {
   constructor(private readonly deps: {original?: PreparationContextSource;
     catalogue?: OriginalCataloguePreparationContext; storeProducts?: OriginalStoreProductPreparationContext;
     storeOrders?: OriginalStoreOrderPreparationContext;
+    storeOperational?: OriginalStoreOperationalPreparationContext;
     storeReceiving?: OriginalStoreReceivingPreparationContext;
     privateStars?: OriginalPurchasedStarsPreparationContext;
     nativePreferencesEnabled?: boolean; nativeBuyerFormsEnabled?: boolean; nativeSupplierFormsEnabled?: boolean;
-    nativePurchaseFormsEnabled?: boolean; now?: () => Date}) {}
+    nativePurchaseFormsEnabled?: boolean; nativeOrderBoardEnabled?: boolean; now?: () => Date}) {}
+  private async readOrderBoard(actor:AccountProfileActor,input:PreparationRequest):Promise<PreparationContext>{
+    if(!this.deps.original||!this.deps.storeOrders||!this.deps.nativeOrderBoardEnabled||actor.tenantId!==undefined||!actor.uid||!actor.projectId||
+      input.scope.audience!=='workspace'||!input.scope.storeId||input.entityId!==null||input.catalogueListingIds!==undefined||
+      input.actionId!==null&&!storeOrderBoardActions.has(input.actionId))return fail('context_unavailable');
+    const now=()=> (this.deps.now?.()??new Date()).getTime(),started=now();
+    const before=await approvedWorkspacePreparationAuthority(this.deps.original,actor,input,started),
+      after=await approvedWorkspacePreparationAuthority(this.deps.original,actor,input,now());
+    if(before.revision!==after.revision)return fail('stale_preparation',409);
+    const until=Math.min(started+60_000,Date.parse(before.validUntil),Date.parse(after.validUntil));
+    if(until<=now())return fail('stale_preparation',409);
+    const revision='store-order-board-owner:'+digest([actor.projectId,actor.uid,input.scope.storeId,after.revision]);
+    const statuses=['Live','New','Packing','Ready','Delivery','Attention','Done'];
+    const validate=(fields:Readonly<Record<string,unknown>>)=>Object.keys(fields).length===1&&
+      typeof fields.status==='string'&&statuses.includes(fields.status);
+    return {revision,validUntil:new Date(until).toISOString(),nativeTargets:[{actionId:'AI-ACT-273',entityId:null,sourceRevision:revision}],
+      tools:[{name:'store_prepare_order_status_filter',
+      actionId:'AI-ACT-273',entityId:null,sourceRevision:revision,
+      description:'Open the original Store order board with the user requested status filter. Ask if status is unclear. Date/period filtering is unavailable: do not drop requested dates or claim matching orders have been found. This tool reads no orders or business outcomes; the native board loads its original current sources.',
+      parameters:{type:'object',properties:{status:{type:'string',enum:statuses}},required:['status'],additionalProperties:false},
+      validate,resolveTarget:fields=>{if(!validate(fields))return fail('invalid_model_result');
+        return {entityId:null,sourceRevision:revision,fields,title:'Filter Store orders',summary:'Show the selected status in your Store order board.'};}}],
+      modelContext:{sourceKind:'native-order-board-owner-v1',storeId:input.scope.storeId,
+        purpose:'Approved Store preparation ownership only. No order, status, quantity, date, customer, payment, packing or delivery fact is inferred.'}};
+  }
   private async readPurchaseRoots(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (!this.deps.original || !this.deps.nativePurchaseFormsEnabled || actor.tenantId !== undefined ||
         !actor.uid || !actor.projectId || input.scope.audience !== 'workspace' || !input.scope.storeId ||
@@ -1425,6 +1579,12 @@ export class CompositePreparationContext implements PreparationContextSource {
       if (!source.tools.some(tool => tool.actionId === proposal.actionId && tool.sourceRevision === proposal.sourceRevision && tool.validate(proposal.fields))) return fail('stale_preparation', 409);
       return source;
     }
+    if(storeOrderBoardActions.has(proposal.actionId)){
+      if(input.actionId!==proposal.actionId||input.entityId!==null||proposal.entityId!==null)return fail('stale_preparation',409);
+      const source=await this.readOrderBoard(actor,input);
+      if(!source.tools.some(t=>t.sourceRevision===proposal.sourceRevision&&t.validate(proposal.fields)))return fail('stale_preparation',409);
+      return source;
+    }
     if (storeSupplierDraftActions.has(proposal.actionId)) {
       if (proposal.actionId !== input.actionId || proposal.entityId !== null || input.entityId !== null) return fail('stale_preparation', 409);
       const source = await this.readSupplierDrafts(actor, input);
@@ -1442,6 +1602,10 @@ export class CompositePreparationContext implements PreparationContextSource {
     if(storeReceivingOriginalActions.has(proposal.actionId)){
       if(!this.deps.storeReceiving)return fail('context_unavailable');
       return this.deps.storeReceiving.readPrepared(actor,input,proposal);
+    }
+    if(storeOperationalActions.has(proposal.actionId)){
+      if(!this.deps.storeOperational)return fail('context_unavailable');
+      return this.deps.storeOperational.readPrepared(actor,input,proposal);
     }
     if(storeOrderOriginalActions.has(proposal.actionId)){
       if(!this.deps.storeOrders)return fail('context_unavailable');
@@ -1471,6 +1635,7 @@ export class CompositePreparationContext implements PreparationContextSource {
     if (input.actionId !== null) {
       if (storePurchaseRootActions.has(input.actionId)) return this.readPurchaseRoots(actor, input);
       if (storeSupplierDraftActions.has(input.actionId)) return this.readSupplierDrafts(actor, input);
+      if(storeOrderBoardActions.has(input.actionId))return this.readOrderBoard(actor,input);
       if(input.actionId==='AI-ACT-055'){
         if(!this.deps.privateStars)return fail('context_unavailable');
         return this.deps.privateStars.read(actor,input);
@@ -1479,6 +1644,10 @@ export class CompositePreparationContext implements PreparationContextSource {
       if(storeReceivingOriginalActions.has(input.actionId)){
         if(!this.deps.storeReceiving)return fail('context_unavailable');
         return this.deps.storeReceiving.read(actor,input);
+      }
+      if(storeOperationalActions.has(input.actionId)){
+        if(!this.deps.storeOperational)return fail('context_unavailable');
+        return this.deps.storeOperational.read(actor,input);
       }
       if(storeOrderOriginalActions.has(input.actionId)){
         if(!this.deps.storeOrders)return fail('context_unavailable');
@@ -1539,6 +1708,7 @@ export class CompositePreparationContext implements PreparationContextSource {
       }
     }
     if (this.deps.storeOrders && input.scope.audience === 'workspace') {
+      if(this.deps.nativeOrderBoardEnabled)values.push(await this.readOrderBoard(actor,input));
       try {
         const orders=await this.deps.storeOrders.read(actor,input);
         const candidate=this.combine([...values,orders]);
@@ -1550,6 +1720,11 @@ export class CompositePreparationContext implements PreparationContextSource {
       catch(error){
         if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;
       }
+    }
+    if(this.deps.storeOperational&&input.scope.audience==='workspace'){
+      try{const value=await this.deps.storeOperational.read(actor,input);
+        canonicalContextProjection(actor,input.scope,this.combine([...values,value]),1);values.push(value);
+      }catch(error){if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;}
     }
     if(this.deps.privateStars&&input.scope.audience==='personal'){
       try{

@@ -4,14 +4,14 @@ import {AccountPlansService} from "../account/plans_service.js";
 import {AccountProfileService} from "../account/profile_service.js";
 import {ProfileWorkspacePreparationContext} from "./profile_context.js";
 import {WorkspaceCatalogueService, type WorkspaceCatalogueRepository} from "../workspace/workspace_catalogue_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext,OriginalPurchasedStarsPreparationContext,OriginalStoreReceivingPreparationContext} from "./domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext,OriginalStoreOperationalPreparationContext,OriginalPurchasedStarsPreparationContext,OriginalStoreReceivingPreparationContext} from "./domain_context.js";
 import {digest} from './model_contract.js';
 import {initializeApp, deleteApp} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
 import {randomUUID} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {isAbsolute} from 'node:path';
-import {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService,type TrustedPlacementReceipt, type PurchaseReference,type ProductFeedbackTarget} from '../workspace/workspace_purchase_projection_service.js';
+import {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService,type TrustedPlacementReceipt, type TrustedOperationalOrderEvidence, type PurchaseReference,type ProductFeedbackTarget} from '../workspace/workspace_purchase_projection_service.js';
 import {handleAssistantCanonicalContextRequest} from "./domain_context_http.js";
 import {AssistantPreparationService, type PreparationRequestStore, type PreparationState} from "./model_service.js";
 const actor = {uid: "host-domain-owner", projectId: "host-domain-project"};
@@ -162,6 +162,87 @@ test('Supplier recovery rechecks current authority and exact source proof withou
     changed.onRead(count => {if (count === 4) {if (kind === 'stale') changed.bump(); else if (kind === 'expired') changed.advance(); else changed.member(false);}});
     await assert.rejects(changed.source.read(actor, changed.input), Error, kind);
   }
+});
+
+test('Operational originals actual loopback SDK preparation leaves original state unchanged and native command owns the transition',{
+  skip:!process.env.FIRESTORE_EMULATOR_HOST,timeout:120000,
+},async()=>{
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!,/^127\.0\.0\.1:\d+$/u);
+  const owner={uid:'host-native-scope-user',projectId:'host-operational-project'},storeId='WK-510001',caseId='WP-240701';
+  const clock=new Date(),until=new Date(clock.getTime()+86_400_000).toISOString(),from=new Date(clock.getTime()-86_400_000).toISOString();
+  const app=initializeApp({projectId:`demo-ai-operational-${randomUUID().slice(0,8)}`},`host-operational-${randomUUID()}`),db=getFirestore(app);
+  db.settings({gaxServerStreamingRetries:true});let paid=true;
+  const workspaces=async()=>({workspaces:[{caseId,status:'live',workspaceId:storeId,profileId:'retailer-grocery',name:'HOST original Store',
+    access:{schemaVersion:1,state:'active',accountId:owner.uid,caseId,workspaceId:storeId,profileId:'retailer-grocery',
+      checkedAt:clock.toISOString(),applicationUpdatedAt:from,membership:{schemaVersion:1,state:'active',membershipId:'HOST-operational-member',
+        workspaceId:storeId,workspaceProfileId:'retailer-grocery',version:1,effectiveFrom:from,expiresAt:until}}}]});
+  const plans=new AccountPlansService({async read(uid,scope){return {ownerUid:uid,accountStatus:'ACTIVE',
+    catalogue:{audience:scope.audience,revision:1,state:'approved',offers:[]},subscription:{ownerUid:uid,scope,revision:1,planId:'HOST-only',
+      planVersion:'v1',name:'Isolated host',state:paid?'active':'expired',validFrom:from,validUntil:until,featureIds:['mool_ai']}};}},
+    {projectId:owner.projectId,now:()=>clock,readWorkspaces:workspaces});
+  const authority=new ProfileWorkspacePreparationContext({profile:{async read(){throw Error('No unrelated Profile access');}},plans,workspaces,now:()=>clock});
+  try{
+    await db.collection('workspaceProfiles').doc(caseId).set({schemaVersion:1,caseId,workspaceId:storeId,ownerUserId:owner.uid,
+      familyId:'products-trade',profileId:'retailer-grocery',status:'live',shopEnabled:true});
+    for(let i=0;i<2;i++){
+      const receipt:TrustedPlacementReceipt={schemaVersion:1,realm:'evaluation',authNamespace:'firebase-default',finalPlacement:true,
+        issuer:'HOST-only',receiptId:`HOST-operational-receipt-${i}`,revision:'HOST-source-v1',buyerUserId:'HOST-original-buyer',
+        stores:[{storeId,caseId,ownerUserId:owner.uid,lines:[{sourceLineId:'HOST-line',skuId:'HOST-sku',canonicalProductId:'HOST-product',
+          verifiedPackId:'HOST-pack',offerId:'HOST-offer',offerRevision:'HOST-price-v1',name:'HOST original product',packLabel:'1 kg',
+          quantityMilli:1000,quantityUnit:'pack',unitPriceMinor:10025,lineTotalMinor:10025}],
+          totals:{itemsMinor:10025,discountMinor:0,taxMinor:0,deliveryMinor:0,freightMinor:0,paymentFeeMinor:0,tipMinor:0,totalMinor:10025}}]};
+      await new WorkspacePurchaseProjectionService(db,'evaluation',{async readFinalPlacement(){return receipt;}}).materialize(`HOST-original-final-${i}`);
+    }
+    const purchases=new WorkspacePurchaseProjectionService(db,'evaluation');
+    const page=await purchases.listStore(owner.uid,{storeId,limit:5,cursor:null}),reference=page.references[0]!;
+    const evidence:TrustedOperationalOrderEvidence={schemaVersion:1,realm:'evaluation',authNamespace:'firebase-default',issuer:'HOST-only',
+      receiptId:'HOST-operational-evidence',revision:'HOST-operational-v1',...reference,customerLabel:'HOST buyer',fulfilment:'delivery',address:'HOST address',
+      placedAt:new Date(clock.getTime()-60_000).toISOString(),acceptanceDeadline:new Date(clock.getTime()+1_800_000).toISOString(),
+      fulfilmentDeadline:new Date(clock.getTime()+3_600_000).toISOString(),initialStage:'Confirmed',allowedActions:['accept','reject','ready']};
+    const producer=new WorkspaceOrderOperationsService(db,'evaluation',{async readOperationalOrder(){return evidence;}},()=>clock);
+    await producer.initialize('HOST-operational-source');
+    const operations=new WorkspaceOrderOperationsService(db,'evaluation',undefined,()=>clock);
+    const source=new OriginalStoreOperationalPreparationContext({projectId:owner.projectId,authority,purchases,operations,now:()=>clock});
+    const input={scope:{audience:'workspace' as const,storeId},requestId:'HOST-operational-prepare',requestRevision:1,
+      expectedEntitlementRevision:'HOST-read-only',message:'Accept this order',language:'English',history:[],actionId:null,entityId:null};
+    const before=await operations.read(owner.uid,'seller',{purchaseId:reference.purchaseId,storeId,orderId:reference.orderId});
+    const prepared=await source.read(owner,input),tool=prepared.tools.find(t=>t.actionId==='AI-ACT-275')!;
+    assert.equal(prepared.nativeTargets!.length,2,'Original without operational evidence stays unavailable; no record is manufactured.');
+    const target=tool.resolveTarget!({orderId:reference.orderId,operation:'accept'});
+    const cancellation=prepared.tools.find(t=>t.actionId==='AI-ACT-285')!.resolveTarget!({orderId:reference.orderId,reason:'Product unavailable'});
+    assert.equal(cancellation.sourceRevision,target.sourceRevision);
+    await source.readPrepared(owner,{...input,actionId:'AI-ACT-285',entityId:reference.orderId},
+      {kind:'proposal',id:'HOST-original-cancel',actionId:'AI-ACT-285',...cancellation,title:'Review',summary:'Host'});
+    const composite=new CompositePreparationContext({original:authority,storeOrders:new OriginalStoreOrderPreparationContext({projectId:owner.projectId,authority,purchases,now:()=>clock}),storeOperational:source,nativeOrderBoardEnabled:true,now:()=>clock});
+    const board=await composite.read(owner,{...input,actionId:'AI-ACT-273'});
+    assert.deepEqual(board.tools[0]!.resolveTarget!({status:'Packing'}).fields,{status:'Packing'});
+    assert.throws(()=>board.tools[0]!.resolveTarget!({status:'Packing',period:'today'}),/invalid_model_result/u);
+    assert.deepEqual(await operations.read(owner.uid,'seller',{purchaseId:reference.purchaseId,storeId,orderId:reference.orderId}),before);
+    const root=db.collection('workspacePurchaseProjections').doc('evaluation').collection('operationalOrders');
+    assert.equal((await root.get()).size,1);assert.equal((await root.doc(reference.orderId).collection('commands').get()).size,0);
+    // Explicit isolated host command, never AI preparation or a phone operation.
+    const command={version:2,purchaseId:reference.purchaseId,storeId,orderId:reference.orderId,operationId:'HOST-explicit-native-accept',
+      expectedRevision:1,action:'accept',reason:null};
+    const result=await operations.command(owner.uid,command);assert.equal(result.state,'applied');assert.equal(result.snapshot.stage,'Preparing');
+    assert.deepEqual(await operations.command(owner.uid,command,true),result);
+    const next=await source.read(owner,input),ready=next.tools.find(t=>t.actionId==='AI-ACT-281')!.resolveTarget!({orderId:reference.orderId});
+    const originalLine=result.snapshot.original.lines[0]!;
+    const packing=next.tools.find(t=>t.actionId==='AI-ACT-280')!.resolveTarget!({orderId:reference.orderId,
+      lineId:originalLine.lineId,quantity:originalLine.quantityMilli,packed:true});
+    assert.equal(packing.sourceRevision,ready.sourceRevision);assert(!next.tools.some(t=>t.actionId==='AI-ACT-285'));
+    await source.readPrepared(owner,{...input,actionId:'AI-ACT-280',entityId:reference.orderId},
+      {kind:'proposal',id:'HOST-original-packing',actionId:'AI-ACT-280',...packing,title:'Review',summary:'Host'});
+    assert.notEqual(ready.sourceRevision,target.sourceRevision);assert.equal((await root.doc(reference.orderId).collection('commands').get()).size,1);
+    await assert.rejects(source.readPrepared(owner,{...input,actionId:'AI-ACT-275',entityId:reference.orderId},
+      {kind:'proposal',id:'HOST-old-op',actionId:'AI-ACT-275',...target,title:'Review',summary:'Host'}),/stale_preparation/u);
+    if(process.env.AI_DOMAIN_OPERATIONAL_ORIGINAL_EXPORT_PATH){const path=process.env.AI_DOMAIN_OPERATIONAL_ORIGINAL_EXPORT_PATH;assert(isAbsolute(path));
+      writeFileSync(path,JSON.stringify({kind:'isolated-host-original-operational-service-contract',ownerUid:owner.uid,storeId,reference,
+        snapshot:before,proof:target.sourceRevision,acknowledgedSnapshot:result.snapshot,readyProof:ready.sourceRevision,
+        packingFields:packing.fields,cancellationFields:cancellation.fields},null,2)+'\n',{flag:'wx'});}
+    paid=false;await assert.rejects(source.read(owner,input));paid=true;
+    await db.collection('workspaceProfiles').doc(caseId).update({ownerUserId:'HOST-new-owner'});
+    await assert.rejects(source.read(owner,input),/workspace_access_unavailable/u);
+  }finally{await db.terminate();await deleteApp(app);}
 });
 
 test('Receiving originals actual loopback SDK joins buying Store original and changed cumulative status without preparation writes', {

@@ -136,6 +136,8 @@ class AssistantOriginalContextReader {
           if (assistantDomainAddressContextActions.contains(entry.key.$1) &&
               !addressSourceReady(entry.value)) continue;
           if(assistantStoreOrderOriginalContextActions.contains(entry.key.$1)&&!originalOrders.contains(entry.key.$2))continue;
+          if(assistantStoreOperationalContextActions.contains(entry.key.$1)&&
+            (entry.key.$2==null||work.workspaceAssistantOperationalOrderProof(entry.key.$1,entry.key.$2!)!=entry.value))continue;
           if(assistantStoreReceivingOriginalContextActions.contains(entry.key.$1)&&!originalReceiving.contains(entry.key.$2))continue;
           if(assistantPrivateStarsContextActions.contains(entry.key.$1)&&!privateStars.contains(entry.key.$2))continue;
           if(assistantStoreRestockOwnerContextActions.contains(entry.key.$1)&&
