@@ -322,4 +322,32 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,13),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainOriginalReceivingStageOwners $row[0] $receivingSeal).Count -eq $row[1]) "original-receiving checkpoint exact stage $($row[0]) owner count"
 }
+$operationalSeal=$approval.scope17StoreOperationsCheckpoint
+Check (Test-AiDomainStoreOperationsCheckpoint $operationalSeal) 'exact qualified original-operational checkpoint'
+Check (@(Get-AiDomainStoreOperationsSealOwners).Count -eq 3) 'only three existing metadata owners for original-operational seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($operationalSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainStoreOperationsCheckpoint $bad)) "reject changed original-operational seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($operationalSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainStoreOperationsCheckpoint $bad)) "reject changed original-operational qualified source $property"
+}
+$bad=($operationalSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainStoreOperationsCheckpoint $bad)) 'reject original-operational source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($operationalSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainStoreOperationsCheckpoint $bad)) "reject expanded original-operational qualification $property"
+}
+$bad=($operationalSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAgentJourneyQualified=$true
+Check (!(Test-AiDomainStoreOperationsCheckpoint $bad)) 'reject fabricated original-operational device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($operationalSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainStoreOperationsCheckpoint $bad)) "reject changed original-operational evidence $property"
+}
+foreach($row in @(@(0,3),@(1,14),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainStoreOperationsStageOwners $row[0] $operationalSeal).Count -eq $row[1]) "original-operational checkpoint exact stage $($row[0]) owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."
