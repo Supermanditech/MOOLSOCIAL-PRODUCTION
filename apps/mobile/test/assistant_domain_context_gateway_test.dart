@@ -42,6 +42,40 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
+  test('Clear Cart metadata requires its exact personal root proof, never a claimed Cart or Store target', () async {
+    final proof = 'buy-cart-clear-owner:${'c' * 64}';
+    final data = <String, Object?>{..._data(), 'revisions': [
+      {'actionId': 'AI-ACT-020', 'entityId': null, 'sourceRevision': proof}]};
+    expect((await _source(_Wire(() => _ok(data))).read(_context, () => true)).revisions, {('AI-ACT-020', null): proof});
+    for (final fault in ['entity', 'namespace', 'proof', 'store', 'foreign-owner']) {
+      final changed = jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
+      final row = (changed['revisions'] as List).single as Map;
+      var context = _context;
+      if (fault == 'entity') row['entityId'] = 'claimed-cart';
+      if (fault == 'namespace') row['sourceRevision'] = 'buy-reference-owner:${'c' * 64}';
+      if (fault == 'proof') row['sourceRevision'] = 'buy-cart-clear-owner:claimed';
+      if (fault == 'foreign-owner') changed['ownerKey'] = 'd' * 64;
+      if (fault == 'store') {
+        context = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'HOST Store',
+          profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
+        changed['scope'] = {'audience': 'workspace', 'storeId': 'store-one'};
+        changed['ownerKey'] = sha256.convert(utf8.encode(jsonEncode(['fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString();
+      }
+      await expectLater(_source(_Wire(() => _ok(changed))).read(context, () => true), throwsA(isA<AssistantModelFailure>()));
+    }
+  });
+  const clearExport = String.fromEnvironment('AI_DOMAIN_CART_CLEAR_EXPORT_PATH');
+  test('Original backend Clear Cart permission metadata decodes through actual mobile gateway', () async {
+    final export = jsonDecode(File(clearExport).readAsStringSync()) as Map<String, dynamic>;
+    expect(export['hostOnly'], true);
+    final actor = export['actor'] as Map<String, dynamic>;
+    final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String, tenantId: null, userId: actor['uid'] as String);
+    final gateway = AssistantDomainContextGateway(owner: owner, isCurrent: () => true, credentials: _Credentials(),
+      transport: _BackendReferenceWire(export['metadata'] as Map<String, dynamic>), clock: () => _at);
+    final result = await gateway.read(MoolAssistantContext(accountScope: owner, authenticationRevision: 1), () => true);
+    expect(result.revisions[('AI-ACT-020', null)], matches(RegExp(r'^buy-cart-clear-owner:[a-f0-9]{64}$')));
+    expect(result.revisions.keys.where((key) => key.$1 == 'AI-ACT-020'), hasLength(1));
+  }, skip: clearExport.isEmpty ? 'Requires explicit isolated original-backend Clear Cart metadata export' : false);
   test('Purchase reference metadata requires personal root and exact original account proof', () async {
     final proof = 'buy-reference-owner:${'a' * 64}';
     final data = <String, Object?>{..._data(), 'revisions': [

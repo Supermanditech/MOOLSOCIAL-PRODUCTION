@@ -773,6 +773,53 @@ function purchaseReferenceFixture() {
     actionId: 'AI-ACT-032', entityId: null};
   return {f, source, original, input, writes: () => writes, bump: () => {revision++;}, onRead: (fn: () => void) => {onRead = fn;}};
 }
+test('Clear Cart prepares only original account-owned native confirmation; duplicate/status recovery never removes anything', async () => {
+  const f = purchaseReferenceFixture(), input = {...f.input, actionId: 'AI-ACT-020', requestId: 'HOST-clear-cart-preparation', message: 'Clear this Cart'};
+  const context = await f.source.read(actor, input), tool = context.tools[0]!;
+  assert.equal(context.tools.length, 1); assert.equal(tool.actionId, input.actionId); assert.equal(tool.entityId, null);
+  assert.match(tool.sourceRevision, /^buy-cart-clear-owner:[a-f0-9]{64}$/u); assertStrictSchema(tool.parameters);
+  assert.equal(tool.validate({}), true);
+  for (const fields of [{scope: 'all'}, {confirmed: true}, {cartId: 'claimed'}, {reference: 'unrelated'}]) assert.equal(tool.validate(fields), false);
+  assert.ok(!JSON.stringify(context.modelContext).includes('HOST private name'));
+  const metadata = await handleAssistantCanonicalContextRequest(f.f.input, {...f.f.deps, context: f.source});
+  assert.equal(metadata.status, 200); if (!metadata.body.ok) assert.fail('Expected current account permission proof');
+  assert.ok(metadata.body.data.revisions.some(row => row.actionId === input.actionId && row.entityId === null && row.sourceRevision === tool.sourceRevision));
+  if (process.env.AI_DOMAIN_CART_CLEAR_EXPORT_PATH) {
+    const path = process.env.AI_DOMAIN_CART_CLEAR_EXPORT_PATH; assert(isAbsolute(path));
+    writeFileSync(path, JSON.stringify({hostOnly: true, actor, metadata: metadata.body}, null, 2) + '\n', {flag: 'wx'});
+  }
+  const requests = new HostRequests(); let models = 0;
+  const service = () => new AssistantPreparationService({projectId: actor.projectId, plans: f.f.plans, context: f.source, requests, now: () => at,
+    usage: {async reserve() {return {id: 'HOST-clear-cart-permit', validUntil: '2026-10-28T08:01:00.000Z'};}, async settle() {}},
+    model: {async prepare() {models++; return {kind: 'tool', name: tool.name, arguments: {}};}}});
+  const payload = {...input, nativeTargets: [{actionId: input.actionId, entityId: null}]};
+  const result = await service().handle(actor, {operation: 'prepare', payload});
+  if (result.state !== 'ready' || result.reply.outcome.kind !== 'proposal') assert.fail('Expected native confirmation proposal');
+  assert.deepEqual(result.reply.outcome.fields, {}); assert.equal(result.reply.outcome.actionId, input.actionId);
+  assert.deepEqual(await service().handle(actor, {operation: 'prepare', payload}), result);
+  assert.deepEqual(await service().handle(actor, {operation: 'status', payload: {scope: input.scope, requestId: input.requestId}}), result);
+  assert.equal(models, 1); assert.equal(f.writes(), 0);
+  f.bump(); await assert.rejects(service().handle(actor, {operation: 'status', payload: {scope: input.scope, requestId: input.requestId}}));
+  assert.equal(f.writes(), 0);
+});
+test('Clear Cart rejects foreign owners, Store scope, claimed Cart identities, revoked access and stale or expanded proposals', async () => {
+  const f = purchaseReferenceFixture(), input = {...f.input, actionId: 'AI-ACT-020'}, context = await f.source.read(actor, input);
+  const tool = context.tools[0]!, proposal = {kind: 'proposal' as const, id: 'HOST-clear-proposal', actionId: input.actionId,
+    entityId: null, sourceRevision: tool.sourceRevision, fields: {}, title: 'Review Cart removal', summary: 'Native confirmation required'};
+  await f.source.readPrepared(actor, input, proposal);
+  for (const changed of [{...input, entityId: 'other-cart'}, {...input, scope: {audience: 'workspace' as const, storeId: 'other-store'}}]) await assert.rejects(f.source.read(actor, changed));
+  await assert.rejects(f.source.read({...actor, uid: 'other-user'}, input));
+  await assert.rejects(f.source.read({...actor, tenantId: 'other-tenant'}, input));
+  await assert.rejects(new CompositePreparationContext({original: f.original}).read(actor, input));
+  await assert.rejects(new CompositePreparationContext({nativeBuyerFormsEnabled: true}).read(actor, input));
+  await assert.rejects(f.source.readPrepared(actor, input, {...proposal, fields: {confirmed: true}}));
+  await assert.rejects(f.source.readPrepared(actor, input, {...proposal, sourceRevision: 'buy-cart-clear-owner:' + '0'.repeat(64)}));
+  await assert.rejects(f.source.readPrepared(actor, input, {...proposal, entityId: 'other-cart'}));
+  f.bump(); await assert.rejects(f.source.readPrepared(actor, input, proposal), /stale_preparation/u);
+  f.onRead(() => f.f.deny()); await assert.rejects(f.source.read(actor, input), /stale_preparation/u);
+  f.onRead(() => {}); await assert.rejects(f.source.read(actor, input), /ai_access_required/u);
+  assert.equal(f.writes(), 0);
+});
 test('Purchase reference uses original paid account proof and raw supplied text; duplicate/status recovery never writes', async () => {
   const f = purchaseReferenceFixture(), raw = '  PO-મૂળ-नमस्ते 12.50  ', context = await f.source.read(actor, f.input), tool = context.tools[0]!;
   assert.equal(context.tools.length, 1); assert.equal(tool.actionId, 'AI-ACT-032'); assert.equal(tool.entityId, null);

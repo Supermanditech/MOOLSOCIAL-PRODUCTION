@@ -12,6 +12,7 @@ const assistantDomainProductContextActions = {'AI-ACT-006', 'AI-ACT-007', 'AI-AC
 const assistantDomainPreferenceContextActions = {'AI-ACT-010', 'AI-ACT-011', 'AI-ACT-012', 'AI-ACT-013'};
 const assistantDomainAddressContextActions = {'AI-ACT-024', 'AI-ACT-027'};
 const assistantDomainPurchaseReferenceContextActions = {'AI-ACT-032'};
+const assistantDomainCartClearContextActions = {'AI-ACT-020'};
 const assistantPrivateStarsContextActions={'AI-ACT-055'};
 const assistantStoreProductContextActions = {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-370', 'AI-ACT-220', 'AI-ACT-230', 'AI-ACT-222', 'AI-ACT-223', 'AI-ACT-226', 'AI-ACT-227', 'AI-ACT-371'};
 const assistantStoreDefaultContextActions = {'AI-ACT-218', 'AI-ACT-219'};
@@ -30,7 +31,7 @@ const assistantStorePublicDetailsContextActions={'AI-ACT-320','AI-ACT-321'};
 const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions,...assistantStoreSupplierDraftContextActions,...assistantStorePurchaseRootContextActions,...assistantStoreOrderBoardContextActions,...assistantStoreReportOwnerContextActions,...assistantStorePublicDetailsContextActions};
 const assistantDomainContextActions = {'AI-ACT-001', 'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
   ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions,
-  ...assistantDomainAddressContextActions,...assistantDomainPurchaseReferenceContextActions,...assistantPrivateStarsContextActions,
+  ...assistantDomainAddressContextActions,...assistantDomainPurchaseReferenceContextActions,...assistantDomainCartClearContextActions,...assistantPrivateStarsContextActions,
   ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreOperationalContextActions,...assistantStoreReceivingOriginalContextActions,...assistantStoreCouponContextActions};
 
 abstract interface class AssistantDomainContextGatewaySource {
@@ -157,6 +158,8 @@ class AssistantDomainContextGateway {
       if (assistantDomainAddressContextActions.contains(action) && (context.inWorkspace || entity == null)) _invalid();
       if (assistantDomainPurchaseReferenceContextActions.contains(action) && (context.inWorkspace || entity != null ||
           !RegExp(r'^buy-reference-owner:[a-f0-9]{64}$').hasMatch(revision))) _invalid();
+      if (assistantDomainCartClearContextActions.contains(action) && (context.inWorkspace || entity != null ||
+          !RegExp(r'^buy-cart-clear-owner:[a-f0-9]{64}$').hasMatch(revision))) _invalid();
       if(assistantPrivateStarsContextActions.contains(action)&&(context.inWorkspace||entity==null||
         !RegExp(r'^buyer-product-stars:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))_invalid();
       if (assistantStoreProductContextActions.contains(action) && (!context.inWorkspace ||
