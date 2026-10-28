@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 12,
+  "localMetadataCommits": 13,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -1843,5 +1843,23 @@
     "productionAcceptance": false,
     "sourceCommit": "e8f92cba6d9d4ee4b36527e3a00b184d456f24f1",
     "authority": "Existing standing exact source/evidence checkpoint authority for named batch branch only."
+  },
+  "scope10PrivateStarsTestAdmission": {
+    "sequence": "10-private-stars-native-test",
+    "baseline": "2c969b300de91cfeb4efb4bbd7a2634741d1b6f0",
+    "newOwners": [
+      "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"
+    ],
+    "contract": "Scope10 existing AI-ACT-055 orderId + lineId/stars bridge to authenticated original private purchased-item ratings and existing native final confirmation. Admit only the existing Buy screen test owner to exercise its original harness. No public-review/report substitution, new domain service, business rule, cloud, model activation, live effect, APK or broad Git authority. Exact necessary owner/admission reconciliation is covered by the active20-scope standing authorization.",
+    "unchangedOwner": {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+      "bytes": 929985,
+      "sha256": "00793D138A31219C9C411C04F9F9685EBEA0CE1694380314C2B55AC25B3FD8DD",
+      "gitBlobOid": "21b4052c2df2b3f566ce3f9d9331421b9fe70faf"
+    },
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "productionAcceptance": false,
+    "newMasterOrMigration": false
   }
 }

@@ -406,7 +406,7 @@ function Test-AiDomainOrderOriginalCheckpoint($Checkpoint) {
 function Get-AiDomainOrderOriginalStageOwners([int]$Count,$Checkpoint) {
  switch($Count){0{@(Get-AiDomainOrderOriginalSealOwners)}1{@($Checkpoint.manifest.changedOwners)}2{@('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')}default{@()}}
 }
-function Invoke-AiDomainOrderOriginalCheckpoint($Checkpoint,[string]$Head,[string]$Phase) {
+function Invoke-AiDomainOrderOriginalCheckpoint($Checkpoint,[string]$Head,[string]$Phase,[switch]$Continuation) {
  Assert-Coordination (Test-AiDomainOrderOriginalCheckpoint $Checkpoint) 'Only the exact tested twelve-owner original order checkpoint is admitted.'
  $base=$Checkpoint.baseline;$approvalOwner='docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json'
  $chain=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"${base}..${Head}"))
@@ -430,6 +430,7 @@ function Invoke-AiDomainOrderOriginalCheckpoint($Checkpoint,[string]$Head,[strin
   else{Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($chain[1]):$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Committed original-order source differs from qualification.'}
  }
  foreach($owner in @(Get-AiDomainBatchMetadataOwners)){
+  if($Continuation){continue}
   if(($chain.Count -eq 0 -and $owner -cin @(Get-AiDomainOrderOriginalSealOwners)) -or
     ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit' -and $owner -ceq $approvalOwner)){continue}
   Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
@@ -437,12 +438,44 @@ function Invoke-AiDomainOrderOriginalCheckpoint($Checkpoint,[string]$Head,[strin
  if($chain.Count -eq 3 -or ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit')){
   Assert-Coordination ($Checkpoint.sourceCommit -ceq $chain[1]) 'Original-order evidence must name its qualified source commit before closure.'
  }
- if($Phase -ceq 'pre_commit'){
+ if($Phase -ceq 'pre_commit' -and !$Continuation){
   $expected=@(Get-AiDomainOrderOriginalStageOwners $chain.Count $Checkpoint)
   Assert-Coordination ($expected.Count -gt 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Only exact original-order-checkpoint stage may be committed.'
   if($chain.Count -eq 1){foreach($row in $Checkpoint.manifest.owners){
    Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',":$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Staged original-order source differs from qualification.'
   }}
+ }
+}
+function Test-AiDomainPrivateStarsTestAdmission($Admission) {
+ if($null -eq $Admission){return $false}
+ $raw=$Admission|ConvertTo-Json -Depth 20 -Compress
+ return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($raw))) -ceq '19136B3CF97288DDB8ABA9DE0D62872A87400B3C1928E258A9F4E416055DFA50'
+}
+function Get-AiDomainPrivateStarsRuntimeOwners($Admission,$Cache) {
+ Assert-Coordination (Test-AiDomainPrivateStarsTestAdmission $Admission) 'Exact existing Buy test admission required.'
+ @(Get-AiDomainCurrentRuntimeOwners $Cache)+@($Admission.newOwners)
+}
+function Invoke-AiDomainPrivateStarsTestAdmission($Admission,[string]$Head,[string]$Phase) {
+ Assert-Coordination (Test-AiDomainPrivateStarsTestAdmission $Admission) 'Only the exact existing native055 test owner is admitted.'
+ $base=$Admission.baseline;$allowed=@(Get-AiDomainAddressCacheAdmissionOwners)
+ $chain=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"${base}..${Head}"))
+ Assert-Coordination ($chain.Count -le 1) 'Only one exact native055 test admission metadata commit is admitted.'
+ if($chain.Count -eq 0){
+  Assert-Coordination ((Get-Sha256 (Join-Path $root $Admission.unchangedOwner.path)) -ceq $Admission.unchangedOwner.sha256) 'Native055 admission must preserve the existing test.'
+ }else{
+  Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$chain[0]))[0]) -ceq $base -and
+   (@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$chain[0]))[0]) -ceq 'coordination(ai-domain-batch-20261028): admit existing private stars native test owner' -and
+   (@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base,$chain[0])|Sort-Object)-join '|') -ceq (@($allowed|Sort-Object)-join '|')) 'Native055 admission parent, subject or owners changed.'
+  Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($chain[0]):$($Admission.unchangedOwner.path)"))[0]) -ceq $Admission.unchangedOwner.gitBlobOid) 'Native055 admission changed the original test source.'
+  $sealed=(@(Get-OctoberCompatibilityGitLines @('show',"$($chain[0]):docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json"))-join "`n")|ConvertFrom-Json
+  Assert-Coordination (Test-AiDomainPrivateStarsTestAdmission $sealed.scope10PrivateStarsTestAdmission) 'Committed native055 test admission changed.'
+ }
+ foreach($owner in @(Get-AiDomainBatchMetadataOwners)){
+  if($chain.Count -eq 0 -and $owner -cin $allowed){continue}
+  Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
+ }
+ if($Phase -ceq 'pre_commit'){
+  Assert-Coordination ($chain.Count -eq 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($allowed|Sort-Object)-join '|')) 'Only exact five-file native055 test admission may be committed.'
  }
 }
 function Invoke-AiDomainBatchAdmission {
@@ -451,7 +484,8 @@ function Invoke-AiDomainBatchAdmission {
  $cache=if($approval.PSObject.Properties.Name -ccontains 'scope07AddressCacheAdmission'){$approval.scope07AddressCacheAdmission}else{$null}
  $cacheCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'scope07AddressCacheCheckpoint'){$approval.scope07AddressCacheCheckpoint}else{$null}
  $orderCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'scope09OrderOriginalCheckpoint'){$approval.scope09OrderOriginalCheckpoint}else{$null}
- $runtime=if($null -ne $cache){@(Get-AiDomainCurrentRuntimeOwners $cache)}else{@(Get-AiDomainBatchRuntimeOwners)}
+ $privateStarsAdmission=if($approval.PSObject.Properties.Name -ccontains 'scope10PrivateStarsTestAdmission'){$approval.scope10PrivateStarsTestAdmission}else{$null}
+ $runtime=if($null -ne $privateStarsAdmission){@(Get-AiDomainPrivateStarsRuntimeOwners $privateStarsAdmission $cache)}elseif($null -ne $cache){@(Get-AiDomainCurrentRuntimeOwners $cache)}else{@(Get-AiDomainBatchRuntimeOwners)}
  $metadata=@(Get-AiDomainBatchMetadataOwners);$bootstrap=@(Get-AiDomainBatchBootstrapOwners);$amend=@(Get-AiDomainBatchSelectorAmendOwners);$owners=$runtime+$metadata
  $branch=@(Get-OctoberCompatibilityGitLines @('branch','--show-current'))[0]
  Assert-Coordination (Test-AiDomainBatchIdentity @{Root=$root.Replace('\','/');Branch=$branch;Lane=$ProductionLane;Role=$AgentRole;Task=$AgentTask;WorkId=$ProductionWorkId;Ticket=$ProductionTicketId;Phase=$ProductionPhase}) 'Combined exact identity/phase required.'
@@ -463,7 +497,7 @@ function Invoke-AiDomainBatchAdmission {
  $scopeTwo = $approval.scope02Admission
  $scopeTwoCheckpoint = $approval.scope02Checkpoint
  $middle=if($approval.PSObject.Properties.Name -ccontains 'scope03Through07Checkpoint'){$approval.scope03Through07Checkpoint}else{$null}
- $metadataCount = if($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
+ $metadataCount = if($null -ne $privateStarsAdmission){13} elseif($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
  Assert-Coordination ($approval.acceptedUiCommit -ceq $base -and $approval.uiContractSha256 -ceq $hash -and $approval.founderAnswer -ceq 'EXECUTE' -and $approval.localMetadataCommits -eq $metadataCount -and !$approval.sourceFeatureCommits -and !$approval.backendBranchPush -and !$approval.deployment -and !$approval.productionAcceptance) 'Exact acceptance/authority differs.'
  if ($null -ne $checkpoint) {Assert-Coordination ($binding.id -ceq 'ai_domain_batch_20261028' -and $binding.state -ceq 'founder_authorized_2026_10_28') 'Correct current batch identity required; no stale Profile or History binding.'}
  Assert-Coordination ((Get-Sha256 (Join-Path $root 'docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md')) -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $record.backendAdmission.originalProviderTestAddendum.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $approval.originalProviderTestAdmission.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22') 'Exact original-provider test boundary changed.'
@@ -491,7 +525,8 @@ function Invoke-AiDomainBatchAdmission {
  }
  if($null -ne $cache){Assert-Coordination (($record.scope07AddressCacheAdmission|ConvertTo-Json -Depth 20 -Compress) -ceq ($cache|ConvertTo-Json -Depth 20 -Compress)) 'Current exact cache-owner admission binding changed.'}
  if($null -ne $cacheCheckpoint){Assert-Coordination ($null -ne $cache -and (Test-AiDomainAddressCacheCheckpoint $cacheCheckpoint)) 'Exact prior cache admission and tested checkpoint are required.'}
- $maximumCommits = if($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
+ if($null -ne $privateStarsAdmission){Assert-Coordination ($null -ne $orderCheckpoint -and ($record.scope10PrivateStarsTestAdmission|ConvertTo-Json -Depth 20 -Compress) -ceq ($privateStarsAdmission|ConvertTo-Json -Depth 20 -Compress)) 'Exact source checkpoint and matching native055 owner admission required.'}
+ $maximumCommits = if($null -ne $privateStarsAdmission){23} elseif($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
  Assert-Coordination ($commits.Count -le $maximumCommits -and @(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$base..$head")).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('ls-files','-v')|Where-Object {$_ -cmatch '^[a-zS] '}).Count -eq 0) 'Only exact admitted checkpoint history; no history/index overrides.'
  $changed=@(@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base))+@(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')))|Sort-Object -Unique
  Assert-AiDomainBatchOwners $changed $owners
@@ -529,7 +564,10 @@ function Invoke-AiDomainBatchAdmission {
           Invoke-AiDomainAddressCacheAdmission $cache 'd6b95fba5666f7c6abf6bad4dd2d0c344f6c7483' 'implementation' -Continuation
           if($null -ne $orderCheckpoint){
            Invoke-AiDomainAddressCacheCheckpoint $cacheCheckpoint '9bea89409b1c1258929e172a6d3b4bbcc385a384' 'implementation' -Continuation
-           Invoke-AiDomainOrderOriginalCheckpoint $orderCheckpoint $head $ProductionPhase
+           if($null -ne $privateStarsAdmission){
+            Invoke-AiDomainOrderOriginalCheckpoint $orderCheckpoint '2c969b300de91cfeb4efb4bbd7a2634741d1b6f0' 'implementation' -Continuation
+            Invoke-AiDomainPrivateStarsTestAdmission $privateStarsAdmission $head $ProductionPhase
+           }else{Invoke-AiDomainOrderOriginalCheckpoint $orderCheckpoint $head $ProductionPhase}
           }else{Invoke-AiDomainAddressCacheCheckpoint $cacheCheckpoint $head $ProductionPhase}
          }else{Invoke-AiDomainAddressCacheAdmission $cache $head $ProductionPhase}
         }else{Invoke-AiDomainMiddleCheckpoint $middle $head $ProductionPhase}

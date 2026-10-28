@@ -192,4 +192,22 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,12),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainOrderOriginalStageOwners $row[0] $orderSeal).Count -eq $row[1]) "original-order checkpoint exact stage $($row[0]) owner count"
 }
+$privateStars=$approval.scope10PrivateStarsTestAdmission
+Check (Test-AiDomainPrivateStarsTestAdmission $privateStars) 'exact existing native055 test admission'
+Check (@(Get-AiDomainPrivateStarsRuntimeOwners $privateStars $cache).Count -eq 35) 'only one existing native055 test added; historical34 unchanged'
+foreach($property in @('sequence','baseline','contract')) {
+ $bad=($privateStars|ConvertTo-Json -Depth 20)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainPrivateStarsTestAdmission $bad)) "reject changed private stars admission $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($privateStars|ConvertTo-Json -Depth 20)|ConvertFrom-Json
+ $bad.unchangedOwner.$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainPrivateStarsTestAdmission $bad)) "reject changed private stars test baseline $property"
+}
+foreach($property in @('sourceFeatureCommitsAuthorized','backendBranchPushAuthorized','productionAcceptance','newMasterOrMigration')) {
+ $bad=($privateStars|ConvertTo-Json -Depth 20)|ConvertFrom-Json;$bad.$property=$true
+ Check (!(Test-AiDomainPrivateStarsTestAdmission $bad)) "reject expanded private stars authority $property"
+}
+$bad=($privateStars|ConvertTo-Json -Depth 20)|ConvertFrom-Json;$bad.newOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainPrivateStarsTestAdmission $bad)) 'reject unrelated private stars owner'
 Write-Output "AI domain batch admission checks passed: $n."

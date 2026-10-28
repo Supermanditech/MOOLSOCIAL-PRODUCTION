@@ -199,7 +199,8 @@
       "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
       "apps/mobile/lib/features/work/work_session.dart",
       "apps/mobile/test/work_workspace_layout_safety_test.dart",
-      "apps/mobile/lib/features/buy/buy_v2_session.dart"
+      "apps/mobile/lib/features/buy/buy_v2_session.dart",
+      "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"
     ],
     "acceptedUiCommit": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
     "contractSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382",
@@ -270,5 +271,23 @@
     "productionAcceptance": false,
     "newMasterOrMigration": false,
     "authority": "Standing exact necessary existing-owner admission under AI-DOMAIN-BATCH-20; no separate founder hash review claimed."
+  },
+  "scope10PrivateStarsTestAdmission": {
+    "sequence": "10-private-stars-native-test",
+    "baseline": "2c969b300de91cfeb4efb4bbd7a2634741d1b6f0",
+    "newOwners": [
+      "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"
+    ],
+    "contract": "Scope10 existing AI-ACT-055 orderId + lineId/stars bridge to authenticated original private purchased-item ratings and existing native final confirmation. Admit only the existing Buy screen test owner to exercise its original harness. No public-review/report substitution, new domain service, business rule, cloud, model activation, live effect, APK or broad Git authority. Exact necessary owner/admission reconciliation is covered by the active20-scope standing authorization.",
+    "unchangedOwner": {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+      "bytes": 929985,
+      "sha256": "00793D138A31219C9C411C04F9F9685EBEA0CE1694380314C2B55AC25B3FD8DD",
+      "gitBlobOid": "21b4052c2df2b3f566ce3f9d9331421b9fe70faf"
+    },
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "productionAcceptance": false,
+    "newMasterOrMigration": false
   }
 }

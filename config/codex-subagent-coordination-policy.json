@@ -405,6 +405,7 @@
         "apps/mobile/lib/features/work/work_session.dart",
         "apps/mobile/test/work_workspace_layout_safety_test.dart",
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
         ".gitattributes",
         "config/codex-subagent-coordination-policy.json",
         "config/cross-agent-incremental-ticket-gate.json",
