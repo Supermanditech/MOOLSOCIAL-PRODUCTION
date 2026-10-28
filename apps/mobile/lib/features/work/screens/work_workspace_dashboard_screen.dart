@@ -5766,6 +5766,11 @@ class _WorkWorkspaceDashboardScreenState
     } else if (action == 'AI-ACT-328') {
       if (entity == null || !_workspaceAlerts(source).any((alert) => alert.id == entity && !alert.requiredAction)) return null;
     } else if (entity != null) { return null; }
+    if (const {'AI-ACT-320', 'AI-ACT-321'}.contains(action) && source.workspaceRequiresMembershipReadback) {
+      final connection = source.publicDetailsGateway ?? source.catalogueGateway;
+      if (connection is! AuthenticatedWorkspaceCatalogueGateway ||
+          !await source.workspaceAssistantPublicDetailsSourceReady(connection.realm, inputCurrent: current)) return null;
+    }
     if (const {'AI-ACT-318', 'AI-ACT-319', 'AI-ACT-327'}.contains(action) && source.tradingPreferencesPersistenceAvailable &&
         (!await source.loadWorkspaceTradingPreferences(expectedStoreId: ctx.workspaceId!) || !current())) return null;
     if (const {'AI-ACT-320', 'AI-ACT-321'}.contains(action)) {
@@ -5779,7 +5784,7 @@ class _WorkWorkspaceDashboardScreenState
           final loaded = await source.loadWorkspacePublicDetailsInputs();
           if (!current() || action == 'AI-ACT-321' && !loaded) return null;
         }
-        if (publisher != null && (!await publisher.restore() || !current())) return null;
+        if (publisher != null && (!await publisher.restore() || !current() || publisher.pending != null || publisher.busy)) return null;
       }
     }
     if (action == 'AI-ACT-322' &&
@@ -5820,6 +5825,16 @@ class _WorkWorkspaceDashboardScreenState
     final action = proposal.actionId, fields = initial.fields;
     if (action == 'AI-ACT-317' && fields['workspaceId'] != proposal.entityId ||
         action == 'AI-ACT-328' && fields['alertId'] != proposal.entityId) return MoolAssistantReviewResult.unavailable;
+    if (const {'AI-ACT-320', 'AI-ACT-321'}.contains(action) && source.workspaceRequiresMembershipReadback) {
+      final connection = source.publicDetailsGateway ?? source.catalogueGateway;
+      if (connection is! AuthenticatedWorkspaceCatalogueGateway ||
+          !await source.workspaceAssistantPublicDetailsSourceReady(connection.realm, inputCurrent: () =>
+            mounted && hostContext.mounted && reviewCurrent() && identical(source, session) &&
+            source.navigationScopeRevision == navigation && source.publicationPreferencesContext == owner &&
+            _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx))) {
+        return MoolAssistantReviewResult.unavailable;
+      }
+    }
     final fingerprint = _settingsAssistantData(source, action);
     final settingsPublisher = const {'AI-ACT-320', 'AI-ACT-321'}.contains(action) ? source.workspacePublicDetailsPublisher : null;
     bool current() => mounted && hostContext.mounted && identical(source, session) &&

@@ -2634,6 +2634,8 @@ function assistantOriginalContextSource(projectId: string) {
     nativePurchaseFormsEnabled: profile && catalogue,
     ...(original ? {original} : {}),
     ...(storeProducts?{storeProducts}:{}),
+    ...(original&&catalogue&&(couponRealm==='evaluation'||couponRealm==='production')?{
+      storePublicDetails:{realm:couponRealm,catalogue:workspaceCatalogueService()}}:{}),
     ...(original&&catalogue&&(couponRealm==='evaluation'||couponRealm==='production')&&(reportPublic||reportJourney)?{
       nativeReports:{realm:couponRealm,public:reportPublic,journey:reportJourney}}:{}),
     ...(original&&storeProducts&&(couponRealm==='evaluation'||couponRealm==='production')?{

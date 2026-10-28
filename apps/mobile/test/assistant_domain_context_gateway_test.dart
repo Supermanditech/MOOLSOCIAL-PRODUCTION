@@ -42,12 +42,12 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
+  for (final actions in [assistantStoreReportOwnerContextActions, assistantStorePublicDetailsContextActions]) {
   for (final compact in [false, true]) {
-    test('Report control metadata preserves exact approved namespace compact$compact', () async {
+    test('Store metadata ${actions.first} preserves exact approved namespace compact$compact', () async {
       final store = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'Host Store',
         profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
-      final proof = 'store-report-owner:evaluation:${'a' * 64}';
-      final actions = assistantStoreReportOwnerContextActions;
+      final proof = '${actions.contains('AI-ACT-320') ? 'store-public-details' : 'store-report-owner'}:evaluation:${'a' * 64}';
       final data = <String, Object?>{..._data(),
         'ownerKey': sha256.convert(utf8.encode(jsonEncode(['fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString(),
         'scope': {'audience': 'workspace', 'storeId': 'store-one'},
@@ -62,7 +62,7 @@ void main() {
         final rows = compact ? changed['nativeSelection']['groups'] as List : changed['revisions'] as List;
         final row = rows.first as Map;
         if (fault == 'entity') row['entityId'] = 'invented-report';
-        if (fault == 'realm') row['sourceRevision'] = 'store-report-owner:unknown:${'a' * 64}';
+        if (fault == 'realm') row['sourceRevision'] = '${actions.contains('AI-ACT-320') ? 'store-public-details' : 'store-report-owner'}:unknown:${'a' * 64}';
         if (fault == 'proof') row['sourceRevision'] = 'store-order-board-owner:${'a' * 64}';
         final context = fault == 'personal' ? _context : fault == 'unapproved'
           ? _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'Host Store',
@@ -71,6 +71,7 @@ void main() {
           throwsA(isA<AssistantModelFailure>()));
       }
     });
+  }
   }
   for (final actions in [assistantStoreSupplierDraftContextActions, assistantStorePurchaseRootContextActions, assistantStoreOrderBoardContextActions]) {
   for (final compact in [false, true]) {
@@ -141,6 +142,31 @@ void main() {
       await expectLater(_source(_Wire(() => _ok(wrong))).read(store, () => true), throwsA(isA<AssistantModelFailure>()));
     });
   }
+  const detailsExport = String.fromEnvironment('AI_DOMAIN_STORE_DETAILS_EXPORT_PATH');
+  test('Actual original public-details metadata crosses the real mobile decoder without private draft values', () async {
+    final export = jsonDecode(File(detailsExport).readAsStringSync()) as Map<String, dynamic>;
+    expect(export['hostOnly'], true);
+    final actor = export['actor'] as Map;
+    final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String, tenantId: null, userId: actor['uid'] as String);
+    final envelope = export['metadata'] as Map<String, dynamic>, scope = export['scope'] as Map;
+    final data = envelope['data'] as Map;
+    final context = MoolAssistantContext(accountScope: owner, authenticationRevision: 1).withWorkspace(
+      MoolAssistantWorkspace(id: scope['storeId'] as String, name: 'HOST original Store', profile: 'retailer-grocery', revision: 1,
+        isStore: true, approved: true, approvalAccountScope: owner));
+    final source = AssistantDomainContextGateway(owner: owner, isCurrent: () => true, credentials: _Credentials(),
+      transport: _CapacityWire(envelope), compactStoreSelection: true,
+      clock: () => DateTime.parse(data['validUntil'] as String).subtract(const Duration(seconds: 30)));
+    addTearDown(source.dispose);
+    final snapshot = await source.read(context, () => true);
+    final proofs = snapshot.revisions.entries.where((entry) => assistantStorePublicDetailsContextActions.contains(entry.key.$1)).toList();
+    expect(proofs.length, 2);
+    for (final proof in proofs) {
+      expect(proof.key.$2, isNull);
+      expect(proof.value, matches(r'^store-public-details:evaluation:[a-f0-9]{64}$'));
+    }
+    expect(snapshot.revisions.keys.any((key) => const {'AI-ACT-324', 'AI-ACT-326'}.contains(key.$1)), isFalse);
+    expect(jsonEncode(envelope).contains((export['details'] as Map)['details']['street'] as String), isFalse);
+  }, skip: detailsExport.isEmpty ? 'Requires explicit isolated original-service public-details export' : false);
   const capacityExport = String.fromEnvironment('AI_DOMAIN_STORE_NATIVE_EXPORT_PATH');
   test('Actual original 2500-product metadata crosses the real mobile decoder without trimming', () async {
     final export = jsonDecode(File(capacityExport).readAsStringSync()) as Map<String, dynamic>;
@@ -209,7 +235,8 @@ void main() {
           ? 'store-supplier-draft-owner:${'a' * 64}' : assistantStorePurchaseRootContextActions.contains(action)
           ? 'store-purchase-root-owner:${'a' * 64}' : assistantStoreOrderBoardContextActions.contains(action)
           ? 'store-order-board-owner:${'a' * 64}' : assistantStoreReportOwnerContextActions.contains(action)
-          ? 'store-report-owner:evaluation:${'a' * 64}' : 'native-owned-defaults-owner-proof'},
+          ? 'store-report-owner:evaluation:${'a' * 64}' : assistantStorePublicDetailsContextActions.contains(action)
+          ? 'store-public-details:evaluation:${'a' * 64}' : 'native-owned-defaults-owner-proof'},
       ]};
     final value = await _source(_Wire(() => _ok(data))).read(store, () => true);
     expect(value.revisions.keys.single, (action, null));

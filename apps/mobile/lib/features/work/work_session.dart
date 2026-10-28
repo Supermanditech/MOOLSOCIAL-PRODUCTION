@@ -1097,6 +1097,32 @@ class WorkSession extends ChangeNotifier {
           .contains(remoteReviewStatus) &&
       {WorkReviewStage.approved, WorkReviewStage.setup, WorkReviewStage.live}
           .contains(reviewStage));
+  /// Read-only AI admission over the original connection and pending journal.
+  /// Never constructs/restores a publisher, adopts inputs or reconciles a write.
+  Future<bool> workspaceAssistantPublicDetailsSourceReady(String realm, {required bool Function() inputCurrent}) async {
+    final account = _contactAccountScope, store = activeWorkspace?.id,
+      navigation = navigationScopeRevision, owner = publicationPreferencesContext;
+    final explicit = publicDetailsGateway, catalogue = catalogueGateway;
+    final connection = explicit ?? (catalogue is AuthenticatedWorkspaceCatalogueGateway && gateway is! ReviewWorkGateway ? catalogue : null);
+    if (_disposed || account == null || store == null || !workspaceRequiresMembershipReadback ||
+        !_currentWorkspaceAccess(store, activeWorkspace?.profileId) || !workspaceStoreAuthoringAvailable ||
+        connection is! AuthenticatedWorkspaceCatalogueGateway || connection.realm != realm ||
+        publicDetailsRealm != null && publicDetailsRealm != realm ||
+        (explicit != null ? connection.ownerAccountId != account : connection.ownerAccountId != null && connection.ownerAccountId != account)) return false;
+    final scope = (account: account, store: store, realm: realm), existing = _publicDetailsPublishers[(account: account, store: store, realm: realm)];
+    bool current() => !_disposed && inputCurrent() && account == _contactAccountScope && activeWorkspace?.id == store &&
+      navigationScopeRevision == navigation && publicationPreferencesContext == owner &&
+      identical(explicit, publicDetailsGateway) && identical(catalogue, catalogueGateway) &&
+      identical(existing, _publicDetailsPublishers[scope]) && workspaceStoreAuthoringAvailable &&
+      _currentWorkspaceAccess(store, activeWorkspace?.profileId) &&
+      (existing == null || existing.active && !existing.busy && existing.pending == null);
+    if (!current()) return false;
+    try {
+      final journal = publicDetailsJournalFactory?.call(scope) ?? SecureWorkPublicDetailsJournal();
+      final pending = await journal.readPending(scope).timeout(const Duration(seconds: 10));
+      return current() && pending == null;
+    } catch (_) { return false; }
+  }
   WorkspacePublicDetailsController? get workspacePublicDetailsPublisher {
     final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
     if (_disposed || account == null || account.isEmpty || store == null ||

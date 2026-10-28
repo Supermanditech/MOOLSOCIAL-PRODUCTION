@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {AccountPlansService} from "../account/plans_service.js";
 import {AccountProfileService} from "../account/profile_service.js";
 import {ProfileWorkspacePreparationContext} from "./profile_context.js";
-import {WorkspaceCatalogueService, type WorkspaceCatalogueRepository} from "../workspace/workspace_catalogue_service.js";
+import {WorkspaceCatalogueService, type WorkspaceCatalogueRepository, type StorePublicDetailsRecord} from "../workspace/workspace_catalogue_service.js";
 import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext,OriginalStoreOperationalPreparationContext,OriginalPurchasedStarsPreparationContext,OriginalStoreReceivingPreparationContext,OriginalStoreCouponPreparationContext} from "./domain_context.js";
 import {digest,assertStrictSchema} from './model_contract.js';
 import {FirestorePromotionRepository,WorkspacePromotionService} from '../workspace/workspace_promotion_service.js';
@@ -48,6 +48,67 @@ function supplierDraftFixture() {
   return {source, input, original, plans, onRead: (fn: typeof onRead) => {onRead = fn;},
     paid: (value: boolean) => {paid = value;}, approved: (value: boolean) => {approved = value;},
     member: (value: boolean) => {member = value;}, bump: () => {version++;}, advance: () => {clock = new Date(clock.getTime() + 60_001);}};
+}
+
+// Original owner-checked public-details service, isolated repository ports only.
+function storeDetailsFixture(){
+  const authority=supplierDraftFixture(),storeId=authority.input.scope.storeId;
+  let reads=0,writes=0,foreign=false,afterRead=()=>{};
+  let head:StorePublicDetailsRecord|undefined={schemaVersion:1,realm:'evaluation',storeId,revision:1,publishedAt:'2026-10-27T08:00:00.000Z',
+    details:{street:'HOST મૂળ માર્ગ',city:'Ahmedabad',state:'Gujarat',pinCode:'380001',publicContactPhone:'+91 98765 43210',openingTime:'09:00',closingTime:'18:00',businessType:'retailer'}};
+  const repository:WorkspaceCatalogueRepository={realm:'evaluation',
+    async store(id){return id!==storeId?undefined:{schemaVersion:1,caseId:'HOST-details-case',ownerUserId:foreign?'HOST-other-owner':actor.uid,
+      familyId:'products-trade',profileId:'retailer-grocery',name:'HOST original Store',area:'HOST',primaryActivity:'Groceries',proofReferences:{},
+      alternateMobileVerified:false,idempotencyKey:'HOST-source-only',requestFingerprint:'HOST-source-only',status:'live',plan:'free',
+      createdAt:'2026-10-27T08:00:00.000Z',updatedAt:'2026-10-27T08:00:00.000Z',workspaceId:storeId};},
+    async save(){writes++;throw Error('No writes permitted');},async page(){return [];},async catalogue(){return undefined;},
+    async readStorePublicDetails(id,owner){assert.equal(id,storeId);assert.equal(owner,actor.uid);reads++;afterRead();return head&&structuredClone(head);},
+    async saveStorePublicDetails(){writes++;throw Error('No writes permitted');},
+    async reconcileStorePublicDetails(){writes++;throw Error('No recovery effects permitted');}};
+  const catalogue=new WorkspaceCatalogueService(repository,{catalogueId:'HOST-original-catalogue',tenantId:'HOST-original-tenant'},()=>at);
+  const source=new CompositePreparationContext({original:authority.original,storePublicDetails:{realm:'evaluation',catalogue},now:()=>at});
+  return {authority,source,catalogue,input:{...authority.input,actionId:'AI-ACT-320'},counts:()=>({reads,writes}),head:()=>head,
+    change:(value:StorePublicDetailsRecord|undefined)=>{head=value;},foreign:()=>{foreign=true;},afterRead:(fn:()=>void)=>{afterRead=fn;}};
+}
+
+test('Store public details actual original service and metadata retain only supported public native fields without writes',async()=>{
+  const f=storeDetailsFixture(),context=await f.source.read(actor,f.input),tool=context.tools[0]!;
+  assert.equal(tool.actionId,'AI-ACT-320');assert.equal(tool.entityId,null);assertStrictSchema(tool.parameters);
+  assert.match(tool.sourceRevision,/^store-public-details:evaluation:[a-f0-9]{64}$/u);
+  const args={apply:['street','publicContactPhone'],street:'  HOST नया मार्ग\nShop 4  ',city:'',state:'',pinCode:'',publicContactPhone:' +91 98765 43210 ',businessType:''};
+  const result=tool.resolveTarget!(args);assert.deepEqual(result.fields,{street:args.street,publicContactPhone:args.publicContactPhone});
+  assert(tool.validate(result.fields));assert(!tool.validate({}));
+  for(const fields of [{legalName:'private'},{gstin:'private'},{openingTime:'09:00'},{address:'hidden'},{businessType:'superadmin'},{street:4},{street:'bad\u0000text'}])assert(!tool.validate(fields));
+  for(const apply of [[],['street','street'],['gstin']])assert.throws(()=>tool.resolveTarget!({...args,apply}),/invalid_model_result/u);
+  const publish=await f.source.read(actor,{...f.input,actionId:'AI-ACT-321'});assertStrictSchema(publish.tools[0]!.parameters);
+  assert(publish.tools[0]!.validate({}));assert(!publish.tools[0]!.validate({published:true}));
+  assert.deepEqual((context.modelContext as {record:unknown}).record,f.head());
+  const metadata=await handleAssistantCanonicalContextRequest({method:'POST',headers:{authorization:'Bearer HOST-only','x-firebase-appcheck':'HOST-only'},bodyBytes:100,
+    body:{operation:'read',payload:{scope:f.input.scope,nativeSelectionVersion:1}}},
+    {projectId:actor.projectId,enabled:true,context:f.source,now:()=>at,async verifyIdToken(){return actor;},async verifyAppCheck(){return {};}});
+  assert.equal(metadata.status,200);assert(metadata.body.ok);
+  const encoded=JSON.stringify(metadata.body);for(const id of ['320','321'])assert(encoded.includes('AI-ACT-'+id));
+  for(const id of ['318','319','322','323','324','326','327','328'])assert(!encoded.includes('AI-ACT-'+id));
+  assert(!encoded.includes('HOST મૂળ માર્ગ'));assert.equal(f.counts().writes,0);
+  if(process.env.AI_DOMAIN_STORE_DETAILS_EXPORT_PATH){const path=process.env.AI_DOMAIN_STORE_DETAILS_EXPORT_PATH;assert(isAbsolute(path));
+    writeFileSync(path,JSON.stringify({hostOnly:true,actor,scope:f.input.scope,metadata:metadata.body,details:f.head(),fields:result.fields},null,2)+'\n',{flag:'wx'});}
+  await f.source.readPrepared(actor,f.input,{kind:'proposal',id:'HOST-public-details-proposal',title:'Review public details',summary:'HOST isolated original fields',actionId:tool.actionId,entityId:null,sourceRevision:tool.sourceRevision,fields:result.fields});
+  f.change({...f.head()!,revision:2});await assert.rejects(f.source.readPrepared(actor,f.input,{kind:'proposal',id:'HOST-public-details-proposal',title:'Review public details',summary:'HOST isolated original fields',actionId:tool.actionId,entityId:null,sourceRevision:tool.sourceRevision,fields:result.fields}),/stale_preparation/u);
+  f.change(undefined);const empty=await f.source.read(actor,f.input);assert.equal((empty.modelContext as {record:unknown}).record,null);
+  assert.notEqual(empty.revision,context.revision);assert.equal(f.counts().writes,0);
+});
+for(const fault of ['paid','approval','member','changed-member','foreign-original-owner','foreign-store','entity','personal','catalogue-selection','future-head','unavailable-source']as const){
+  test('Store public details actual original authority rejects '+fault+' without write or recovery',async()=>{
+    const f=storeDetailsFixture();let input={...f.input};
+    if(fault==='paid')f.authority.paid(false);if(fault==='approval')f.authority.approved(false);if(fault==='member')f.authority.member(false);
+    if(fault==='changed-member')f.afterRead(()=>f.authority.member(false));if(fault==='foreign-original-owner')f.foreign();
+    if(fault==='future-head')f.change({...f.head()!,publishedAt:'2026-10-29T08:00:00.000Z'});
+    if(fault==='foreign-store')input={...input,scope:{audience:'workspace',storeId:'HOST-other-store'}};
+    const request={...input,...(fault==='entity'?{entityId:'HOST-other-record'}:{}),...(fault==='personal'?{scope:{audience:'personal' as const,storeId:null}}:{}),
+      ...(fault==='catalogue-selection'?{catalogueListingIds:['listing-'+ 'a'.repeat(64)]}:{})};
+    const source=fault==='unavailable-source'?new CompositePreparationContext({original:f.authority.original,now:()=>at}):f.source;
+    await assert.rejects(source.read(actor,request));assert.equal(f.counts().writes,0);
+  });
 }
 
 test('Supplier drafts actual approved paid authority prepares only user text and original native query', async () => {

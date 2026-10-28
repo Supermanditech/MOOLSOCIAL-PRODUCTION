@@ -5707,6 +5707,53 @@ class _SettingsPublicJournal implements WorkspacePublicDetailsJournal {
   }
   @override Future<void> removePending(WorkspacePublicDetailsIntent value) async { original = null; }
 }
+// Isolated original Work/owned-public-details wire; never installed on a phone.
+class _OriginalSettingsHost {
+  final journal = _SettingsPublicJournal();
+  final operations = <String>[];
+  late _AuthenticatedNativeScopeFixture native;
+  late _NativeScopeProofStore publication;
+  bool disposed = false;
+  Future<void> dispose() async { if (disposed) return; disposed = true; await native.dispose(); }
+  bool revoked = false;
+  int journalFactories = 0;
+  Future<void> ready() async {
+    final endpoint = Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
+    final wire = catalogue_fixture.OwnerTransport((body) async {
+      final operation = body['operation'] as String; operations.add(operation);
+      if (operation == 'readStorePublicDetails') return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+        'schemaVersion': 1, 'realm': 'evaluation', 'storeId': 'WK-510001', 'storeClassificationReadbackVersion': 1,
+        'operation': operation, 'idempotencyKey': null, 'record': null, 'locationVerified': false, 'publicAvailabilityConfirmed': false}}));
+      if (operation != 'listWorkspaces') return const SocialContentResponse(statusCode: 503, body: '{}');
+      final checked = DateTime.now().toUtc().subtract(const Duration(seconds: 1));
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {'workspaces': revoked ? [] : [{
+        'caseId': 'WP-240701', 'status': 'live', 'plan': 'free', 'workspaceId': 'WK-510001', 'profileId': 'retailer-grocery',
+        'name': 'HOST original settings Store', 'area': 'HOST', 'primaryActivity': 'Groceries',
+        'access': {'schemaVersion': 1, 'state': 'active', 'accountId': 'host-native-scope-user', 'caseId': 'WP-240701',
+          'workspaceId': 'WK-510001', 'profileId': 'retailer-grocery', 'checkedAt': checked.toIso8601String(),
+          'applicationUpdatedAt': checked.subtract(const Duration(seconds: 10)).toIso8601String(),
+          'membership': {'schemaVersion': 1, 'state': 'active', 'membershipId': 'HOST-settings-member',
+            'workspaceId': 'WK-510001', 'workspaceProfileId': 'retailer-grocery', 'version': 1,
+            'effectiveFrom': checked.subtract(const Duration(days: 1)).toIso8601String(),
+            'expiresAt': checked.add(const Duration(hours: 1)).toIso8601String()}}}]}}));
+    });
+    native = _AuthenticatedNativeScopeFixture(connectedPrincipal: true, makeWork: (contact, purchase, inventory, trading) {
+      publication = _NativeScopeProofStore(contact.accountScope);
+      return WorkSession(gateway: AuthenticatedWorkGateway(endpoint: endpoint, credentials: catalogue_fixture.Credentials(), transport: wire),
+        catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: endpoint, credentials: catalogue_fixture.Credentials(),
+          transport: wire, realm: 'evaluation', storeClassificationReadbackSupported: true),
+        publicDetailsJournalFactory: (_) { journalFactories++; return journal; },
+        publicationPreferencesStoreFactory: (_) => publication,
+        contactDraftStore: contact, purchaseEntryStore: purchase, inventoryStore: inventory,
+        tradingPreferencesStoreFactory: (_) => trading, catalogueReference: workspaceMasterCatalogue);
+    });
+    await native.ready();
+  }
+  WorkspacePublicDetailsIntent pending() => WorkspacePublicDetailsIntent(ownerAccountId: 'host-native-scope-user', realm: 'evaluation',
+    storeId: 'WK-510001', expectedRevision: 0, idempotencyKey: 'HOST-original-public-update',
+    details: WorkspacePublicDetailsFields.fromJson({'street': 'HOST original road', 'city': 'Ahmedabad', 'state': 'Gujarat',
+      'pinCode': '380001', 'publicContactPhone': '', 'openingTime': '', 'closingTime': ''}));
+}
 class _SettingsPublicGateway implements WorkspacePublicDetailsOwnerGateway {
   int writes = 0;
   WorkspacePublicDetailsWriteState outcome = WorkspacePublicDetailsWriteState.saved;
@@ -9404,6 +9451,72 @@ void main() {
   registerReceiving251ReadOnlyTests();
   _settlementNativeTests();
   _work02NativeTests();
+  testWidgets('AI-SETTINGS-ORIGINAL readiness reads pending only and rejects source retirement without adopting inputs', (tester) async {
+    final f = _OriginalSettingsHost(); await f.ready(); addTearDown(f.dispose);
+    final work = f.native.work, before = f.native.writes, operations = f.operations.length;
+    final fields = work.workspacePublicationDetails.toJson();
+    expect(await work.workspaceAssistantPublicDetailsSourceReady('production', inputCurrent: () => true), isFalse);
+    expect(f.journalFactories, 0);
+    expect(await work.workspaceAssistantPublicDetailsSourceReady('evaluation', inputCurrent: () => true), isTrue);
+    expect(f.journalFactories, 1, reason: 'No publisher was constructed; only the original journal factory was read.');
+    expect(f.operations.length, operations); expect(f.native.writes, before);
+    expect(work.workspacePublicationDetails.toJson(), fields);
+    final gate = Completer<void>(); f.journal.readGate = gate;
+    var current = true;
+    final pending = work.workspaceAssistantPublicDetailsSourceReady('evaluation', inputCurrent: () => current);
+    await tester.pump(); current = false; gate.complete(); expect(await pending, isFalse);
+    expect(f.native.writes, before); expect(work.workspacePublicationDetails.toJson(), fields);
+    current = true;
+    final slow = Completer<void>(); f.journal.readGate = slow;
+    final timedOut = work.workspaceAssistantPublicDetailsSourceReady('evaluation', inputCurrent: () => current);
+    await tester.pump(const Duration(seconds: 11)); expect(await timedOut, isFalse);
+    slow.complete(); await tester.pump();
+    expect(f.native.writes, before); expect(work.workspacePublicationDetails.toJson(), fields);
+    f.journal.readGate = null; f.revoked = true; await work.refreshFeed();
+    expect(await work.workspaceAssistantPublicDetailsSourceReady('evaluation', inputCurrent: () => true), isFalse);
+    await tester.pumpWidget(const SizedBox()); await f.dispose();
+  }, skip: const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL') !=
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
+  testWidgets('AI-SETTINGS-ORIGINAL pending update blocks preparation and remains untouched without reconcile', (tester) async {
+    final f = _OriginalSettingsHost(); await f.ready(); addTearDown(f.dispose);
+    f.journal.original = f.pending(); final fingerprint = f.journal.original!.fingerprint;
+    final before = f.native.writes, operations = f.operations.length;
+    expect(await f.native.work.workspaceAssistantPublicDetailsSourceReady('evaluation', inputCurrent: () => true), isFalse);
+    expect(f.journal.original!.fingerprint, fingerprint); expect(f.native.writes, before); expect(f.operations.length, operations);
+    await tester.pumpWidget(f.native.app); await tester.pumpAndSettle();
+    for (final action in ['AI-ACT-320', 'AI-ACT-321']) {
+      final adapter = f.native.adapters(tester).singleWhere((value) => value.actionId == action);
+      expect(await adapter.snapshot(f.native.readContext(), null), isNull);
+    }
+    expect(f.journal.original!.fingerprint, fingerprint);
+    expect(f.operations.any((value) => value == 'saveStorePublicDetails' || value == 'reconcileStorePublicDetails'), isFalse);
+    expect(f.publication.saves, 0); await tester.pumpWidget(const SizedBox()); await f.dispose();
+  }, skip: const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL') !=
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
+  for (final action in ['AI-ACT-320', 'AI-ACT-321']) {
+    testWidgets('AI-SETTINGS-ORIGINAL $action opens actual native review with no Save or Publish effect', (tester) async {
+      final f = _OriginalSettingsHost(); await f.ready(); addTearDown(f.dispose);
+      await tester.pumpWidget(f.native.app); await tester.pumpAndSettle(); final before = f.native.writes;
+      final fields = action == 'AI-ACT-320' ? <String, Object?>{'street': 'HOST नया मार्ग', 'publicContactPhone': '+91 98765 43210'} : <String, Object?>{};
+      final original = f.native.work.workspacePublicationDetails.toJson();
+      final proposal = await stockAssistantProposal(tester, f.native, action, fields: fields);
+      final adapter = f.native.adapters(tester).singleWhere((value) => value.actionId == action);
+      final opened = adapter.openReview(proposal, () => true); await tester.pumpAndSettle();
+      expect(find.text('Review Store settings'), findsOneWidget); expect(find.byType(StorePublicationSettings), findsOneWidget);
+      if (action == 'AI-ACT-320') {
+        final section = find.byKey(const PageStorageKey('work-publication-address-section'));
+        await tester.ensureVisible(section); await tester.tap(section); await tester.pumpAndSettle();
+        expect(tester.widget<TextFormField>(find.byKey(const Key('work-publication-street'))).controller!.text, fields['street']);
+        expect(tester.widget<TextFormField>(find.byKey(const Key('work-publication-publicContactPhone'))).controller!.text, fields['publicContactPhone']);
+      }
+      expect(f.native.work.workspacePublicationDetails.toJson(), original); expect(f.native.writes, before);
+      expect(f.operations.any((value) => value == 'saveStorePublicDetails' || value == 'reconcileStorePublicDetails'), isFalse);
+      await tester.pageBack(); await tester.pumpAndSettle(); await opened;
+      expect(f.native.writes, before); expect(f.journal.original, isNull); expect(f.publication.saves, 0);
+      await tester.pumpWidget(const SizedBox()); await f.dispose();
+    }, skip: const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL') !=
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
+  }
   testWidgets('AI-REPORT canonical reader readiness uses current original membership realm and enabled section', (tester) async {
     final endpoint = Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
     var calls = 0, revoked = false, current = true;
