@@ -518,4 +518,16 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,4),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainCartClearStageOwners $row[0] $cartClearSeal).Count -eq $row[1]) "cart-clear checkpoint exact stage $($row[0]) owner count"
 }
+$quoteRecurrence=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).quoteImplementationRecurrence20261029
+Check (Test-AiDomainQuoteRecurrenceAdmission $quoteRecurrence) 'exact registered quote implementation recurrence'
+Check (!(Test-AiDomainQuoteRecurrenceAdmission $null)) 'reject absent quote recurrence'
+Check (@(Get-AiDomainQuoteRecurrenceAdmissionOwners).Count -eq 4) 'four existing recurrence metadata owners'
+foreach($property in @('baseline','registryAfterSha256','kind','metadataCommitSubject')){
+ $bad=($quoteRecurrence|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainQuoteRecurrenceAdmission $bad)) "reject changed quote recurrence $property"
+}
+$bad=($quoteRecurrence|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.owners+=@('foreign')
+Check (!(Test-AiDomainQuoteRecurrenceAdmission $bad)) 'reject expanded recurrence owners'
+$bad=($quoteRecurrence|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.incident.correctiveSourceRetryPerformed=$true
+Check (!(Test-AiDomainQuoteRecurrenceAdmission $bad)) 'reject changed incident boundary'
 Write-Output "AI domain batch admission checks passed: $n."

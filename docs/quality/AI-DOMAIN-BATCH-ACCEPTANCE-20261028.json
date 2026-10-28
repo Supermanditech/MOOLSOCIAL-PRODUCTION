@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 24,
+  "localMetadataCommits": 25,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -6205,5 +6205,58 @@
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
     "sourceCommit": "535b85ed408a40236641ab9317f7886f61603df0"
+  },
+  "quoteImplementationRecurrence20261029": {
+    "baseline": "7eb5914fb8fb484eac9157da888cac6480b967b4",
+    "branch": "work/codex-backend/ai-domain-batch-20261028",
+    "kind": "existing_mandatory_regression_recurrence_registration_only",
+    "metadataCommitSubject": "coordination(ai-domain-batch-20261028): record retained quote implementation regression recurrence",
+    "registryCount": 4624,
+    "registryBeforeSha256": "4B3DF3778AC782C95C287D209493C91052F7497C92CEB700FAC40ABF0DA30F2A",
+    "registryAfterSha256": "C67831B680E27B5A85096539A4E95D7D3333C5D4DC242A3D479319143BAA52D7",
+    "owners": [
+      "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "config/codex-development-regression-registry.json",
+      "scripts/ai-domain-batch-admission.ps1",
+      "scripts/test-ai-domain-batch-admission.ps1"
+    ],
+    "incident": {
+      "id": "AI-DOMAIN-BATCH-20-QUOTE-IMPLEMENTATION-RECURRENCE-20261029",
+      "atUtc": "2026-10-28T19:48:22.076661+00:00",
+      "state": "registered_before_corrective_retry",
+      "baseline": "7eb5914fb8fb484eac9157da888cac6480b967b4",
+      "sourceOwner": "backend/functions/src/assistant/domain_context.ts",
+      "mistakes": [
+        {
+          "registryId": "REG-20260810-923-C27C-SWITCHER-RADIUS-PATCH-WRONG-OWNER-REJECTION",
+          "rootCause": "An unqualified repeated const records declaration anchored the type patch; it changed the original receiving collection at1531 instead of the new retained-quote collection at1855.",
+          "detection": "Second --noEmit compiler run reported receiving row.reference unknown and the unchanged quote implicit-any error. No feature/evidence commit, emitted JS or OPPO restart occurred.",
+          "prevention": "Restore the unrelated declaration exactly; anchor the quote declaration with its unique quoteId read loop; verify literal locations/diff, then rerun compile and original receiving/quote regressions.",
+          "evidence": [
+            "scope05-quotes-typecheck-v1.log",
+            "scope05-quotes-typecheck-v2.log"
+          ]
+        },
+        {
+          "registryId": "REG-20261002-4652-PURCHASE-HISTORY-RESUME-PREFLIGHT",
+          "rootCause": "A source read used64physical lines containing very long one-line owner arrays; output exceeded1900tokens.",
+          "detection": "Tool reported2475tokens and truncation. Omitted portions are unqualified.",
+          "prevention": "Recover exact bounded function/owner projections with measured serialized length; never rely on partial output or group mandatory owners.",
+          "evidence": [
+            "Retained truncated source-read tool result."
+          ]
+        }
+      ],
+      "correctiveSourceRetryPerformed": false,
+      "sourceClaimNotExpanded": true,
+      "newPolicyOrBusinessRule": false,
+      "registryBeforeSha256": "4B3DF3778AC782C95C287D209493C91052F7497C92CEB700FAC40ABF0DA30F2A",
+      "registryAfterSha256": "C67831B680E27B5A85096539A4E95D7D3333C5D4DC242A3D479319143BAA52D7",
+      "registryEntryCount": 4624
+    },
+    "newPolicyOrBusinessRule": false,
+    "runtimeOwnerExpansion": false,
+    "sourceOrProductionAcceptanceClaimed": false,
+    "oneLocalMetadataCommitAuthorizedByStandingScope": true
   }
 }

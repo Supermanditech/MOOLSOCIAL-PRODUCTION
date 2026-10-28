@@ -20261,7 +20261,20 @@
         "scripts/check-codex-development-regression-memory.ps1"
       ],
       "evidence": [
-        "docs/quality/UAW-C27C-SWITCHER-RADIUS-PATCH-WRONG-OWNER-REJECTION-20260810.md"
+        "docs/quality/UAW-C27C-SWITCHER-RADIUS-PATCH-WRONG-OWNER-REJECTION-20260810.md",
+        "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json#quoteImplementationRecurrence20261029"
+      ],
+      "recurrences": [
+        {
+          "incidentId": "AI-DOMAIN-BATCH-20-QUOTE-IMPLEMENTATION-RECURRENCE-20261029",
+          "state": "registered_before_corrective_retry",
+          "rootCause": "An unqualified repeated const records declaration anchored the type patch; it changed the original receiving collection at1531 instead of the new retained-quote collection at1855.",
+          "detection": "Second --noEmit compiler run reported receiving row.reference unknown and the unchanged quote implicit-any error. No feature/evidence commit, emitted JS or OPPO restart occurred.",
+          "prevention": "Restore the unrelated declaration exactly; anchor the quote declaration with its unique quoteId read loop; verify literal locations/diff, then rerun compile and original receiving/quote regressions.",
+          "evidence": [
+            "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json#quoteImplementationRecurrence20261029"
+          ]
+        }
       ]
     },
     {
@@ -105700,10 +105713,23 @@
       ],
       "evidence": [
         "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md",
-        "config/codex-subagent-coordination-policy.json"
+        "config/codex-subagent-coordination-policy.json",
+        "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json#quoteImplementationRecurrence20261029"
       ],
       "retainedTaskEvidence": "C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/purchase-r12-resume-preflight-20261002.json. All required memory pages recovered through verified EOF3698. Exact archived zero-byte preimage found unchanged; implementation memory replay with EvidenceArchiveRoot and coordination at registry4605 both exited0. Those prerequisites do not establish R12 implementation or device acceptance. Architect reviewed provided facts without repository/device access. No application code, saved purchase records, tests or OPPO actions changed during these failed reads.",
-      "originalRegistryId": "REG-20261002-4635-PURCHASE-HISTORY-RESUME-PREFLIGHT"
+      "originalRegistryId": "REG-20261002-4635-PURCHASE-HISTORY-RESUME-PREFLIGHT",
+      "recurrences": [
+        {
+          "incidentId": "AI-DOMAIN-BATCH-20-QUOTE-IMPLEMENTATION-RECURRENCE-20261029",
+          "state": "registered_before_corrective_retry",
+          "rootCause": "A source read used64physical lines containing very long one-line owner arrays; output exceeded1900tokens.",
+          "detection": "Tool reported2475tokens and truncation. Omitted portions are unqualified.",
+          "prevention": "Recover exact bounded function/owner projections with measured serialized length; never rely on partial output or group mandatory owners.",
+          "evidence": [
+            "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json#quoteImplementationRecurrence20261029"
+          ]
+        }
+      ]
     },
     {
       "id": "REG-20260922-4644-CURSOR-STOREFRONT-MORE-STORES-NAVIGATION",
