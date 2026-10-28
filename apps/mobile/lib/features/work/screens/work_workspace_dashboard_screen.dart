@@ -5785,6 +5785,7 @@ class _WorkWorkspaceDashboardScreenState
           if (!current() || action == 'AI-ACT-321' && !loaded) return null;
         }
         if (publisher != null && (!await publisher.restore() || !current() || publisher.pending != null || publisher.busy)) return null;
+        if (action == 'AI-ACT-321' && source.workspacePublicDetailsFieldsForPublishing == null) return null;
       }
     }
     if (action == 'AI-ACT-322' &&
@@ -5834,6 +5835,9 @@ class _WorkWorkspaceDashboardScreenState
             _financeAssistantContext(hostContext)?.binding == ctx.binding && _financePermitted(ctx))) {
         return MoolAssistantReviewResult.unavailable;
       }
+    }
+    if (action == 'AI-ACT-321' && source.workspacePublicDetailsFieldsForPublishing == null) {
+      return MoolAssistantReviewResult.unavailable;
     }
     final fingerprint = _settingsAssistantData(source, action);
     final settingsPublisher = const {'AI-ACT-320', 'AI-ACT-321'}.contains(action) ? source.workspacePublicDetailsPublisher : null;

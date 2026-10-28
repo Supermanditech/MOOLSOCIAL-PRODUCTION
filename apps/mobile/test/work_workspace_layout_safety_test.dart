@@ -9493,9 +9493,31 @@ void main() {
     expect(f.publication.saves, 0); await tester.pumpWidget(const SizedBox()); await f.dispose();
   }, skip: const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL') !=
       'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
+  testWidgets('AI-SETTINGS-ORIGINAL publication cannot offer an empty saved-details review', (tester) async {
+    final f = _OriginalSettingsHost(); await f.ready(); addTearDown(f.dispose);
+    expect(await f.native.work.loadWorkspacePublicDetailsInputs(), isTrue);
+    expect(f.native.work.workspacePublicDetailsFieldsForPublishing, isNull);
+    await tester.pumpWidget(f.native.app); await tester.pumpAndSettle();
+    final adapter = f.native.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-321');
+    final snapshot = await adapter.snapshot(f.native.readContext(), null);
+    try {
+      expect(snapshot, isNull, reason: 'Publication requires an actual valid saved original, not a blank-form shortcut.');
+      expect(f.publication.saves, 0); expect(f.journal.original, isNull);
+      expect(f.operations.any((value) => value == 'saveStorePublicDetails' || value == 'reconcileStorePublicDetails'), isFalse);
+    } finally { await tester.pumpWidget(const SizedBox()); await f.dispose(); }
+  }, skip: const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL') !=
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
   for (final action in ['AI-ACT-320', 'AI-ACT-321']) {
     testWidgets('AI-SETTINGS-ORIGINAL $action opens actual native review with no Save or Publish effect', (tester) async {
       final f = _OriginalSettingsHost(); await f.ready(); addTearDown(f.dispose);
+      if (action == 'AI-ACT-321') {
+        expect(await f.native.work.loadWorkspacePublicDetailsInputs(), isTrue);
+        expect(f.native.work.saveWorkspacePublicationDetails(const WorkspaceStorePublicationDetails(
+          street: 'HOST saved road', city: 'Ahmedabad', state: 'Gujarat', pinCode: '380001', publicContactPhone: '+919876543210')), isTrue);
+        await f.native.work.workspacePublicationPreferencesWrite;
+        expect(f.native.work.workspacePublicDetailsFieldsForPublishing, isNotNull);
+      }
+      final publicationWrites = f.publication.saves;
       await tester.pumpWidget(f.native.app); await tester.pumpAndSettle(); final before = f.native.writes;
       final fields = action == 'AI-ACT-320' ? <String, Object?>{'street': 'HOST नया मार्ग', 'publicContactPhone': '+91 98765 43210'} : <String, Object?>{};
       final original = f.native.work.workspacePublicationDetails.toJson();
@@ -9508,11 +9530,26 @@ void main() {
         await tester.ensureVisible(section); await tester.tap(section); await tester.pumpAndSettle();
         expect(tester.widget<TextFormField>(find.byKey(const Key('work-publication-street'))).controller!.text, fields['street']);
         expect(tester.widget<TextFormField>(find.byKey(const Key('work-publication-publicContactPhone'))).controller!.text, fields['publicContactPhone']);
+      } else {
+        final section = find.byKey(const PageStorageKey('work-publication-address-section'));
+        await tester.ensureVisible(section); await tester.tap(section); await tester.pumpAndSettle();
+        expect(tester.widget<TextFormField>(find.byKey(const Key('work-publication-street'))).controller!.text, 'HOST saved road');
       }
       expect(f.native.work.workspacePublicationDetails.toJson(), original); expect(f.native.writes, before);
       expect(f.operations.any((value) => value == 'saveStorePublicDetails' || value == 'reconcileStorePublicDetails'), isFalse);
       await tester.pageBack(); await tester.pumpAndSettle(); await opened;
-      expect(f.native.writes, before); expect(f.journal.original, isNull); expect(f.publication.saves, 0);
+      expect(f.native.writes, before); expect(f.journal.original, isNull); expect(f.publication.saves, publicationWrites);
+      if (action == 'AI-ACT-321') {
+        expect(f.native.work.saveWorkspacePublicationDetails(WorkspaceStorePublicationDetails.fromJson({
+          ...f.native.work.workspacePublicationDetails.toJson(), 'street': ''})), isTrue);
+        await f.native.work.workspacePublicationPreferencesWrite;
+        expect(f.native.work.workspacePublicDetailsFieldsForPublishing, isNull);
+        final changedWrites = f.publication.saves;
+        expect(await adapter.openReview(proposal, () => true), scope_contract.MoolAssistantReviewResult.stale,
+          reason: 'The original saved details changed after the proposal; the old handoff must retire.');
+        expect(f.publication.saves, changedWrites);
+        expect(f.operations.any((value) => value == 'saveStorePublicDetails' || value == 'reconcileStorePublicDetails'), isFalse);
+      }
       await tester.pumpWidget(const SizedBox()); await f.dispose();
     }, skip: const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL') !=
       'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace');
