@@ -12,7 +12,7 @@ import {getFirestore} from 'firebase-admin/firestore';
 import {randomUUID} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {isAbsolute} from 'node:path';
-import {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService,type TrustedPlacementReceipt, type TrustedOperationalOrderEvidence, type PurchaseReference,type ProductFeedbackTarget} from '../workspace/workspace_purchase_projection_service.js';
+import {WorkspaceBulkQuoteService, WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService,type TrustedPlacementReceipt, type TrustedOperationalOrderEvidence, type PurchaseReference,type ProductFeedbackTarget} from '../workspace/workspace_purchase_projection_service.js';
 import {handleAssistantCanonicalContextRequest} from "./domain_context_http.js";
 import {AssistantPreparationService, type PreparationRequestStore, type PreparationState} from "./model_service.js";
 const actor = {uid: "host-domain-owner", projectId: "host-domain-project"};
@@ -936,4 +936,103 @@ test("Domain original preparation service accepts only the source-bound native s
   assert.equal(models, 1); assert.deepEqual(settled, ["completed"]); assert.equal(f.counts().writes, 0);
   f.revoke(); await assert.rejects(service.handle(actor, {operation: "status", payload: {scope: payload.scope, requestId: payload.requestId}}));
   assert.equal(models, 1); assert.equal(f.counts().writes, 0);
+});
+
+
+test('Retained quotes use actual original buyer-owned service without writes; stale, foreign and expanded proposals fail', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-ai-retained-${randomUUID().slice(0, 8)}`}, `retained-${randomUUID()}`), db = getFirestore(app);
+  const f = purchaseReferenceFixture(), storeId = 'host-quote-store', skuId = 'host-quote-sku';
+  const listingId = 'listing-' + digest([1, 'evaluation', storeId, skuId, 'bulk']);
+  const catalogue = {bulkQuotationSnapshot: async () => [{state: 'ready', realm: 'evaluation', storeId,
+    publicStore: {id: storeId, name: 'HOST labelled supplier only', profileId: 'wholesaler'}, items: [{
+      skuId, revision: 1, canonicalProductId: 'host-canonical', verifiedPackId: 'host-pack',
+      content: {title: 'HOST labelled product', variant: 'મૂળ\nनमस्ते'}, pack: {label: '25 kg bag'},
+      channels: [{kind: 'bulk', minimumOrder: 10, quantityStep: 5, validUntil: '2026-10-29T08:00:00.000Z'}],
+      listings: [{schemaVersion: 1, realm: 'evaluation', listingId, storeId, skuId, channel: 'bulk', canonicalProductId: 'host-canonical', verifiedPackId: 'host-pack'}],
+      supplierPolicy: {schemaVersion: 1, realm: 'evaluation', storeId, skuId, observedAt: at.toISOString(), state: 'ready', revision: 1,
+        requiresAcceptance: true, policy: {id: 'host-policy', storeId, revision: 'policy-v1', productIds: [skuId], requiresAcceptance: true,
+          validUntil: null, title: 'HOST terms only', body: 'Isolated original-service fixture; never supplier authority on OPPO'}},
+    }]}]};
+  const quotes = new WorkspaceBulkQuoteService(db, 'evaluation', catalogue, () => at);
+  try {
+    await db.collection('workspaceProfiles').doc('host-quote-case').set({schemaVersion: 1, caseId: 'host-quote-case', workspaceId: storeId,
+      ownerUserId: 'host-supplier', familyId: 'products-trade', profileId: 'wholesaler', status: 'live', shopEnabled: true});
+    const created = await quotes.request(actor.uid, {schemaVersion: 1, requestId: 'host-retained-request', storeId,
+      lines: [{lineId: 'host-line', skuId, listingId, skuRevision: 1, quantity: 10}]}) as {quoteId: string};
+    await quotes.offer('host-supplier', {schemaVersion: 1, quoteId: created.quoteId, operationId: 'host-offer', expectedRevision: 1,
+      validUntil: '2026-10-28T08:05:00.000Z', prices: [{lineId: 'host-line', unitPriceMinor: 10025}]});
+    await quotes.accept(actor.uid, {schemaVersion: 1, quoteId: created.quoteId, operationId: 'host-accept', expectedRevision: 2});
+    const head = await quotes.read(actor.uid, {quoteId: created.quoteId});
+    const source = new CompositePreparationContext({original: f.original, retainedQuotes: {realm: 'evaluation', source: quotes}, now: () => at});
+    const httpInput = {...f.f.input, body: {operation: 'read', payload: {scope: f.input.scope, retainedSupplierQuoteIds: [created.quoteId]}}};
+    const metadata = await handleAssistantCanonicalContextRequest(httpInput, {...f.f.deps, context: source});
+    assert.equal(metadata.status, 200); if (!metadata.body.ok) assert.fail('Expected original retained quote metadata');
+    assert.deepEqual(metadata.body.data.revisions.filter(row => row.entityId === created.quoteId).map(row => row.actionId).sort(), ['AI-ACT-348', 'AI-ACT-349']);
+    if (process.env.AI_DOMAIN_RETAINED_QUOTE_EXPORT_PATH) {
+      const path = process.env.AI_DOMAIN_RETAINED_QUOTE_EXPORT_PATH; assert(isAbsolute(path));
+      writeFileSync(path, JSON.stringify({hostOnly: true, actor, head, metadata: metadata.body, profileRevision: 'profile:3'}, null, 2) + '\n', {flag: 'wx'});
+    }
+    for (const actionId of ['AI-ACT-348', 'AI-ACT-349']) {
+      const input = {...f.input, actionId, entityId: created.quoteId};
+      const context = await source.read(actor, input), tool = context.tools[0]!;
+      assert.equal(tool.actionId, actionId); assert.equal(tool.entityId, created.quoteId);
+      assert.match(tool.sourceRevision, /^buyer-retained-quote:evaluation:[a-f0-9]{64}$/u);
+      const profile = await f.original.read(actor, {...input, actionId: null, entityId: null});
+      assert.equal(tool.sourceRevision, 'buyer-retained-quote:evaluation:' + digest([actor.projectId, actor.uid, profile.revision, head]));
+      assertStrictSchema(tool.parameters); assert(tool.validate({})); assert(!tool.validate({confirmed: true}));
+      const proposal = {kind: 'proposal' as const, id: 'host-quote-proposal', actionId, entityId: created.quoteId,
+        sourceRevision: tool.sourceRevision, fields: {}, title: 'Review', summary: 'Original native review required'};
+      await source.readPrepared(actor, input, proposal);
+      const requests = new HostRequests(); let modelCalls = 0;
+      const preparation = () => new AssistantPreparationService({projectId: actor.projectId, plans: f.f.plans, context: source, requests,
+        now: () => at, usage: {async reserve() {return {id: 'HOST-retained-quote-permit', validUntil: '2026-10-28T08:01:00.000Z'};}, async settle() {}},
+        model: {async prepare() {modelCalls++; return {kind: 'tool', name: tool.name, arguments: {}};}}});
+      const payload = {...input, requestId: 'HOST-retained-' + actionId, nativeTargets: [{actionId, entityId: created.quoteId}]};
+      const ready = await preparation().handle(actor, {operation: 'prepare', payload});
+      if (ready.state !== 'ready' || ready.reply.outcome.kind !== 'proposal') assert.fail('Expected original retained quote proposal');
+      assert.equal(ready.reply.outcome.entityId, created.quoteId); assert.equal(ready.reply.outcome.sourceRevision, tool.sourceRevision);
+      assert.deepEqual(ready.reply.outcome.fields, {});
+      assert.deepEqual(await preparation().handle(actor, {operation: 'prepare', payload}), ready);
+      assert.deepEqual(await preparation().handle(actor, {operation: 'status', payload: {scope: input.scope, requestId: payload.requestId}}), ready);
+      assert.equal(modelCalls, 1); assert.equal(f.writes(), 0);
+      await assert.rejects(source.readPrepared(actor, input, {...proposal, fields: {accepted: true}}));
+      await assert.rejects(source.readPrepared(actor, input, {...proposal, sourceRevision: 'foreign'}));
+      await assert.rejects(source.read({...actor, uid: 'other-buyer'}, input));
+      await assert.rejects(source.read(actor, {...input, scope: {audience: 'workspace', storeId}}));
+      await assert.rejects(source.read({...actor, tenantId: 'other-tenant'}, input));
+      const root = await source.read(actor, {...input, actionId: null, entityId: null, nativeTargets: [{actionId, entityId: created.quoteId}]});
+      const selector = root.tools.find(t => t.actionId === actionId)!;
+      assert(selector.resolveTarget); assert.equal(selector.resolveTarget({quoteId: created.quoteId}).sourceRevision, tool.sourceRevision);
+      assert.throws(() => selector.resolveTarget!({quoteId: 'foreign'}));
+      assert.throws(() => selector.resolveTarget!({quoteId: created.quoteId, confirmed: true}));
+      assert.deepEqual(await quotes.read(actor.uid, {quoteId: created.quoteId}), head);
+      assert.equal(f.writes(), 0);
+    }
+    const input = {...f.input, actionId: 'AI-ACT-349', entityId: created.quoteId};
+    const old = await source.read(actor, input);
+    const stale = {kind: 'proposal' as const, id: 'host-stale-quote', actionId: input.actionId, entityId: input.entityId,
+      sourceRevision: old.tools[0]!.sourceRevision, fields: {}, title: 'Review', summary: 'Original native review'};
+    f.bump(); await assert.rejects(source.readPrepared(actor, input, stale), /stale_preparation/u);
+    const newer = await source.read(actor, input); assert.equal(newer.tools.length, 1);
+    for (const fault of ['realm', 'viewer', 'owner', 'unknown-key', 'changed-during-read']) {
+      let reads = 0;
+      const unstable = new CompositePreparationContext({original: f.original, now: () => at, retainedQuotes: {realm: 'evaluation', source: {
+        async read(uid, query) {
+          reads++; const raw = await quotes.read(uid, query) as Record<string, unknown>;
+          if (fault === 'realm') return {...raw, realm: 'production'};
+          if (fault === 'viewer') return {...raw, viewerRole: 'supplier'};
+          if (fault === 'owner') return {...raw, customerReference: 'customer-' + '0'.repeat(32)};
+          if (fault === 'unknown-key') return {...raw, privileged: true};
+          return reads === 1 ? raw : {...raw, storeName: 'HOST changed original source'};
+        },
+      }}});
+      await assert.rejects(unstable.read(actor, input));
+      assert.deepEqual(await quotes.read(actor.uid, {quoteId: created.quoteId}), head);
+    }
+    await assert.rejects(source.read(actor, {...input, entityId: 'bulk-' + '0'.repeat(64)}));
+    f.onRead(() => f.f.deny()); await assert.rejects(source.read(actor, input));
+  } finally {await db.terminate(); await deleteApp(app);}
 });

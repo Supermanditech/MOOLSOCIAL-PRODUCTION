@@ -13,6 +13,14 @@ const assistantDomainPreferenceContextActions = {'AI-ACT-010', 'AI-ACT-011', 'AI
 const assistantDomainAddressContextActions = {'AI-ACT-024', 'AI-ACT-027'};
 const assistantDomainPurchaseReferenceContextActions = {'AI-ACT-032'};
 const assistantDomainCartClearContextActions = {'AI-ACT-020'};
+const assistantBuyerRetainedQuoteContextActions = {'AI-ACT-348', 'AI-ACT-349'};
+List<String> assistantRetainedSupplierQuoteSelection(Object? value) {
+  if (value is! List || value.length > 500 || value.toSet().length != value.length ||
+      value.any((id) => id is! String || !RegExp(r'^bulk-[a-f0-9]{64}$').hasMatch(id))) {
+    throw const AssistantModelFailure('invalid_request');
+  }
+  return List<String>.unmodifiable(value.cast<String>());
+}
 const assistantPrivateStarsContextActions={'AI-ACT-055'};
 const assistantStoreProductContextActions = {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-370', 'AI-ACT-220', 'AI-ACT-230', 'AI-ACT-222', 'AI-ACT-223', 'AI-ACT-226', 'AI-ACT-227', 'AI-ACT-371'};
 const assistantStoreDefaultContextActions = {'AI-ACT-218', 'AI-ACT-219'};
@@ -31,7 +39,7 @@ const assistantStorePublicDetailsContextActions={'AI-ACT-320','AI-ACT-321'};
 const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions,...assistantStoreSupplierDraftContextActions,...assistantStorePurchaseRootContextActions,...assistantStoreOrderBoardContextActions,...assistantStoreReportOwnerContextActions,...assistantStorePublicDetailsContextActions};
 const assistantDomainContextActions = {'AI-ACT-001', 'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
   ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions,
-  ...assistantDomainAddressContextActions,...assistantDomainPurchaseReferenceContextActions,...assistantDomainCartClearContextActions,...assistantPrivateStarsContextActions,
+  ...assistantDomainAddressContextActions,...assistantDomainPurchaseReferenceContextActions,...assistantDomainCartClearContextActions,...assistantBuyerRetainedQuoteContextActions,...assistantPrivateStarsContextActions,
   ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions,...assistantStoreOperationalContextActions,...assistantStoreReceivingOriginalContextActions,...assistantStoreCouponContextActions};
 
 abstract interface class AssistantDomainContextGatewaySource {
@@ -73,8 +81,10 @@ class AssistantDomainContextGateway {
     return value;
   }
   Future<AssistantCanonicalContextSnapshot> read(MoolAssistantContext context,
-      bool Function() current, {List<String>? catalogueListingIds}) async {
+      bool Function() current, {List<String>? catalogueListingIds, List<String>? retainedSupplierQuoteIds}) async {
     final selection = catalogueListingIds == null ? null : assistantCatalogueListingSelection(catalogueListingIds);
+    final quotes = retainedSupplierQuoteIds == null ? null : assistantRetainedSupplierQuoteSelection(retainedSupplierQuoteIds);
+    if (quotes != null && context.inWorkspace) throw const AssistantModelFailure('invalid_request');
     void check() {
       if (!available || !current() || !context.signedIn || context.accountScope != owner ||
           context.workspaceId != null && !context.inWorkspace || context.inWorkspace && !context.storeWorkspace) {
@@ -95,7 +105,8 @@ class AssistantDomainContextGateway {
       headers: {'Authorization': 'Bearer $token', 'X-Firebase-AppCheck': proof},
       body: {'operation': 'read', 'payload': {'scope': scope,
         if (compact) 'nativeSelectionVersion': 1,
-        if (selection != null) 'catalogueListingIds': selection}});
+        if (selection != null) 'catalogueListingIds': selection,
+        if (quotes != null) 'retainedSupplierQuoteIds': quotes}});
     check();
     if (response.statusCode == 401 || response.statusCode == 403) {
       // A later explicit read may use refreshed access. No private cache exists.
@@ -160,6 +171,8 @@ class AssistantDomainContextGateway {
           !RegExp(r'^buy-reference-owner:[a-f0-9]{64}$').hasMatch(revision))) _invalid();
       if (assistantDomainCartClearContextActions.contains(action) && (context.inWorkspace || entity != null ||
           !RegExp(r'^buy-cart-clear-owner:[a-f0-9]{64}$').hasMatch(revision))) _invalid();
+      if (assistantBuyerRetainedQuoteContextActions.contains(action) && (context.inWorkspace || entity == null ||
+          quotes == null || !quotes.contains(entity) || !RegExp(r'^buyer-retained-quote:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))) _invalid();
       if(assistantPrivateStarsContextActions.contains(action)&&(context.inWorkspace||entity==null||
         !RegExp(r'^buyer-product-stars:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))_invalid();
       if (assistantStoreProductContextActions.contains(action) && (!context.inWorkspace ||

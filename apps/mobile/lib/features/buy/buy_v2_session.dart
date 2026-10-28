@@ -7412,6 +7412,79 @@ class BuyV2Session extends ChangeNotifier {
   final _assistantPrivateStarsOrders=<String,List<WorkspaceProductFeedbackTarget>>{};
   Object _assistantPrivateStarsOwner=Object();
   Object? _assistantPrivateStarsIdentity;
+  int _assistantRetainedQuoteRead = 0;
+  /// Original read only. Do not initialise/reconcile quote controllers, replay
+  /// journals, adopt fetched heads, choose an agreement or mutate the Cart.
+  Future<Set<(String, String)>> readAssistantRetainedQuoteOriginals(Map<(String, String), String> expected, {
+    required String projectId, required String accountUserId, required String accountOwnerScope,
+    required String profileRevision, required bool Function() inputCurrent, required DateTime validUntil,
+  }) async {
+    final operation = ++_assistantRetainedQuoteRead, access = bulkQuotes, storage = customerStateStore;
+    if (expected.isEmpty || access == null || storage == null || accountOwnerScope.isEmpty ||
+        !RegExp(r'^profile:\d+$').hasMatch(profileRevision) ||
+        access.gateway.gateway.endpoint != Uri.https('asia-south1-$projectId.cloudfunctions.net', '/moolSocialWorkspace')) return {};
+    if (!inputCurrent() || _collectionDisposed || isStoreProcurement || !access.active || access.role != 'buyer' ||
+        access.account != accountUserId || storage.ownerScope != accountOwnerScope || customerStateRecoveryPending ||
+        cartChangesBlocked || checkoutBusy || checkoutRequiresResolution || _supplierQuoteSaveBusy) return {};
+    Object? ordered(Object? value) {
+      if (value is Map) {
+        final map = Map<String, Object?>.from(value), keys = value.keys.cast<String>().toList()..sort();
+        return {for (final key in keys) key: ordered(map[key])};
+      }
+      if (value is List) return value.map(ordered).toList();
+      return value;
+    }
+    String encoded(Object? value) => jsonEncode(ordered(value));
+    final realm = access.realm;
+    String witness() => encoded([view.name, destination.name, cartScope.name, checkoutScope.name,
+      for (final line in allCartLines) [line.product.id, line.product.storeId, line.product.publicListingIdentity?.toJson(),
+        line.product.packTerms?.revision, line.product.priceMinor, line.quantity, line.scheduledFulfilment?.toJson()],
+      for (final quote in selectedSupplierQuotes) [quote.quoteId, quote.storeId, quote.quoteBinding]]);
+    final captured = witness();
+    bool current() => operation == _assistantRetainedQuoteRead && inputCurrent() && !_collectionDisposed &&
+      !isStoreProcurement && identical(bulkQuotes, access) && access.active && access.role == 'buyer' &&
+      access.account == accountUserId && access.realm == realm && {'evaluation', 'production'}.contains(realm) &&
+      identical(customerStateStore, storage) && storage.ownerScope == accountOwnerScope &&
+      !customerStateRecoveryPending && !cartChangesBlocked && !checkoutBusy && !checkoutRequiresResolution &&
+      !_supplierQuoteSaveBusy && validUntil.isAfter(access.gateway.gateway.now().toUtc()) && witness() == captured;
+    try {
+      if (!current()) return {};
+      final selected = {for (final quote in selectedSupplierQuotes) quote.quoteId: quote};
+      final ids = expected.keys.map((key) => key.$2).toSet().toList()..sort();
+      final ready = <(String, String)>{};
+      for (final quoteId in ids) {
+        if (!current()) return {};
+        final retained = selected[quoteId];
+        if (retained == null || retained.realm != realm) continue;
+        final controller = access.forStore(retained.storeId);
+        if (!controller.active || !controller.initialized || controller.busy || controller.pending.isNotEmpty) continue;
+        final originalHead = controller.head(quoteId), originalHeadJson = originalHead == null ? null : encoded(originalHead.toJson());
+        final pending = await access.journal.read(controller.scope).timeout(const Duration(seconds: 10));
+        if (!current()) return {};
+        if (pending.isNotEmpty || !controller.active || controller.busy || controller.pending.isNotEmpty) continue;
+        final original = await access.gateway.read(account: accountUserId, storeId: retained.storeId, quoteId: quoteId,
+          current: current).timeout(const Duration(seconds: 10));
+        if (!current()) return {};
+        final pendingAfter = await access.journal.read(controller.scope).timeout(const Duration(seconds: 10));
+        if (!current()) return {};
+        if (pendingAfter.isNotEmpty) continue;
+        if (!controller.active || controller.busy || controller.pending.isNotEmpty ||
+            encoded(controller.head(quoteId)?.toJson()) != encoded(originalHead?.toJson())) continue;
+        if (original.toJson()['viewerRole'] != 'buyer') continue;
+        final proof = 'buyer-retained-quote:$realm:${sha256.convert(utf8.encode(encoded([
+          projectId, accountUserId, profileRevision, original.toJson()])))}';
+        for (final action in const ['AI-ACT-348', 'AI-ACT-349']) {
+          final key = (action, quoteId);
+          if (expected[key] != proof) continue;
+          if (action == 'AI-ACT-349' && (!original.accepted || originalHeadJson == null ||
+              originalHeadJson != encoded(original.toJson()) || original.revision != retained.acceptedRevision ||
+              original.toJson()['acceptance']['agreementFingerprint'] != retained.agreementFingerprint)) continue;
+          ready.add(key);
+        }
+      }
+      return current() ? ready : {};
+    } on Object {return {};}
+  }
   int _assistantPrivateStarsRead=0;
   bool _assistantPrivateStarsReading=false;
   bool Function()? _assistantPrivateStarsCurrent;

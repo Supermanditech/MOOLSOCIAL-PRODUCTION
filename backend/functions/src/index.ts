@@ -2633,6 +2633,9 @@ function assistantOriginalContextSource(projectId: string) {
     nativeSupplierFormsEnabled: profile && catalogue,
     nativePurchaseFormsEnabled: profile && catalogue,
     ...(original ? {original} : {}),
+    ...(original&&catalogue&&(couponRealm==='evaluation'||couponRealm==='production')&&
+      process.env.MOOLSOCIAL_PURCHASE_REALM===couponRealm&&process.env.MOOLSOCIAL_BULK_SUPPLIER_QUOTES_V1==='true'?{
+      retainedQuotes:{realm:couponRealm,source:{read:(userId,body)=>workspaceBulkQuoteService().read(userId,body)}}}:{}),
     ...(storeProducts?{storeProducts}:{}),
     ...(original&&catalogue&&(couponRealm==='evaluation'||couponRealm==='production')?{
       storePublicDetails:{realm:couponRealm,catalogue:workspaceCatalogueService()}}:{}),

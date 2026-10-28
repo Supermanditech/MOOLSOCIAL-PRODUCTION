@@ -92,3 +92,21 @@ test('Store mask rejects stale ownership, legacy overlap, bad trailing bits, dup
     assert.throws(() => canonicalContextRequest({operation: 'read', payload: bad}));
   }
 });
+
+
+test('Domain retained quote read hints are bounded exact buyer-owned identifiers, never agreement writes', () => {
+  const ids = ['bulk-' + 'a'.repeat(64), 'bulk-' + 'b'.repeat(64)];
+  assert.deepEqual(canonicalContextRequest({operation: 'read', payload: {scope, retainedSupplierQuoteIds: ids}}),
+    {scope, retainedSupplierQuoteIds: ids});
+  assert.deepEqual(contextReadSelection(scope, undefined, ids).nativeTargets,
+    ids.map(entityId => ({actionId: 'AI-ACT-349', entityId})));
+  assert.deepEqual(contextReadSelection(scope, undefined, []).nativeTargets, []);
+  for (const bad of [null, {}, ['bulk-short'], [ids[0], ids[0]], [1], [{quoteId: ids[0]}],
+    Array.from({length: 501}, (_, n) => 'bulk-' + n.toString(16).padStart(64, '0'))]) {
+    assert.throws(() => canonicalContextRequest({operation: 'read', payload: {scope, retainedSupplierQuoteIds: bad}}));
+  }
+  const workspace = {audience: 'workspace' as const, storeId: 'host-store'};
+  assert.throws(() => canonicalContextRequest({operation: 'read', payload: {scope: workspace, retainedSupplierQuoteIds: ids}}));
+  assert.throws(() => contextReadSelection(workspace, undefined, ids));
+  assert.throws(() => canonicalContextRequest({operation: 'read', payload: {scope, retainedSupplierQuoteIds: ids, acceptQuote: true}}));
+});

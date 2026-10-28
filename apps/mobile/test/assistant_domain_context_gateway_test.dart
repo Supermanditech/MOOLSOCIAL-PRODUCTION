@@ -7,6 +7,7 @@ import 'package:moolsocial/features/assistant/domain_context_gateway.dart';
 import 'package:moolsocial/features/assistant/model_gateway.dart';
 import 'package:moolsocial/features/assistant/mool_assistant.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 
 // Explicit host-only credential and network seams; never phone authority/data.
@@ -42,6 +43,67 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
+  const retainedExport = String.fromEnvironment('AI_DOMAIN_RETAINED_QUOTE_EXPORT_PATH');
+  test('Original retained quote service metadata and full Unicode record retain the same mobile proof', () async {
+    final export = jsonDecode(File(retainedExport).readAsStringSync()) as Map<String, dynamic>;
+    expect(export['hostOnly'], true);
+    final actor = export['actor'] as Map<String, dynamic>;
+    final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String, tenantId: null, userId: actor['uid'] as String);
+    final quote = WorkspaceBulkQuote.decode(export['head'], realm: 'evaluation', now: _at);
+    expect(quote.accepted, true);
+    Object? ordered(Object? value) {
+      if (value is Map) {
+        final keys = value.keys.cast<String>().toList()..sort();
+        return {for (final key in keys) key: ordered(value[key])};
+      }
+      if (value is List) return value.map(ordered).toList();
+      return value;
+    }
+    final proof = 'buyer-retained-quote:evaluation:${sha256.convert(utf8.encode(jsonEncode(ordered([
+      actor['projectId'], actor['uid'], export['profileRevision'], quote.toJson()]))))}';
+    final gateway = AssistantDomainContextGateway(owner: owner, isCurrent: () => true, credentials: _Credentials(),
+      transport: _BackendReferenceWire(export['metadata'] as Map<String, dynamic>, retainedIds: [quote.quoteId]), clock: () => _at);
+    final result = await gateway.read(MoolAssistantContext(accountScope: owner, authenticationRevision: 1), () => true,
+      retainedSupplierQuoteIds: [quote.quoteId]);
+    expect(result.revisions[('AI-ACT-348', quote.quoteId)], proof);
+    expect(result.revisions[('AI-ACT-349', quote.quoteId)], proof);
+    expect(quote.lines.single.variant, contains('મૂળ'));
+  }, skip: retainedExport.isEmpty ? 'Requires explicit isolated original-service quote export' : false);
+  test('Retained quote metadata requires exact selected buyer identifiers and source namespace', () async {
+    final quote = 'bulk-${'a' * 64}', other = 'bulk-${'b' * 64}';
+    final proof = 'buyer-retained-quote:evaluation:${'c' * 64}';
+    final data = <String, Object?>{..._data(), 'revisions': [
+      {'actionId': 'AI-ACT-348', 'entityId': quote, 'sourceRevision': proof},
+      {'actionId': 'AI-ACT-349', 'entityId': quote, 'sourceRevision': proof}]};
+    final wire = _Wire(() => _ok(data));
+    final result = await _source(wire).read(_context, () => true, retainedSupplierQuoteIds: [quote]);
+    expect(result.revisions, {('AI-ACT-348', quote): proof, ('AI-ACT-349', quote): proof});
+    expect((wire.bodies.single['payload'] as Map)['retainedSupplierQuoteIds'], [quote]);
+    for (final fault in ['missing-hint', 'foreign-hint', 'entity', 'namespace', 'realm', 'proof', 'owner']) {
+      final changed = jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
+      final row = (changed['revisions'] as List).first as Map;
+      if (fault == 'entity') row['entityId'] = null;
+      if (fault == 'namespace') row['sourceRevision'] = 'buy-reference-owner:${'c' * 64}';
+      if (fault == 'realm') row['sourceRevision'] = 'buyer-retained-quote:unknown:${'c' * 64}';
+      if (fault == 'proof') row['sourceRevision'] = 'buyer-retained-quote:evaluation:claimed';
+      if (fault == 'owner') changed['ownerKey'] = 'd' * 64;
+      await expectLater(_source(_Wire(() => _ok(changed))).read(_context, () => true,
+        retainedSupplierQuoteIds: fault == 'missing-hint' ? null : [fault == 'foreign-hint' ? other : quote]),
+        throwsA(isA<AssistantModelFailure>()));
+    }
+    for (final invalid in [[quote, quote], ['bulk-short'], List.generate(501, (n) => 'bulk-${n.toRadixString(16).padLeft(64, '0')}')]) {
+      final credentials = _Credentials();
+      await expectLater(_source(_Wire(() => _ok(data)), credentials: credentials).read(_context, () => true,
+        retainedSupplierQuoteIds: invalid), throwsA(isA<AssistantModelFailure>()));
+      expect(credentials.tokens, 0);
+    }
+    final store = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'HOST Store',
+      profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
+    final credentials = _Credentials();
+    await expectLater(_source(_Wire(() => _ok(data)), credentials: credentials).read(store, () => true,
+      retainedSupplierQuoteIds: [quote]), throwsA(isA<AssistantModelFailure>()));
+    expect(credentials.tokens, 0);
+  });
   test('Clear Cart metadata requires its exact personal root proof, never a claimed Cart or Store target', () async {
     final proof = 'buy-cart-clear-owner:${'c' * 64}';
     final data = <String, Object?>{..._data(), 'revisions': [
@@ -453,12 +515,14 @@ void main() {
 }
 
 class _BackendReferenceWire implements SocialContentTransport {
-  _BackendReferenceWire(this.metadata);
+  _BackendReferenceWire(this.metadata, {this.retainedIds});
   final Map<String, dynamic> metadata;
+  final List<String>? retainedIds;
   @override Future<SocialContentResponse> postJson(Uri endpoint, {required Map<String, String> headers,
       required Map<String, Object?> body}) async {
     expect(endpoint.path, '/moolSocialAssistantContext');
-    expect(body, {'operation': 'read', 'payload': {'scope': {'audience': 'personal', 'storeId': null}}});
+    expect(body, {'operation': 'read', 'payload': {'scope': {'audience': 'personal', 'storeId': null},
+      if (retainedIds != null) 'retainedSupplierQuoteIds': retainedIds}});
     return SocialContentResponse(statusCode: 200, body: jsonEncode(metadata));
   }
 }

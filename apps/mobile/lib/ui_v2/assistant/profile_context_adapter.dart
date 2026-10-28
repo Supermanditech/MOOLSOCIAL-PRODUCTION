@@ -31,6 +31,8 @@ class AssistantOriginalContextReader {
         session.navigationAuthenticationGeneration == generation && context.accountScope == owner;
     if (!alive()) throw const AssistantModelFailure('account_scope_mismatch');
     final revisions = <AssistantContextKey, String>{};
+    String? retainedQuoteProfileRevision, retainedQuoteOwnerScope;
+    Object? retainedQuoteProfileGateway;
     bool Function(String) addressSourceReady = (_) => false;
     var until = DateTime.now().toUtc().add(const Duration(seconds: 60));
     if (!context.inWorkspace) {
@@ -39,6 +41,9 @@ class AssistantOriginalContextReader {
       final profile = await gateway.readForPreparation();
       if (!alive() || profile.ownerUid != owner!.userId) throw const AssistantModelFailure('stale_preparation');
       final revision = 'profile:${profile.revision}';
+      retainedQuoteProfileRevision = revision;
+      retainedQuoteOwnerScope = gateway.ownerScope;
+      retainedQuoteProfileGateway = gateway;
       addressSourceReady = (sourceRevision) => alive() && buy != null &&
           !buy!.isStoreProcurement &&
           !buyV2AddressFormOpen(buy!) && !buyV2AddressRequestFormOpen(buy!) &&
@@ -96,7 +101,11 @@ class AssistantOriginalContextReader {
               product.destination == buy!.destination).map((product) => product.id).toSet().toList()
           : null;
         selection?.sort();
-        final domain = await domainGateway.read(context, alive, catalogueListingIds: selection);
+        final quoteSelection = !context.inWorkspace && buy != null && !buy!.isStoreProcurement && buy!.view == BuyV2View.cart
+          ? buy!.selectedSupplierQuotes.map((quote) => quote.quoteId).toSet().toList() : null;
+        quoteSelection?.sort();
+        final domain = await domainGateway.read(context, alive, catalogueListingIds: selection,
+          retainedSupplierQuoteIds: quoteSelection == null || quoteSelection.isEmpty ? null : quoteSelection);
         if (!alive() || domain.binding != context.binding) throw const AssistantModelFailure('stale_preparation');
         if (domain.revisions.keys.any((key) =>
             !assistantDomainContextActions.contains(key.$1) || revisions.containsKey(key))) {
@@ -134,8 +143,22 @@ class AssistantOriginalContextReader {
           for(final entry in domain.revisions.entries.where((entry)=>
             assistantPrivateStarsContextActions.contains(entry.key.$1)&&entry.key.$2!=null))entry.key.$2!:entry.value,
         },accountUserId:owner.userId,binding:context.binding,inputCurrent:alive,validUntil:domain.validUntil);
+        final quoteRevision = retainedQuoteProfileRevision, quoteOwnerScope = retainedQuoteOwnerScope;
+        final retainedQuotes = buy == null || quoteRevision == null || quoteOwnerScope == null ? <(String, String)>{} :
+          await buy!.readAssistantRetainedQuoteOriginals({
+            for (final entry in domain.revisions.entries.where((entry) =>
+              assistantBuyerRetainedQuoteContextActions.contains(entry.key.$1) && entry.key.$2 != null))
+                (entry.key.$1, entry.key.$2!): entry.value,
+          }, projectId: owner.projectId, accountUserId: owner.userId, accountOwnerScope: quoteOwnerScope,
+            profileRevision: quoteRevision, inputCurrent: () => alive() &&
+              identical(session.accountProfileGateway, retainedQuoteProfileGateway) &&
+              session.accountProfileGateway?.ownerScope == quoteOwnerScope &&
+              'profile:${session.accountProfileGateway?.snapshot?.revision}' == quoteRevision,
+            validUntil: domain.validUntil);
         if (!alive()) throw const AssistantModelFailure('stale_preparation');
         for (final entry in domain.revisions.entries) {
+          if (assistantBuyerRetainedQuoteContextActions.contains(entry.key.$1) &&
+              (entry.key.$2 == null || !retainedQuotes.contains((entry.key.$1, entry.key.$2!)))) continue;
           // Accept only an unchanged original native cache. Explicit refresh,
           // persistence and native final confirmation remain separate actions.
           if (assistantDomainAddressContextActions.contains(entry.key.$1) &&
