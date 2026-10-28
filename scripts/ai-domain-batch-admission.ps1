@@ -526,7 +526,7 @@ function Test-AiDomainSupplierDraftCheckpoint($Checkpoint) {
 function Get-AiDomainSupplierDraftStageOwners([int]$Count,$Checkpoint) {
  switch($Count){0{@(Get-AiDomainSupplierDraftSealOwners)}1{@($Checkpoint.manifest.changedOwners)}2{@('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')}default{@()}}
 }
-function Invoke-AiDomainSupplierDraftCheckpoint($Checkpoint,[string]$Head,[string]$Phase) {
+function Invoke-AiDomainSupplierDraftCheckpoint($Checkpoint,[string]$Head,[string]$Phase,[switch]$Continuation) {
  Assert-Coordination (Test-AiDomainSupplierDraftCheckpoint $Checkpoint) 'Only the exact tested seven-owner supplier draft checkpoint is admitted.'
  $base=$Checkpoint.baseline;$approvalOwner='docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json'
  $chain=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"${base}..${Head}"))
@@ -550,6 +550,7 @@ function Invoke-AiDomainSupplierDraftCheckpoint($Checkpoint,[string]$Head,[strin
   else{Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($chain[1]):$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Committed supplier-draft source differs from qualification.'}
  }
  foreach($owner in @(Get-AiDomainBatchMetadataOwners)){
+  if($Continuation){continue}
   if(($chain.Count -eq 0 -and $owner -cin @(Get-AiDomainSupplierDraftSealOwners)) -or
     ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit' -and $owner -ceq $approvalOwner)){continue}
   Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
@@ -557,11 +558,70 @@ function Invoke-AiDomainSupplierDraftCheckpoint($Checkpoint,[string]$Head,[strin
  if($chain.Count -eq 3 -or ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit')){
   Assert-Coordination ($Checkpoint.sourceCommit -ceq $chain[1]) 'Supplier-draft evidence must name its qualified source commit before closure.'
  }
- if($Phase -ceq 'pre_commit'){
+ if($Phase -ceq 'pre_commit' -and !$Continuation){
   $expected=@(Get-AiDomainSupplierDraftStageOwners $chain.Count $Checkpoint)
   Assert-Coordination ($expected.Count -gt 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Only exact supplier-draft-checkpoint stage may be committed.'
   if($chain.Count -eq 1){foreach($row in $Checkpoint.manifest.owners){
    Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',":$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Staged supplier-draft source differs from qualification.'
+  }}
+ }
+}
+function Get-AiDomainPurchaseRootSealOwners {
+ @('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json','scripts/ai-domain-batch-admission.ps1','scripts/test-ai-domain-batch-admission.ps1')
+}
+function Test-AiDomainPurchaseRootCheckpoint($Checkpoint) {
+ if($null -eq $Checkpoint -or $Checkpoint.sequence -cne '12-purchase-root-source' -or
+   $Checkpoint.baseline -cne '910c6187b04ad4e6b13269a54c9c423d4fce7328' -or
+   $Checkpoint.namedBranchPushAuthorized -isnot [bool] -or !$Checkpoint.namedBranchPushAuthorized -or
+   $Checkpoint.productionAcceptance -isnot [bool] -or $Checkpoint.productionAcceptance){return $false}
+ $pins=@{manifest='EFA2BA11DEBE5977B24FB25FC33CE017DCA064632CF05259BA443D6385B7E0BD';
+   disposition='86B22BDB2CA58B2B73AAB830321421149F54F335BC22A3790CC2AE7753142133';
+   evidence='B61952656D3FBF5EA8E585FDEDF98DF5A4340C9154D5FEC284D58985F03817EC'}
+ foreach($part in $pins.Keys){
+  $raw=$Checkpoint.$part|ConvertTo-Json -Depth 60 -Compress
+  if([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($raw))) -cne $pins[$part]){return $false}
+ }
+ return $true
+}
+function Get-AiDomainPurchaseRootStageOwners([int]$Count,$Checkpoint) {
+ switch($Count){0{@(Get-AiDomainPurchaseRootSealOwners)}1{@($Checkpoint.manifest.changedOwners)}2{@('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')}default{@()}}
+}
+function Invoke-AiDomainPurchaseRootCheckpoint($Checkpoint,[string]$Head,[string]$Phase) {
+ Assert-Coordination (Test-AiDomainPurchaseRootCheckpoint $Checkpoint) 'Only the exact tested eight-owner purchase root checkpoint is admitted.'
+ $base=$Checkpoint.baseline;$approvalOwner='docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json'
+ $chain=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"${base}..${Head}"))
+ Assert-Coordination ($chain.Count -le 3) 'Only exact purchase-root metadata, source and evidence commits are admitted.'
+ $subjects=@('coordination(ai-domain-batch-20261028): admit qualified purchase root checkpoint',
+   'feat(ai-domain-batch-20261028): connect purchase register roots and stable native reviews',
+   'test(ai-domain-batch-20261028): record purchase root qualification and limits')
+ for($i=0;$i -lt $chain.Count;$i++){
+  $parent=if($i -eq 0){$base}else{$chain[$i-1]};$expected=@(Get-AiDomainPurchaseRootStageOwners $i $Checkpoint)
+  Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$chain[$i]))[0]) -ceq $parent -and
+   (@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$chain[$i]))[0]) -ceq $subjects[$i] -and
+   (@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$parent,$chain[$i])|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Purchase-root checkpoint parent, subject or exact owners changed.'
+ }
+ if($chain.Count -gt 0){
+  $sealed=(@(Get-OctoberCompatibilityGitLines @('show',"$($chain[0]):$approvalOwner"))-join "`n")|ConvertFrom-Json
+  Assert-Coordination (Test-AiDomainPurchaseRootCheckpoint $sealed.scope12PurchaseRootCheckpoint) 'Committed purchase-root qualification changed.'
+ }
+ foreach($row in $Checkpoint.manifest.owners){
+  if($chain.Count -lt 2){Assert-Coordination ((Get-Sha256 (Join-Path $root $row.path)) -ceq $row.sha256 -and
+    (@(Get-OctoberCompatibilityGitLines @('hash-object',"--path=$($row.path)",$row.path))[0]) -ceq $row.gitBlobOid) 'Working purchase-root source differs from qualification.'}
+  else{Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($chain[1]):$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Committed purchase-root source differs from qualification.'}
+ }
+ foreach($owner in @(Get-AiDomainBatchMetadataOwners)){
+  if(($chain.Count -eq 0 -and $owner -cin @(Get-AiDomainPurchaseRootSealOwners)) -or
+    ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit' -and $owner -ceq $approvalOwner)){continue}
+  Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
+ }
+ if($chain.Count -eq 3 -or ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit')){
+  Assert-Coordination ($Checkpoint.sourceCommit -ceq $chain[1]) 'Purchase-root evidence must name its qualified source commit before closure.'
+ }
+ if($Phase -ceq 'pre_commit'){
+  $expected=@(Get-AiDomainPurchaseRootStageOwners $chain.Count $Checkpoint)
+  Assert-Coordination ($expected.Count -gt 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Only exact purchase-root-checkpoint stage may be committed.'
+  if($chain.Count -eq 1){foreach($row in $Checkpoint.manifest.owners){
+   Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',":$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Staged purchase-root source differs from qualification.'
   }}
  }
 }
@@ -607,6 +667,7 @@ function Invoke-AiDomainBatchAdmission {
  $privateStarsAdmission=if($approval.PSObject.Properties.Name -ccontains 'scope10PrivateStarsTestAdmission'){$approval.scope10PrivateStarsTestAdmission}else{$null}
  $privateStarsCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'scope10PrivateStarsCheckpoint'){$approval.scope10PrivateStarsCheckpoint}else{$null}
  $supplierDraftCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'scope11SupplierDraftCheckpoint'){$approval.scope11SupplierDraftCheckpoint}else{$null}
+ $purchaseRootCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'scope12PurchaseRootCheckpoint'){$approval.scope12PurchaseRootCheckpoint}else{$null}
  $runtime=if($null -ne $privateStarsAdmission){@(Get-AiDomainPrivateStarsRuntimeOwners $privateStarsAdmission $cache)}elseif($null -ne $cache){@(Get-AiDomainCurrentRuntimeOwners $cache)}else{@(Get-AiDomainBatchRuntimeOwners)}
  $metadata=@(Get-AiDomainBatchMetadataOwners);$bootstrap=@(Get-AiDomainBatchBootstrapOwners);$amend=@(Get-AiDomainBatchSelectorAmendOwners);$owners=$runtime+$metadata
  $branch=@(Get-OctoberCompatibilityGitLines @('branch','--show-current'))[0]
@@ -619,7 +680,7 @@ function Invoke-AiDomainBatchAdmission {
  $scopeTwo = $approval.scope02Admission
  $scopeTwoCheckpoint = $approval.scope02Checkpoint
  $middle=if($approval.PSObject.Properties.Name -ccontains 'scope03Through07Checkpoint'){$approval.scope03Through07Checkpoint}else{$null}
- $metadataCount = if($null -ne $supplierDraftCheckpoint){15} elseif($null -ne $privateStarsCheckpoint){14} elseif($null -ne $privateStarsAdmission){13} elseif($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
+ $metadataCount = if($null -ne $purchaseRootCheckpoint){16} elseif($null -ne $supplierDraftCheckpoint){15} elseif($null -ne $privateStarsCheckpoint){14} elseif($null -ne $privateStarsAdmission){13} elseif($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
  Assert-Coordination ($approval.acceptedUiCommit -ceq $base -and $approval.uiContractSha256 -ceq $hash -and $approval.founderAnswer -ceq 'EXECUTE' -and $approval.localMetadataCommits -eq $metadataCount -and !$approval.sourceFeatureCommits -and !$approval.backendBranchPush -and !$approval.deployment -and !$approval.productionAcceptance) 'Exact acceptance/authority differs.'
  if ($null -ne $checkpoint) {Assert-Coordination ($binding.id -ceq 'ai_domain_batch_20261028' -and $binding.state -ceq 'founder_authorized_2026_10_28') 'Correct current batch identity required; no stale Profile or History binding.'}
  Assert-Coordination ((Get-Sha256 (Join-Path $root 'docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md')) -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $record.backendAdmission.originalProviderTestAddendum.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $approval.originalProviderTestAdmission.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22') 'Exact original-provider test boundary changed.'
@@ -650,7 +711,8 @@ function Invoke-AiDomainBatchAdmission {
  if($null -ne $privateStarsAdmission){Assert-Coordination ($null -ne $orderCheckpoint -and ($record.scope10PrivateStarsTestAdmission|ConvertTo-Json -Depth 20 -Compress) -ceq ($privateStarsAdmission|ConvertTo-Json -Depth 20 -Compress)) 'Exact source checkpoint and matching native055 owner admission required.'}
  if($null -ne $privateStarsCheckpoint){Assert-Coordination ($null -ne $privateStarsAdmission -and (Test-AiDomainPrivateStarsCheckpoint $privateStarsCheckpoint)) 'Exact existing test admission and qualified private-rating checkpoint required.'}
  if($null -ne $supplierDraftCheckpoint){Assert-Coordination ($null -ne $privateStarsCheckpoint -and (Test-AiDomainSupplierDraftCheckpoint $supplierDraftCheckpoint)) 'Exact existing private-rating checkpoint and qualified supplier draft checkpoint required.'}
- $maximumCommits = if($null -ne $supplierDraftCheckpoint){29} elseif($null -ne $privateStarsCheckpoint){26} elseif($null -ne $privateStarsAdmission){23} elseif($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
+ if($null -ne $purchaseRootCheckpoint){Assert-Coordination ($null -ne $supplierDraftCheckpoint -and (Test-AiDomainPurchaseRootCheckpoint $purchaseRootCheckpoint)) 'Exact existing supplier checkpoint and qualified purchase root checkpoint required.'}
+ $maximumCommits = if($null -ne $purchaseRootCheckpoint){32} elseif($null -ne $supplierDraftCheckpoint){29} elseif($null -ne $privateStarsCheckpoint){26} elseif($null -ne $privateStarsAdmission){23} elseif($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
  Assert-Coordination ($commits.Count -le $maximumCommits -and @(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$base..$head")).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('ls-files','-v')|Where-Object {$_ -cmatch '^[a-zS] '}).Count -eq 0) 'Only exact admitted checkpoint history; no history/index overrides.'
  $changed=@(@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base))+@(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')))|Sort-Object -Unique
  Assert-AiDomainBatchOwners $changed $owners
@@ -694,7 +756,10 @@ function Invoke-AiDomainBatchAdmission {
              Invoke-AiDomainPrivateStarsTestAdmission $privateStarsAdmission '47a64270dbd603c09ee0c0e8b908616332093187' 'implementation' -Continuation
              if($null -ne $supplierDraftCheckpoint){
               Invoke-AiDomainPrivateStarsCheckpoint $privateStarsCheckpoint 'be023a1fe2a3ec3a79b0f436669bb498f5923d9f' 'implementation' -Continuation
-              Invoke-AiDomainSupplierDraftCheckpoint $supplierDraftCheckpoint $head $ProductionPhase
+              if($null -ne $purchaseRootCheckpoint){
+               Invoke-AiDomainSupplierDraftCheckpoint $supplierDraftCheckpoint '910c6187b04ad4e6b13269a54c9c423d4fce7328' 'implementation' -Continuation
+               Invoke-AiDomainPurchaseRootCheckpoint $purchaseRootCheckpoint $head $ProductionPhase
+              }else{Invoke-AiDomainSupplierDraftCheckpoint $supplierDraftCheckpoint $head $ProductionPhase}
              }else{Invoke-AiDomainPrivateStarsCheckpoint $privateStarsCheckpoint $head $ProductionPhase}
             }else{Invoke-AiDomainPrivateStarsTestAdmission $privateStarsAdmission $head $ProductionPhase}
            }else{Invoke-AiDomainOrderOriginalCheckpoint $orderCheckpoint $head $ProductionPhase}
