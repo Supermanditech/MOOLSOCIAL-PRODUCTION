@@ -31,7 +31,8 @@ export const storeCouponActions=new Set(['AI-ACT-308','AI-ACT-309','AI-ACT-310']
 export const storeReportOwnerActions=new Set(['AI-ACT-312','AI-ACT-313','AI-ACT-314','AI-ACT-411']);
 export const storePublicDetailsActions=new Set(['AI-ACT-320','AI-ACT-321']);
 export const storeNativeMaskActions = new Set([...storeProductActions, ...storeProductOwnerActions,...storeStockOwnerActions,...storeRestockOwnerActions,...storeOrderOriginalActions,...storeOperationalActions,...storeOrderBoardActions,...storeSupplierDraftActions,...storePurchaseRootActions,...storeReceivingOriginalActions,...storeCouponActions,...storeReportOwnerActions,...storePublicDetailsActions]);
-export const catalogueSearchActions = new Set(["AI-ACT-001", "AI-ACT-002", "AI-ACT-003", "AI-ACT-004", "AI-ACT-005", ...catalogueProductActions]);
+export const cataloguePriceRefreshActions = new Set(["AI-ACT-060", "AI-ACT-352"]);
+export const catalogueSearchActions = new Set(["AI-ACT-001", "AI-ACT-002", "AI-ACT-003", "AI-ACT-004", "AI-ACT-005", ...catalogueProductActions, ...cataloguePriceRefreshActions]);
 export function canonicalContextRequest(value: unknown): {scope: PlansScope; catalogueListingIds?: readonly string[]; retainedSupplierQuoteIds?: readonly string[]; nativeSelectionVersion?: 1} {
   const request = object(value, ["operation", "payload"]);
   if (request.operation !== "read") return fail("invalid_request", 400);

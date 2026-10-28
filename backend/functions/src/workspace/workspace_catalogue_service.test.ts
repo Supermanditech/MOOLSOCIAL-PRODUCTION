@@ -1093,7 +1093,8 @@ test('LF-BULK HTTP dispatch keeps reads and recovery authenticated, namespace fe
   const commodityMutation = route.match(/const commodityPriceMutation = ([^;]+);/u)?.[1]; assert.ok(commodityMutation);
   const callback = route.match(/verifyIdToken: async \(token\) => \{([\s\S]*?)\n\s*\},/u)?.[1]; assert.ok(callback);
   const guard = callback.match(/if \(([^\n]+)\) \{/u)?.[1]; assert.ok(guard);
-  const flags = guard.split(' || ');
+  const flags = guard.split(' || ').filter(value => /^[A-Za-z][A-Za-z0-9]*$/u.test(value));
+  assert.ok(guard.includes('["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation)'));
   for (const operation of ['requestBulkSupplierQuote', 'offerBulkSupplierQuote', 'acceptBulkSupplierQuote', 'withdrawBulkSupplierQuote',
     'readBulkSupplierQuote', 'listBuyerBulkSupplierQuotes', 'listStoreBulkSupplierQuotes', 'reconcileBulkSupplierQuote']) {
     const action = bulkSupplierQuoteOperation(operation); assert.ok(action);
@@ -1101,8 +1102,8 @@ test('LF-BULK HTTP dispatch keeps reads and recovery authenticated, namespace fe
       'catalogueProductionAction', 'bulkQuoteAction',
       `const commodityPriceMutation = ${commodityMutation}; return ${mutation}`)(operation, undefined, undefined, undefined, undefined, undefined, action);
     assert.equal(writes, ['request', 'offer', 'accept', 'withdraw'].includes(action));
-    const verify = new Function('getAuth', 'requireDefaultPurchaseTenant', ...flags, `return async(token) => {${callback}}`)(
-      () => ({verifyIdToken: async (token: object) => token}), requireDefaultPurchaseTenant,
+    const verify = new Function('getAuth', 'requireDefaultPurchaseTenant', 'operation', ...flags, `return async(token) => {${callback}}`)(
+      () => ({verifyIdToken: async (token: object) => token}), requireDefaultPurchaseTenant, operation,
       ...flags.map(f => f === 'bulkQuoteOperation')) as (token: object) => Promise<object>;
     assert.deepEqual(await verify({uid: 'same-uid'}), {uid: 'same-uid'});
     for (const tenant of ['another-tenant', '', null]) await assert.rejects(verify({uid: 'same-uid', firebase: {tenant}}), {code: 'authentication_required'});
@@ -1117,7 +1118,8 @@ test('LF14 Checkout HTTP verifier rejects tenant UID collisions for recording an
   const callback = route.match(/verifyIdToken: async \(token\) => \{([\s\S]*?)\n\s*\},/u)?.[1];
   assert.ok(callback);
   const guarded = callback.match(/if \(([^\n]+)\) \{/u)?.[1]; assert.ok(guarded);
-  const flags = guarded.split(' || ');
+  const flags = guarded.split(' || ').filter(value => /^[A-Za-z][A-Za-z0-9]*$/u.test(value));
+  assert.ok(guarded.includes('["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation)'));
   const classification = route.match(/const checkoutEntryOperation = ([^;]+);/u)?.[1]; assert.ok(classification);
   assert.match(route, /checkoutEntryOperation && process\.env\.MOOLSOCIAL_CHECKOUT_ENTRIES_V1 !== 'true'/u);
   assert.ok(route.slice(route.indexOf('const mutation ='), route.indexOf('const supplierPolicyOperation'))
@@ -1129,9 +1131,9 @@ test('LF14 Checkout HTTP verifier rejects tenant UID collisions for recording an
   ]) {
     const checkout = new Function('operation', `return ${classification}`)(operation) as boolean;
     assert.equal(checkout, activeFlag === 'checkoutEntryOperation');
-    const verify = new Function('getAuth', 'requireDefaultPurchaseTenant', ...flags,
+    const verify = new Function('getAuth', 'requireDefaultPurchaseTenant', 'operation', ...flags,
       `return async (token) => {${callback}}`)(
-      () => ({verifyIdToken: async (token: object) => token}), requireDefaultPurchaseTenant,
+      () => ({verifyIdToken: async (token: object) => token}), requireDefaultPurchaseTenant, operation,
       ...flags.map(flag => flag === activeFlag)) as (token: object) => Promise<object>;
     assert.deepEqual(await verify({uid: 'same-uid', firebase: {}}), {uid: 'same-uid', firebase: {}});
     for (const tenant of ['another-tenant', '', null]) {
@@ -3939,6 +3941,55 @@ for (const channel of ['retail', 'wholesale', 'bulk'] as const) {
     assert.deepEqual(removal.tools[0]!.resolveTarget!({listingId: listing.listingId}).fields, {});
     assert.throws(() => removal.tools[0]!.resolveTarget!({listingId: value.skuId}));
     assert.throws(() => removal.tools[0]!.resolveTarget!({listingId: listing.listingId, quantity: 0}));
+    if (channel === 'bulk') {
+      const expiredAt = new Date(Date.parse(repository.price!.validUntil) + 1);
+      const expiredProvider = new WorkspaceCatalogueService(repository, catalogueIdentity, () => expiredAt);
+      const expiredPlans = new AccountPlansService({async read(uid, selectedScope) {return {
+        ownerUid: uid, accountStatus: 'ACTIVE', catalogue: {audience: selectedScope.audience, revision: 1, state: 'approved', offers: []},
+        subscription: {ownerUid: uid, scope: selectedScope, revision: 1, planId: 'host-paid', planVersion: 'v1',
+          name: 'Host-only original expired-price authority', state: 'active', validFrom: '2026-10-15T00:00:00.000Z',
+          validUntil: '2026-10-17T00:00:00.000Z', featureIds: ['mool_ai']}};}}, {projectId: actor.projectId, now: () => expiredAt});
+      const expiredContext = new OriginalCataloguePreparationContext({projectId: actor.projectId, plans: expiredPlans,
+        catalogue: expiredProvider, now: () => expiredAt});
+      const readBody = {operation: 'read', payload: {scope, catalogueListingIds: [listing.listingId]}};
+      const metadata = await handleAssistantCanonicalContextRequest({method: 'POST', headers: {
+        authorization: 'Bearer HOST-ONLY-price-reader', 'x-firebase-appcheck': 'HOST-ONLY-proof'},
+        body: readBody, bodyBytes: Buffer.byteLength(JSON.stringify(readBody))}, {
+        projectId: actor.projectId, enabled: true, context: expiredContext, now: () => expiredAt,
+        async verifyIdToken(token) {assert.equal(token, 'HOST-ONLY-price-reader'); return actor;},
+        async verifyAppCheck(token, consume) {assert.equal(token, 'HOST-ONLY-proof'); assert.equal(consume, false); return {alreadyConsumed: false};}});
+      assert.equal(metadata.status, 200);
+      const envelope = metadata.body as {ok: boolean; data: {revisions: Array<{actionId: string; entityId: string | null; sourceRevision: string}>}};
+      assert.equal(envelope.ok, true);
+      assert(envelope.data.revisions.some(row => row.actionId === 'AI-ACT-001' && row.entityId === null));
+      for (const actionId of ['AI-ACT-060', 'AI-ACT-352']) assert(envelope.data.revisions.some(row =>
+        row.actionId === actionId && row.entityId === listing.listingId && /^catalogue-stale-price:[a-f0-9]{64}$/u.test(row.sourceRevision)));
+      assert(!envelope.data.revisions.some(row => ['AI-ACT-014', 'AI-ACT-017'].includes(row.actionId)));
+      const exportPath = process.env.AI_DOMAIN_PRICE_REFRESH_EXPORT_PATH;
+      if (exportPath) writeFileSync(exportPath, JSON.stringify({schemaVersion: 1, hostOnly: true, actor,
+        now: expiredAt.toISOString(), listingId: listing.listingId, metadata: metadata.body}, null, 2) + '\n', 'utf8');
+      for (const actionId of ['AI-ACT-060', 'AI-ACT-352']) {
+        const input = {scope, requestId: `HOST-original-expired-${actionId}`, requestRevision: 1,
+          expectedEntitlementRevision: 'personal:null:1:1', message: 'Ask supplier for an updated price', language: 'English', history: [], actionId};
+        const selected = await expiredContext.read(actor, {...input, entityId: listing.listingId});
+        assert.equal(selected.tools.length, 1); assertStrictSchema(selected.tools[0]!.parameters);
+        assert.match(selected.tools[0]!.sourceRevision, /^catalogue-stale-price:[a-f0-9]{64}$/u);
+        assert.equal(selected.tools[0]!.validate({}), true);
+        const dynamic = await expiredContext.read(actor, {...input, entityId: null, catalogueListingIds: [listing.listingId]});
+        assertStrictSchema(dynamic.tools[0]!.parameters);
+        const target = dynamic.tools[0]!.resolveTarget!({listingId: listing.listingId});
+        assert.equal(target.sourceRevision, selected.tools[0]!.sourceRevision);
+        const recovered = await expiredContext.readPrepared(actor, {...input, entityId: listing.listingId},
+          {kind: 'proposal', id: 'HOST-original-expired', actionId, entityId: listing.listingId,
+            sourceRevision: target.sourceRevision, fields: {}, title: 'Review', summary: 'Host original'});
+        assert.equal(recovered.tools[0]!.sourceRevision, target.sourceRevision);
+        assert.equal((selected.modelContext!.products as Array<Record<string, unknown>>)[0]!.expiredPriceValidUntil,
+          repository.price!.validUntil);
+      }
+      await assert.rejects(expiredContext.read(actor, {scope, requestId: 'HOST-expired-no-buy', requestRevision: 1,
+        expectedEntitlementRevision: 'personal:null:1:1', message: 'Buy this', language: 'English', history: [],
+        actionId: 'AI-ACT-014', entityId: listing.listingId}), /context_unavailable/u);
+    }
     assert.equal(before, cataloguePayloadHash({records: [...repository.records], catalogue: repository.aggregate, price: repository.price ?? null}));
   });
 }

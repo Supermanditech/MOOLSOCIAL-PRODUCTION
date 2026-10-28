@@ -631,9 +631,11 @@ test("Domain composite missing optional catalogue does not remove established Pr
 });
 
 const originalListingId = (n: number) => "listing-" + n.toString(16).padStart(64, "0");
-function populatedFixture(count = 2, channel = "retail", contactReady = false) {
+function populatedFixture(count = 2, channel = "retail", contactReady = false,
+  price?: {validUntil: string; revision?: number; onRead?: () => void; freshListingId?: string}) {
   const f = fixture(), ids = Array.from({length: count}, (_, n) => originalListingId(n + 1));
   f.mutate(data => {
+    price?.onRead?.();
     const query = data.query as {listingIds: string[]; destination: string; categoryId: string; tradeType: string | null};
     const matches = query.destination === (channel === "retail" ? "shop" : "wholesale") &&
       ["all", "grocery"].includes(query.categoryId) && (query.tradeType === null || query.tradeType === channel);
@@ -645,13 +647,93 @@ function populatedFixture(count = 2, channel = "retail", contactReady = false) {
       items: [{skuId: listingId, canonicalProductId: "canonical-rice", verifiedPackId: "verified-pack", content: {title: "Original rice", brand: "Original brand", variant: "", categoryId: "grocery", description: "Untrusted text must stay out", productFacts: {requiresPrescription: false}},
         pack: {label: "5 kg", quantityMilli: 5000, unit: "kg", unitsPerCase: 1},
         channels: [{kind: channel, priceMinor: 10000, mrpMinor: 12000, minimumOrder: 1, quantityStep: 1,
-          revision: "original-term", validUntil: "2026-10-28T09:00:00.000Z", supplierTax: {version: 2, rateBasisPoints: 1800, basis: "included"}}],
+          revision: "original-term", validUntil: listingId === price?.freshListingId ? "2026-10-28T09:00:00.000Z"
+            : price?.validUntil ?? "2026-10-28T09:00:00.000Z",
+          ...(price?.revision === undefined ? {} : {priceConfirmation: {revision: price.revision}}),
+          supplierTax: {version: 2, rateBasisPoints: 1800, basis: "included"}}],
         listings: [{schemaVersion: 1, realm: "evaluation", listingId, storeId: "original-store", skuId: listingId,
           canonicalProductId: "canonical-rice", verifiedPackId: "verified-pack", channel}]}]}})),
       page: {...data.page as object, totalCount: matches && !query.listingIds.length ? count : selected.length}};
   });
   return {...f, ids};
 }
+for (const actionId of ['AI-ACT-060', 'AI-ACT-352']) {
+  test(`Expired supplier price ${actionId} prepares exact native Review without sending a request`, async () => {
+    const f = populatedFixture(2, 'retail', false, {validUntil: '2026-10-28T07:59:00.000Z', revision: 3});
+    const input = {...request, actionId, catalogueListingIds: f.ids};
+    const source = await f.context.read(actor, input), tool = source.tools[0]!;
+    const target = tool.resolveTarget!({listingId: f.ids[1]});
+    assert.equal(target.entityId, f.ids[1]); assert.deepEqual(target.fields, {});
+    assert.equal(tool.validate({}), true); assert.equal(tool.validate({requestNow: true}), false);
+    assert.throws(() => tool.resolveTarget!({listingId: f.ids[1], execute: true}));
+    assert.throws(() => tool.resolveTarget!({listingId: originalListingId(99)}));
+    assert.equal(source.nativeTargets!.length, 2);
+    assert(source.nativeTargets!.some(t => t.entityId === target.entityId && t.sourceRevision === target.sourceRevision));
+    assert.equal(source.validUntil, '2026-10-28T08:01:00.000Z');
+    assert.equal((source.modelContext as {sourceKind: string}).sourceKind, 'original-expired-commodity-price-v1');
+    assert(!JSON.stringify(source.modelContext).includes('priceMinor'));
+    assert(f.calls.every(call => Object.hasOwn(call, 'query') && !Object.hasOwn(call, 'operation')));
+    const selected = {...input, entityId: f.ids[1]!};
+    const recovered = await f.context.readPrepared(actor, selected, {kind: 'proposal', id: 'HOST-stale-price',
+      actionId, entityId: target.entityId, sourceRevision: target.sourceRevision, fields: {}, title: 'Review', summary: 'Host only'});
+    assert.equal(recovered.tools[0]!.sourceRevision, target.sourceRevision);
+  });
+  test(`Expired supplier price ${actionId} rejects fresh/noncommodity/missing originals`, async () => {
+    for (const price of [{validUntil: '2026-10-28T09:00:00.000Z', revision: 3},
+      {validUntil: '2026-10-28T07:59:00.000Z'}, {validUntil: '2026-10-28T07:59:00.000Z', revision: 0}]) {
+      const f = populatedFixture(1, 'retail', false, price);
+      await assert.rejects(f.context.read(actor, {...request, actionId, entityId: f.ids[0]!}), /context_unavailable/u);
+    }
+    const absent = populatedFixture(0, 'retail', false, {validUntil: '2026-10-28T07:59:00.000Z', revision: 1});
+    await assert.rejects(absent.context.read(actor, {...request, actionId}), /context_unavailable/u);
+  });
+  test(`Expired supplier price ${actionId} binds price revision and rejects changed source on recovery`, async () => {
+    const price = {validUntil: '2026-10-28T07:59:00.000Z', revision: 3};
+    const f = populatedFixture(1, 'bulk', false, price), input = {...request, actionId, entityId: f.ids[0]!};
+    const source = await f.context.read(actor, input), tool = source.tools[0]!;
+    const proposal = {kind: 'proposal' as const, id: 'HOST-price-recovery', actionId, entityId: input.entityId,
+      sourceRevision: tool.sourceRevision, fields: {}, title: 'Review', summary: 'Host only'};
+    price.revision++;
+    await assert.rejects(f.context.readPrepared(actor, input, proposal), /stale_preparation/u);
+    price.validUntil = '2026-10-28T09:00:00.000Z';
+    await assert.rejects(f.context.readPrepared(actor, input, proposal), /context_unavailable/u);
+  });
+}
+test('Missing original remains independent search without an invented expired-price context', async () => {
+  const f = fixture();
+  const value = await f.context.read(actor, {...request, actionId: null, catalogueListingIds: [originalListingId(1)]});
+  assert(value.tools.some(tool => tool.actionId === 'AI-ACT-001'));
+  assert.equal(value.tools.some(tool => ['AI-ACT-060', 'AI-ACT-352'].includes(tool.actionId)), false);
+  assert.equal(value.modelContext!.expiredSupplierPriceReview, undefined);
+  assert(!JSON.stringify(value.modelContext).includes('supplier price has expired'));
+});
+test('Mixed current and expired originals keep purchase and refresh targets separate', async () => {
+  const price = {validUntil: '2026-10-28T07:59:00.000Z', revision: 3, freshListingId: ''};
+  const f = populatedFixture(2, 'bulk', false, price); price.freshListingId = f.ids[0]!;
+  const value = await f.context.read(actor, {...request, actionId: null, catalogueListingIds: f.ids});
+  const buy = value.tools.find(tool => tool.actionId === 'AI-ACT-014')!;
+  assert.equal(buy.resolveTarget!({listingId: f.ids[0], quantity: 3}).entityId, f.ids[0]);
+  assert.throws(() => buy.resolveTarget!({listingId: f.ids[1], quantity: 3}));
+  for (const actionId of ['AI-ACT-060', 'AI-ACT-352']) {
+    const tool = value.tools.find(tool => tool.actionId === actionId)!;
+    assert.equal(tool.resolveTarget!({listingId: f.ids[1]}).entityId, f.ids[1]);
+    assert.throws(() => tool.resolveTarget!({listingId: f.ids[0]}));
+    assert(value.nativeTargets!.some(target => target.actionId === actionId && target.entityId === f.ids[1]));
+    assert(!value.nativeTargets!.some(target => target.actionId === actionId && target.entityId === f.ids[0]));
+  }
+  assert(!value.nativeTargets!.some(target => target.actionId === 'AI-ACT-014' && target.entityId === f.ids[1]));
+});
+test('Expired commodity source never unlocks purchase and changed readback cannot prepare', async () => {
+  const price = {validUntil: '2026-10-28T07:59:00.000Z', revision: 1};
+  const f = populatedFixture(1, 'retail', false, price);
+  await assert.rejects(f.context.read(actor, {...request, actionId: 'AI-ACT-014', entityId: f.ids[0]!}), /context_unavailable/u);
+  let reads = 0;
+  const changing = populatedFixture(1, 'retail', false, {...price, onRead: () => {if (++reads === 5) changing.change();}});
+  await assert.rejects(changing.context.read(actor, {...request, actionId: 'AI-ACT-060', entityId: changing.ids[0]!}), /stale_preparation/u);
+  f.deny();
+  await assert.rejects(f.context.read(actor, {...request, actionId: 'AI-ACT-060', entityId: f.ids[0]!}));
+});
+
 test("Original listing selector maps public record to exact native entity without descriptive instructions", async () => {
   const f = populatedFixture(), c = await f.context.read(actor, {...request, actionId: null, catalogueListingIds: f.ids});
   const tool = c.tools.find(t => t.actionId === "AI-ACT-006")!;

@@ -8,7 +8,7 @@ import 'profile_context.dart';
 
 // Match only original readers actually registered in the current backend.
 const assistantDomainProductContextActions = {'AI-ACT-006', 'AI-ACT-007', 'AI-ACT-009', 'AI-ACT-014', 'AI-ACT-017', 'AI-ACT-018', 'AI-ACT-019',
-  'AI-ACT-336', 'AI-ACT-337', 'AI-ACT-338', 'AI-ACT-339'};
+  'AI-ACT-060', 'AI-ACT-352', 'AI-ACT-336', 'AI-ACT-337', 'AI-ACT-338', 'AI-ACT-339'};
 const assistantDomainPreferenceContextActions = {'AI-ACT-010', 'AI-ACT-011', 'AI-ACT-012', 'AI-ACT-013'};
 const assistantDomainAddressContextActions = {'AI-ACT-024', 'AI-ACT-027'};
 const assistantDomainPurchaseReferenceContextActions = {'AI-ACT-032'};
@@ -166,6 +166,8 @@ class AssistantDomainContextGateway {
           (entity != null || context.inWorkspace)) _invalid();
       if (assistantDomainProductContextActions.contains(action) && (context.inWorkspace || entity == null ||
           selection == null || !selection.contains(entity))) _invalid();
+      if (const {'AI-ACT-060', 'AI-ACT-352'}.contains(action) &&
+          !RegExp(r'^catalogue-stale-price:[a-f0-9]{64}$').hasMatch(revision)) _invalid();
       if (assistantDomainAddressContextActions.contains(action) && (context.inWorkspace || entity == null)) _invalid();
       if (assistantDomainPurchaseReferenceContextActions.contains(action) && (context.inWorkspace || entity != null ||
           !RegExp(r'^buy-reference-owner:[a-f0-9]{64}$').hasMatch(revision))) _invalid();

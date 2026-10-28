@@ -44,6 +44,50 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
+  const priceExport = String.fromEnvironment('AI_DOMAIN_PRICE_REFRESH_EXPORT_PATH');
+  test('Actual expired-price catalogue HTTP metadata decodes through the original mobile gateway', () async {
+    final data = jsonDecode(File(priceExport).readAsStringSync()) as Map<String, dynamic>;
+    expect(data['hostOnly'], true);
+    final actor = data['actor'] as Map<String, dynamic>;
+    final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String,
+      tenantId: null, userId: actor['uid'] as String);
+    final listing = data['listingId'] as String;
+    final gateway = AssistantDomainContextGateway(owner: owner, isCurrent: () => true, credentials: _Credentials(),
+      transport: _BackendReferenceWire(data['metadata'] as Map<String, dynamic>, listingIds: [listing]),
+      clock: () => DateTime.parse(data['now'] as String));
+    final result = await gateway.read(MoolAssistantContext(accountScope: owner, authenticationRevision: 1),
+      () => true, catalogueListingIds: [listing]);
+    for (final action in ['AI-ACT-060', 'AI-ACT-352']) {
+      expect(result.revisions[(action, listing)], matches(RegExp(r'^catalogue-stale-price:[a-f0-9]{64}$')));
+    }
+    expect(result.revisions.containsKey(('AI-ACT-001', null)), true);
+    expect(result.revisions.containsKey(('AI-ACT-014', listing)), false);
+  }, skip: priceExport.isEmpty ? 'Requires explicit isolated original-service expired-price export' : false);
+  for (final action in ['AI-ACT-060', 'AI-ACT-352']) {
+    test('Expired supplier price $action requires selected personal original and exact source proof', () async {
+      final listing = 'listing-${'a' * 64}', proof = 'catalogue-stale-price:${'b' * 64}';
+      final data = <String, Object?>{..._data(), 'revisions': [
+        {'actionId': action, 'entityId': listing, 'sourceRevision': proof}]};
+      final result = await _source(_Wire(() => _ok(data))).read(_context, () => true, catalogueListingIds: [listing]);
+      expect(result.revisions, {(action, listing): proof});
+      for (final fault in ['unselected', 'root', 'proof', 'foreign-owner', 'store']) {
+        final changed = jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
+        final row = (changed['revisions'] as List).single as Map;
+        var context = _context;
+        if (fault == 'root') row['entityId'] = null;
+        if (fault == 'proof') row['sourceRevision'] = 'catalogue-product:${'b' * 64}';
+        if (fault == 'foreign-owner') changed['ownerKey'] = 'c' * 64;
+        if (fault == 'store') {
+          context = _context.withWorkspace(const MoolAssistantWorkspace(id: 'store-one', name: 'HOST Store',
+            profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
+          changed['scope'] = {'audience': 'workspace', 'storeId': 'store-one'};
+          changed['ownerKey'] = sha256.convert(utf8.encode(jsonEncode(['fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString();
+        }
+        await expectLater(_source(_Wire(() => _ok(changed))).read(context, () => true,
+          catalogueListingIds: fault == 'unselected' ? null : [listing]), throwsA(isA<AssistantModelFailure>()));
+      }
+    });
+  }
   const restockExport = String.fromEnvironment('AI_DOMAIN_RESTOCK_SELECTION_EXPORT_PATH');
   test('Original selected Restock service and native product bind exact Unicode pack and price', () async {
     final export = jsonDecode(File(restockExport).readAsStringSync()) as Map<String, dynamic>;
@@ -486,7 +530,8 @@ void main() {
     final id = 'listing-${List.filled(64, 'a').join()}';
     final selected = <String>[id];
     final wire = _Wire(() => _ok({..._data(), 'revisions': [
-      {'actionId': action, 'entityId': id, 'sourceRevision': 'catalogue-product:original'},
+      {'actionId': action, 'entityId': id, 'sourceRevision': const {'AI-ACT-060', 'AI-ACT-352'}.contains(action)
+        ? 'catalogue-stale-price:${'b' * 64}' : 'catalogue-product:original'},
     ]}));
     final value = await _source(wire).read(_context, () => true, catalogueListingIds: selected);
     selected.clear();
@@ -586,14 +631,16 @@ void main() {
 }
 
 class _BackendReferenceWire implements SocialContentTransport {
-  _BackendReferenceWire(this.metadata, {this.retainedIds});
+  _BackendReferenceWire(this.metadata, {this.retainedIds, this.listingIds});
   final Map<String, dynamic> metadata;
   final List<String>? retainedIds;
+  final List<String>? listingIds;
   @override Future<SocialContentResponse> postJson(Uri endpoint, {required Map<String, String> headers,
       required Map<String, Object?> body}) async {
     expect(endpoint.path, '/moolSocialAssistantContext');
     expect(body, {'operation': 'read', 'payload': {'scope': {'audience': 'personal', 'storeId': null},
-      if (retainedIds != null) 'retainedSupplierQuoteIds': retainedIds}});
+      if (retainedIds != null) 'retainedSupplierQuoteIds': retainedIds,
+      if (listingIds != null) 'catalogueListingIds': listingIds}});
     return SocialContentResponse(statusCode: 200, body: jsonEncode(metadata));
   }
 }

@@ -7,7 +7,7 @@ import type {WorkspacePromotionService,StoreCouponRecord} from '../workspace/wor
 import type {PreparationContextSource} from "./model_service.js";
 import {AssistantModelError, canonical, digest, fail, id, object,
   catalogueListingSelection, preparationNativeTargetLimit, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
-import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, buyerRetainedQuoteActions, retainedSupplierQuoteSelection, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeOperationalActions,storeOrderBoardActions,storeSupplierDraftActions,storePurchaseRootActions,storeReceivingOriginalActions,storeCouponActions,storeReportOwnerActions,storePublicDetailsActions, searchSuggestion} from "./domain_context_contract.js";
+import {canonicalContextProjection, catalogueProductActions, cataloguePriceRefreshActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, buyerRetainedQuoteActions, retainedSupplierQuoteSelection, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeOperationalActions,storeOrderBoardActions,storeSupplierDraftActions,storePurchaseRootActions,storeReceivingOriginalActions,storeCouponActions,storeReportOwnerActions,storePublicDetailsActions, searchSuggestion} from "./domain_context_contract.js";
 
 const paidRevision = (p: PlansReadback) => canonical([p.owner, p.scope, p.catalogueRevision, p.subscriptionRevision]);
 const searchSchema = {type: "object", properties: {query: {type: "string"}},
@@ -104,7 +104,7 @@ export class OriginalCataloguePreparationContext implements PreparationContextSo
     // full records, private source details and arbitrary descriptions do not.
     return {destination, snapshotId: page.snapshotId, count: page.totalCount as number};
   }
-  private async products(ids: readonly string[], snapshots: ReadonlyArray<{destination: "shop" | "wholesale"; snapshotId: string; count: number}>) {
+  private async products(ids: readonly string[], snapshots: ReadonlyArray<{destination: "shop" | "wholesale"; snapshotId: string; count: number}>, expiredCommodityOnly = false) {
     const found = new Map<string, OriginalPublicProduct>();
     for (let start = 0; start < ids.length; start += 50) {
       const batch = ids.slice(start, start + 50);
@@ -154,10 +154,22 @@ export class OriginalCataloguePreparationContext implements PreparationContextSo
               !Number.isSafeInteger(terms.priceMinor) || (terms.priceMinor as number) < 0 ||
               terms.mrpMinor !== null && (!Number.isSafeInteger(terms.mrpMinor) || (terms.mrpMinor as number) < 0) ||
               typeof terms.revision !== "string" || !terms.revision || terms.revision.length > 256 ||
-              !Number.isFinite(expiry) || expiry <= this.now() ||
+              !Number.isFinite(expiry) ||
               [terms.minimumOrder, terms.quantityStep, pack.quantityMilli, pack.unitsPerCase]
                 .some(value => !Number.isSafeInteger(value) || (value as number) < 1) ||
               !["kg", "L", "count"].includes(String(pack.unit))) return fail("context_unavailable");
+          const confirmation = terms.priceConfirmation === undefined ? null : object(terms.priceConfirmation);
+          const commodityConfirmed = confirmation !== null && Number.isSafeInteger(confirmation.revision) && (confirmation.revision as number) >= 1;
+          if (!expiredCommodityOnly && expiry <= this.now()) {
+            // An expired supplier confirmation is not a purchasable offer. A
+            // separate read-only refresh context may still expose its native Review.
+            if (commodityConfirmed) continue;
+            return fail('context_unavailable');
+          }
+          if (expiredCommodityOnly) {
+            if (expiry > this.now()) continue;
+            if (!commodityConfirmed) continue;
+          }
           let supplierTax: Readonly<Record<string, unknown>> | null = null;
           if (terms.supplierTax !== undefined) {
             const tax = object(terms.supplierTax), field = tax.version === 1 ? "amountMinor" : "rateBasisPoints";
@@ -182,7 +194,9 @@ export class OriginalCataloguePreparationContext implements PreparationContextSo
             priceRevision: terms.revision, priceValidUntil: terms.validUntil as string, validUntil: expiry,
             minimumOrder: terms.minimumOrder as number, quantityStep: terms.quantityStep as number,
             quantityMilli: pack.quantityMilli as number, unit: pack.unit as string, unitsPerCase: pack.unitsPerCase as number, supplierTax,
-            revision: "catalogue-product:" + digest([snapshot.snapshotId, identity])});
+            revision: expiredCommodityOnly
+              ? "catalogue-stale-price:" + digest([snapshot.snapshotId, identity, terms])
+              : "catalogue-product:" + digest([snapshot.snapshotId, identity])});
         }
       }
     }
@@ -192,7 +206,53 @@ export class OriginalCataloguePreparationContext implements PreparationContextSo
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if(input.scope.audience==='workspace')return this.readRestock(actor,input);
-    return this.readOriginal(actor, input);
+    if (cataloguePriceRefreshActions.has(input.actionId ?? '')) return this.readPriceRefresh(actor, input);
+    const original = await this.readOriginal(actor, input);
+    if (input.actionId !== null || !input.catalogueListingIds?.length ||
+        (original.modelContext?.products as unknown[]).length === input.catalogueListingIds.length) return original;
+    // Canonical mobile context reads use actionId=null. Expose expired-price
+    // targets separately, without promoting their expired prices into Buy tools.
+    const refresh = await this.readPriceRefresh(actor, input);
+    if (!refresh.tools.length) return original;
+    return {...original, revision: 'catalogue-with-price-refresh:' + digest([original.revision, refresh.revision]),
+      validUntil: new Date(Math.min(Date.parse(original.validUntil), Date.parse(refresh.validUntil))).toISOString(),
+      tools: [...original.tools, ...refresh.tools], nativeTargets: [...(original.nativeTargets ?? original.tools.map(
+        ({actionId, entityId, sourceRevision}) => ({actionId, entityId, sourceRevision}))), ...(refresh.nativeTargets ?? [])],
+      modelContext: {...original.modelContext, expiredSupplierPriceReview: refresh.modelContext}};
+  }
+  private async readPriceRefresh(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
+    if (input.scope.audience !== 'personal' || input.actionId !== null && !cataloguePriceRefreshActions.has(input.actionId)) return fail('context_unavailable');
+    const started = this.now(), before = await this.paid(actor, input);
+    const ids = catalogueListingSelection(input.entityId === null ? input.catalogueListingIds ?? [] : [input.entityId]);
+    const snapshots = [await this.catalogueSnapshot('shop'), await this.catalogueSnapshot('wholesale')];
+    const products = await this.products(ids, snapshots, true);
+    const fresh = [await this.catalogueSnapshot('shop'), await this.catalogueSnapshot('wholesale')];
+    const reread = await this.products(ids, fresh, true), after = await this.paid(actor, input);
+    if (canonical(snapshots) !== canonical(fresh) || canonical(products) !== canonical(reread) || paidRevision(before) !== paidRevision(after)) return fail('stale_preparation', 409);
+    const until = Math.min(started + 60_000, Date.parse(before.validUntil), Date.parse(after.validUntil));
+    if (!products.length && input.actionId !== null || until <= this.now()) return fail('context_unavailable');
+    const revision = 'catalogue-price-refresh:' + digest([actor.projectId, snapshots, products]);
+    const selected = input.entityId !== null;
+    const description = 'Review requesting an updated supplier price';
+    const validate = (fields: Readonly<Record<string, unknown>>) => Object.keys(fields).length === 0;
+    const actionIds = input.actionId === null ? [...cataloguePriceRefreshActions] : [input.actionId];
+    const tools = products.length ? actionIds.map((actionId): PreparationTool => ({name: `buy_review_supplier_price_refresh_${actionId.slice(-3)}`, actionId, entityId: input.entityId,
+      sourceRevision: selected ? products[0]!.revision : revision, description, validate,
+      parameters: {type: 'object', properties: selected ? {} : {listingId: {type: 'string', enum: products.map(p => p.listingId)}},
+        required: selected ? [] : ['listingId'], additionalProperties: false},
+      ...(!selected ? {targetSelector: 'listingId', resolveTarget: (fields: Readonly<Record<string, unknown>>) => {
+        if (Object.keys(fields).length !== 1) return fail('invalid_model_result');
+        const product = products.find(p => p.listingId === fields.listingId);
+        if (!product) return fail('invalid_model_result');
+        return {entityId: product.listingId, sourceRevision: product.revision, fields: {}, title: description,
+          summary: [product.title, product.variant, product.pack].filter(Boolean).join(' · ')};
+      }} : {})})) : [];
+    return {revision, validUntil: new Date(until).toISOString(), tools,
+      nativeTargets: products.flatMap(p => actionIds.map(actionId => ({actionId, entityId: p.listingId, sourceRevision: p.revision}))),
+      modelContext: {audience: 'personal', sourceKind: 'original-expired-commodity-price-v1',
+        purpose: 'Prepare native Review only. The supplier price has expired. No refresh request is sent and no current price, stock, delivery or ordering eligibility is inferred.',
+        products: products.map(p => ({listingId: p.listingId, title: p.title, variant: p.variant, pack: p.pack,
+          channel: p.channel, supplier: {id: p.storeId, name: p.supplierName}, expiredPriceValidUntil: p.priceValidUntil}))}};
   }
   private async readRestock(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (!this.deps.workspaceAuthority || input.scope.audience !== 'workspace' || !input.scope.storeId ||
@@ -335,6 +395,11 @@ export class OriginalCataloguePreparationContext implements PreparationContextSo
       return source;
     }
     if (proposal.actionId !== input.actionId || proposal.entityId !== input.entityId) return fail("stale_preparation", 409);
+    if (cataloguePriceRefreshActions.has(proposal.actionId)) {
+      const source = await this.readPriceRefresh(actor, input), tool = source.tools[0];
+      if (!tool || tool.sourceRevision !== proposal.sourceRevision || !tool.validate(proposal.fields)) return fail('stale_preparation', 409);
+      return source;
+    }
     return this.readOriginal(actor, input, proposal.fields);
   }
   private async confirmChoice(actionId: string, fields: Readonly<Record<string, unknown>>,
