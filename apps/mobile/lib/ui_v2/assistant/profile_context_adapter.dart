@@ -121,6 +121,10 @@ class AssistantOriginalContextReader {
           for(final entry in domain.revisions.entries.where((entry)=>
             assistantStoreOrderOriginalContextActions.contains(entry.key.$1)&&entry.key.$2!=null))entry.key.$2!:entry.value,
         },inputCurrent:alive,validUntil:domain.validUntil);
+        final privateStars=buy==null?<String>{}:await buy!.readAssistantPrivateStarsOriginals({
+          for(final entry in domain.revisions.entries.where((entry)=>
+            assistantPrivateStarsContextActions.contains(entry.key.$1)&&entry.key.$2!=null))entry.key.$2!:entry.value,
+        },accountUserId:owner!.userId,binding:context.binding,inputCurrent:alive,validUntil:domain.validUntil);
         if (!alive()) throw const AssistantModelFailure('stale_preparation');
         for (final entry in domain.revisions.entries) {
           // Accept only an unchanged original native cache. Explicit refresh,
@@ -128,6 +132,7 @@ class AssistantOriginalContextReader {
           if (assistantDomainAddressContextActions.contains(entry.key.$1) &&
               !addressSourceReady(entry.value)) continue;
           if(assistantStoreOrderOriginalContextActions.contains(entry.key.$1)&&!originalOrders.contains(entry.key.$2))continue;
+          if(assistantPrivateStarsContextActions.contains(entry.key.$1)&&!privateStars.contains(entry.key.$2))continue;
           if(assistantStoreRestockOwnerContextActions.contains(entry.key.$1)&&
               !RegExp(r'^store-restock-source:[a-f0-9]{64}$').hasMatch(entry.value))continue;
           final submissionRoot=entry.key.$1=='AI-ACT-223'&&entry.key.$2==null;

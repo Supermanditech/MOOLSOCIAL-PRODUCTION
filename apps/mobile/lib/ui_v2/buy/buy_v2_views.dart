@@ -129,7 +129,10 @@ Iterable<MoolAssistantNativeAdapter> buyShop05NativeAdapters({required BuyV2Sess
   final owner=(_buyShop04Owners[session]??const <BuyShop04NativeOwner>{}).where((candidate)=>candidate.admitted).singleOrNull;
   if(owner==null)return const [];
   return [for(final id in const ['AI-ACT-048','AI-ACT-049','AI-ACT-050','AI-ACT-051','AI-ACT-052','AI-ACT-053','AI-ACT-055'])
-    BuyShop04NativeAdapter(actionId:id,session:session,navigator:navigator,currentContext:currentContext,
+    if(id=='AI-ACT-055')BuyOriginalPrivateStarsNativeAdapter(actionId:id,session:session,navigator:navigator,currentContext:currentContext,
+      isRootCurrent:isRootCurrent,scopeOwner:scopeOwner,accountIdentity:accountIdentity,
+      accountAuthenticated:accountAuthenticated,capturedOwner:owner)
+    else BuyShop04NativeAdapter(actionId:id,session:session,navigator:navigator,currentContext:currentContext,
       isRootCurrent:isRootCurrent,scopeOwner:scopeOwner,accountIdentity:accountIdentity,
       accountAuthenticated:accountAuthenticated,capturedOwner:owner),
     for(final id in const ['AI-ACT-054','AI-ACT-056'])BuyProductFeedbackNativeAdapter(actionId:id,
@@ -474,6 +477,73 @@ class _BuyShop05PurchasedStarsState extends State<_BuyShop05PurchasedStars>{
 }
 
 
+/// Reuses the original private-stars page without manufacturing a Buy order.
+class BuyOriginalPrivateStarsNativeAdapter extends BuyShop04NativeAdapter {
+  BuyOriginalPrivateStarsNativeAdapter({required super.actionId,required super.session,required super.navigator,
+    required super.currentContext,required super.isRootCurrent,required super.scopeOwner,required super.accountIdentity,
+    required super.accountAuthenticated,required super.capturedOwner});
+  final _sourceAnchors=<String,({Object binding,Object owner,Object actor,String revision})>{};
+  int _sourceVersion=0;
+  bool _sourceSame(MoolAssistantProposal p){
+    final row=_sourceAnchors[p.entityId],source=p.entityId==null?null:session.assistantPrivateStarsOriginals(p.entityId!);
+    return row!=null&&source!=null&&row.binding==p.binding&&identical(row.owner,source.owner)&&row.actor==_actorOwner&&
+      row.revision==p.sourceRevision&&_actor(p.binding)&&_assistantActive&&capturedOwner.current;
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)async{
+    final source=entityId==null?null:session.assistantPrivateStarsOriginals(entityId);
+    if(source==null){if(_sourceAnchors.remove(entityId)!=null)return null;return super.snapshot(context,entityId);}
+    if(!_assistantCurrent||!_actor(context.binding)||!capturedOwner.current||_buyNativeReviews[session]==true||
+      _buyBrowseReviews[session]==true||_buyInstructionDraftOpen(session)||(_buyQuantityEditors[session]??0)>0||
+      buyV2AddressFormOpen(session)||buyV2AddressRequestFormOpen(session))return null;
+    final old=_sourceAnchors[entityId],actor=_actorOwner;
+    final row=old!=null&&old.binding==context.binding&&identical(old.owner,source.owner)&&old.actor==actor?old:
+      (binding:context.binding,owner:source.owner,actor:actor,revision:'buyer-private-stars-native:${++_sourceVersion}');
+    _sourceAnchors[entityId!]=row;
+    return MoolAssistantNativeSnapshot(binding:context.binding,entityId:entityId,sourceRevision:row.revision,permitted:true);
+  }
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,
+      {required bool Function() isCurrent,required Listenable ownerChanges})async{
+    final anchor=_sourceAnchors[p.entityId];
+    if(anchor==null)return super.openOwnedReview(p,isCurrent:isCurrent,ownerChanges:ownerChanges);
+    bool actor()=>isCurrent()&&p.validUntil.isAfter(DateTime.now())&&_actor(p.binding)&&_assistantActive&&capturedOwner.current&&
+      anchor.actor==_actorOwner&&session.assistantPrivateStarsOwnerCurrent(anchor.owner);
+    bool current()=>actor()&&_sourceSame(p);
+    if(_buyNativeReviews[session]==true)return MoolAssistantReviewResult.stale;
+    if(actionId!='AI-ACT-055'||p.actionId!=actionId||!_assistantCurrent||!current()||validateFields(p.fields)!=null){
+      if(!current())_sourceAnchors.remove(p.entityId);
+      return MoolAssistantReviewResult.stale;
+    }
+    final initial=BuyShop04InitialData.fromFields(actionId,p.fields),source=session.assistantPrivateStarsOriginals(p.entityId!)!;
+    final targets=source.targets.where((t)=>t.orderLineId==initial.lineId).toList(growable:false);
+    if(targets.length!=1)return MoolAssistantReviewResult.unavailable;
+    final target=targets.single,reader=session.purchaseReader!,realm=session.purchaseRealm,expected=session.privateStarRating(target.id);
+    Future<void>? operation;var retired=false;_buyNativeReviews[session]=true;
+    try{
+      final projection=await reader.readPurchaseProjection(role:WorkspaceOrderIdentityRole.buyer,realm:realm,purchaseId:target.reference.purchaseId);
+      if(!current()||projection?.sourceRevision!=target.reference.sourceRevision){_sourceAnchors.remove(p.entityId);return MoolAssistantReviewResult.stale;}
+      final originals=projection!.orders.where((o)=>o.orderId==target.reference.orderId&&o.storeId==target.reference.storeId&&
+        o.originalFingerprint==target.reference.originalFingerprint).toList(growable:false);
+      if(originals.length!=1){_sourceAnchors.remove(p.entityId);return MoolAssistantReviewResult.stale;}
+      final lines=originals.single.lines.where((l)=>l.lineId==target.orderLineId&&l.name==target.productLabel&&l.publicListing==target.purchasedListing).toList(growable:false);
+      if(lines.length!=1){_sourceAnchors.remove(p.entityId);return MoolAssistantReviewResult.stale;}
+      final gateway=AuthenticatedWorkspaceOrderOperationsGateway(reader);
+      final fresh=await gateway.readProductFeedbackTarget(realm:realm,reference:target.reference,line:lines.single);
+      if(!current()||fresh==null||jsonEncode(fresh.toJson())!=jsonEncode(target.toJson())){_sourceAnchors.remove(p.entityId);return MoolAssistantReviewResult.stale;}
+      final saved=await gateway.readProductStars(fresh),rating=saved?.rating;
+      if(!current()||saved==null||rating?.revision!=expected?.revision||rating?.stars!=expected?.stars||rating?.updatedAt!=expected?.updatedAt){
+        _sourceAnchors.remove(p.entityId);return MoolAssistantReviewResult.stale;
+      }
+      final used=await navigator.push<bool>(MaterialPageRoute(builder:(_)=>_BuyShop04ReviewPage(session:session,actionId:actionId,
+        entity:p.entityId,initial:initial,order:null,nativeOwner:capturedOwner,current:current,actorCurrent:actor,validUntil:p.validUntil,
+        readProjection:null,onPrepared:(){},trackNative:(future)=>operation=future,onRetired:()=>retired=true,
+        purchasedStars:(reference:target.reference,original:originals.single,line:lines.single),
+        changes:Listenable.merge([scopeOwner,ownerChanges,capturedOwner,session,?session.collectionIdentity,?session.procurementIdentity]))));
+      if(operation!=null)await operation;
+      return !retired&&actor()&&(used==true||current())?MoolAssistantReviewResult.opened:MoolAssistantReviewResult.stale;
+    }on Object{_sourceAnchors.remove(p.entityId);return MoolAssistantReviewResult.unavailable;}
+    finally{_buyNativeReviews[session]=false;}
+  }
+}
 class BuyShop04NativeAdapter implements MoolAssistantOwnerAwareNativeAdapter, MoolAssistantRouteBoundNativeAdapter {
   BuyShop04NativeAdapter({required this.actionId,required this.session,required this.navigator,
     required this.currentContext,required this.isRootCurrent,required this.scopeOwner,
@@ -714,12 +784,13 @@ class _BuyShop04Scope extends InheritedWidget {
 class _BuyShop04ReviewPage extends StatefulWidget {
   const _BuyShop04ReviewPage({required this.session,required this.actionId,required this.entity,required this.initial,
     required this.order,required this.nativeOwner,required this.current,required this.actorCurrent,
-    required this.validUntil,required this.changes,required this.trackNative,required this.onRetired,required this.readProjection,required this.onPrepared});
+    required this.validUntil,required this.changes,required this.trackNative,required this.onRetired,required this.readProjection,required this.onPrepared,this.purchasedStars});
   final BuyV2Session session;
   final String actionId;
   final String? entity;
   final BuyShop04InitialData initial;
   final BuyV2Order? order;
+  final ({WorkspacePurchaseReference reference,WorkspacePurchaseOrder original,WorkspacePurchasedSkuLine line})? purchasedStars;
   final BuyShop04NativeOwner nativeOwner;
   final BuyV2CheckoutReadProjection? readProjection;
   final VoidCallback onPrepared;
@@ -808,7 +879,12 @@ class _BuyShop04ReviewPageState extends State<_BuyShop04ReviewPage>{
     if(action=='AI-ACT-050')return _BuyShop04OpenNative(onOpen:()async{if(!_canAct)return;await showBuyV2OrderResolutionSheet(nativeContext,session:session,order:widget.order!,onOpenSupport:(){},initial:widget.initial);if(mounted)_finish();});
     if(action=='AI-ACT-052')return ListView(padding:const EdgeInsets.all(12),children:[_BalancePaymentCard(session:session,order:widget.order!,paymentHandoff:_paymentHandoff)]);
     if(action=='AI-ACT-053')return _BuyV2CollectionOrderView(session:session,order:widget.order!,onOpenOrderHelp:(_){},capturedCurrent:()=>_ownerCurrent,allowCapturedScan:true,cameraBuilder:widget.nativeOwner.collectionCameraBuilder);
-    if(action=='AI-ACT-055')return _BuyShop05PurchasedStars(session:session,order:widget.order!,initial:widget.initial,scope:_BuyShop04Scope.of(nativeContext)!);
+    if(action=='AI-ACT-055'){
+      final original=widget.purchasedStars,scope=_BuyShop04Scope.of(nativeContext)!;
+      if(original!=null)return _ProductReviewSheet(session:session,reference:original.reference,original:original.original,line:original.line,
+        initialStars:widget.initial.stars,capturedCurrent:scope.ownerCurrent,capturedCommit:(operation)=>scope.perform(operation,false));
+      return _BuyShop05PurchasedStars(session:session,order:widget.order!,initial:widget.initial,scope:scope);
+    }
     if(action=='AI-ACT-413' || action=='AI-ACT-414')return _BuyShop04OpenNative(onOpen:()=>_invoice(nativeContext));
     if(action=='AI-ACT-043')return BuyV2OrdersView(session:session,onOpenOrderHelp:(_){},invoiceDownloader:null,readQuery:'',
       permittedOrder:(order)=>order.destination!=BuyV2Destination.medicine && order.lines.every((line)=>!line.product.requiresPrescription));
@@ -845,9 +921,9 @@ class _BuyShop04ReviewPageState extends State<_BuyShop04ReviewPage>{
   }
   @override void dispose(){_expiry?.cancel();widget.changes.removeListener(_changed);super.dispose();}
   @override Widget build(BuildContext context){
-    final target=widget.order!=null || widget.actionId=='AI-ACT-043'?BuyV2Destination.orders:widget.session.destination;
+    final target=widget.order!=null || widget.purchasedStars!=null || widget.actionId=='AI-ACT-043'?BuyV2Destination.orders:widget.session.destination;
     final view=widget.actionId=='AI-ACT-043'?BuyV2View.catalogue:widget.actionId=='AI-ACT-045'?BuyV2View.orderItems:
-      widget.order!=null?BuyV2View.tracking:widget.actionId=='AI-ACT-058' || widget.actionId=='AI-ACT-346'?BuyV2View.recovery:BuyV2View.checkout;
+      widget.order!=null||widget.purchasedStars!=null?BuyV2View.tracking:widget.actionId=='AI-ACT-058' || widget.actionId=='AI-ACT-346'?BuyV2View.recovery:BuyV2View.checkout;
     return PopScope<bool>(canPop:_closing,onPopInvokedWithResult:(didPop,_){if(!didPop){
       if(_inner.currentState?.canPop()==true)_inner.currentState!.pop();else _finish();}},
       child:Scaffold(appBar:AppBar(title:const Text('Review order action'),leading:BackButton(onPressed:_finish)),

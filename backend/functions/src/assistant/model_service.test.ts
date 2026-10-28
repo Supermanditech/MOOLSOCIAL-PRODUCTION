@@ -64,6 +64,37 @@ function fixture() {
   return {service: new AssistantPreparationService(deps), deps, row, context, store, settlements,
     model: (fn: typeof model) => {model = fn;}, advance: (ms: number) => {now = new Date(now.getTime() + ms);}, counts: () => ({calls, contexts, reserved})};
 }
+test('Private purchased-stars native selection restricts model order, line choices and reference context together',async()=>{
+  const f=fixture(),first='host-purchased-order-a',second='host-purchased-order-b';
+  Object.assign(f.context,{nativeTargets:[{actionId:'AI-ACT-055',entityId:first,sourceRevision:'host-stars-proof-a'},
+    {actionId:'AI-ACT-055',entityId:second,sourceRevision:'host-stars-proof-b'}],
+    modelContext:{sourceKind:'composite-original-context-v1',sources:[{sourceKind:'original-private-product-stars-v1',
+      coverage:'indexed_recorded_completions',orders:[{orderId:first,items:[{lineId:'host-line-a',label:'Host purchased item A'}]},
+        {orderId:second,items:[{lineId:'host-line-b',label:'Host private item B'}]}]}]},
+    tools:[{name:'host_prepare_private_stars',actionId:'AI-ACT-055',entityId:null,sourceRevision:'host-stars-root',
+      description:'Host original private-stars source fixture',targetSelector:'orderId',
+      parameters:{type:'object',additionalProperties:false,required:['orderId','lineId','stars'],properties:{
+        orderId:{type:'string',enum:[first,second]},lineId:{type:'string',enum:['host-line-a','host-line-b']},stars:{type:'integer',minimum:1,maximum:5}}},
+      validate:(fields:Readonly<Record<string,unknown>>)=>Object.keys(fields).length===2&&fields.lineId==='host-line-a'&&fields.stars===4,
+      resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
+        assert.equal(args.orderId,first);assert.equal(args.lineId,'host-line-a');
+        return {entityId:first,sourceRevision:'host-stars-proof-a',fields:{lineId:args.lineId,stars:args.stars}};
+      }}]});
+  let modelCalls=0;
+  const service=new AssistantPreparationService({...f.deps,model:{async prepare(_input,tools,_signal,reference){
+    modelCalls++;assert.equal(tools.length,1);
+    const properties=tools[0]!.parameters.properties as Record<string,{enum?:unknown[]}>;
+    assert.deepEqual(properties.orderId!.enum,[first]);assert.deepEqual(properties.lineId!.enum,['host-line-a']);
+    assert(JSON.stringify(reference).includes('Host purchased item A'));assert(!JSON.stringify(reference).includes('Host private item B'));
+    assert(!JSON.stringify(tools[0]!.parameters).includes('host-line-b'));
+    return {kind:'tool',name:'host_prepare_private_stars',arguments:{orderId:first,lineId:'host-line-a',stars:4}};
+  }}});
+  const value=await service.handle(actor,{operation:'prepare',payload:{...request,actionId:'AI-ACT-055',nativeTargets:[{actionId:'AI-ACT-055',entityId:first}]}});
+  assert.equal(value.state,'ready');assert.equal(modelCalls,1);
+  if(value.state==='ready'){assert.equal(value.reply.outcome.kind,'proposal');if(value.reply.outcome.kind==='proposal'){
+    assert.equal(value.reply.outcome.entityId,first);assert.deepEqual(value.reply.outcome.fields,{lineId:'host-line-a',stars:4});
+  }}
+});
 test("AI-B01 actual paid service prepares a typed native proposal without domain execution", async () => {
   const f = fixture(); const result = await f.service.handle(actor, {operation: "prepare", payload: request});
   assert.equal(result.state, "ready"); if (result.state !== "ready") return;

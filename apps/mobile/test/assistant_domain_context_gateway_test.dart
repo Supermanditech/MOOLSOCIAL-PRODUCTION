@@ -218,6 +218,21 @@ void main() {
       await expectLater(_source(_Wire(() => _ok(invalid))).read(_context, () => true), throwsA(isA<AssistantModelFailure>()));
     }
   });
+  test('Private stars metadata requires a personal exact order and original rating proof',()async{
+    final proof='buyer-product-stars:evaluation:${'a'*64}',data={..._data(),
+      'revisions':[{'actionId':'AI-ACT-055','entityId':'host-purchased-order','sourceRevision':'buyer-product-stars:evaluation:${'a'*64}'}]};
+    final value=await _source(_Wire(()=>_ok(data))).read(_context,()=>true);
+    expect(value.revisions,{('AI-ACT-055','host-purchased-order'):proof});
+    for(final row in [
+      {'actionId':'AI-ACT-055','entityId':null,'sourceRevision':proof},
+      {'actionId':'AI-ACT-055','entityId':'host-purchased-order','sourceRevision':'catalogue:invented'},
+    ])await expectLater(_source(_Wire(()=>_ok({..._data(),'revisions':[row]}))).read(_context,()=>true),throwsA(isA<AssistantModelFailure>()));
+    const workspace=MoolAssistantContext(accountScope:_owner,authenticationRevision:1,workspaceId:'store-one',
+      workspaceRevision:1,storeWorkspace:true,workspaceApproved:true);
+    final foreign={...data,'scope':{'audience':'workspace','storeId':'store-one'},
+      'ownerKey':sha256.convert(utf8.encode(jsonEncode(['fixture-project','domain-host-a','workspace','store-one']))).toString()};
+    await expectLater(_source(_Wire(()=>_ok(foreign))).read(workspace,()=>true),throwsA(isA<AssistantModelFailure>()));
+  });
   test('Domain gateway exact read-only request returns bound registered revisions with standard proof', () async {
     final credentials = _Credentials(), wire = _Wire(() => _ok(_data()));
     final value = await _source(wire, credentials: credentials).read(_context, () => true);

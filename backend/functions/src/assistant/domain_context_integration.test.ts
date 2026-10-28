@@ -4,13 +4,14 @@ import {AccountPlansService} from "../account/plans_service.js";
 import {AccountProfileService} from "../account/profile_service.js";
 import {ProfileWorkspacePreparationContext} from "./profile_context.js";
 import {WorkspaceCatalogueService, type WorkspaceCatalogueRepository} from "../workspace/workspace_catalogue_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext} from "./domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext,OriginalPurchasedStarsPreparationContext} from "./domain_context.js";
+import {digest} from './model_contract.js';
 import {initializeApp, deleteApp} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
 import {randomUUID} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {isAbsolute} from 'node:path';
-import {WorkspacePurchaseProjectionService, type TrustedPlacementReceipt, type PurchaseReference} from '../workspace/workspace_purchase_projection_service.js';
+import {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService,type TrustedPlacementReceipt, type PurchaseReference,type ProductFeedbackTarget} from '../workspace/workspace_purchase_projection_service.js';
 import {handleAssistantCanonicalContextRequest} from "./domain_context_http.js";
 import {AssistantPreparationService, type PreparationRequestStore, type PreparationState} from "./model_service.js";
 const actor = {uid: "host-domain-owner", projectId: "host-domain-project"};
@@ -126,6 +127,80 @@ test('Order originals actual loopback SDK projection service to authorised AI me
     await assert.rejects(orders.read(owner,{scope:{audience:'workspace',storeId},requestId:'HOST-order-source',requestRevision:1,
       expectedEntitlementRevision:'HOST-read-only',message:'View original order',language:'English',history:[],actionId:'AI-ACT-274',entityId:null}));
     assert.equal((await db.collection('workspacePurchaseProjections').doc('evaluation').collection('purchases').get()).size,countBefore);
+  }finally{await db.terminate();await deleteApp(app);}
+});
+test('Private stars actual loopback original completion index rating receiver and authorised AI metadata retain exact purchased lines',{
+  skip:!process.env.FIRESTORE_EMULATOR_HOST,timeout:120000,
+},async()=>{
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!,/^127\.0\.0\.1:\d+$/u);
+  const owner={uid:'buyer-1',projectId:actor.projectId},storeId='HOST-native-store',caseId='HOST-private-case',f=fixture();
+  const app=initializeApp({projectId:`demo-ai-stars-${randomUUID().slice(0,8)}`},`host-stars-${randomUUID()}`),db=getFirestore(app);
+  db.settings({gaxServerStreamingRetries:true});
+  const profile=new AccountProfileService({async readAccount(uid){return {uid,status:'ACTIVE',profile:{ownerUid:uid,revision:1,
+    updatedAt:'2026-10-27T00:00:00.000Z',displayName:'Host private buyer',addresses:[],selectedAddressId:null,invoiceProfiles:[]}};},
+    async readReceipt(){return undefined;},async commit(){throw Error('No Profile writes in private rating preparation');}},owner.projectId,()=>at);
+  const authority=new ProfileWorkspacePreparationContext({profile,plans:f.plans,workspaces:async()=>[],now:()=>at});
+  try{
+    await db.collection('workspaceProfiles').doc(caseId).set({schemaVersion:1,caseId,workspaceId:storeId,ownerUserId:'HOST-private-seller',
+      familyId:'products-trade',profileId:'retailer-grocery',status:'live',shopEnabled:true});
+    const purchases=new WorkspacePurchaseProjectionService(db,'evaluation'),projections=[];
+    // Accepted host-only source receipts exercise the actual materializers;
+    // no public issuer, device provider or real completion is configured.
+    for(let index=0;index<7;index++){
+      const receipt:TrustedPlacementReceipt={schemaVersion:5,realm:'evaluation',authNamespace:'firebase-default',finalPlacement:true,
+        issuer:'HOST-private-placement',receiptId:`HOST-private-receipt-${index}`,revision:'HOST-private-original-v1',buyerUserId:owner.uid,
+        stores:[{storeId,caseId,ownerUserId:'HOST-private-seller',lines:[0,1].map(line=>({sourceLineId:`HOST-private-line-${index}-${line}`,
+          skuId:`HOST-private-sku-${line}`,canonicalProductId:`HOST-private-product-${line}`,verifiedPackId:`HOST-private-pack-${line}`,
+          offerId:`HOST-private-offer-${line}`,offerRevision:'HOST-private-price-v1',name:`Host purchased item ${index}/${line}`,packLabel:'1 kg',variant:'',
+          quantityMilli:1000,quantityUnit:'pack',unitPriceMinor:10025,lineTotalMinor:10025,scheduledFulfilment:null,
+          publicListing:{schemaVersion:1,realm:'evaluation',storeId,skuId:`HOST-private-sku-${line}`,
+            listingId:'listing-'+digest([1,'evaluation',storeId,`HOST-private-sku-${line}`,'retail']),
+            canonicalProductId:`HOST-private-product-${line}`,verifiedPackId:`HOST-private-pack-${line}`,channel:'retail'}})),
+          benefitAttribution:{schemaVersion:1,components:[]},totals:{itemsMinor:20050,discountMinor:0,taxMinor:0,deliveryMinor:0,freightMinor:0,paymentFeeMinor:0,tipMinor:0,totalMinor:20050}}]};
+      const made=await new WorkspacePurchaseProjectionService(db,'evaluation',{async readFinalPlacement(){return receipt;}}).materialize(`HOST-private-placement-${index}`);
+      const projection=await purchases.readBuyer(owner.uid,{purchaseId:made.purchaseId}),order=projection.orders[0]!;
+      projections.push(projection);
+      const original={purchaseId:projection.purchaseId,storeId,orderId:order.orderId,originalFingerprint:order.originalFingerprint,sourceRevision:projection.sourceRevision};
+      const ops=new WorkspaceOrderOperationsService(db,'evaluation',{async readOperationalOrder(){return {schemaVersion:1,realm:'evaluation',authNamespace:'firebase-default',
+        issuer:'HOST-private-operations',receiptId:`HOST-private-operation-${index}`,revision:'HOST-private-operation-v1',...original,
+        customerLabel:'Host buyer',fulfilment:'delivery',address:'Host original delivery',placedAt:new Date(at.getTime()-1000).toISOString(),
+        acceptanceDeadline:new Date(at.getTime()+60_000).toISOString(),fulfilmentDeadline:new Date(at.getTime()+3_600_000).toISOString(),initialStage:'Ready',allowedActions:[]};}},()=>at,
+        {issuer:'HOST-private-completion',async readCompletion(){return {schemaVersion:1,realm:'evaluation',authNamespace:'firebase-default',issuer:'HOST-private-completion',
+          receiptId:`HOST-private-completed-${index}`,revision:'HOST-private-completion-v1',...original,operationalSourceRevision:'HOST-private-operation-v1',
+          operationalRevision:1,outcome:'delivered',occurredAt:at.toISOString()};}});
+      await ops.initialize(`HOST-private-ready-${index}`);
+      const line=order.original.lines[0]!;
+      await assert.rejects(ops.readBuyerProductFeedbackTarget(owner.uid,{...original,orderLineId:line.lineId}));
+      await ops.recordCompletion(`HOST-private-completed-${index}`);
+    }
+    const operations=new WorkspaceOrderOperationsService(db,'evaluation',undefined,()=>at);
+    const source=new OriginalPurchasedStarsPreparationContext({projectId:owner.projectId,authority,operations,now:()=>at});
+    const context=new CompositePreparationContext({original:authority,privateStars:source});
+    const input={scope:{audience:'personal' as const,storeId:null},requestId:'HOST-private-source',requestRevision:1,
+      expectedEntitlementRevision:'personal:null:1:1',message:'Give four private stars to the purchased item',language:'English',history:[],actionId:'AI-ACT-055',entityId:null};
+    const prepared=await source.read(owner,input);assert.equal(prepared.nativeTargets!.length,7);
+    const targets:ProductFeedbackTarget[]=[];let cursor:string|null=null;
+    do{const page=await operations.listBuyerProductFeedbackTargets(owner.uid,{limit:5,cursor});targets.push(...page.targets);cursor=page.nextCursor;}while(cursor!==null);
+    assert.equal(targets.length,14);assert.equal((await operations.listBuyerProductFeedbackTargets('HOST-foreign-buyer',{limit:5,cursor:null})).targets.length,0);
+    const response=await handleAssistantCanonicalContextRequest({method:'POST',headers:{authorization:'Bearer HOST-only','x-firebase-appcheck':'HOST-only'},
+      bodyBytes:100,body:{operation:'read',payload:{scope:input.scope}}},{projectId:owner.projectId,enabled:true,context,now:()=>at,
+        async verifyIdToken(){return owner;},async verifyAppCheck(){return {};}});
+    assert.equal(response.status,200);assert(response.body.ok);
+    assert.equal((await db.collection('workspacePurchaseProjections').doc('evaluation').collection('productStarRatings').get()).size,0);
+    if(process.env.AI_DOMAIN_PRIVATE_STARS_EXPORT_PATH){
+      const path=process.env.AI_DOMAIN_PRIVATE_STARS_EXPORT_PATH;assert(isAbsolute(path));
+      writeFileSync(path,JSON.stringify({kind:'isolated-host-private-stars-original-service-contract',buyerUid:owner.uid,targets,projections,
+        proofs:prepared.nativeTargets},null,2)+'\n',{flag:'wx'});
+    }
+    const first=targets[0]!,before=prepared.nativeTargets!.find(t=>t.entityId===first.orderId)!;
+    const tool=prepared.tools[0]!,selected=tool.resolveTarget!({orderId:first.orderId,lineId:first.orderLineId,stars:4});
+    assert.deepEqual(selected.fields,{lineId:first.orderLineId,stars:4});
+    const saved=await operations.submitProductStars(owner.uid,{targetId:first.id,expectedRevision:0,operationId:'HOST-private-native-save',stars:2});
+    assert.equal(saved.rating?.stars,2);assert.equal(saved.rating?.revision,1);
+    const changed=await source.read(owner,{...input,entityId:first.orderId});assert.notEqual(changed.tools[0]!.sourceRevision,before.sourceRevision);
+    assert.equal((await operations.readBuyerProductStars(owner.uid,{targetId:first.id}))!.stars,2);
+    await assert.rejects(operations.readBuyerProductStars('HOST-foreign-buyer',{targetId:first.id}));
+    f.deny();await assert.rejects(source.read(owner,input),/ai_access_required/u);
   }finally{await db.terminate();await deleteApp(app);}
 });
 /** Actual production services; explicit host-only empty directory/subscription ports. */

@@ -47,6 +47,7 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
   targets: readonly {actionId: string; entityId: string | null}[]): PreparationContext['modelContext'] {
   const skus = new Set<string>();
   const orders = new Set(targets.filter(target=>target.actionId==='AI-ACT-274'&&target.entityId!==null).map(target=>target.entityId!));
+  const privateStarsOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-055'&&target.entityId!==null).map(target=>target.entityId!));
   for(const tool of tools){
     if(!storeProductActions.has(tool.actionId))continue;
     const selected=new Set(targets.filter(target=>target.actionId===tool.actionId&&target.entityId!==null).map(target=>target.entityId!));
@@ -60,6 +61,13 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
   }
   function project(value: PreparationContext['modelContext']): PreparationContext['modelContext'] {
     if (value === undefined) return value;
+    if(value.sourceKind==='original-private-product-stars-v1'){
+      if(!Array.isArray(value.orders))return fail('context_unavailable');
+      return {...value,orders:value.orders.filter(row=>{
+        const orderId=object(row).orderId;if(typeof orderId!=='string')return fail('context_unavailable');
+        return privateStarsOrders.has(orderId);
+      })};
+    }
     if(value.sourceKind==='original-store-order-facts-v1'){
       if(!Array.isArray(value.orders))return fail('context_unavailable');
       return {...value,orders:value.orders.filter(row=>{
@@ -81,6 +89,24 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
     return value;
   }
   return project(context.modelContext);
+}
+function privateStarsModelLines(value:PreparationContext['modelContext'],orders:ReadonlySet<string>):string[]{
+  const lines=new Set<string>();
+  function visit(source:PreparationContext['modelContext']){
+    if(source===undefined)return;
+    if(source.sourceKind==='composite-original-context-v1'){
+      if(!Array.isArray(source.sources))return fail('context_unavailable');
+      for(const child of source.sources)if(child!==null)visit(object(child));
+    }else if(source.sourceKind==='original-private-product-stars-v1'){
+      if(!Array.isArray(source.orders))return fail('context_unavailable');
+      for(const raw of source.orders){
+        const order=object(raw);if(typeof order.orderId!=='string'||!Array.isArray(order.items))return fail('context_unavailable');
+        if(!orders.has(order.orderId))continue;
+        for(const rawItem of order.items){const item=object(rawItem);lines.add(id(item.lineId));}
+      }
+    }
+  }
+  visit(value);return [...lines].sort();
 }
 /** Intersect native readiness hints with original registered source targets.
  * No caller-authored tool, field, permission or source revision is admitted. */
@@ -109,7 +135,11 @@ function nativeContext(actor: AccountProfileActor, context: PreparationContext, 
     const permitted = new Set(nativeTargets.filter(target => target.actionId === tool.actionId && target.entityId !== null).map(target => target.entityId));
     const values = selector.enum.filter(value => permitted.has(value as string));
     if (!values.length) return [];
+    const privateLines=tool.actionId==='AI-ACT-055'&&tool.targetSelector==='orderId'
+      ?privateStarsModelLines(context.modelContext,new Set(values as string[])):null;
+    if(privateLines!==null&&!privateLines.length)return fail('context_unavailable');
     return [{...tool, parameters: {...tool.parameters, properties: {...properties,
+      ...(privateLines===null?{}:{lineId:{...object(properties.lineId),enum:privateLines}}),
       [tool.targetSelector]: {...selector, enum: values}}}}];
   });
   return {...context, tools, nativeTargets,

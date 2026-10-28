@@ -7409,6 +7409,91 @@ class BuyV2Session extends ChangeNotifier {
   ]);
   bool get privateStarsHasMore => _privateStarsCursor != null;
   bool get privateStarsRecoveryFull => _productStarAttempts.length >= 100;
+  final _assistantPrivateStarsOrders=<String,List<WorkspaceProductFeedbackTarget>>{};
+  Object _assistantPrivateStarsOwner=Object();
+  Object? _assistantPrivateStarsIdentity;
+  int _assistantPrivateStarsRead=0;
+  bool _assistantPrivateStarsReading=false;
+  bool Function()? _assistantPrivateStarsCurrent;
+  String? _assistantPrivateStarsWitness;
+  void _retireAssistantPrivateStars(){
+    _assistantPrivateStarsOwner=Object();_assistantPrivateStarsIdentity=null;
+    _assistantPrivateStarsOrders.clear();_assistantPrivateStarsCurrent=null;_assistantPrivateStarsWitness=null;
+  }
+  bool assistantPrivateStarsOwnerCurrent(Object owner){
+    if(!identical(owner,_assistantPrivateStarsOwner)||_assistantPrivateStarsReading)return false;
+    if(_assistantPrivateStarsCurrent?.call()==true)return true;
+    _retireAssistantPrivateStars();return false;
+  }
+  ({Object owner,List<WorkspaceProductFeedbackTarget> targets})? assistantPrivateStarsOriginals(String orderId){
+    final targets=_assistantPrivateStarsOrders[orderId];
+    if(targets==null||!assistantPrivateStarsOwnerCurrent(_assistantPrivateStarsOwner))return null;
+    // Source readiness is separate from actor lifetime. An accepted original
+    // save changes this cache/journal itself; it must retain its owner guard.
+    if(privateStarsNativeReviewSource!=_assistantPrivateStarsWitness||targets.any((target)=>!canSavePrivateStars(target.id)))return null;
+    return (owner:_assistantPrivateStarsOwner,targets:targets);
+  }
+  /// Original read-only capture. Never restores, retries or clears a save journal.
+  Future<Set<String>> readAssistantPrivateStarsOriginals(Map<String,String> expected,{required String accountUserId,
+      required Object binding,required bool Function() inputCurrent,required DateTime validUntil})async{
+    final read=++_assistantPrivateStarsRead;_assistantPrivateStarsReading=true;var accepted=false;
+    try{
+    if(expected.isEmpty||isStoreProcurement||!inputCurrent()||!privateStarsAvailable||privateStarsLoading||privateStarsBusy||
+      customerStateRecoveryPending||_productReportJournalLoadedOwner==null||
+      _productReportJournalLoadedOwner!=customerStateStore?.ownerScope)return {};
+    final reader=purchaseReader!,realm=purchaseRealm,scope=_preparePrivateStars(),owner=customerStateStore!.ownerScope;
+    final witness=privateStarsNativeReviewSource,feedback=productFeedbackContext,lifetime=reader.lifetime();
+    bool actorCurrent()=>inputCurrent()&&!_collectionDisposed&&!isStoreProcurement&&
+      validUntil.isAfter(DateTime.now().toUtc())&&identical(reader,purchaseReader)&&reader.isCurrent&&lifetime!=null&&reader.lifetime()==lifetime&&reader.accountUserId==accountUserId&&
+      purchaseRealm==realm&&productFeedbackContext==feedback&&customerStateStore?.ownerScope==owner&&
+      _productReportJournalLoadedOwner==owner&&!customerStateRecoveryPending&&
+      _preparePrivateStars()==scope;
+    bool current()=>read==_assistantPrivateStarsRead&&actorCurrent();
+    final keys=expected.keys.toList()..sort();
+    final identity=(binding,reader,lifetime,realm,scope,owner,feedback,jsonEncode([for(final key in keys)[key,expected[key]]]));
+    if(!current())return {};
+    final gateway=AuthenticatedWorkspaceOrderOperationsGateway(reader),groups=<String,List<WorkspaceProductFeedbackTarget>>{},
+      seen=<String>{},cursors=<String>{};
+    String? cursor;
+      do{
+        final page=await gateway.listProductFeedbackTargets(realm:realm,cursor:cursor);
+        if(!current()||page==null)return {};
+        for(final target in page.targets){
+          if(!seen.add(target.id)||seen.length>30000)return {};
+          if(expected.containsKey(target.reference.orderId))groups.putIfAbsent(target.reference.orderId,()=>[]).add(target);
+        }
+        cursor=page.nextCursor;if(cursor!=null&&!cursors.add(cursor))return {};
+      }while(cursor!=null);
+      final ready=<String,List<WorkspaceProductFeedbackTarget>>{},ratings=<String,WorkspaceProductStars?>{};
+      for(final entry in groups.entries){
+        final rows=entry.value..sort((a,b)=>a.id.compareTo(b.id)),proofRows=<List<Object?>>[];
+        var available=true;
+        for(final target in rows){
+          if(!current()||_productStarAttempts.containsKey(target.id)){available=false;break;}
+          final saved=await gateway.readProductStars(target);
+          if(!current())return {};
+          if(saved==null){available=false;break;}
+          final rating=saved.rating;
+          ratings[target.id]=rating;
+          proofRows.add([target.id,rating?.revision??0,rating?.stars,rating?.updatedAt.toUtc().toIso8601String()]);
+        }
+        final proof='buyer-product-stars:$realm:${sha256.convert(utf8.encode(jsonEncode(proofRows)))}';
+        if(available&&proof==expected[entry.key])ready[entry.key]=List.unmodifiable(rows);
+      }
+      if(!current()||privateStarsLoading||privateStarsBusy||privateStarsNativeReviewSource!=witness)return {};
+      final keepOwner=_assistantPrivateStarsIdentity==identity&&_assistantPrivateStarsWitness==witness;
+      for(final rows in ready.values)for(final target in rows){
+        _privateStarsTargets[target.id]=target;_privateStarsSaved[target.id]=ratings[target.id];
+      }
+      if(!keepOwner)_assistantPrivateStarsOwner=Object();
+      _assistantPrivateStarsOrders..clear()..addAll(ready);_assistantPrivateStarsCurrent=actorCurrent;
+      _assistantPrivateStarsIdentity=identity;
+      _assistantPrivateStarsWitness=privateStarsNativeReviewSource;
+      accepted=true;
+      return ready.keys.toSet();
+    }on Object{return {};}
+    finally{if(read==_assistantPrivateStarsRead){_assistantPrivateStarsReading=false;if(!accepted)_retireAssistantPrivateStars();}}
+  }
   Object? _preparePrivateStars() {
     final valid = _prepareProductFeedbackScope() && privateStarsAvailable;
     final scope = valid ? (purchaseReader, purchaseRealm, _productFeedbackScope, customerStateStore?.ownerScope) : null;

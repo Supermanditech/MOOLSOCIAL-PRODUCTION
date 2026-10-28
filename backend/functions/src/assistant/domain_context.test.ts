@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {AccountPlansService} from "../account/plans_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext} from "./domain_context.js";
-import type {PurchaseReferencePage} from "../workspace/workspace_purchase_projection_service.js";
-import {AssistantModelError, type PreparationContext, type PreparationRequest} from "./model_contract.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext, OriginalPurchasedStarsPreparationContext} from "./domain_context.js";
+import type {PurchaseReferencePage,ProductFeedbackTarget,ProductFeedbackTargetPage} from "../workspace/workspace_purchase_projection_service.js";
+import {AssistantModelError, digest, type PreparationContext, type PreparationRequest} from "./model_contract.js";
 import {canonicalContextProjection, storeProductActions} from "./domain_context_contract.js";
 
 const actor = {uid: "domain-host-a", projectId: "domain-host-project"};
@@ -12,6 +12,94 @@ const scope = {audience: "personal" as const, storeId: null};
 const request: PreparationRequest = {scope, requestId: "host-request", requestRevision: 1,
   message: "Find rice", language: "English", history: [], actionId: "AI-ACT-001", entityId: null,
   expectedEntitlementRevision: "personal:null:1:1"};
+
+/** Isolated existing completion-index port; no runtime completions are minted. */
+function privateStarsFixture(count=13){
+  const calls:Readonly<Record<string,unknown>>[]=[];
+  let revision=1,ratingRevision=0,denied=false,ratingUnavailable=false,clock=new Date(at),mutate=(page:ProductFeedbackTargetPage,_call:number)=>page;
+  const targets:ProductFeedbackTarget[]=Array.from({length:count},(_,i)=>{
+    const listing={schemaVersion:1 as const,realm:'evaluation' as const,listingId:'host-listing-'+i,storeId:'host-seller',skuId:'host-sku-'+i,
+      canonicalProductId:'host-product-'+i,verifiedPackId:'host-pack-'+i,channel:'retail' as const};
+    listing.listingId='listing-'+digest([1,listing.realm,listing.storeId,listing.skuId,listing.channel]);
+    const target={id:'',kind:'product' as const,purchaseId:'host-purchase',storeId:listing.storeId,orderId:'host-order-'+Math.floor(i/2),
+      orderLineId:'host-line-'+i,productId:listing.listingId,productLabel:'Host purchased item '+i,
+      originalFingerprint:'a'.repeat(64),sourceRevision:'source-v1',purchasedListing:listing,
+      completedAt:'2026-10-27T08:00:00.000Z',completionId:'completion-'+'b'.repeat(64),completionRevision:'completion-v1'};
+    target.id='feedback-'+digest([1,'evaluation','firebase-default',actor.uid,target.purchaseId,target.storeId,target.orderId,target.orderLineId,
+      target.originalFingerprint,target.sourceRevision,target.productLabel,listing.listingId,listing.skuId,listing.canonicalProductId,
+      listing.verifiedPackId,listing.channel,target.completionId,target.completionRevision,target.completedAt]);
+    return target;
+  });
+  const source=new OriginalPurchasedStarsPreparationContext({projectId:actor.projectId,now:()=>clock,
+    authority:{async read(_actor,input){
+      if(denied)throw new AssistantModelError('ai_access_required',403);
+      assert.equal(input.actionId,null);assert.equal(input.entityId,null);
+      return {revision:'profile:'+revision,validUntil:'2026-10-28T08:01:00.000Z',modelContext:{audience:'personal'},
+        tools:[{name:'host-personal-profile',actionId:'AI-ACT-196',entityId:null,sourceRevision:'profile:'+revision,
+          description:'Host fixture authority',parameters:{},validate:()=>true}]};
+    }},operations:{async listBuyerProductFeedbackTargets(uid,body){
+      assert.equal(uid,actor.uid);assert.equal(body.limit,5);calls.push({...body});
+      const offset=body.cursor===null?0:Number(String(body.cursor).split(':')[1]);
+      return mutate({schemaVersion:1,realm:'evaluation',authNamespace:'firebase-default',viewerRole:'buyer',viewerUserId:uid,
+        coverage:'indexed_recorded_completions',targets:structuredClone(targets.slice(offset,offset+5)),
+        nextCursor:offset+5<targets.length?'host-stars:'+String(offset+5):null},calls.length);
+    },async readBuyerProductStars(uid,body){
+      assert.equal(uid,actor.uid);if(ratingUnavailable)throw new Error('Host original rating unavailable');
+      const target=targets.find(target=>target.id===body.targetId);assert(target);
+      return ratingRevision===0?null:{target:structuredClone(target),revision:ratingRevision,stars:3,updatedAt:'2026-10-28T07:00:00.000Z'};
+    }}});
+  const input={...request,actionId:'AI-ACT-055',entityId:null,message:'Give the purchased item four private stars'};
+  return {source,input,targets,calls,deny:()=>{denied=true;},bump:()=>{revision++;},advance:(ms:number)=>{clock=new Date(clock.getTime()+ms);},
+    mutate:(f:typeof mutate)=>{mutate=f;},rate:()=>{ratingRevision++;},ratingUnavailable:()=>{ratingUnavailable=true;}};
+}
+test('Private stars source traverses all original completion pages and binds exact order and purchased line',async()=>{
+  const f=privateStarsFixture(),value=await f.source.read(actor,f.input),last=f.targets.at(-1)!;
+  assert.equal(f.calls.length,6);assert.equal(value.nativeTargets!.length,7);
+  const tool=value.tools[0]!,target=tool.resolveTarget!({orderId:last.orderId,lineId:last.orderLineId,stars:4});
+  assert.equal(target.entityId,last.orderId);assert.deepEqual(target.fields,{lineId:last.orderLineId,stars:4});assert(tool.validate(target.fields));
+  assert.throws(()=>tool.resolveTarget!({orderId:last.orderId,lineId:f.targets[0]!.orderLineId,stars:4}),/invalid_model_result/u);
+  for(const fields of [{lineId:last.orderLineId,stars:6},{lineId:last.orderLineId,stars:0},{lineId:last.orderLineId,stars:4,comment:'public review'}])
+    assert.equal(tool.validate(fields),false);
+  assert(!JSON.stringify(value.modelContext).includes('originalFingerprint'));assert(!JSON.stringify(value.modelContext).includes('feedback-'));
+  const recovered=await f.source.readPrepared(actor,{...f.input,entityId:last.orderId},{kind:'proposal',id:'host-private-proposal',
+    actionId:'AI-ACT-055',entityId:last.orderId,sourceRevision:target.sourceRevision,title:'Private stars',summary:'Host fixture',fields:target.fields});
+  assert.equal(recovered.tools[0]!.sourceRevision,target.sourceRevision);
+});
+for(const fault of ['foreign','realm','coverage','duplicate','cursor-cycle','identity','future'])test(`Private stars rejects original ${fault} without fabricated eligibility`,async()=>{
+  const f=privateStarsFixture();f.mutate((page,call)=>{
+    if(fault==='foreign')page.viewerUserId='foreign-buyer';
+    if(fault==='realm'&&call===2)page.realm='production';
+    if(fault==='coverage')page.coverage='not-original' as typeof page.coverage;
+    if(fault==='duplicate'&&call===2)page.targets[0]={...f.targets[0]!};
+    if(fault==='cursor-cycle')page.nextCursor='host-stars:5';
+    if(fault==='identity')page.targets[0]!.originalFingerprint='c'.repeat(64);
+    if(fault==='future')page.targets[0]!.completedAt='2026-10-29T08:00:00.000Z';
+    return page;
+  });await assert.rejects(f.source.read(actor,f.input),/context_unavailable/u);
+});
+test('Private stars source denies Workspace or foreign account and does not turn public review into private feedback',async()=>{
+  const f=privateStarsFixture();
+  await assert.rejects(f.source.read({...actor,projectId:'other-project'},f.input),/account_scope_mismatch/u);
+  await assert.rejects(f.source.read(actor,{...f.input,scope:{audience:'workspace',storeId:'host-seller'}}),/context_unavailable/u);
+  for(const actionId of ['AI-ACT-054','AI-ACT-056'])await assert.rejects(f.source.read(actor,{...f.input,actionId}),/context_unavailable/u);
+  f.deny();await assert.rejects(f.source.read(actor,f.input),/ai_access_required/u);assert.equal(f.calls.length,0);
+});
+test('Private stars source detects changed authority or a slow complete index',async()=>{
+  const changed=privateStarsFixture();changed.mutate((page,call)=>{if(call===6)changed.bump();return page;});
+  await assert.rejects(changed.source.read(actor,changed.input),/stale_preparation/u);
+  const slow=privateStarsFixture();slow.mutate((page,call)=>{if(call===2)slow.advance(60_001);return page;});
+  await assert.rejects(slow.source.read(actor,slow.input),/stale_preparation/u);assert.equal(slow.calls.length,2);
+  const empty=privateStarsFixture(0),value=await empty.source.read(actor,empty.input);assert.deepEqual(value.tools,[]);
+  await assert.rejects(empty.source.read(actor,{...empty.input,entityId:'missing-order'}),/context_unavailable/u);
+});
+test('Private stars proof includes original saved-rating revision and never confuses unavailable with no rating',async()=>{
+  const f=privateStarsFixture(),before=await f.source.read(actor,f.input);f.rate();
+  const after=await f.source.read(actor,f.input);
+  assert.notEqual(before.nativeTargets![0]!.sourceRevision,after.nativeTargets![0]!.sourceRevision);
+  f.ratingUnavailable();await assert.rejects(f.source.read(actor,f.input),/context_unavailable/u);
+  const changed=privateStarsFixture();changed.mutate((page,call)=>{if(call===4)changed.rate();return page;});
+  await assert.rejects(changed.source.read(actor,changed.input),/stale_preparation/u);
+});
 
 /** Isolated original-reader contract port; never installed as a runtime source. */
 function originalOrderFixture(count=13) {

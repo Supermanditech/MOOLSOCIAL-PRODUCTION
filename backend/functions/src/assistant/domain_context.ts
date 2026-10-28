@@ -1,7 +1,7 @@
 import type {AccountPlansService, PlansReadback} from "../account/plans_service.js";
 import type {AccountProfileActor} from "../account/profile_service.js";
 import type {WorkspaceCatalogueService, StoreSkuRecord} from "../workspace/workspace_catalogue_service.js";
-import type {WorkspacePurchaseProjectionService, PurchaseReference} from "../workspace/workspace_purchase_projection_service.js";
+import type {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, PurchaseReference, ProductFeedbackTarget} from "../workspace/workspace_purchase_projection_service.js";
 import type {PreparationContextSource} from "./model_service.js";
 import {AssistantModelError, canonical, digest, fail, id, object,
   catalogueListingSelection, preparationNativeTargetLimit, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
@@ -1036,10 +1036,124 @@ export class OriginalStoreOrderPreparationContext implements PreparationContextS
         orders:second.references.map(row=>({orderId:row.orderId,sourceRevision:row.sourceRevision}))}};
   }
 }
+/** Existing private purchased-item stars only; never public review eligibility. */
+export class OriginalPurchasedStarsPreparationContext implements PreparationContextSource {
+  constructor(private readonly deps:{projectId:string;authority:PreparationContextSource;
+    operations:Pick<WorkspaceOrderOperationsService,'listBuyerProductFeedbackTargets'|'readBuyerProductStars'>;now?:()=>Date}){}
+  private now(){return (this.deps.now?.()??new Date()).getTime();}
+  private async authority(actor:AccountProfileActor,input:PreparationRequest){
+    const value=await this.deps.authority.read(actor,{...input,actionId:null,entityId:null});
+    if(value.modelContext?.audience!=='personal'||!value.tools.some(tool=>tool.actionId==='AI-ACT-196')||
+      !Number.isFinite(Date.parse(value.validUntil))||Date.parse(value.validUntil)<=this.now())return fail('account_scope_mismatch',403);
+    return value;
+  }
+  private async snapshot(actor:AccountProfileActor,selected:string|null,deadline:number){
+    const targets:ProductFeedbackTarget[]=[],seen=new Set<string>(),cursors=new Set<string>();
+    const ratings:Record<string,readonly unknown[]>={};
+    let cursor:string|null=null,realm:string|null=null;
+    do{
+      if(this.now()>=deadline)return fail('stale_preparation',409);
+      let raw:unknown;
+      try{raw=await this.deps.operations.listBuyerProductFeedbackTargets(actor.uid,{limit:5,cursor});}
+      catch(error){
+        const status=error!==null&&typeof error==='object'&&'status' in error?error.status:null;
+        if(status===401||status===403)return fail('account_scope_mismatch',403);
+        return fail('context_unavailable');
+      }
+      if(this.now()>=deadline)return fail('stale_preparation',409);
+      const page=object(raw,['schemaVersion','realm','authNamespace','viewerRole','viewerUserId','coverage','targets','nextCursor']);
+      if(page.schemaVersion!==1||!['evaluation','production'].includes(String(page.realm))||realm!==null&&realm!==page.realm||
+        page.authNamespace!=='firebase-default'||page.viewerRole!=='buyer'||page.viewerUserId!==actor.uid||
+        page.coverage!=='indexed_recorded_completions'||!Array.isArray(page.targets)||page.targets.length>5||
+        page.nextCursor!==null&&(typeof page.nextCursor!=='string'||!page.nextCursor||page.nextCursor.length>512))return fail('context_unavailable');
+      realm=page.realm as string;
+      for(const value of page.targets){
+        const row=object(value,['id','kind','purchaseId','storeId','orderId','orderLineId','productId','productLabel',
+          'originalFingerprint','sourceRevision','purchasedListing','completedAt','completionId','completionRevision']);
+        const listing=object(row.purchasedListing,['schemaVersion','realm','listingId','storeId','skuId','canonicalProductId','verifiedPackId','channel']);
+        for(const key of ['purchaseId','storeId','orderId','orderLineId','sourceRevision','completionRevision'])id(row[key]);
+        for(const key of ['listingId','storeId','skuId','canonicalProductId','verifiedPackId'])id(listing[key]);
+        if(row.kind!=='product'||typeof row.productLabel!=='string'||row.productLabel.trim()!==row.productLabel||!row.productLabel||
+          row.productLabel.length>240||!/^completion-[a-f0-9]{64}$/u.test(String(row.completionId))||
+          !/^[a-f0-9]{64}$/u.test(String(row.originalFingerprint))||listing.schemaVersion!==1||listing.realm!==realm||listing.storeId!==row.storeId||
+          listing.listingId!==row.productId||!['retail','wholesale','bulk'].includes(String(listing.channel))||
+          listing.listingId!=='listing-'+digest([1,realm,listing.storeId,listing.skuId,listing.channel])||
+          typeof row.completedAt!=='string'||!Number.isFinite(Date.parse(row.completedAt))||Date.parse(row.completedAt)>this.now())return fail('context_unavailable');
+        const expected='feedback-'+digest([1,realm,'firebase-default',actor.uid,row.purchaseId,row.storeId,row.orderId,row.orderLineId,
+          row.originalFingerprint,row.sourceRevision,row.productLabel,listing.listingId,listing.skuId,listing.canonicalProductId,
+          listing.verifiedPackId,listing.channel,row.completionId,row.completionRevision,row.completedAt]);
+        if(row.id!==expected||seen.has(expected))return fail('context_unavailable');
+        seen.add(expected);if(seen.size>preparationNativeTargetLimit)return fail('context_unavailable');
+        if(selected===null||row.orderId===selected){
+          if(this.now()>=deadline)return fail('stale_preparation',409);
+          let saved;
+          try{saved=await this.deps.operations.readBuyerProductStars(actor.uid,{targetId:expected});}
+          catch{return fail('context_unavailable');}
+          if(this.now()>=deadline)return fail('stale_preparation',409);
+          if(saved!==null&&(canonical(saved.target)!==canonical(row)||!Number.isSafeInteger(saved.revision)||saved.revision<1||
+            !Number.isInteger(saved.stars)||saved.stars<1||saved.stars>5||!Number.isFinite(Date.parse(saved.updatedAt))||
+            Date.parse(saved.updatedAt)>this.now()))return fail('context_unavailable');
+          ratings[expected]=saved===null?[0,null,null]:[saved.revision,saved.stars,saved.updatedAt];
+          targets.push(row as unknown as ProductFeedbackTarget);
+        }
+      }
+      cursor=page.nextCursor as string|null;
+      if(cursor!==null&&cursors.has(cursor))return fail('context_unavailable');
+      if(cursor!==null)cursors.add(cursor);
+    }while(cursor!==null);
+    targets.sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
+    return {realm,targets,ratings};
+  }
+  async readPrepared(actor:AccountProfileActor,input:PreparationRequest,proposal:Extract<PreparationReply['outcome'],{kind:'proposal'}>){
+    if(input.actionId!=='AI-ACT-055'||proposal.actionId!==input.actionId||proposal.entityId!==input.entityId)return fail('stale_preparation',409);
+    const value=await this.read(actor,input);
+    if(value.tools.length!==1||!value.tools[0]!.validate(proposal.fields))return fail('stale_preparation',409);
+    return value;
+  }
+  async read(actor:AccountProfileActor,input:PreparationRequest):Promise<PreparationContext>{
+    if(actor.projectId!==this.deps.projectId||!actor.uid||actor.tenantId!==undefined)return fail('account_scope_mismatch',403);
+    if(input.scope.audience!=='personal'||input.scope.storeId!==null||input.actionId!==null&&input.actionId!=='AI-ACT-055'||
+      input.entityId!==null&&input.actionId!=='AI-ACT-055')return fail('context_unavailable');
+    const started=this.now(),before=await this.authority(actor,input),deadline=Math.min(started+60_000,Date.parse(before.validUntil));
+    const first=await this.snapshot(actor,input.entityId,deadline),second=await this.snapshot(actor,input.entityId,deadline);
+    const after=await this.authority(actor,input);
+    if(before.revision!==after.revision||canonical(first)!==canonical(second))return fail('stale_preparation',409);
+    const until=Math.min(deadline,Date.parse(after.validUntil));if(until<=this.now())return fail('stale_preparation',409);
+    const orders=new Map<string,ProductFeedbackTarget[]>();
+    for(const target of second.targets){const rows=orders.get(target.orderId)??[];rows.push(target);orders.set(target.orderId,rows);}
+    if(input.entityId!==null&&!orders.has(input.entityId))return fail('context_unavailable');
+    for(const rows of orders.values())if(new Set(rows.map(row=>canonical([row.purchaseId,row.storeId,row.originalFingerprint,row.sourceRevision]))).size!==1||
+      new Set(rows.map(row=>row.orderLineId)).size!==rows.length)return fail('context_unavailable');
+    // Target IDs commit to exact purchase/listing/completion facts; the saved
+    // rating revision (including confirmed absence) also retires old proposals.
+    const proof=(orderId:string)=>`buyer-product-stars:${second.realm}:`+digest(orders.get(orderId)!.map(row=>[row.id,...second.ratings[row.id]!]));
+    const valid=(orderId:string,fields:Readonly<Record<string,unknown>>)=>Object.keys(fields).length===2&&
+      typeof fields.lineId==='string'&&orders.get(orderId)?.some(row=>row.orderLineId===fields.lineId)===true&&
+      typeof fields.stars==='number'&&Number.isInteger(fields.stars)&&fields.stars>=1&&fields.stars<=5;
+    const revision='buyer-product-stars-context:'+digest([actor.projectId,actor.uid,after.revision,second]);
+    const dynamic=input.entityId===null,tools:PreparationTool[]=[];
+    if(orders.size)tools.push({name:'buyer_prepare_private_product_stars',actionId:'AI-ACT-055',entityId:input.entityId,
+      sourceRevision:dynamic?revision:proof(input.entityId!),description:'Review private stars for a completed purchased item; not a public review.',
+      parameters:{type:'object',additionalProperties:false,required:[...(dynamic?['orderId']:[]),'lineId','stars'],properties:{
+        ...(dynamic?{orderId:{type:'string',enum:[...orders.keys()]}}:{}),
+        lineId:{type:'string',enum:second.targets.map(row=>row.orderLineId)},stars:{type:'integer',minimum:1,maximum:5}}},
+      validate:fields=>input.entityId!==null?valid(input.entityId,fields):[...orders.keys()].some(orderId=>valid(orderId,fields)),
+      ...(dynamic?{targetSelector:'orderId',resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
+        if(Object.keys(args).length!==3||typeof args.orderId!=='string'||!orders.has(args.orderId))return fail('invalid_model_result');
+        const fields={lineId:args.lineId,stars:args.stars};if(!valid(args.orderId,fields))return fail('invalid_model_result');
+        return {entityId:args.orderId,sourceRevision:proof(args.orderId),fields};
+      }}:{})});
+    return {revision,validUntil:new Date(until).toISOString(),tools,
+      nativeTargets:[...orders.keys()].map(orderId=>({actionId:'AI-ACT-055',entityId:orderId,sourceRevision:proof(orderId)})),
+      modelContext:{sourceKind:'original-private-product-stars-v1',coverage:'indexed_recorded_completions',
+        orders:[...orders.entries()].map(([orderId,rows])=>({orderId,items:rows.map(row=>({lineId:row.orderLineId,label:row.productLabel}))}))}};
+  }
+}
 export class CompositePreparationContext implements PreparationContextSource {
   constructor(private readonly deps: {original?: PreparationContextSource;
     catalogue?: OriginalCataloguePreparationContext; storeProducts?: OriginalStoreProductPreparationContext;
     storeOrders?: OriginalStoreOrderPreparationContext;
+    privateStars?: OriginalPurchasedStarsPreparationContext;
     nativePreferencesEnabled?: boolean; nativeBuyerFormsEnabled?: boolean}) {}
   private deliveryAddresses(input: PreparationRequest, original: PreparationContext): PreparationContext {
     if (!this.deps.nativeBuyerFormsEnabled || input.scope.audience !== 'personal' ||
@@ -1108,6 +1222,10 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
     proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
+    if(proposal.actionId==='AI-ACT-055'){
+      if(!this.deps.privateStars)return fail('context_unavailable');
+      return this.deps.privateStars.readPrepared(actor,input,proposal);
+    }
     if (personalDeliveryAddressActions.has(proposal.actionId)) {
       if (input.actionId !== proposal.actionId || input.entityId !== proposal.entityId || Object.keys(proposal.fields).length !== 0) return fail('stale_preparation', 409);
       return this.readDeliveryAddresses(actor, input);
@@ -1138,6 +1256,10 @@ export class CompositePreparationContext implements PreparationContextSource {
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (input.actionId !== null) {
+      if(input.actionId==='AI-ACT-055'){
+        if(!this.deps.privateStars)return fail('context_unavailable');
+        return this.deps.privateStars.read(actor,input);
+      }
       if (personalDeliveryAddressActions.has(input.actionId)) return this.readDeliveryAddresses(actor, input);
       if(storeOrderOriginalActions.has(input.actionId)){
         if(!this.deps.storeOrders)return fail('context_unavailable');
@@ -1190,6 +1312,15 @@ export class CompositePreparationContext implements PreparationContextSource {
         values.push(orders);
       }
       catch(error){
+        if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;
+      }
+    }
+    if(this.deps.privateStars&&input.scope.audience==='personal'){
+      try{
+        const stars=await this.deps.privateStars.read(actor,input);
+        canonicalContextProjection(actor,input.scope,this.combine([...values,stars]));
+        values.push(stars);
+      }catch(error){
         if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;
       }
     }

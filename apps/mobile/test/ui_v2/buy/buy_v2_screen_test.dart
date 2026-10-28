@@ -15,6 +15,7 @@ import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/assistant/mool_assistant.dart';
+import 'package:moolsocial/features/assistant/profile_context.dart';
 import 'package:moolsocial/ui_v2/assistant/mool_assistant_v2.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
@@ -19377,6 +19378,85 @@ class _Shop05Stars {
     expect(await h.cart.session.loadPrivateStarsFor(restored!.reference,projection!.orders.single.lines.single),isTrue);
   }
 }
+// Scope10 original-source HOST bridge; never a runtime provider or phone record.
+class _Source10PrivateStarsHost {
+  final stars=_Shop05Stars();
+  late final h=_Shop05Harness(delivery:_Shop05Delivery(),resolution:_Shop05Resolution(),reader:stars.reader);
+  bool active=true;
+  Map<String,String> get proofs {
+    final groups=<String,List<String>>{};
+    for(final raw in stars.page['targets'] as List){final row=raw as Map;groups.putIfAbsent(row['orderId'] as String,()=>[]).add(row['id'] as String);}
+    return {for(final entry in groups.entries)entry.key:
+      'buyer-product-stars:evaluation:${sha256.convert(utf8.encode(jsonEncode((entry.value..sort()).map((id)=>[id,0,null,null]).toList())))}'};
+  }
+  Future<void> ready(WidgetTester tester,{int orderCount=1,int lineCount=1})async{
+    await h.prepare(tester,savedOrder:false,view:BuyV2View.catalogue);
+    // Reuse the existing authenticated original fixture construction only.
+    // Its compatibility BuyV2Order return is deliberately never installed.
+    stars.order(h.cart.product);
+    if(orderCount>1||lineCount>1){
+      final originals=<String,Map<String,dynamic>>{},targets=<Map<String,dynamic>>[];
+      for(var i=0;i<orderCount;i++){
+        final data=jsonDecode(jsonEncode(stars.purchase)) as Map<String,dynamic>,order=data['orders'][0] as Map<String,dynamic>;
+        data['purchaseId']='HOST-scope10-purchase-$i';order['orderId']='HOST-scope10-order-$i';
+        final original=order['original'] as Map<String,dynamic>,first=Map<String,dynamic>.from(original['lines'][0] as Map);
+        original['lines']=[for(var j=0;j<lineCount;j++){...first,'lineId':'HOST-scope10-line-$i-$j'}];
+        final totals=original['totals'] as Map<String,dynamic>;
+        totals['itemsMinor']=(first['lineTotalMinor'] as int)*lineCount;totals['totalMinor']=totals['itemsMinor'];
+        host_stars.rehashPurchaseOrder(order);originals[data['purchaseId'] as String]=data;
+        for(final line in original['lines'] as List)targets.add(Map<String,dynamic>.from(host_stars.feedbackTargetPage(
+          purchase:data,orderLineId:(line as Map)['lineId'] as String)['targets'][0] as Map));
+      }
+      stars.page={...stars.page,'targets':targets};stars.target=targets.first;
+      stars.purchase=originals.values.first;
+      stars.wire.respond=(body){switch(body['operation']){
+        case 'listBuyerProductFeedbackTargets':
+          final start=body['cursor']==null?0:int.parse((body['cursor'] as String).split(':').last);
+          return {...stars.page,'targets':targets.skip(start).take(5).toList(),
+            'nextCursor':start+5<targets.length?'HOST-scope10-page:${start+5}':null};
+        case 'readBuyerPurchaseProjection':return originals[body['purchaseId']]!;
+        case 'readBuyerProductFeedbackTarget':
+          final target=targets.singleWhere((t)=>t['orderId']==body['orderId']&&t['orderLineId']==body['orderLineId']);
+          return Map<String,dynamic>.from(stars.page)..remove('coverage')..remove('targets')..remove('nextCursor')..['target']=target;
+        case 'readBuyerProductStars':return {'schemaVersion':1,'realm':'evaluation','authNamespace':'firebase-default','viewerRole':'buyer',
+          'viewerUserId':'buyer-1','targetId':body['targetId'],'rating':null};
+        case 'submitBuyerProductStars':
+          stars.sends++;if(stars.loseAck)throw StateError('Host original lost acknowledgment');
+          return host_stars.starResult()..['operationId']=body['operationId']..['rating']['stars']=body['stars']
+            ..['rating']['target']=targets.singleWhere((t)=>t['id']==body['targetId']);
+        case 'reconcileBuyerProductStars':return host_stars.starResult()..['operationId']=body['operationId']..['state']='not_recorded'..['rating']=null;
+        default:throw StateError('Unexpected original scope10 operation');
+      }};
+    }
+    expect(h.cart.session.orders,isEmpty);expect(h.commerce.order,isNull);
+  }
+  Future<Set<String>> capture({Map<String,String>? expected,DateTime? validUntil,String? account,bool Function()? current}){
+    final binding=h.cart.context.binding;
+    return h.cart.session.readAssistantPrivateStarsOriginals(expected??proofs,accountUserId:account??stars.reader.accountUserId,binding:binding,
+      inputCurrent:()=>active&&h.cart.context.binding==binding&&current?.call()!=false,validUntil:validUntil??DateTime.now().add(const Duration(minutes:1)));
+  }
+  void adoptOriginalServiceContract(String path){
+    final value=jsonDecode(File(path).readAsStringSync()) as Map;
+    expect(value['kind'],'isolated-host-private-stars-original-service-contract');expect(value['buyerUid'],stars.reader.accountUserId);
+    final targets=(value['targets'] as List).map((row)=>Map<String,dynamic>.from(row as Map)).toList(),
+      projections=(value['projections'] as List).map((row)=>Map<String,dynamic>.from(row as Map)).toList();
+    stars.target=targets.first;stars.purchase=projections.first;stars.page={...stars.page,'targets':targets};
+    expect(proofs,{for(final raw in value['proofs'] as List)(raw as Map)['entityId'] as String:raw['sourceRevision'] as String});
+    stars.wire.respond=(body){switch(body['operation']){
+      case 'listBuyerProductFeedbackTargets':
+        final start=body['cursor']==null?0:int.parse((body['cursor'] as String).split(':').last);
+        return {...stars.page,'targets':targets.skip(start).take(5).toList(),
+          'nextCursor':start+5<targets.length?'HOST-export-page:${start+5}':null};
+      case 'readBuyerPurchaseProjection':return projections.singleWhere((p)=>p['purchaseId']==body['purchaseId']);
+      case 'readBuyerProductFeedbackTarget':return Map<String,dynamic>.from(stars.page)..remove('coverage')..remove('targets')..remove('nextCursor')
+        ..['target']=targets.singleWhere((t)=>t['orderId']==body['orderId']&&t['orderLineId']==body['orderLineId']);
+      case 'readBuyerProductStars':return {'schemaVersion':1,'realm':'evaluation','authNamespace':'firebase-default','viewerRole':'buyer',
+        'viewerUserId':value['buyerUid'],'targetId':body['targetId'],'rating':null};
+      default:throw StateError('This exported contract qualification is read-only');
+    }};
+  }
+  Future<void> dispose(WidgetTester tester)=>h.dispose(tester);
+}
 Future<void> _shop05Reveal(WidgetTester tester,Finder finder)async{
   if(finder.evaluate().isEmpty){final list=find.byType(ListView).last;
     final scroll=find.descendant(of:list,matching:find.byType(Scrollable)).last;
@@ -19896,6 +19976,165 @@ void registerShop05NativeTests(){
     expect(h.cart.owner.lastSnapshot!.balancePaymentHolds.single.toJson(),retainedHold);
     expect(balance.receivedAmount,balance.amount);await h.finishReview(tester);await h.dispose(tester);
   });
+  testWidgets('SCOPE10 private stars original capture uses confirmed no-rating reads without installing Buy orders or writing',(tester)async{
+    final f=_Source10PrivateStarsHost();
+    try{
+      await f.ready(tester);final writes=f.h.cart.owner.writes;
+      expect(await f.capture(),{f.stars.target['orderId']});
+      expect(f.h.cart.session.assistantPrivateStarsOriginals(f.stars.target['orderId']),isNotNull);
+      expect(f.h.cart.session.orders,isEmpty);expect(f.h.cart.owner.writes,writes);expect(f.stars.sends,0);
+      expect(f.stars.wire.requests.map((r)=>r['operation']).where((op)=>op=='readBuyerPurchaseProjection'),isEmpty);
+      f.active=false;expect(f.h.cart.session.assistantPrivateStarsOriginals(f.stars.target['orderId']),isNull);
+    }finally{await f.dispose(tester);}
+  });
+  testWidgets('SCOPE10 private stars actual canonical guard preserves unchanged repeated reads through native Review',(tester)async{
+    final f=_Source10PrivateStarsHost();AssistantProfileContextGuard? guard;
+    try{
+      await f.ready(tester);final original=await f.h.openAI(tester,'AI-ACT-055'),id=f.stars.target['orderId'] as String;
+      guard=AssistantProfileContextGuard(readContext:()=>f.h.cart.context,ownerChanges:Listenable.merge([f.h.cart.scope,f.h.cart.session]),
+        nativeAdapters:[original],canonicalActions:const {'AI-ACT-055'},recoverableActions:const {'AI-ACT-055'},
+        readCanonical:(context,current)async{
+          final ready=await f.capture(current:current);
+          return AssistantCanonicalContextSnapshot(binding:context.binding,revisions:{
+            if(ready.contains(id))('AI-ACT-055',id):f.proofs[id]!},validUntil:DateTime.now().add(const Duration(minutes:1)));
+        });
+      await guard.capture(f.h.cart.context,()=>true);
+      final adapter=guard.adapters.single,snapshot=await adapter.snapshot(f.h.cart.context,id);
+      expect(snapshot?.permitted,isTrue);expect(snapshot!.sourceRevision,f.proofs[id]);
+      final proposal=MoolAssistantProposal(id:'HOST-scope10-guard',actionId:'AI-ACT-055',binding:f.h.cart.context.binding,
+        requestRevision:1,entitlementRevision:'HOST-paid',sourceRevision:snapshot.sourceRevision,entityId:id,
+        validUntil:DateTime.now().add(const Duration(minutes:1)),title:'Private stars',summary:'Host fixture',
+        fields:{'lineId':f.stars.target['orderLineId'],'stars':4});
+      final opened=adapter.openReview(proposal,()=>guard!.current);await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-product-review-sheet')),findsOneWidget);expect(f.stars.sends,0);
+      final control=find.byKey(const ValueKey('buy-submit-private-stars'));await _shop05Reveal(tester,control);
+      await tester.tap(control);await tester.pumpAndSettle();expect(f.stars.sends,1);
+      await tester.binding.handlePopRoute();await tester.pumpAndSettle();expect(await opened,MoolAssistantReviewResult.opened);
+      expect(f.h.cart.session.orders,isEmpty);expect(tester.takeException(),isNull);
+    }finally{guard?.dispose();await f.dispose(tester);}
+  });
+  testWidgets('SCOPE10 private stars source opens original native sheet without a Buy order and sends only on final tap',(tester)async{
+    final f=_Source10PrivateStarsHost();
+    try{
+      await f.ready(tester);expect(await f.capture(),{f.stars.target['orderId']});final writes=f.h.cart.owner.writes;
+      await f.h.startReview(tester,'AI-ACT-055',entity:f.stars.target['orderId'],fields:{'lineId':f.stars.target['orderLineId'],'stars':4});
+      expect(find.byKey(const ValueKey('buy-product-review-sheet')),findsOneWidget);expect(f.stars.sends,0);expect(f.h.cart.owner.writes,writes);
+      expect(f.h.cart.session.orders,isEmpty);
+      final control=find.byKey(const ValueKey('buy-submit-private-stars'));await _shop05Reveal(tester,control);
+      final send=tester.widget<ButtonStyleButton>(control).onPressed!;send();send();await tester.pumpAndSettle();
+      expect(f.stars.sends,1);expect(f.h.cart.session.privateStarRating(f.stars.target['id'])!.stars,4);
+      expect(f.h.cart.session.privateStarAttempt(f.stars.target['id']),isNull);expect(f.h.cart.session.orders,isEmpty);
+      await f.h.finishReview(tester);
+    }finally{await f.dispose(tester);}
+  });
+  testWidgets('SCOPE10 private stars actual SDK exported originals and proofs open exact purchased lines in native sheet',(tester)async{
+    const path=String.fromEnvironment('AI_DOMAIN_PRIVATE_STARS_EXPORT_PATH');
+    final f=_Source10PrivateStarsHost();
+    try{
+      await f.ready(tester);f.adoptOriginalServiceContract(path);expect(await f.capture(),f.proofs.keys.toSet());
+      expect(f.proofs,hasLength(7));expect(f.stars.page['targets'],hasLength(14));
+      final original=await f.h.openAI(tester,'AI-ACT-055'),ids=f.proofs.keys.toList();
+      for(final index in [0,3,6]){
+        final id=ids[index],target=(f.stars.page['targets'] as List).cast<Map>().firstWhere((t)=>t['orderId']==id);
+        final snapshot=(await original.snapshot(f.h.cart.context,id))!;
+        final proposal=MoolAssistantProposal(id:'HOST-service-native-$index',actionId:'AI-ACT-055',binding:f.h.cart.context.binding,
+          requestRevision:1,entitlementRevision:'HOST-paid',sourceRevision:snapshot.sourceRevision,entityId:id,
+          validUntil:DateTime.now().add(const Duration(minutes:1)),title:'Private stars',summary:'Host source contract',fields:{'lineId':target['orderLineId'],'stars':3});
+        final opened=original.openReview(proposal,()=>f.active);await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('buy-product-review-sheet')),findsOneWidget);expect(find.text(target['productLabel'] as String),findsWidgets);
+        await tester.binding.handlePopRoute();await tester.pumpAndSettle();expect(await opened,MoolAssistantReviewResult.opened);
+      }
+      expect(f.h.cart.session.orders,isEmpty);expect(f.stars.sends,0);expect(tester.takeException(),isNull);
+    }finally{await f.dispose(tester);}
+  },skip:const String.fromEnvironment('AI_DOMAIN_PRIVATE_STARS_EXPORT_PATH').isEmpty);
+  testWidgets('SCOPE10 private stars thirteen original orders keep first middle last native anchors and full pagination',(tester)async{
+    final f=_Source10PrivateStarsHost();
+    try{
+      await f.ready(tester,orderCount:13);expect(await f.capture(),f.proofs.keys.toSet());
+      expect(f.stars.wire.requests.where((r)=>r['operation']=='listBuyerProductFeedbackTargets'),hasLength(3));
+      final original=await f.h.openAI(tester,'AI-ACT-055'),rows=(f.stars.page['targets'] as List).cast<Map<String,dynamic>>();
+      final snapshots={for(final row in rows)row['orderId'] as String:await original.snapshot(f.h.cart.context,row['orderId'] as String)};
+      expect(snapshots.values.every((s)=>s!=null),isTrue);
+      expect(await f.capture(),f.proofs.keys.toSet());
+      for(final index in [0,6,12]){
+        final row=rows[index],id=row['orderId'] as String,snapshot=snapshots[id]!;
+        expect((await original.snapshot(f.h.cart.context,id))!.sourceRevision,snapshot.sourceRevision);
+        final proposal=MoolAssistantProposal(id:'HOST-scope10-$index',actionId:'AI-ACT-055',binding:f.h.cart.context.binding,
+          requestRevision:1,entitlementRevision:'HOST-paid',sourceRevision:snapshot.sourceRevision,entityId:id,
+          validUntil:DateTime.now().add(const Duration(minutes:1)),title:'Private stars',summary:'Host fixture',fields:{'lineId':row['orderLineId'],'stars':3});
+        final opened=original.openReview(proposal,()=>f.active);await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('buy-product-review-sheet')),findsOneWidget);
+        expect(await original.openReview(proposal,()=>f.active),MoolAssistantReviewResult.stale);
+        await tester.binding.handlePopRoute();await tester.pumpAndSettle();expect(await opened,MoolAssistantReviewResult.opened);
+      }
+      expect(f.stars.sends,0);expect(f.h.cart.session.orders,isEmpty);expect(tester.takeException(),isNull);
+    }finally{await f.dispose(tester);}
+  });
+  for(final retirement in ['owner','route'])testWidgets('SCOPE10 private stars $retirement retirement during full original read cannot open or revive',(tester)async{
+    final f=_Source10PrivateStarsHost(),entered=Completer<void>(),release=Completer<void>();
+    try{
+      await f.ready(tester);expect(await f.capture(),{f.stars.target['orderId']});final original=await f.h.openAI(tester,'AI-ACT-055');
+      final id=f.stars.target['orderId'] as String,snapshot=(await original.snapshot(f.h.cart.context,id))!;
+      final proposal=MoolAssistantProposal(id:'HOST-scope10-delayed',actionId:'AI-ACT-055',binding:f.h.cart.context.binding,
+        requestRevision:1,entitlementRevision:'HOST-paid',sourceRevision:snapshot.sourceRevision,entityId:id,
+        validUntil:DateTime.now().add(const Duration(minutes:1)),title:'Private stars',summary:'Host fixture',fields:{'lineId':f.stars.target['orderLineId'],'stars':4});
+      f.stars.wire.beforePost=(body)async{if(body['operation']=='readBuyerPurchaseProjection'){entered.complete();await release.future;}};
+      final opened=original.openReview(proposal,()=>true);await tester.pump();expect(entered.isCompleted,isTrue);
+      if(retirement=='owner'){f.active=false;}else{f.h.cart.navigator.currentState!.pop();}
+      await tester.pumpAndSettle();release.complete();await tester.pumpAndSettle();expect(await opened,MoolAssistantReviewResult.stale);
+      expect(find.byKey(const ValueKey('buy-product-review-sheet')),findsNothing);expect(f.stars.sends,0);
+      if(retirement=='owner'){
+        f.active=true;f.stars.wire.beforePost=null;expect(await f.capture(),{id});
+        expect((await original.snapshot(f.h.cart.context,id))!.sourceRevision,isNot(snapshot.sourceRevision));
+      }
+      expect(await original.openReview(proposal,()=>true),MoolAssistantReviewResult.stale);
+    }finally{if(!release.isCompleted)release.complete();await f.dispose(tester);}
+  });
+  testWidgets('SCOPE10 private stars unresolved original save withholds its entire two-line order and preserves journal',(tester)async{
+    final f=_Source10PrivateStarsHost();
+    try{
+      await f.ready(tester,lineCount:2);
+      final projection=await f.stars.reader.readPurchaseProjection(role:WorkspaceOrderIdentityRole.buyer,realm:'evaluation',purchaseId:f.stars.purchase['purchaseId']);
+      expect(projection,isNotNull);expect(projection!.orders.single.lines,hasLength(2));
+      final target=AuthenticatedWorkspaceOrderOperationsGateway(f.stars.reader).restoreProductFeedbackTarget(f.stars.target,realm:'evaluation')!;
+      expect(await f.h.cart.session.loadPrivateStarsFor(target.reference,projection.orders.single.lines.first),isTrue);
+      f.stars.loseAck=true;expect(await f.h.cart.session.savePrivateStars(target.id,2),isFalse);
+      final pending=f.h.cart.session.privateStarAttempt(target.id)!;final writes=f.h.cart.owner.writes;
+      expect(await f.capture(),isEmpty);expect(f.h.cart.session.assistantPrivateStarsOriginals(target.reference.orderId),isNull);
+      expect(f.h.cart.session.privateStarAttempt(target.id),same(pending));expect(f.h.cart.owner.writes,writes);expect(f.stars.sends,1);
+      expect(f.stars.wire.requests.where((r)=>r['operation']=='reconcileBuyerProductStars'),isEmpty);
+    }finally{await f.dispose(tester);}
+  });
+  testWidgets('SCOPE10 private stars changed saved rating before Review retires the original proposal',(tester)async{
+    final f=_Source10PrivateStarsHost();
+    try{
+      await f.ready(tester);expect(await f.capture(),{f.stars.target['orderId']});final respond=f.stars.wire.respond!;
+      f.stars.wire.respond=(body){if(body['operation']=='readBuyerProductStars')return {...respond(body),
+        'rating':{'target':f.stars.target,'stars':2,'revision':1,'updatedAt':'2026-10-19T00:00:00.000Z'}};return respond(body);};
+      await f.h.startReview(tester,'AI-ACT-055',entity:f.stars.target['orderId'],fields:{'lineId':f.stars.target['orderLineId'],'stars':4});
+      expect(await f.h.review,MoolAssistantReviewResult.stale);expect(find.byKey(const ValueKey('buy-product-review-sheet')),findsNothing);
+      expect(f.stars.sends,0);expect(f.h.cart.session.privateStarRating(f.stars.target['id']),isNull);
+    }finally{await f.dispose(tester);}
+  });
+  for(final fault in ['account','proof','expired','read-unavailable','foreign-page','cycle','missing-index','same-id-change','uncompleted']){
+    testWidgets('SCOPE10 private stars source $fault stays unavailable without writes',(tester)async{
+      final f=_Source10PrivateStarsHost();
+      try{
+        await f.ready(tester);final writes=f.h.cart.owner.writes,respond=f.stars.wire.respond!;
+        if(fault=='read-unavailable')f.stars.wire.respond=(body){if(body['operation']=='readBuyerProductStars')throw StateError('Host unavailable');return respond(body);};
+        if(fault=='foreign-page')f.stars.page['viewerUserId']='foreign-owner';
+        if(fault=='cycle')f.stars.page['nextCursor']='HOST-cycle';
+        if(fault=='missing-index')f.stars.page['targets']=<Object>[];
+        if(fault=='same-id-change')f.stars.target['sourceRevision']='HOST-different-source';
+        if(fault=='uncompleted')f.stars.target['completedAt']=DateTime.now().add(const Duration(days:1)).toUtc().toIso8601String();
+        final expected={...f.proofs};if(fault=='proof')expected.updateAll((key,value)=>'buyer-product-stars:evaluation:${'c'*64}');
+        expect(await f.capture(expected:expected,account:fault=='account'?'foreign-owner':null,
+          validUntil:fault=='expired'?DateTime.now().subtract(const Duration(seconds:1)):null),isEmpty);
+        expect(f.h.cart.session.assistantPrivateStarsOriginals(f.stars.target['orderId']),isNull);
+        expect(f.h.cart.owner.writes,writes);expect(f.stars.sends,0);expect(f.h.cart.session.orders,isEmpty);
+      }finally{await f.dispose(tester);}
+    });
+  }
   testWidgets('AI-SHOP05 055 original purchased SKU receives proposed private stars and native Send once',(tester)async{
     final stars=_Shop05Stars(),delivery=_Shop05Delivery(),resolution=_Shop05Resolution();
     final h=_Shop05Harness(delivery:delivery,resolution:resolution,reader:stars.reader,orderFactory:stars.order);
