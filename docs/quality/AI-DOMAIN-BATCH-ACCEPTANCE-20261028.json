@@ -808,6 +808,16 @@
         "scripts/ai-domain-batch-admission.ps1",
         "scripts/test-ai-domain-batch-admission.ps1"
       ]
+    },
+    "sealChecks": {
+      "admissionChecksPassed": 71,
+      "metadataTypeCorrectionCommit": "19db9d662a48328f6a9ce0dea21731fad846b58d",
+      "runtimeManifestUnchanged": true,
+      "sourceBlobOwners": 33,
+      "changedSourceOwners": 22,
+      "currentSourceOppo": "oppo-scope02-v4",
+      "productionAcceptance": false,
+      "remoteVerification": "Normal named-branch push and independent exact readback follow this evidence commit; recorded externally to avoid self-referential commit identity."
     }
   }
 }
