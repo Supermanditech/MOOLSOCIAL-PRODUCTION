@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {AccountPlansService} from "../account/plans_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext} from "./domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext} from "./domain_context.js";
+import type {PurchaseReferencePage} from "../workspace/workspace_purchase_projection_service.js";
 import {AssistantModelError, type PreparationContext, type PreparationRequest} from "./model_contract.js";
+import {canonicalContextProjection, storeProductActions} from "./domain_context_contract.js";
 
 const actor = {uid: "domain-host-a", projectId: "domain-host-project"};
 const at = new Date("2026-10-28T08:00:00.000Z");
@@ -10,6 +12,113 @@ const scope = {audience: "personal" as const, storeId: null};
 const request: PreparationRequest = {scope, requestId: "host-request", requestRevision: 1,
   message: "Find rice", language: "English", history: [], actionId: "AI-ACT-001", entityId: null,
   expectedEntitlementRevision: "personal:null:1:1"};
+
+/** Isolated original-reader contract port; never installed as a runtime source. */
+function originalOrderFixture(count=13) {
+  const calls: Readonly<Record<string, unknown>>[]=[];
+  let authorityRevision=1,denied=false,clock=new Date(at);
+  let mutate=(page:PurchaseReferencePage,_call:number)=>page;
+  const rows=Array.from({length:count},(_,i)=>({purchaseId:`host-purchase-${i}`,storeId:'host-order-store',
+    orderId:`host-order-${String(i).padStart(4,'0')}`,originalFingerprint:'a'.repeat(64),sourceRevision:'source-v1'}));
+  const source=new OriginalStoreOrderPreparationContext({projectId:actor.projectId,now:()=>clock,
+    authority:{async read(_actor,input){
+      if(denied)throw new AssistantModelError('workspace_access_unavailable',403);
+      assert.equal(input.actionId,null);assert.equal(input.entityId,null);
+      return {revision:`host-owner:${authorityRevision}`,validUntil:'2026-10-28T08:01:00.000Z',
+        modelContext:{audience:'workspace',current:{id:'host-order-store'}},
+        tools:[{name:'host-current-owner',actionId:'AI-ACT-317',entityId:'host-order-store',sourceRevision:'host-owner',
+          description:'Host authority fixture',parameters:{},validate:()=>true}]};
+    }},purchases:{async listStore(uid,body){
+      assert.equal(uid,actor.uid);assert.equal(body.storeId,'host-order-store');assert.equal(body.limit,5);
+      calls.push({...body});const offset=body.cursor===null?0:Number(String(body.cursor).split(':')[1]);
+      assert(Number.isInteger(offset));
+      return mutate({schemaVersion:2,realm:'evaluation',authNamespace:'firebase-default',viewerRole:'seller',viewerUserId:actor.uid,
+        storeId:'host-order-store',coverage:'indexed_original_facts',references:structuredClone(rows.slice(offset,offset+5)),
+        nextCursor:offset+5<rows.length?`host-cursor:${offset+5}`:null},calls.length);
+    }}});
+  const input:PreparationRequest={...request,scope:{audience:'workspace',storeId:'host-order-store'},message:'View the original order',actionId:'AI-ACT-274'};
+  return {source,input,rows,calls,mutate:(f:typeof mutate)=>{mutate=f;},deny:()=>{denied=true;},changeOwner:()=>{authorityRevision++;},
+    advance:(ms:number)=>{clock=new Date(clock.getTime()+ms);}};
+}
+test('Order originals preparation follows every original reference page and resolves exact final order',async()=>{
+  const f=originalOrderFixture(),value=await f.source.read(actor,f.input);
+  assert.equal(f.calls.length,6);assert.equal(value.nativeTargets!.length,13);
+  assert.deepEqual(f.calls.map(call=>call.cursor),[null,'host-cursor:5','host-cursor:10',null,'host-cursor:5','host-cursor:10']);
+  const target=value.tools[0]!.resolveTarget!({orderId:f.rows.at(-1)!.orderId});
+  assert.equal(target.entityId,f.rows.at(-1)!.orderId);assert.deepEqual(target.fields,{});
+  assert.equal(value.tools[0]!.validate({}),true);assert.equal(value.tools[0]!.validate({paymentState:'paid'}),false);
+  assert(!JSON.stringify(value.modelContext).includes('originalFingerprint'));
+  assert.throws(()=>value.tools[0]!.resolveTarget!({orderId:'another-store-order'}),/invalid_model_result/u);
+});
+test('Order originals exact recovery reads beyond first page and preserves the original proof',async()=>{
+  const f=originalOrderFixture(),initial=await f.source.read(actor,f.input),target=initial.tools[0]!.resolveTarget!({orderId:f.rows[11]!.orderId});
+  const prepared=await f.source.readPrepared(actor,{...f.input,entityId:target.entityId},{kind:'proposal',id:'host-prepared-order',
+    actionId:'AI-ACT-274',entityId:target.entityId,sourceRevision:target.sourceRevision,title:'View original',summary:'Host fixture',fields:{}});
+  assert.equal(prepared.tools[0]!.sourceRevision,target.sourceRevision);assert.equal(prepared.tools[0]!.entityId,target.entityId);
+  await assert.rejects(f.source.read(actor,{...f.input,entityId:'missing-order'}),/context_unavailable/u);
+  await assert.rejects(f.source.readPrepared(actor,f.input,{kind:'proposal',id:'host-prepared-order',actionId:'AI-ACT-274',
+    entityId:target.entityId,sourceRevision:target.sourceRevision,title:'View original',summary:'Host fixture',fields:{}}),/stale_preparation/u);
+});
+test('Order originals reject foreign actor personal scope and missing approval before original reads',async()=>{
+  const f=originalOrderFixture();
+  await assert.rejects(f.source.read({...actor,projectId:'foreign-project'},f.input),/account_scope_mismatch/u);
+  await assert.rejects(f.source.read(actor,{...f.input,scope}),/context_unavailable/u);
+  f.deny();await assert.rejects(f.source.read(actor,f.input),/workspace_access_unavailable/u);assert.equal(f.calls.length,0);
+});
+for(const fault of ['actor','store','realm','coverage','duplicate','cursor-cycle'])test(`Order originals reject malformed original ${fault} without fallback`,async()=>{
+  const f=originalOrderFixture();f.mutate((page,call)=>{
+    if(fault==='actor')page.viewerUserId='foreign-owner';
+    if(fault==='store')page.references[0]!.storeId='foreign-store';
+    if(fault==='realm'&&call===2)page.realm='production';
+    if(fault==='coverage')page.coverage='saved_original_facts';
+    if(fault==='duplicate'&&call===2)page.references[0]={...f.rows[0]!};
+    if(fault==='cursor-cycle')page.nextCursor='host-cursor:5';
+    return page;
+  });await assert.rejects(f.source.read(actor,f.input),/context_unavailable/u);
+});
+test('Order originals reject source or authority changes during the two original reads',async()=>{
+  const changed=originalOrderFixture();changed.mutate((page,call)=>{
+    if(call===4)page.references[0]!.originalFingerprint='b'.repeat(64);return page;
+  });await assert.rejects(changed.source.read(actor,changed.input),/stale_preparation/u);
+  const owner=originalOrderFixture();owner.mutate((page,call)=>{if(call===6)owner.changeOwner();return page;});
+  await assert.rejects(owner.source.read(actor,owner.input),/stale_preparation/u);
+});
+test('Empty original index stays empty and does not manufacture an order',async()=>{
+  const f=originalOrderFixture(0),value=await f.source.read(actor,f.input);
+  assert.deepEqual(value.tools,[]);assert.deepEqual(value.nativeTargets,[]);assert.equal(f.calls.length,2);
+});
+test('Order originals stop a slow original index at the existing capture deadline without accepting a prefix',async()=>{
+  const f=originalOrderFixture();f.mutate((page,call)=>{if(call===2)f.advance(60_001);return page;});
+  await assert.rejects(f.source.read(actor,f.input),/stale_preparation/u);
+  assert.equal(f.calls.length,2);
+});
+for(const [productCount,orderCount,accepted] of [[2500,2487,true],[2500,2488,false],[0,5000,true],[0,5001,false]] as const)
+test(`Complete optional order index respects shared protocol capacity: ${productCount} products, ${orderCount} orders`,async()=>{
+  const f=originalOrderFixture(orderCount);
+  const rootActions=['218','219','372','213','215','224','225','374','231','232','233','407','408'];
+  const targets:Array<{actionId:string;entityId:string|null;sourceRevision:string}>=[];
+  const base:PreparationContext={revision:'host-capacity-original',validUntil:'2026-10-28T08:01:00.000Z',
+    tools:[{name:'host-current-owner',actionId:'AI-ACT-317',entityId:'host-order-store',sourceRevision:'host-owner',
+      description:'Host original authority',parameters:{},validate:()=>true}],nativeTargets:targets};
+  targets.push({actionId:'AI-ACT-317',entityId:'host-order-store',sourceRevision:'host-owner'});
+  if(productCount){
+    for(let i=0;i<productCount;i++)for(const actionId of storeProductActions)
+      targets.push({actionId,entityId:`host-capacity-sku-${i}`,sourceRevision:`host-sku-proof-${i}`});
+    for(const action of rootActions)targets.push({actionId:`AI-ACT-${action}`,entityId:null,sourceRevision:`host-root-${action}`});
+    assert.equal(base.nativeTargets!.length,25014);
+  }
+  const source=new CompositePreparationContext({original:{async read(){return base;}},storeOrders:f.source});
+  const input={...f.input,actionId:null};
+  const value=await source.read(actor,input),wire=canonicalContextProjection(actor,input.scope,value,1);
+  const orders=value.nativeTargets!.filter(target=>target.actionId==='AI-ACT-274');
+  assert.equal(orders.length,accepted?orderCount:0);
+  assert.equal(value.nativeTargets!.length,base.nativeTargets!.length+(accepted?orderCount:0));
+  assert.equal(value.tools.some(tool=>tool.actionId==='AI-ACT-317'),true);
+  assert.equal(value.tools.some(tool=>tool.actionId==='AI-ACT-274'),accepted);
+  assert(wire.nativeSelection!.groups.length<=5000);
+  if(accepted)assert.equal(wire.nativeSelection!.groups.length,5000);
+  else assert.deepEqual(value,base);
+});
 /** Original Plans class, explicit isolated host subscription and catalogue seams. */
 function fixture() {
   let state = "active", revision = 1, reads = 0, clock = new Date(at), change = false, unavailable = false;

@@ -16,11 +16,12 @@ const assistantStoreDefaultContextActions = {'AI-ACT-218', 'AI-ACT-219'};
 const assistantStoreOwnerReadContextActions = {'AI-ACT-213', 'AI-ACT-215', 'AI-ACT-224', 'AI-ACT-372', 'AI-ACT-225', 'AI-ACT-374'};
 const assistantStoreStockOwnerContextActions={'AI-ACT-231','AI-ACT-232','AI-ACT-233','AI-ACT-407','AI-ACT-408'};
 const assistantStoreRestockOwnerContextActions={'AI-ACT-234'};
+const assistantStoreOrderOriginalContextActions={'AI-ACT-274'};
 const assistantStoreOwnerContextActions = {...assistantStoreDefaultContextActions, ...assistantStoreOwnerReadContextActions,...assistantStoreStockOwnerContextActions,...assistantStoreRestockOwnerContextActions};
 const assistantDomainContextActions = {'AI-ACT-001', 'AI-ACT-002', 'AI-ACT-003', 'AI-ACT-004', 'AI-ACT-005',
   ...assistantDomainProductContextActions, ...assistantDomainPreferenceContextActions,
   ...assistantDomainAddressContextActions,
-  ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions};
+  ...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions};
 
 abstract interface class AssistantDomainContextGatewaySource {
   AssistantDomainContextGateway? assistantDomainContextGateway(
@@ -109,7 +110,7 @@ class AssistantDomainContextGateway {
     final rows = List<Object?>.of(data['revisions'] as List);
     final masked = <AssistantContextKey, String>{};
     String? selectionFingerprint;
-    const maskActions = {...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions};
+    const maskActions = {...assistantStoreProductContextActions, ...assistantStoreOwnerContextActions,...assistantStoreOrderOriginalContextActions};
     if (compact) {
       final selected = _map(data['nativeSelection'], {'version', 'fingerprint', 'groups'});
       if (selected['version'] != 1 || selected['fingerprint'] is! String ||
@@ -147,6 +148,9 @@ class AssistantDomainContextGateway {
       if (assistantStoreProductContextActions.contains(action) && (!context.inWorkspace ||
           entity == null && !(action=='AI-ACT-223'&&RegExp(r'^store-product-submission-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))) _invalid();
       if (assistantStoreOwnerContextActions.contains(action) && (!context.inWorkspace || entity != null)) _invalid();
+      if (assistantStoreOrderOriginalContextActions.contains(action) && (!context.inWorkspace ||
+          !context.storeWorkspace || !context.workspaceApproved || entity == null ||
+          !RegExp(r'^store-order-original:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))) _invalid();
       if (assistantDomainContextActions.contains(action)) revisions[key] = revision;
       if (compact && maskActions.contains(action)) {
         if (entity != null && !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]*$').hasMatch(entity)) _invalid();

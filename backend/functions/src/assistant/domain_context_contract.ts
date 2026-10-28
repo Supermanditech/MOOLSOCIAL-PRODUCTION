@@ -13,7 +13,8 @@ export const storeProductOwnerReadActions = new Set(["AI-ACT-213", "AI-ACT-215",
 export const storeProductOwnerActions = new Set([...storeProductDefaultActions, ...storeProductOwnerReadActions]);
 export const storeStockOwnerActions=new Set(['AI-ACT-231','AI-ACT-232','AI-ACT-233','AI-ACT-407','AI-ACT-408']);
 export const storeRestockOwnerActions=new Set(['AI-ACT-234']);
-export const storeNativeMaskActions = new Set([...storeProductActions, ...storeProductOwnerActions,...storeStockOwnerActions,...storeRestockOwnerActions]);
+export const storeOrderOriginalActions=new Set(['AI-ACT-274']);
+export const storeNativeMaskActions = new Set([...storeProductActions, ...storeProductOwnerActions,...storeStockOwnerActions,...storeRestockOwnerActions,...storeOrderOriginalActions]);
 export const catalogueSearchActions = new Set(["AI-ACT-001", "AI-ACT-002", "AI-ACT-003", "AI-ACT-004", "AI-ACT-005", ...catalogueProductActions]);
 export function canonicalContextRequest(value: unknown): {scope: PlansScope; catalogueListingIds?: readonly string[]; nativeSelectionVersion?: 1} {
   const request = object(value, ["operation", "payload"]);

@@ -6538,7 +6538,7 @@ bool _nativeProductReady(WorkSession source, String action, String? entity, {Wor
     final buyerReader=procurement?.scopeCurrent==true&&purchase?.procurementScopeCurrent==true&&
       purchase?.procurementContext?.storeId==store?purchase?.purchaseReader:null;
     final navigation=source.navigationScopeRevision;
-    WorkspaceOriginalAssistantTarget? resolve(String entity,bool buyer){
+    WorkspaceOriginalAssistantTarget? resolve(String entity,bool buyer,[bool preparedOriginal=false]){
       if(!mounted||!hostContext.mounted||!identical(session,source)||source.navigationScopeRevision!=navigation||
         _financeAssistantContext(hostContext)?.binding!=trusted.binding||!_financePermitted(trusted))return null;
       String orderId=entity;String? lineId;
@@ -6550,7 +6550,12 @@ bool _nativeProductReady(WorkSession source, String action, String? entity, {Wor
       final reader=buyer?buyerReader:sellerReader;
       if(reader==null||!reader.isCurrent||reader.accountUserId!=widget.accountIdentity?.firebasePrincipal?.userId)return null;
       final realm=buyer?purchase!.purchaseRealm:source.originalPurchaseRealm;
-      WorkspacePurchaseReference? reference=workspaceAssistantOriginalReference(gateway:reader,role:role,realm:realm,storeId:store,orderId:orderId);
+      // The AI viewer must not discover itself in the mounted originals index:
+      // that index invokes its inputCurrent guard, which resolves this target.
+      WorkspacePurchaseReference? reference=preparedOriginal
+        ? !buyer&&lineId==null?source.workspaceAssistantOriginalOrderReference(orderId):null
+        : workspaceAssistantOriginalReference(gateway:reader,role:role,realm:realm,storeId:store,orderId:orderId);
+      if(preparedOriginal&&reference==null)return null;
       if(buyer){
         if(!identical(_storeProcurement,procurement)||procurement?.scopeCurrent!=true||!identical(procurement?.session,purchase)||
           purchase?.procurementScopeCurrent!=true||purchase?.procurementContext?.storeId!=store||!identical(purchase?.purchaseReader,reader))return null;
@@ -6570,11 +6575,14 @@ bool _nativeProductReady(WorkSession source, String action, String? entity, {Wor
     for(final action in WorkspaceOrderOriginalNativeAdapter.supported){
       final buyer=const {'AI-ACT-396','AI-ACT-399'}.contains(action);
       if((buyer?buyerReader:sellerReader)==null)continue;
-      yield WorkspaceOrderOriginalNativeAdapter(actionId:action,navigator:Navigator.of(hostContext,rootNavigator:true),
+      WorkspaceOrderOriginalNativeAdapter createOriginal()=>WorkspaceOrderOriginalNativeAdapter(actionId:action,navigator:Navigator.of(hostContext,rootNavigator:true),
         currentContext:()=>_financeAssistantContext(hostContext),
         currentOwner:()=>mounted&&hostContext.mounted&&identical(session,source)&&source.navigationScopeRevision==navigation&&
           _financeAssistantContext(hostContext)?.binding==trusted.binding&&_financePermitted(trusted),
-        ownerChanges:Listenable.merge([source,_financeOwner,?procurement,?purchase]),resolve:(entity)=>resolve(entity,buyer));
+        ownerChanges:Listenable.merge([source,_financeOwner,?procurement,?purchase]),resolve:(entity)=>resolve(entity,buyer,action=='AI-ACT-274'));
+      yield action=='AI-ACT-274' ? _StoreOriginalFactsAssistantAdapter(createOriginal:createOriginal,
+        currentContext:()=>_financeAssistantContext(hostContext),resolve:(entity)=>resolve(entity,false,true),
+        ownerChanges:Listenable.merge([source,_financeOwner,?procurement,?purchase])) : createOriginal();
     }
   }
 
@@ -35616,6 +35624,70 @@ class StoreProductNativeInitial {
   bool matches(WorkspaceCatalogueItem product) => mapEquals(references, StoreProductInitialData.referenceFields(product));
 }
 
+/// Capture immutable pointers only; opening Review still reads the selected
+/// original through the existing authenticated viewer. No order/status cache.
+class _StoreOriginalFactsAssistantAdapter implements MoolAssistantOwnerAwareNativeAdapter, MoolAssistantRouteBoundNativeAdapter {
+  _StoreOriginalFactsAssistantAdapter({required this.createOriginal,required this.currentContext,
+    required this.resolve,required this.ownerChanges});
+  final WorkspaceOrderOriginalNativeAdapter Function() createOriginal;
+  final MoolAssistantContext? Function() currentContext;
+  final WorkspaceOriginalAssistantTarget? Function(String) resolve;
+  final Listenable ownerChanges;
+  @override String get actionId=>'AI-ACT-274';
+  @override Set<String> get allowedFields=>const {};
+  @override String? validateFields(Map<String,Object?> fields)=>fields.isEmpty?null:'Choose an original Store order.';
+  Route<void>? _route;NavigatorState? _navigator;bool _opened=false;int _version=0;
+  final _anchors=<String,({Object owner,String revision})>{};
+  @override void bindAssistantRoute(Route<void> route,NavigatorState owner){
+    if(_route!=null||!owner.mounted||route.navigator!=null&&!identical(route.navigator,owner))throw StateError('Original viewer route changed');
+    _route=route;_navigator=owner;
+  }
+  Object _owner(WorkspaceOriginalAssistantTarget target)=>(target.gateway,target.gateway.lifetime(),target.binding);
+  WorkspaceOriginalAssistantTarget? _target(Object binding,String? entity){
+    final context=currentContext();
+    if(entity==null||_navigator?.mounted!=true||_route?.isActive!=true||!identical(_route?.navigator,_navigator)||
+        context?.binding!=binding||context?.storeWorkspace!=true||context?.workspaceApproved!=true)return null;
+    final target=resolve(entity);
+    if(target==null||target.role!=WorkspaceOrderIdentityRole.seller||target.lineId!=null||!target.gateway.isCurrent||
+        target.reference.storeId!=context!.workspaceId||!target.reference.valid)return null;
+    return target;
+  }
+  bool _same(MoolAssistantProposal proposal){
+    final target=_target(proposal.binding,proposal.entityId),anchor=_anchors[proposal.entityId];
+    return target!=null&&anchor!=null&&anchor.owner==_owner(target)&&anchor.revision==proposal.sourceRevision;
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context,String? entityId)async{
+    if(_opened||_route?.isCurrent!=true)return null;
+    final target=_target(context.binding,entityId);if(target==null)return null;
+    final owner=_owner(target),previous=_anchors[entityId];
+    final anchor=previous?.owner==owner?previous!:(owner:owner,revision:'store-original-native:${++_version}');
+    _anchors[entityId!]=anchor;
+    return MoolAssistantNativeSnapshot(binding:context.binding,entityId:entityId,sourceRevision:anchor.revision,permitted:true);
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal,bool Function() isCurrent)=>
+    openOwnedReview(proposal,isCurrent:isCurrent,ownerChanges:ownerChanges);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
+      {required bool Function() isCurrent,required Listenable ownerChanges})async{
+    bool current()=>isCurrent()&&proposal.validUntil.isAfter(DateTime.now())&&_same(proposal);
+    if(_opened||_route?.isCurrent!=true||proposal.actionId!=actionId||validateFields(proposal.fields)!=null||!current())return MoolAssistantReviewResult.stale;
+    _opened=true;
+    try{
+      final original=createOriginal();original.bindAssistantRoute(_route!,_navigator!);
+      final native=await original.snapshot(currentContext()!,proposal.entityId);
+      if(native==null||!current()){
+        // A retired in-flight read must not revive its old preparation when
+        // the same account or reader later becomes available again.
+        _anchors.remove(proposal.entityId);
+        return MoolAssistantReviewResult.stale;
+      }
+      final handoff=MoolAssistantProposal(id:proposal.id,actionId:actionId,binding:proposal.binding,
+        requestRevision:proposal.requestRevision,entitlementRevision:proposal.entitlementRevision,entityId:proposal.entityId,
+        sourceRevision:native.sourceRevision,validUntil:proposal.validUntil,fields:proposal.fields,title:proposal.title,summary:proposal.summary,
+        preparationRequestId:proposal.preparationRequestId,preparationSourceRevision:proposal.preparationSourceRevision,recovered:proposal.recovered);
+      return await original.openOwnedReview(handoff,isCurrent:current,ownerChanges:ownerChanges);
+    }finally{_opened=false;}
+  }
+}
 class _StorePublishedProductAssistantAdapter implements MoolAssistantOwnerAwareNativeAdapter, MoolAssistantRouteBoundNativeAdapter,
     MoolAssistantCanonicalProductIdentityAdapter, MoolAssistantBatchNativeAdapter {
   _StorePublishedProductAssistantAdapter({required this.readSnapshot, required this.open, required this.nativeRoute, required this.navigator,

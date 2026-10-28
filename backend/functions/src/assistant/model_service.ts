@@ -46,6 +46,7 @@ function contextBinding(c: PreparationContext): string {
 function selectedNativeModelReference(context: PreparationContext, tools: PreparationContext['tools'],
   targets: readonly {actionId: string; entityId: string | null}[]): PreparationContext['modelContext'] {
   const skus = new Set<string>();
+  const orders = new Set(targets.filter(target=>target.actionId==='AI-ACT-274'&&target.entityId!==null).map(target=>target.entityId!));
   for(const tool of tools){
     if(!storeProductActions.has(tool.actionId))continue;
     const selected=new Set(targets.filter(target=>target.actionId===tool.actionId&&target.entityId!==null).map(target=>target.entityId!));
@@ -59,6 +60,13 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
   }
   function project(value: PreparationContext['modelContext']): PreparationContext['modelContext'] {
     if (value === undefined) return value;
+    if(value.sourceKind==='original-store-order-facts-v1'){
+      if(!Array.isArray(value.orders))return fail('context_unavailable');
+      return {...value,orders:value.orders.filter(row=>{
+        const orderId=object(row).orderId;if(typeof orderId!=='string')return fail('context_unavailable');
+        return orders.has(orderId);
+      })};
+    }
     if (value.sourceKind === 'original-store-owned-skus-v1') {
       if (!Array.isArray(value.products)) return fail('context_unavailable');
       return {...value, products: value.products.filter(row => {

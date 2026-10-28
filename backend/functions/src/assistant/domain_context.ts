@@ -1,10 +1,11 @@
 import type {AccountPlansService, PlansReadback} from "../account/plans_service.js";
 import type {AccountProfileActor} from "../account/profile_service.js";
 import type {WorkspaceCatalogueService, StoreSkuRecord} from "../workspace/workspace_catalogue_service.js";
+import type {WorkspacePurchaseProjectionService, PurchaseReference} from "../workspace/workspace_purchase_projection_service.js";
 import type {PreparationContextSource} from "./model_service.js";
 import {AssistantModelError, canonical, digest, fail, id, object,
-  catalogueListingSelection, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
-import {catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions, searchSuggestion} from "./domain_context_contract.js";
+  catalogueListingSelection, preparationNativeTargetLimit, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
+import {canonicalContextProjection, catalogueProductActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions, searchSuggestion} from "./domain_context_contract.js";
 
 const paidRevision = (p: PlansReadback) => canonical([p.owner, p.scope, p.catalogueRevision, p.subscriptionRevision]);
 const searchSchema = {type: "object", properties: {query: {type: "string"}},
@@ -956,9 +957,89 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
 }
 
 /** Compose source readers; preserve the qualified original Profile path. */
+/** Indexed immutable purchase facts only: never tracking, payment or invoice bytes. */
+export class OriginalStoreOrderPreparationContext implements PreparationContextSource {
+  constructor(private readonly deps: {projectId: string; authority: PreparationContextSource;
+    purchases: Pick<WorkspacePurchaseProjectionService, "listStore">; now?: () => Date}) {}
+  private now() {return (this.deps.now?.() ?? new Date()).getTime();}
+  private async snapshot(actor: AccountProfileActor, storeId: string, selected: string | null, deadline: number) {
+    const references: PurchaseReference[] = [], ids = new Set<string>(), cursors = new Set<string>();
+    let cursor: string | null = null, realm: string | null = null;
+    do {
+      if(this.now()>=deadline)return fail('stale_preparation',409);
+      let raw: unknown;
+      try {raw = await this.deps.purchases.listStore(actor.uid, {storeId, limit: 5, cursor});}
+      catch (error) {
+        const status = error !== null && typeof error === 'object' && 'status' in error ? error.status : null;
+        if (status === 401 || status === 403 || status === 404) return fail('workspace_access_unavailable', 403);
+        return fail('context_unavailable');
+      }
+      if(this.now()>=deadline)return fail('stale_preparation',409);
+      const page = object(raw, ['schemaVersion','realm','authNamespace','viewerRole','viewerUserId','storeId','coverage','references','nextCursor']);
+      if (page.schemaVersion !== 2 || !['evaluation','production'].includes(String(page.realm)) ||
+          realm !== null && realm !== page.realm || page.authNamespace !== 'firebase-default' ||
+          page.viewerRole !== 'seller' || page.viewerUserId !== actor.uid || page.storeId !== storeId ||
+          page.coverage !== 'indexed_original_facts' || !Array.isArray(page.references) || page.references.length > 5 ||
+          page.nextCursor !== null && (typeof page.nextCursor !== 'string' || !page.nextCursor || page.nextCursor.length > 512)) return fail('context_unavailable');
+      realm = page.realm as string;
+      for (const value of page.references) {
+        const row = object(value, ['purchaseId','storeId','orderId','originalFingerprint','sourceRevision']);
+        const reference: PurchaseReference = {purchaseId: id(row.purchaseId), storeId: id(row.storeId), orderId: id(row.orderId),
+          originalFingerprint: String(row.originalFingerprint), sourceRevision: id(row.sourceRevision)};
+        if (reference.storeId !== storeId || !/^[a-f0-9]{64}$/u.test(reference.originalFingerprint) || ids.has(reference.orderId)) return fail('context_unavailable');
+        ids.add(reference.orderId);
+        if (selected === null || reference.orderId === selected) references.push(reference);
+        if (ids.size > preparationNativeTargetLimit) return fail('context_unavailable');
+      }
+      cursor = page.nextCursor as string | null;
+      if (cursor !== null && cursors.has(cursor)) return fail('context_unavailable');
+      if (cursor !== null) cursors.add(cursor);
+      if (selected !== null && references.length) break;
+    } while (cursor !== null);
+    references.sort((a,b) => a.orderId < b.orderId ? -1 : a.orderId > b.orderId ? 1 : 0);
+    return {realm, references};
+  }
+  async readPrepared(actor: AccountProfileActor, input: PreparationRequest, proposal: Extract<PreparationReply['outcome'], {kind: 'proposal'}>): Promise<PreparationContext> {
+    if (proposal.actionId !== 'AI-ACT-274' || input.actionId !== proposal.actionId || input.entityId !== proposal.entityId ||
+        Object.keys(proposal.fields).length !== 0) return fail('stale_preparation', 409);
+    return this.read(actor, input);
+  }
+  async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
+    if (actor.projectId !== this.deps.projectId || !actor.uid || actor.tenantId !== undefined) return fail('account_scope_mismatch', 403);
+    if (input.scope.audience !== 'workspace' || !input.scope.storeId || input.actionId !== null && input.actionId !== 'AI-ACT-274' ||
+        input.entityId !== null && input.actionId !== 'AI-ACT-274' || input.catalogueListingIds?.length) return fail('context_unavailable');
+    const started = this.now(), before = await approvedWorkspacePreparationAuthority(this.deps.authority, actor, input, started);
+    const deadline=Math.min(started+60_000,Date.parse(before.validUntil));
+    const first = await this.snapshot(actor, input.scope.storeId, input.entityId, deadline);
+    const second = await this.snapshot(actor, input.scope.storeId, input.entityId, deadline);
+    const after = await approvedWorkspacePreparationAuthority(this.deps.authority, actor, input, this.now());
+    if (before.revision !== after.revision || canonical(first) !== canonical(second)) return fail('stale_preparation', 409);
+    const until = Math.min(started + 60_000, Date.parse(before.validUntil), Date.parse(after.validUntil));
+    if (until <= this.now() || input.entityId !== null && !second.references.length) return fail('context_unavailable');
+    const proof = (row: PurchaseReference) => `store-order-original:${second.realm}:` + digest([
+      row.purchaseId,row.storeId,row.orderId,row.originalFingerprint,row.sourceRevision]);
+    const revision = 'store-order-original-context:' + digest([actor.projectId,actor.uid,input.scope.storeId,after.revision,second]);
+    const dynamic = input.entityId === null, tools: PreparationTool[] = [];
+    if (second.references.length) tools.push({name:'store_review_order_original',actionId:'AI-ACT-274',entityId:input.entityId,
+      sourceRevision: dynamic ? revision : proof(second.references[0]!),description:'View saved original purchase facts for this Store order; current payment and delivery status are separate.',
+      parameters:{type:'object',properties:dynamic?{orderId:{type:'string',enum:second.references.map(row=>row.orderId)}}:{},
+        required:dynamic?['orderId']:[],additionalProperties:false},validate:fields=>Object.keys(fields).length===0,
+      ...(dynamic?{targetSelector:'orderId',resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
+        if(Object.keys(args).length!==1)return fail('invalid_model_result');
+        const row=second.references.find(row=>row.orderId===args.orderId);
+        if(!row)return fail('invalid_model_result');
+        return {entityId:row.orderId,sourceRevision:proof(row),fields:{}};
+      }}:{})});
+    return {revision,validUntil:new Date(until).toISOString(),tools,
+      nativeTargets:second.references.map(row=>({actionId:'AI-ACT-274',entityId:row.orderId,sourceRevision:proof(row)})),
+      modelContext:{sourceKind:'original-store-order-facts-v1',coverage:'indexed_original_facts',
+        orders:second.references.map(row=>({orderId:row.orderId,sourceRevision:row.sourceRevision}))}};
+  }
+}
 export class CompositePreparationContext implements PreparationContextSource {
   constructor(private readonly deps: {original?: PreparationContextSource;
     catalogue?: OriginalCataloguePreparationContext; storeProducts?: OriginalStoreProductPreparationContext;
+    storeOrders?: OriginalStoreOrderPreparationContext;
     nativePreferencesEnabled?: boolean; nativeBuyerFormsEnabled?: boolean}) {}
   private deliveryAddresses(input: PreparationRequest, original: PreparationContext): PreparationContext {
     if (!this.deps.nativeBuyerFormsEnabled || input.scope.audience !== 'personal' ||
@@ -1031,6 +1112,10 @@ export class CompositePreparationContext implements PreparationContextSource {
       if (input.actionId !== proposal.actionId || input.entityId !== proposal.entityId || Object.keys(proposal.fields).length !== 0) return fail('stale_preparation', 409);
       return this.readDeliveryAddresses(actor, input);
     }
+    if(storeOrderOriginalActions.has(proposal.actionId)){
+      if(!this.deps.storeOrders)return fail('context_unavailable');
+      return this.deps.storeOrders.readPrepared(actor,input,proposal);
+    }
     if(storeRestockOwnerActions.has(proposal.actionId)){
       if(!this.deps.catalogue)return fail('context_unavailable');
       return this.deps.catalogue.readPrepared(actor,input,proposal);
@@ -1054,6 +1139,10 @@ export class CompositePreparationContext implements PreparationContextSource {
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (input.actionId !== null) {
       if (personalDeliveryAddressActions.has(input.actionId)) return this.readDeliveryAddresses(actor, input);
+      if(storeOrderOriginalActions.has(input.actionId)){
+        if(!this.deps.storeOrders)return fail('context_unavailable');
+        return this.deps.storeOrders.read(actor,input);
+      }
       if(storeRestockOwnerActions.has(input.actionId)){
         if(!this.deps.catalogue)return fail('context_unavailable');
         return this.deps.catalogue.read(actor,input);
@@ -1091,7 +1180,23 @@ export class CompositePreparationContext implements PreparationContextSource {
         if (!(error instanceof AssistantModelError) || error.code !== "context_unavailable" || !values.length) throw error;
       }
     }
+    if (this.deps.storeOrders && input.scope.audience === 'workspace') {
+      try {
+        const orders=await this.deps.storeOrders.read(actor,input);
+        const candidate=this.combine([...values,orders]);
+        // Qualify the complete optional index against the existing wire
+        // protocol. Never return a prefix or let it disable established tools.
+        canonicalContextProjection(actor,input.scope,candidate,1);
+        values.push(orders);
+      }
+      catch(error){
+        if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;
+      }
+    }
     if (!values.length) return fail("context_unavailable");
+    return this.combine(values);
+  }
+  private combine(values: PreparationContext[]): PreparationContext {
     if (values.length === 1) return values[0]!;
     return {revision: "composite:" + digest(values.map(v => v.revision)),
       validUntil: new Date(Math.min(...values.map(v => Date.parse(v.validUntil)))).toISOString(),

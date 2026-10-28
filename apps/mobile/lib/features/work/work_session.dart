@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import '../buy/buy_v2_content_contracts.dart' show BuyV2StoreListing;
 import '../buy/buy_v2_models.dart' show buyV2WholeRupees, buyV2ExactMinorAmount;
 
@@ -740,8 +741,56 @@ class WorkSession extends ChangeNotifier {
   String originalPurchaseRealm = '';
   AuthenticatedWorkspaceOrderIdentityGateway? get originalPurchaseReader =>
       !_disposed && _originalPurchaseReader?.isCurrent == true ? _originalPurchaseReader : null;
+  Map<String, WorkspacePurchaseReference> _assistantOriginalReferences = const {};
+  bool Function()? _assistantOriginalReferencesCurrent;
+  int _assistantOriginalReferencesGeneration = 0;
+  WorkspacePurchaseReference? workspaceAssistantOriginalOrderReference(String orderId) =>
+      _assistantOriginalReferencesCurrent?.call() == true ? _assistantOriginalReferences[orderId] : null;
+
+  /// Read the existing immutable original-reference pages only. Preparation
+  /// never restores/reconciles operational commands or changes the order feed.
+  Future<Set<String>> readWorkspaceAssistantOriginalReferences(Map<String,String> expected,
+      {required bool Function() inputCurrent,required DateTime validUntil}) async {
+    final reader=originalPurchaseReader,realm=originalPurchaseRealm,account=_contactAccountScope,
+      store=activeWorkspace?.id,data=_storeData,navigation=navigationScopeRevision,owner=publicationPreferencesContext;
+    final generation=++_assistantOriginalReferencesGeneration;
+    _assistantOriginalReferences=const {};_assistantOriginalReferencesCurrent=null;
+    bool current()=>inputCurrent()&&DateTime.now().toUtc().isBefore(validUntil.toUtc())&&!_disposed&&generation==_assistantOriginalReferencesGeneration&&
+      reader!=null&&identical(reader,originalPurchaseReader)&&reader.isCurrent&&reader.accountUserId==account&&
+      originalPurchaseRealm==realm&&_contactAccountScope==account&&activeWorkspace?.id==store&&
+      identical(data,_storeData)&&navigationScopeRevision==navigation&&publicationPreferencesContext==owner&&
+      workspaceOperationalFeedAvailable&&!workspaceAccountRecoveryPending&&!workspaceAccountRecoveryFailed;
+    if(expected.isEmpty||!current()||store==null||!workspaceRequiresMembershipReadback||
+        !_currentWorkspaceAccess(store,activeWorkspace?.profileId)||
+        expected.values.any((value)=>!RegExp('^store-order-original:$realm:[a-f0-9]{64}\$').hasMatch(value)))return const {};
+    final references=<String,WorkspacePurchaseReference>{},seen=<String>{},cursors=<String>{};
+    String? cursor;
+    try{
+      do{
+        final page=await reader!.listPurchaseReferences(role:WorkspaceOrderIdentityRole.seller,realm:realm,storeId:store,cursor:cursor);
+        if(!current()||page==null||page.coverage!='indexed_original_facts')return const {};
+        for(final reference in page.references){
+          if(!reference.valid||reference.storeId!=store||!seen.add(reference.orderId))return const {};
+          if(expected.containsKey(reference.orderId)){
+            final proof='store-order-original:$realm:${crypto.sha256.convert(utf8.encode(jsonEncode([
+              reference.purchaseId,reference.storeId,reference.orderId,reference.originalFingerprint,reference.sourceRevision])))}';
+            if(expected[reference.orderId]==proof)references[reference.orderId]=reference;
+          }
+        }
+        cursor=page.nextCursor;
+        if(cursor!=null&&!cursors.add(cursor))return const {};
+        if(seen.length>30000)return const {}; // Existing shared native-target protocol capacity.
+      }while(cursor!=null&&references.length<expected.length);
+      if(!current())return const {};
+      _assistantOriginalReferences=Map.unmodifiable(references);
+      _assistantOriginalReferencesCurrent=current;
+      return Set.unmodifiable(references.keys);
+    }on Object{return const {};}
+  }
   void bindOriginalPurchaseReader(AuthenticatedWorkspaceOrderIdentityGateway? reader, String realm) {
     if (_disposed || identical(reader, _originalPurchaseReader) && realm == originalPurchaseRealm) return;
+    _assistantOriginalReferencesGeneration++;
+    _assistantOriginalReferences=const {};_assistantOriginalReferencesCurrent=null;
     _restockReceivingEpoch = Object();
     for (final data in {..._storeDataById.values, _storeData}) {
       data.restockReceiving.clear();

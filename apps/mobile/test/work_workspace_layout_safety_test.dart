@@ -7851,7 +7851,167 @@ class _Published230Host {
   }
 }
 
+// Isolated original-reader contract fixtures. Never installed on a phone.
+class _OriginalFacts09Host {
+  final product=_Published230Host(BuyV2OfferClass.retail);
+  final wire=purchase_fixture.Transport();
+  final originals=<String,Map<String,dynamic>>{};
+  final references=<WorkspacePurchaseReference>[];
+  late AuthenticatedWorkspaceOrderIdentityGateway reader;
+  late scope_contract.MoolAssistantNativeAdapter adapter;
+  late Route<void> assistant;
+  late NavigatorState navigator;
+  bool active=true;int pages=0,originalReads=0;
+  Future<void> Function()? beforePage,beforeOriginal;
+  String fault='';
+  Map<String,String> get proofs=>{for(final r in references)r.orderId:
+    'store-order-original:evaluation:${crypto.sha256.convert(utf8.encode(jsonEncode([r.purchaseId,r.storeId,r.orderId,r.originalFingerprint,r.sourceRevision])))}'};
+  Future<void> ready(WidgetTester tester)async{
+    await product.ready(tester);
+    const originalServicePath=String.fromEnvironment('AI_DOMAIN_ORDER_ORIGINAL_EXPORT_PATH');
+    if(originalServicePath.isNotEmpty){
+      final exported=jsonDecode(File(originalServicePath).readAsStringSync()) as Map;
+      expect(exported['kind'],'isolated-host-original-service-contract');expect(exported['storeId'],product.store);
+      expect(exported['ownerUid'],'host-native-scope-user');
+      for(final raw in exported['references'] as List)references.add(WorkspacePurchaseReference.fromJson(raw));
+      for(final raw in exported['projections'] as List){
+        final value=Map<String,dynamic>.from(raw as Map),order=(raw['orders'] as List).single as Map;
+        expect(value['viewerUserId'],'host-native-scope-user');expect(order['storeId'],product.store);
+        originals[order['orderId'] as String]=value;
+      }
+      expect(proofs,{for(final raw in exported['proofs'] as List)(raw as Map)['entityId'] as String:raw['sourceRevision'] as String});
+      expect(references,hasLength(13));expect(originals,hasLength(13));
+    }else for(var index=0;index<13;index++){
+      final value=purchase_fixture.purchaseResponse(role:'seller');
+      value['viewerUserId']='host-native-scope-user';value['purchaseId']='HOST-original-purchase-$index';
+      final order=value['orders'][0] as Map<String,dynamic>;
+      order['storeId']=product.store;order['orderId']='HOST-original-order-$index';
+      order['originalFingerprint']=crypto.sha256.convert(utf8.encode(jsonEncode({
+        'factsVersion':2,'storeId':product.store,'orderId':order['orderId'],'original':order['original']}))).toString();
+      final reference=WorkspacePurchaseReference(purchaseId:value['purchaseId'] as String,storeId:product.store,
+        orderId:order['orderId'] as String,originalFingerprint:order['originalFingerprint'] as String,sourceRevision:value['sourceRevision'] as String);
+      references.add(reference);originals[reference.orderId]=value;
+    }
+    wire.beforePost=(body)async{
+      if(body['operation']=='listStorePurchaseReferences')await beforePage?.call();
+      if(body['operation']=='readStorePurchaseProjection')await beforeOriginal?.call();
+    };
+    wire.respond=(body){
+      if(body['operation']=='listStorePurchaseReferences'){
+        pages++;
+        final start=body['cursor']==null?0:int.parse((body['cursor'] as String).split(':').last);
+        final next=start+5<references.length?'HOST-page:${start+5}':null;
+        final rows=references.skip(start).take(5).map((r)=>r.toJson()).toList();
+        if(fault=='foreign'&&rows.isNotEmpty)rows[0]={...rows[0],'storeId':'HOST-other-store'};
+        return {'schemaVersion':2,'realm':'evaluation','authNamespace':'firebase-default','viewerRole':'seller',
+          'viewerUserId':'host-native-scope-user','storeId':product.store,'coverage':'indexed_original_facts',
+          'references':rows,'nextCursor':fault=='cycle'?'HOST-page:5':next};
+      }
+      if(body['operation']=='readStorePurchaseProjection'){
+        originalReads++;return originals[body['orderId']]!;
+      }
+      throw StateError('Unexpected original operation ${body['operation']}');
+    };
+    reader=purchase_fixture.projectionGateway(wire,account:'host-native-scope-user',lifetime:()=>active?'HOST-original-current':null);
+    product.native.work.bindOriginalPurchaseReader(reader,'evaluation');
+    await tester.pumpAndSettle();
+  }
+  Future<Set<String>> capture({DateTime? validUntil})=>product.native.work.readWorkspaceAssistantOriginalReferences(proofs,
+    inputCurrent:()=>active,validUntil:validUntil??DateTime.now().add(const Duration(minutes:1)));
+  Future<void> bind(WidgetTester tester)async{
+    final context=tester.element(find.text('Store overview'));
+    final scope=context.getInheritedWidgetOfExactType<MoolAssistantNativeScope>()!;
+    adapter=scope.readAdapters(context).singleWhere((a)=>a.actionId=='AI-ACT-274');
+    navigator=Navigator.of(context,rootNavigator:true);
+    assistant=MaterialPageRoute<void>(builder:(_)=>const Scaffold(body:Text('HOST original AI route')));
+    (adapter as MoolAssistantRouteBoundNativeAdapter).bindAssistantRoute(assistant,navigator);
+    unawaited(navigator.push<void>(assistant));await tester.pumpAndSettle();
+  }
+  scope_contract.MoolAssistantProposal proposal(WorkspacePurchaseReference reference,String source)=>scope_contract.MoolAssistantProposal(
+    id:'HOST-order-${reference.orderId}',actionId:'AI-ACT-274',entityId:reference.orderId,binding:product.native.readContext().binding,
+    requestRevision:1,entitlementRevision:'HOST-paid-only',sourceRevision:source,
+    validUntil:DateTime.now().add(const Duration(minutes:1)),title:'View original order',summary:'HOST fixture',fields:const {});
+  Future<void> dispose(WidgetTester tester)=>product.dispose(tester);
+}
+
 void main() {
+
+  testWidgets('FE-ORDER274 reference capture follows all pages without writes or full-order reads',(tester)async{
+    final h=_OriginalFacts09Host();
+    try{
+      await h.ready(tester);final writes=h.product.native.writes;
+      expect(await h.capture(),unorderedEquals(h.references.map((r)=>r.orderId)));
+      expect(h.pages,3);expect(h.originalReads,0);expect(h.product.native.writes,writes);
+      expect(h.product.native.work.workspaceAssistantOriginalOrderReference(h.references.last.orderId)?.purchaseId,h.references.last.purchaseId);
+      h.active=false;
+      expect(h.product.native.work.workspaceAssistantOriginalOrderReference(h.references.first.orderId),isNull);
+    }finally{await h.dispose(tester);}
+  });
+  for(final fault in ['foreign','cycle','expired','expires-during-page','retired']){
+    testWidgets('FE-ORDER274 original reference $fault never becomes a partial native source',(tester)async{
+      final h=_OriginalFacts09Host();
+      try{
+        await h.ready(tester);h.fault=fault;
+        if(fault=='retired')h.beforePage=()async{h.active=false;};
+        if(fault=='expires-during-page')h.beforePage=()async{
+          await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:150)));
+        };
+        final writes=h.product.native.writes;
+        expect(await h.capture(validUntil:fault=='expired'?DateTime.now().subtract(const Duration(seconds:1)):
+          fault=='expires-during-page'?DateTime.now().add(const Duration(milliseconds:100)):null),isEmpty);
+        expect(h.product.native.work.workspaceAssistantOriginalOrderReference(h.references.first.orderId),isNull);
+        expect(h.product.native.writes,writes);expect(h.originalReads,0);
+        if(fault=='expired')expect(h.pages,0);
+        if(fault=='expires-during-page')expect(h.pages,1);
+      }finally{await h.dispose(tester);}
+    });
+  }
+  for(final retirement in ['owner','route'])testWidgets('FE-ORDER274 $retirement retirement during full original read cannot open or revive the old proposal',(tester)async{
+    final h=_OriginalFacts09Host(),pending=Completer<void>(),entered=Completer<void>();
+    try{
+      await h.ready(tester);expect(await h.capture(),hasLength(13));await h.bind(tester);
+      final reference=h.references.last,snapshot=(await h.adapter.snapshot(h.product.native.readContext(),h.references.last.orderId))!;
+      final proposal=h.proposal(reference,snapshot.sourceRevision),writes=h.product.native.writes;
+      h.beforeOriginal=()async{entered.complete();await pending.future;};
+      final opened=h.adapter.openReview(proposal,()=>true);
+      await tester.pump();expect(entered.isCompleted,isTrue);
+      if(retirement=='owner'){h.active=false;}else{h.navigator.pop();}
+      await tester.pumpAndSettle();pending.complete();await tester.pumpAndSettle();
+      expect(await opened,scope_contract.MoolAssistantReviewResult.stale);
+      expect(find.byType(WorkspacePurchaseOriginals),findsNothing);expect(h.product.native.writes,writes);
+      if(retirement=='owner'){
+        h.active=true;h.beforeOriginal=null;expect(await h.capture(),hasLength(13));
+        final fresh=await h.adapter.snapshot(h.product.native.readContext(),reference.orderId);
+        expect(fresh,isNotNull);expect(fresh!.sourceRevision,isNot(snapshot.sourceRevision));
+      }else expect(await h.adapter.snapshot(h.product.native.readContext(),reference.orderId),isNull);
+      expect(await h.adapter.openReview(proposal,()=>true),scope_contract.MoolAssistantReviewResult.stale);
+      expect(tester.takeException(),isNull);
+    }finally{if(!pending.isCompleted)pending.complete();await h.dispose(tester);}
+  });
+  testWidgets('FE-ORDER274 first middle last native originals retain independent anchors and reject duplicate Review',(tester)async{
+    final h=_OriginalFacts09Host();
+    try{
+      await h.ready(tester);expect(await h.capture(),hasLength(13));await h.bind(tester);
+      final snapshots={for(final r in h.references)r.orderId:await h.adapter.snapshot(h.product.native.readContext(),r.orderId)};
+      expect(snapshots.values.every((value)=>value!=null),isTrue);expect(h.originalReads,0);
+      for(final index in [0,6,12]){
+        final reference=h.references[index],snapshot=snapshots[h.references[index].orderId]!;
+        expect((await h.adapter.snapshot(h.product.native.readContext(),reference.orderId))!.sourceRevision,snapshot.sourceRevision);
+        final proposal=h.proposal(reference,snapshot.sourceRevision);
+        final opened=h.adapter.openReview(proposal,()=>h.active);
+        await tester.pumpAndSettle();
+        expect(await h.adapter.openReview(proposal,()=>h.active),scope_contract.MoolAssistantReviewResult.stale);
+        expect(h.originalReads,index==0?1:index==6?2:3);
+        expect(find.byType(WorkspacePurchaseOriginals),findsOneWidget);
+        h.navigator.pop();await tester.pumpAndSettle();
+        expect(await opened,scope_contract.MoolAssistantReviewResult.opened);
+      }
+      h.active=false;
+      final old=h.proposal(h.references.first,snapshots[h.references.first.orderId]!.sourceRevision);
+      expect(await h.adapter.openReview(old,()=>true),scope_contract.MoolAssistantReviewResult.stale);
+      expect(tester.takeException(),isNull);
+    }finally{await h.dispose(tester);}
+  });
 
   testWidgets('FE-PRODUCT-01 batch 1250 original native products agrees with single Review snapshots without writes', (tester) async {
     final inventory = _NativeScopeInventoryStore();

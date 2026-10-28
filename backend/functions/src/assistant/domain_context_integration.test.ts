@@ -4,11 +4,130 @@ import {AccountPlansService} from "../account/plans_service.js";
 import {AccountProfileService} from "../account/profile_service.js";
 import {ProfileWorkspacePreparationContext} from "./profile_context.js";
 import {WorkspaceCatalogueService, type WorkspaceCatalogueRepository} from "../workspace/workspace_catalogue_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext} from "./domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext} from "./domain_context.js";
+import {initializeApp, deleteApp} from 'firebase-admin/app';
+import {getFirestore} from 'firebase-admin/firestore';
+import {randomUUID} from 'node:crypto';
+import {writeFileSync} from 'node:fs';
+import {isAbsolute} from 'node:path';
+import {WorkspacePurchaseProjectionService, type TrustedPlacementReceipt, type PurchaseReference} from '../workspace/workspace_purchase_projection_service.js';
 import {handleAssistantCanonicalContextRequest} from "./domain_context_http.js";
 import {AssistantPreparationService, type PreparationRequestStore, type PreparationState} from "./model_service.js";
 const actor = {uid: "host-domain-owner", projectId: "host-domain-project"};
 const at = new Date("2026-10-28T08:00:00.000Z");
+
+test('Order originals actual loopback SDK projection service to authorised AI metadata preserves all indexed references',{
+  skip:!process.env.FIRESTORE_EMULATOR_HOST,timeout:120000,
+},async()=>{
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!,/^127\.0\.0\.1:\d+$/u);
+  const owner={uid:'host-native-scope-user',projectId:'host-order-project'},storeId='WK-510001',caseId='HOST-order-case';
+  const app=initializeApp({projectId:`demo-ai-order-${randomUUID().slice(0,8)}`},`host-order-${randomUUID()}`);
+  const db=getFirestore(app);db.settings({gaxServerStreamingRetries:true});
+  let paid=true;
+  const workspaces=async()=>({workspaces:[{caseId,status:'live',workspaceId:storeId,profileId:'retailer-grocery',name:'HOST original Store',
+    access:{schemaVersion:1,state:'active',accountId:owner.uid,caseId,workspaceId:storeId,profileId:'retailer-grocery',
+      checkedAt:at.toISOString(),applicationUpdatedAt:new Date(at.getTime()-1000).toISOString(),
+      membership:{schemaVersion:1,state:'active',membershipId:'HOST-order-member',workspaceId:storeId,workspaceProfileId:'retailer-grocery',
+        version:1,effectiveFrom:'2026-10-27T00:00:00.000Z',expiresAt:'2026-10-29T00:00:00.000Z'}}}]});
+  const plans=new AccountPlansService({async read(uid,scope){return {ownerUid:uid,accountStatus:'ACTIVE',
+    catalogue:{audience:scope.audience,revision:1,state:'approved',offers:[]},subscription:{ownerUid:uid,scope,revision:1,
+      planId:'host-only-plan',planVersion:'v1',name:'Host fixture only',state:paid?'active':'expired',
+      validFrom:'2026-10-27T00:00:00.000Z',validUntil:'2026-10-29T00:00:00.000Z',featureIds:['mool_ai']}};}},
+    {projectId:owner.projectId,now:()=>at,readWorkspaces:workspaces});
+  const authority=new ProfileWorkspacePreparationContext({profile:{async read(){throw Error('Personal Profile is not an order source');}},
+    plans,workspaces,now:()=>at});
+  try{
+    const profile={schemaVersion:1,caseId,workspaceId:storeId,ownerUserId:owner.uid,familyId:'products-trade',profileId:'retailer-grocery',status:'live',shopEnabled:true};
+    await db.collection('workspaceProfiles').doc(caseId).set(profile);
+    // Host-only placement receipts seed actual immutable originals through the
+    // production materializer. No HTTP issuer or real commerce is enabled.
+    for(let index=0;index<13;index++){
+      const receipt:TrustedPlacementReceipt={schemaVersion:1,realm:'evaluation',authNamespace:'firebase-default',finalPlacement:true,
+        issuer:'HOST-order-fixture',receiptId:`HOST-original-receipt-${index}`,revision:'HOST-source-v1',buyerUserId:'HOST-order-buyer',
+        stores:[{storeId,caseId,ownerUserId:owner.uid,lines:[{sourceLineId:'HOST-source-line',skuId:'HOST-sku',canonicalProductId:'HOST-product',
+          verifiedPackId:'HOST-pack',offerId:'HOST-offer',offerRevision:'HOST-price-v1',name:'HOST original product',packLabel:'1 kg',
+          quantityMilli:1000,quantityUnit:'pack',unitPriceMinor:10025,lineTotalMinor:10025}],
+          totals:{itemsMinor:10025,discountMinor:0,taxMinor:0,deliveryMinor:0,freightMinor:0,paymentFeeMinor:0,tipMinor:0,totalMinor:10025}}]};
+      await new WorkspacePurchaseProjectionService(db,'evaluation',{async readFinalPlacement(){return receipt;}}).materialize(`HOST-final-source-${index}`);
+    }
+    const purchases=new WorkspacePurchaseProjectionService(db,'evaluation');
+    const orders=new OriginalStoreOrderPreparationContext({projectId:owner.projectId,authority,purchases,now:()=>at});
+    const context=new CompositePreparationContext({original:authority,storeOrders:orders});
+    const input={method:'POST',headers:{authorization:'Bearer HOST-only','x-firebase-appcheck':'HOST-only'},bodyBytes:100,
+      body:{operation:'read',payload:{scope:{audience:'workspace',storeId},nativeSelectionVersion:1}}};
+    const reply=await handleAssistantCanonicalContextRequest(input,{projectId:owner.projectId,enabled:true,context,now:()=>at,
+      async verifyIdToken(){return owner;},async verifyAppCheck(){return {};}});
+    assert.equal(reply.status,200);assert(reply.body.ok);
+    if(!reply.body.ok)return;
+    const references:PurchaseReference[]=[];let cursor:string|null=null;
+    do{const page=await purchases.listStore(owner.uid,{storeId,limit:5,cursor});references.push(...page.references);cursor=page.nextCursor;}while(cursor!==null);
+    assert.equal(references.length,13);
+    const prepared=await orders.read(owner,{scope:{audience:'workspace',storeId},requestId:'HOST-order-source',requestRevision:1,
+      expectedEntitlementRevision:'HOST-read-only',message:'View original order',language:'English',history:[],actionId:'AI-ACT-274',entityId:null});
+    assert.equal(prepared.nativeTargets!.length,13);
+    const projections=[];
+    for(const reference of references){
+      const selected=prepared.tools[0]!.resolveTarget!({orderId:reference.orderId});
+      assert.equal(selected.entityId,reference.orderId);
+      assert.deepEqual(selected.fields,{});
+      projections.push(await purchases.readStore(owner.uid,{purchaseId:reference.purchaseId,storeId,orderId:reference.orderId}));
+    }
+    if(process.env.AI_DOMAIN_ORDER_ORIGINAL_EXPORT_PATH){
+      const path=process.env.AI_DOMAIN_ORDER_ORIGINAL_EXPORT_PATH;assert(isAbsolute(path));
+      writeFileSync(path,JSON.stringify({kind:'isolated-host-original-service-contract',storeId,ownerUid:owner.uid,references,
+        projections,proofs:prepared.nativeTargets},null,2)+'\n',{flag:'wx'});
+    }
+    const chosen=references.at(-1)!;
+    const results=new Map<string,{fingerprint:string;lease:string;result:PreparationState}>();let modelCalls=0,reservations=0;
+    // Request/usage storage is an explicit host port here; durable request
+    // semantics retain their separate sealed SQL integration qualification.
+    const requests:PreparationRequestStore={
+      async claim(key,fingerprint){
+        const row=results.get(key);if(row)return row.fingerprint===fingerprint?row.result:{state:'conflict'};
+        results.set(key,{fingerprint,lease:key,result:{state:'pending'}});return{state:'claimed',lease:key};
+      },
+      async read(key){return results.get(key)?.result;},
+      async finish(key,lease,result){
+        const row=results.get(key);assert(row);assert.equal(row.lease,lease);
+        if(row.result.state!=='cancelled')row.result=result;return row.result;
+      },
+      async cancel(key){
+        const row=results.get(key);if(!row)return undefined;
+        if(row.result.state!=='ready')row.result={state:'cancelled'};return row.result;
+      },
+    };
+    const preparation=new AssistantPreparationService({projectId:owner.projectId,plans,context,requests,now:()=>at,
+      usage:{async reserve(){reservations++;return{id:'HOST-order-permit',validUntil:'2026-10-28T08:01:00.000Z'};},async settle(){}},
+      model:{async prepare(_request,tools,_signal,modelContext){
+        modelCalls++;assert.equal(tools.length,1);assert.equal(tools[0]!.actionId,'AI-ACT-274');
+        assert(JSON.stringify(modelContext).includes(chosen.orderId));
+        for(const other of references.filter(row=>row.orderId!==chosen.orderId))assert(!JSON.stringify(modelContext).includes(other.orderId));
+        return{kind:'tool' as const,name:tools[0]!.name,arguments:{orderId:chosen.orderId}};
+      }},
+    });
+    const payload={scope:{audience:'workspace' as const,storeId},requestId:'HOST-order-preparation',requestRevision:1,
+      expectedEntitlementRevision:`workspace:${storeId}:1:1`,message:'Show this original order',language:'English',history:[],
+      actionId:'AI-ACT-274',entityId:null,nativeTargets:[{actionId:'AI-ACT-274',entityId:chosen.orderId}]};
+    const preparedResult=await preparation.handle(owner,{operation:'prepare',payload});
+    assert.equal(preparedResult.state,'ready');
+    if(preparedResult.state==='ready'){
+      assert.equal(preparedResult.reply.outcome.kind,'proposal');
+      if(preparedResult.reply.outcome.kind==='proposal'){
+        assert.equal(preparedResult.reply.outcome.entityId,chosen.orderId);assert.deepEqual(preparedResult.reply.outcome.fields,{});
+      }
+    }
+    assert.deepEqual(await preparation.handle(owner,{operation:'prepare',payload}),preparedResult);
+    assert.equal(modelCalls,1);assert.equal(reservations,1);
+    const countBefore=(await db.collection('workspacePurchaseProjections').doc('evaluation').collection('purchases').get()).size;
+    await assert.rejects(purchases.listStore('HOST-foreign-owner',{storeId,limit:5,cursor:null}));
+    paid=false;await assert.rejects(orders.read(owner,{scope:{audience:'workspace',storeId},requestId:'HOST-order-source',requestRevision:1,
+      expectedEntitlementRevision:'HOST-read-only',message:'View original order',language:'English',history:[],actionId:'AI-ACT-274',entityId:null}));
+    paid=true;await db.collection('workspaceProfiles').doc(caseId).update({ownerUserId:'HOST-new-owner'});
+    await assert.rejects(orders.read(owner,{scope:{audience:'workspace',storeId},requestId:'HOST-order-source',requestRevision:1,
+      expectedEntitlementRevision:'HOST-read-only',message:'View original order',language:'English',history:[],actionId:'AI-ACT-274',entityId:null}));
+    assert.equal((await db.collection('workspacePurchaseProjections').doc('evaluation').collection('purchases').get()).size,countBefore);
+  }finally{await db.terminate();await deleteApp(app);}
+});
 /** Actual production services; explicit host-only empty directory/subscription ports. */
 function fixture() {
   let reads = 0, writes = 0, state = "active", revoke = false, malformed = false;
