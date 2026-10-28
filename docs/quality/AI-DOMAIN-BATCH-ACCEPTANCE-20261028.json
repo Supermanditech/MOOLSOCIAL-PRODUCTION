@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 23,
+  "localMetadataCommits": 24,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -5902,5 +5902,308 @@
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
     "sourceCommit": "4bf4cce44cc5e375f52f81f3bce5029b10472ac5"
+  },
+  "scope06CartClearCheckpoint": {
+    "sequence": "06-original-cart-clear",
+    "baseline": "af51db32eae8bbe483f660ac97c9e443c96b3356",
+    "manifest": {
+      "scope": 6,
+      "baseline": "af51db32eae8bbe483f660ac97c9e443c96b3356",
+      "branch": "work/codex-backend/ai-domain-batch-20261028",
+      "changedOwners": [
+        "backend/functions/src/assistant/domain_context.ts",
+        "backend/functions/src/assistant/domain_context_integration.test.ts",
+        "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+        "apps/mobile/test/assistant_domain_context_gateway_test.dart"
+      ],
+      "owners": [
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.ts",
+          "sha256": "87008940F8BDADF652110BB7D8E4D849B881868F56D89A180FB7B903D0E0DD01",
+          "bytes": 9023,
+          "gitBlobOid": "0e76cd1af86cf5775ddd6453a76446104dc7e4dc"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.test.ts",
+          "sha256": "41456B6D378BA90870D5663823CB4B59463490EA5F8AE6CCC98124FE14F4BB8C",
+          "bytes": 8113,
+          "gitBlobOid": "ee2988638789a76c51b9ee425eae5e1df625c215"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.ts",
+          "sha256": "99ECF593A9330DDEA1D2A76BD22B938AA2CF5FDE7F1C0E0A61755B0B0E6E7EA1",
+          "bytes": 196704,
+          "gitBlobOid": "b712bb6e635ef4ca59a636bc7482c57a195cc753"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.test.ts",
+          "sha256": "447B46B460821B706DB4EF3F4DB6553CC367466FBCAD4F0D9B34C7AC4EFB3CC7",
+          "bytes": 72386,
+          "gitBlobOid": "eeeadc9212455186779fc94f51140e8e7c39ef87"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.ts",
+          "sha256": "B87C01F6811E3EBBE86D010AC5D0488626266B00C80920553FAB502D2941936A",
+          "bytes": 3248,
+          "gitBlobOid": "e029fd941d1ed11f8278dc97593f03bc7120572f"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.test.ts",
+          "sha256": "CD77B75EF8E7EE01980DB7CC200233944C5CA60C88A454BF7F4E4B4242A25598",
+          "bytes": 5373,
+          "gitBlobOid": "aaec24000807da73e92fa7563fefa7a897ccfd57"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_integration.test.ts",
+          "sha256": "8382C5A7024EF8323E234BCD7ADB60056892164A33616F586A6014569DD4A547",
+          "bytes": 89181,
+          "gitBlobOid": "96bdb4b31506bfb3a550a588b8e2f5deaec6cc61"
+        },
+        {
+          "path": "backend/functions/src/index.ts",
+          "sha256": "BADD8058199D39B8C22E1995214F77E5053418BA292E31BC8DE28E779A665CB9",
+          "bytes": 153401,
+          "gitBlobOid": "4843014c72154cb015081e3b8ea40dd9e2fce8cc"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+          "sha256": "0B4DCBF677E338B04285F46CA3BCB203431FC56DFD1105541D7E0A7DE1054366",
+          "bytes": 15130,
+          "gitBlobOid": "2daded9a4b377f2d00d7fcfe9e8a9690ac226968"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/profile_context.dart",
+          "sha256": "2A2902F853D5FB6AA693D79F3FBA3FD7412B4A49D1D30490EE7F69E0855472A6",
+          "bytes": 18268,
+          "gitBlobOid": "6da659d0791dbe402cae8f083b8fce83fd8be21e"
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+          "sha256": "F8ABB359ADF4714C9DD330AD17D34DAD5D441D6763D2902B9F0A177F5E4DD6A8",
+          "bytes": 91081,
+          "gitBlobOid": "0a1b8f3f814fbf517e8cd43e9b29563acdd99215"
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+          "sha256": "2570BB48BDFA8F9E9EA0D61348A0F1B3CD778105565FB8784C6FE156F5928342",
+          "bytes": 79399,
+          "gitBlobOid": "624089b250cb5cee594dbc7377302ed72ab6ecf3"
+        },
+        {
+          "path": "apps/mobile/lib/app/moolsocial_app.dart",
+          "sha256": "82EEADE801CB2A7C04AF8C95819FA6EC30B138357753F426EB95741EDA101FD6",
+          "bytes": 24302,
+          "gitBlobOid": "48928f20d1f30bfe9c417c037e3a13d334806a7d"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+          "sha256": "094AAE05163871D8471226E6C699091319F4D77478871D24CF251D86D41B6A70",
+          "bytes": 21371,
+          "gitBlobOid": "1b779c47e1475cc8495b5aaa7c019ab88efd276b"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "sha256": "9A3D5F14C5DE7BAC9853FCB847B6B41172E9406ED5B51786CB312B7F60C23F47",
+          "bytes": 1286333,
+          "gitBlobOid": "9cc105b977dceccf75b1653744bcd31db33869cc"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+          "sha256": "5D3AAF88764035306EA953C003A3E8FD9CF97AD368C9F759ABB81F81FDEB5C89",
+          "bytes": 208676,
+          "gitBlobOid": "4bcecc4240109fd15eb3792e83a8b42bd44d75f8"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+          "sha256": "65BEAABD649BA32DE5832DD184A7AA2CEC53E9F6A85A46F314956BBA7F1A7F70",
+          "bytes": 3003479,
+          "gitBlobOid": "9fd8e21b61ebc00ccdc1f2da59aaeb74f5a91a85"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+          "sha256": "2F45D45216C04E804C22D6E40C9A5BB20BF49E50A1D078B1B6C1E8EC7B2D3591",
+          "bytes": 36187,
+          "gitBlobOid": "27b1ab2bc16e49733728ede632ab1ab7eed5df65"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_guard_test.dart",
+          "sha256": "07FF247E0BD3D5723684EB9D2D964256FF412E8485563F2E86CC93B08018882A",
+          "bytes": 23093,
+          "gitBlobOid": "ba6eefe5ce1cd7ca1e4a258da52129ccd3cdb0bf"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_integration_test.dart",
+          "sha256": "6111CC00A6A198BD59BE7E1AD7405CF0F3EE44B79DD569D217839866153BC3CC",
+          "bytes": 13480,
+          "gitBlobOid": "9469edfbb72b6c990d2f623ca833d91cec1b43c0"
+        },
+        {
+          "path": "apps/mobile/test/assistant_profile_context_test.dart",
+          "sha256": "1ECF64F5F5616593D77A9F08056780AF1D2A9A4AFDFD1C9A4456E628E843FD8E",
+          "bytes": 42768,
+          "gitBlobOid": "c92a9cfd087af7007bcfdf64330dd2b586ab3f42"
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_flow_test.dart",
+          "sha256": "B28A93CB0D149BDE6D5F9626FB16A1735CAAFA7A92A85FCF54D2D95ED71DD045",
+          "bytes": 21891,
+          "gitBlobOid": "f10032c3246ec403981fa5e08caa9b406de4ba29"
+        },
+        {
+          "path": "apps/mobile/test/mool_assistant_test.dart",
+          "sha256": "243464A4A4BC28DF08880001EB54DD1305F4AB363359A7589AFF1292641A5F8B",
+          "bytes": 209745,
+          "gitBlobOid": "047997523bc4f1b5d1eb29be01791301ed527980"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.ts",
+          "sha256": "BB9C8812CC5C082A61F98A5F9F3083D147358A411028E027E14EDE2DE17A2473",
+          "bytes": 12353,
+          "gitBlobOid": "93a2fd5beec230a123d81fbc5348b940847e140c"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.test.ts",
+          "sha256": "9CC5DA02340D57584370E237D16A4C33D0977F8E69BA7BB5B4EA1FC2DAE7EBDF",
+          "bytes": 7425,
+          "gitBlobOid": "de5b8a64e908a1c706f5c71dfb000813ef266c48"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.ts",
+          "sha256": "CB746B589267B9D806818895B546F931E6BCCABF4548FC41B6690C24186EB137",
+          "bytes": 28218,
+          "gitBlobOid": "1e75ee9ab1ad1e36dd41f763cdde2045ce2c552e"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.test.ts",
+          "sha256": "CFE0386B8FFB2072089381FA5EF5AFD0933516C21B228CD35B172C3069F10F97",
+          "bytes": 37545,
+          "gitBlobOid": "cf09fe0a6095a6bb17cd2477dd39db97c1179fbf"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/model_gateway.dart",
+          "sha256": "877B55A27C6C1D8886EC5CA630BFC00AED2F0F1A5E6DD86431A8ABCF11CDB2C5",
+          "bytes": 22299,
+          "gitBlobOid": "ed9e3f1aa2522bd888d2223022d9716996440b25"
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_gateway_test.dart",
+          "sha256": "1ADB4083861EEBEA9334E4949806067ADAA14EA3357AB95DBE02B4AE373EFFFB",
+          "bytes": 15042,
+          "gitBlobOid": "7c237c56100dc191e0d9431ee8bd8660c444a5ec"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+          "sha256": "8D1928EF537F55B9E3645A6D039F2ECDB2F01FC9A6DB4D2416CAF872934C7435",
+          "bytes": 105705,
+          "gitBlobOid": "079662fdd40a32059a0ea01cfe6355dc1ceb4130"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+          "sha256": "8F1EBD0F5F4CBD84CB2B642BAC7E8058234736B012D640F66A74E7DD709968E3",
+          "bytes": 526267,
+          "gitBlobOid": "f8b47e91b94cd80839f81000d4efda85cdd786d6"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_session.dart",
+          "sha256": "3E162D3EE8F0F6DC15D314EEC10B92971AD73A18FFA03451E14AD6CD82918E8D",
+          "bytes": 842244,
+          "gitBlobOid": "c6901140fb2a79da8645db1bb950e2d0c684c50e"
+        },
+        {
+          "path": "apps/mobile/test/work_workspace_layout_safety_test.dart",
+          "sha256": "6D4152DCCBFE524BE79D50A097EB7352E0C9AD19E49DC4BB71D90FE0DC89D15D",
+          "bytes": 4505798,
+          "gitBlobOid": "488b3fbacaf86a52753a590ca82cf05e0fcd00a4"
+        },
+        {
+          "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "sha256": "C32D344A354299090367EC274C6B84226209CBFE1650A94FFEA087C2511BE261",
+          "bytes": 869945,
+          "gitBlobOid": "138e84520cbffebd3a30bc817081246317c18732"
+        },
+        {
+          "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "sha256": "A8FBA26E9357025C951F6CF5904EA8F671AF5D2C19B8BE16F89DE323C1D90567",
+          "bytes": 950105,
+          "gitBlobOid": "00a2a79d20ba56c4d016af575c53aed838e7ab9d"
+        }
+      ]
+    },
+    "disposition": {
+      "scope": 6,
+      "action": "AI-ACT-020",
+      "state": "partial_original_account_owned_Clear_Cart_confirmation_host_and_reachable_oppo_qualified",
+      "wholeScopeClosed": false,
+      "founderApprovalClaimed": false,
+      "productionAcceptance": false,
+      "liveEffect": false,
+      "apkBuiltOrInstalled": false,
+      "oppo": {
+        "directory": "oppo-scope06-clear-v1",
+        "currentSourceOwnersMatched": 13,
+        "restartParityCases": 22,
+        "inspectionGatePassed": true,
+        "savedFingerprintsUnchanged": 108,
+        "sourceOwnersUnchanged": 35,
+        "populatedAgentJourneyQualified": false,
+        "reachableScreens": [
+          "Protected Cart recovery without retry/clear",
+          "Signed-out Profile",
+          "Android Back to original protected Cart"
+        ],
+        "visualAssessment": "No new clipping, overflow or navigation defect in these reachable states. Populated Clear Cart native confirmation remains host-tested only.",
+        "cleanDetach": true,
+        "cleanDetachExit": 0
+      },
+      "qualification": "SCOPE06-CLEAR-QUALIFICATION-v2.json",
+      "remaining": "Retained personal quotes and selected-product Store Restock have original sources/native hooks; remaining joins still require implementation. Other non-payment backend source gaps now separately requested. Payment integration remains deferred."
+    },
+    "evidence": [
+      {
+        "path": "scope06-clear-backend-v1.log",
+        "passed": 216,
+        "conditionalSkipped": 5,
+        "sha256": "0178E03C012A5851D2E0CD382F05C31D5328E0F34FC9B1E8877E34C081DB171D"
+      },
+      {
+        "path": "scope06-original-services-loopback-v1.log",
+        "passed": 401,
+        "conditionalSkipped": 0,
+        "sha256": "65E299ECB5CDA3882D53BBCE18860EBE27C70E368FBE9F412E9D053F57A1767F"
+      },
+      {
+        "path": "scope06-clear-gateway-v1.log",
+        "passed": 87,
+        "conditionalSkipped": 2,
+        "sha256": "DAD5D2EA3F83E86CEB643838436B320E5CB07FCC19786AE2421A11BB2432F2F9"
+      },
+      {
+        "path": "scope06-clear-native-v1.log",
+        "passed": 34,
+        "conditionalSkipped": 0,
+        "sha256": "EA1B7171594756DB73EE481C816B37210FE68369DA4D465D4DC12DACEDEDBCD8"
+      },
+      {
+        "path": "scope06-clear-shared-v1.log",
+        "passed": 382,
+        "conditionalSkipped": 15,
+        "sha256": "85FC9D8F745EED1EF758C435E6606B3C474D0A0B02BBBF5ED12F0AD69ECAEE97"
+      },
+      {
+        "path": "scope06-clear-analysis-v1.log",
+        "passed": 0,
+        "conditionalSkipped": 0,
+        "sha256": "1009D9B7E153EBFA7FE82CBFD1A2E18F89BC7A5CAFBF8A683863073C638BC38D"
+      },
+      {
+        "path": "SCOPE06-CLEAR-QUALIFICATION-v2.json",
+        "passed": 0,
+        "conditionalSkipped": 0,
+        "sha256": "FCD67E92DBE21F7E72AEE7D43B57C7284AC8FD53A550DF6CEA1F9C04FC6CE4AE"
+      }
+    ],
+    "namedBranchPushAuthorized": true,
+    "productionAcceptance": false,
+    "sourceCommit": null
   }
 }

@@ -490,4 +490,32 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,4),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainPurchaseReferenceStageOwners $row[0] $purchaseReferenceSeal).Count -eq $row[1]) "purchase-reference checkpoint exact stage $($row[0]) owner count"
 }
+$cartClearSeal=$approval.scope06CartClearCheckpoint
+Check (Test-AiDomainCartClearCheckpoint $cartClearSeal) 'exact qualified cart-clear checkpoint'
+Check (@(Get-AiDomainCartClearSealOwners).Count -eq 3) 'only three existing metadata owners for cart-clear seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($cartClearSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainCartClearCheckpoint $bad)) "reject changed cart-clear seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($cartClearSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainCartClearCheckpoint $bad)) "reject changed cart-clear qualified source $property"
+}
+$bad=($cartClearSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainCartClearCheckpoint $bad)) 'reject cart-clear source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($cartClearSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainCartClearCheckpoint $bad)) "reject expanded cart-clear qualification $property"
+}
+$bad=($cartClearSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAgentJourneyQualified=$true
+Check (!(Test-AiDomainCartClearCheckpoint $bad)) 'reject fabricated cart-clear device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($cartClearSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainCartClearCheckpoint $bad)) "reject changed cart-clear evidence $property"
+}
+foreach($row in @(@(0,3),@(1,4),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainCartClearStageOwners $row[0] $cartClearSeal).Count -eq $row[1]) "cart-clear checkpoint exact stage $($row[0]) owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."
