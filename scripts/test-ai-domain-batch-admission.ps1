@@ -378,4 +378,32 @@ foreach($property in @('path','sha256')) {
 foreach($row in @(@(0,3),@(1,12),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainStoreCouponsStageOwners $row[0] $couponSeal).Count -eq $row[1]) "original-coupon checkpoint exact stage $($row[0]) owner count"
 }
+$reportSeal=$approval.scope19StoreReportsCheckpoint
+Check (Test-AiDomainStoreReportsCheckpoint $reportSeal) 'exact qualified original-report-controls checkpoint'
+Check (@(Get-AiDomainStoreReportsSealOwners).Count -eq 3) 'only three existing metadata owners for original-report-controls seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($reportSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainStoreReportsCheckpoint $bad)) "reject changed original-report-controls seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($reportSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainStoreReportsCheckpoint $bad)) "reject changed original-report-controls qualified source $property"
+}
+$bad=($reportSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainStoreReportsCheckpoint $bad)) 'reject original-report-controls source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($reportSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainStoreReportsCheckpoint $bad)) "reject expanded original-report-controls qualification $property"
+}
+$bad=($reportSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAgentJourneyQualified=$true
+Check (!(Test-AiDomainStoreReportsCheckpoint $bad)) 'reject fabricated original-report-controls device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($reportSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainStoreReportsCheckpoint $bad)) "reject changed original-report-controls evidence $property"
+}
+foreach($row in @(@(0,3),@(1,10),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainStoreReportsStageOwners $row[0] $reportSeal).Count -eq $row[1]) "original-report-controls checkpoint exact stage $($row[0]) owner count"
+}
 Write-Output "AI domain batch admission checks passed: $n."

@@ -766,7 +766,7 @@ function Test-AiDomainStoreCouponsCheckpoint($Checkpoint) {
 function Get-AiDomainStoreCouponsStageOwners([int]$Count,$Checkpoint) {
  switch($Count){0{@(Get-AiDomainStoreCouponsSealOwners)}1{@($Checkpoint.manifest.changedOwners)}2{@('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')}default{@()}}
 }
-function Invoke-AiDomainStoreCouponsCheckpoint($Checkpoint,[string]$Head,[string]$Phase) {
+function Invoke-AiDomainStoreCouponsCheckpoint($Checkpoint,[string]$Head,[string]$Phase,[switch]$Continuation) {
  Assert-Coordination (Test-AiDomainStoreCouponsCheckpoint $Checkpoint) 'Only the exact tested twelve-owner original Store coupon checkpoint is admitted.'
  $base=$Checkpoint.baseline;$approvalOwner='docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json'
  $chain=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"${base}..${Head}"))
@@ -790,6 +790,7 @@ function Invoke-AiDomainStoreCouponsCheckpoint($Checkpoint,[string]$Head,[string
   else{Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($chain[1]):$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Committed original-coupon source differs from qualification.'}
  }
  foreach($owner in @(Get-AiDomainBatchMetadataOwners)){
+  if($Continuation){continue}
   if(($chain.Count -eq 0 -and $owner -cin @(Get-AiDomainStoreCouponsSealOwners)) -or
     ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit' -and $owner -ceq $approvalOwner)){continue}
   Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
@@ -797,11 +798,70 @@ function Invoke-AiDomainStoreCouponsCheckpoint($Checkpoint,[string]$Head,[string
  if($chain.Count -eq 3 -or ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit')){
   Assert-Coordination ($Checkpoint.sourceCommit -ceq $chain[1]) 'Original-coupon evidence must name its qualified source commit before closure.'
  }
- if($Phase -ceq 'pre_commit'){
+ if($Phase -ceq 'pre_commit' -and !$Continuation){
   $expected=@(Get-AiDomainStoreCouponsStageOwners $chain.Count $Checkpoint)
   Assert-Coordination ($expected.Count -gt 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Only exact original-coupon-checkpoint stage may be committed.'
   if($chain.Count -eq 1){foreach($row in $Checkpoint.manifest.owners){
    Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',":$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Staged original-coupon source differs from qualification.'
+  }}
+ }
+}
+function Get-AiDomainStoreReportsSealOwners {
+ @('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json','scripts/ai-domain-batch-admission.ps1','scripts/test-ai-domain-batch-admission.ps1')
+}
+function Test-AiDomainStoreReportsCheckpoint($Checkpoint) {
+ if($null -eq $Checkpoint -or $Checkpoint.sequence -cne '19-original-report-controls' -or
+   $Checkpoint.baseline -cne '27302f4b5cf70f7b6aa78ec50301e71d143ee094' -or
+   $Checkpoint.namedBranchPushAuthorized -isnot [bool] -or !$Checkpoint.namedBranchPushAuthorized -or
+   $Checkpoint.productionAcceptance -isnot [bool] -or $Checkpoint.productionAcceptance){return $false}
+ $pins=@{manifest='3154DAA8961FD33B5ED489EC227A8BDCE247DBB7DE8F018BEA247F00D2450645';
+   disposition='F227BA0CC94303FEAC9BB5F1DF35D7CAB7E81B3D58254F3FC112AE2D4AEDD1DE';
+   evidence='0CC77AB9083118F53F2DC8538EC744515E305F5D957B7E63B17CD909FBD8159B'}
+ foreach($part in $pins.Keys){
+  $raw=$Checkpoint.$part|ConvertTo-Json -Depth 60 -Compress
+  if([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($raw))) -cne $pins[$part]){return $false}
+ }
+ return $true
+}
+function Get-AiDomainStoreReportsStageOwners([int]$Count,$Checkpoint) {
+ switch($Count){0{@(Get-AiDomainStoreReportsSealOwners)}1{@($Checkpoint.manifest.changedOwners)}2{@('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')}default{@()}}
+}
+function Invoke-AiDomainStoreReportsCheckpoint($Checkpoint,[string]$Head,[string]$Phase) {
+ Assert-Coordination (Test-AiDomainStoreReportsCheckpoint $Checkpoint) 'Only the exact tested ten-owner original Store report control checkpoint is admitted.'
+ $base=$Checkpoint.baseline;$approvalOwner='docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json'
+ $chain=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"${base}..${Head}"))
+ Assert-Coordination ($chain.Count -le 3) 'Only exact original-report-controls metadata, source and evidence commits are admitted.'
+ $subjects=@('coordination(ai-domain-batch-20261028): admit qualified original Store report control checkpoint',
+   'feat(ai-domain-batch-20261028): connect original Store report control source and native review',
+   'test(ai-domain-batch-20261028): record original Store report control qualification and limits')
+ for($i=0;$i -lt $chain.Count;$i++){
+  $parent=if($i -eq 0){$base}else{$chain[$i-1]};$expected=@(Get-AiDomainStoreReportsStageOwners $i $Checkpoint)
+  Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$chain[$i]))[0]) -ceq $parent -and
+   (@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$chain[$i]))[0]) -ceq $subjects[$i] -and
+   (@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$parent,$chain[$i])|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Original-coupon checkpoint parent, subject or exact owners changed.'
+ }
+ if($chain.Count -gt 0){
+  $sealed=(@(Get-OctoberCompatibilityGitLines @('show',"$($chain[0]):$approvalOwner"))-join "`n")|ConvertFrom-Json
+  Assert-Coordination (Test-AiDomainStoreReportsCheckpoint $sealed.scope19StoreReportsCheckpoint) 'Committed original-report-controls qualification changed.'
+ }
+ foreach($row in $Checkpoint.manifest.owners){
+  if($chain.Count -lt 2){Assert-Coordination ((Get-Sha256 (Join-Path $root $row.path)) -ceq $row.sha256 -and
+    (@(Get-OctoberCompatibilityGitLines @('hash-object',"--path=$($row.path)",$row.path))[0]) -ceq $row.gitBlobOid) 'Working original-report-controls source differs from qualification.'}
+  else{Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($chain[1]):$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Committed original-report-controls source differs from qualification.'}
+ }
+ foreach($owner in @(Get-AiDomainBatchMetadataOwners)){
+  if(($chain.Count -eq 0 -and $owner -cin @(Get-AiDomainStoreReportsSealOwners)) -or
+    ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit' -and $owner -ceq $approvalOwner)){continue}
+  Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
+ }
+ if($chain.Count -eq 3 -or ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit')){
+  Assert-Coordination ($Checkpoint.sourceCommit -ceq $chain[1]) 'Original-coupon evidence must name its qualified source commit before closure.'
+ }
+ if($Phase -ceq 'pre_commit'){
+  $expected=@(Get-AiDomainStoreReportsStageOwners $chain.Count $Checkpoint)
+  Assert-Coordination ($expected.Count -gt 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Only exact original-report-controls-checkpoint stage may be committed.'
+  if($chain.Count -eq 1){foreach($row in $Checkpoint.manifest.owners){
+   Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',":$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Staged original-report-controls source differs from qualification.'
   }}
  }
 }
@@ -851,6 +911,7 @@ function Invoke-AiDomainBatchAdmission {
  $originalReceivingCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'scope13OriginalReceivingCheckpoint'){$approval.scope13OriginalReceivingCheckpoint}else{$null}
  $storeOperationsCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'scope17StoreOperationsCheckpoint'){$approval.scope17StoreOperationsCheckpoint}else{$null}
  $storeCouponsCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'scope18StoreCouponsCheckpoint'){$approval.scope18StoreCouponsCheckpoint}else{$null}
+ $storeReportsCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'scope19StoreReportsCheckpoint'){$approval.scope19StoreReportsCheckpoint}else{$null}
  $runtime=if($null -ne $privateStarsAdmission){@(Get-AiDomainPrivateStarsRuntimeOwners $privateStarsAdmission $cache)}elseif($null -ne $cache){@(Get-AiDomainCurrentRuntimeOwners $cache)}else{@(Get-AiDomainBatchRuntimeOwners)}
  $metadata=@(Get-AiDomainBatchMetadataOwners);$bootstrap=@(Get-AiDomainBatchBootstrapOwners);$amend=@(Get-AiDomainBatchSelectorAmendOwners);$owners=$runtime+$metadata
  $branch=@(Get-OctoberCompatibilityGitLines @('branch','--show-current'))[0]
@@ -863,7 +924,7 @@ function Invoke-AiDomainBatchAdmission {
  $scopeTwo = $approval.scope02Admission
  $scopeTwoCheckpoint = $approval.scope02Checkpoint
  $middle=if($approval.PSObject.Properties.Name -ccontains 'scope03Through07Checkpoint'){$approval.scope03Through07Checkpoint}else{$null}
- $metadataCount = if($null -ne $storeCouponsCheckpoint){19} elseif($null -ne $storeOperationsCheckpoint){18} elseif($null -ne $originalReceivingCheckpoint){17} elseif($null -ne $purchaseRootCheckpoint){16} elseif($null -ne $supplierDraftCheckpoint){15} elseif($null -ne $privateStarsCheckpoint){14} elseif($null -ne $privateStarsAdmission){13} elseif($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
+ $metadataCount = if($null -ne $storeReportsCheckpoint){20} elseif($null -ne $storeCouponsCheckpoint){19} elseif($null -ne $storeOperationsCheckpoint){18} elseif($null -ne $originalReceivingCheckpoint){17} elseif($null -ne $purchaseRootCheckpoint){16} elseif($null -ne $supplierDraftCheckpoint){15} elseif($null -ne $privateStarsCheckpoint){14} elseif($null -ne $privateStarsAdmission){13} elseif($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
  Assert-Coordination ($approval.acceptedUiCommit -ceq $base -and $approval.uiContractSha256 -ceq $hash -and $approval.founderAnswer -ceq 'EXECUTE' -and $approval.localMetadataCommits -eq $metadataCount -and !$approval.sourceFeatureCommits -and !$approval.backendBranchPush -and !$approval.deployment -and !$approval.productionAcceptance) 'Exact acceptance/authority differs.'
  if ($null -ne $checkpoint) {Assert-Coordination ($binding.id -ceq 'ai_domain_batch_20261028' -and $binding.state -ceq 'founder_authorized_2026_10_28') 'Correct current batch identity required; no stale Profile or History binding.'}
  Assert-Coordination ((Get-Sha256 (Join-Path $root 'docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md')) -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $record.backendAdmission.originalProviderTestAddendum.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $approval.originalProviderTestAdmission.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22') 'Exact original-provider test boundary changed.'
@@ -898,7 +959,8 @@ function Invoke-AiDomainBatchAdmission {
  if($null -ne $originalReceivingCheckpoint){Assert-Coordination ($null -ne $purchaseRootCheckpoint -and (Test-AiDomainOriginalReceivingCheckpoint $originalReceivingCheckpoint)) 'Exact prior purchase checkpoint and qualified original receiving checkpoint required.'}
  if($null -ne $storeOperationsCheckpoint){Assert-Coordination ($null -ne $originalReceivingCheckpoint -and (Test-AiDomainStoreOperationsCheckpoint $storeOperationsCheckpoint)) 'Exact prior receiving checkpoint and qualified original operational checkpoint required.'}
  if($null -ne $storeCouponsCheckpoint){Assert-Coordination ($null -ne $storeOperationsCheckpoint -and (Test-AiDomainStoreCouponsCheckpoint $storeCouponsCheckpoint)) 'Exact prior operational checkpoint and qualified original coupon checkpoint required.'}
- $maximumCommits = if($null -ne $storeCouponsCheckpoint){41} elseif($null -ne $storeOperationsCheckpoint){38} elseif($null -ne $originalReceivingCheckpoint){35} elseif($null -ne $purchaseRootCheckpoint){32} elseif($null -ne $supplierDraftCheckpoint){29} elseif($null -ne $privateStarsCheckpoint){26} elseif($null -ne $privateStarsAdmission){23} elseif($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
+ if($null -ne $storeReportsCheckpoint){Assert-Coordination ($null -ne $storeCouponsCheckpoint -and (Test-AiDomainStoreReportsCheckpoint $storeReportsCheckpoint)) 'Exact prior coupon checkpoint and qualified original report-controls checkpoint required.'}
+ $maximumCommits = if($null -ne $storeReportsCheckpoint){44} elseif($null -ne $storeCouponsCheckpoint){41} elseif($null -ne $storeOperationsCheckpoint){38} elseif($null -ne $originalReceivingCheckpoint){35} elseif($null -ne $purchaseRootCheckpoint){32} elseif($null -ne $supplierDraftCheckpoint){29} elseif($null -ne $privateStarsCheckpoint){26} elseif($null -ne $privateStarsAdmission){23} elseif($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
  Assert-Coordination ($commits.Count -le $maximumCommits -and @(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$base..$head")).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('ls-files','-v')|Where-Object {$_ -cmatch '^[a-zS] '}).Count -eq 0) 'Only exact admitted checkpoint history; no history/index overrides.'
  $changed=@(@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base))+@(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')))|Sort-Object -Unique
  Assert-AiDomainBatchOwners $changed $owners
@@ -950,7 +1012,10 @@ function Invoke-AiDomainBatchAdmission {
                  Invoke-AiDomainOriginalReceivingCheckpoint $originalReceivingCheckpoint '6651c66950e25abb7bf3e9b8e65625a342ca6de3' 'implementation' -Continuation
                  if($null -ne $storeCouponsCheckpoint){
                   Invoke-AiDomainStoreOperationsCheckpoint $storeOperationsCheckpoint '06a1abc4a04424d4a07a5d8117fe3f64a80bff75' 'implementation' -Continuation
-                  Invoke-AiDomainStoreCouponsCheckpoint $storeCouponsCheckpoint $head $ProductionPhase
+                  if($null -ne $storeReportsCheckpoint){
+                   Invoke-AiDomainStoreCouponsCheckpoint $storeCouponsCheckpoint '27302f4b5cf70f7b6aa78ec50301e71d143ee094' 'implementation' -Continuation
+                   Invoke-AiDomainStoreReportsCheckpoint $storeReportsCheckpoint $head $ProductionPhase
+                  }else{Invoke-AiDomainStoreCouponsCheckpoint $storeCouponsCheckpoint $head $ProductionPhase}
                  }else{Invoke-AiDomainStoreOperationsCheckpoint $storeOperationsCheckpoint $head $ProductionPhase}
                 }else{Invoke-AiDomainOriginalReceivingCheckpoint $originalReceivingCheckpoint $head $ProductionPhase}
                }else{Invoke-AiDomainPurchaseRootCheckpoint $purchaseRootCheckpoint $head $ProductionPhase}
