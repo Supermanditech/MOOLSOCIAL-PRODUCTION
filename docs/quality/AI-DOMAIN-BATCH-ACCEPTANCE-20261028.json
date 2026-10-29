@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 33,
+  "localMetadataCommits": 34,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -8254,5 +8254,177 @@
     "legacyMigration": false,
     "runtimeMembershipSourceAvailable": false,
     "automaticRestockRuntimeRegistration": false
+  },
+  "aggregate03PurchaseDataCheckpoint": {
+    "sequence": "03-original-supplier-purchase-data",
+    "baseline": "0970f163439497a4b184773580078f6bc5149d31",
+    "namedBranchPushAuthorized": true,
+    "productionAcceptance": false,
+    "manifest": {
+      "changedOwners": [
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+        "apps/mobile/lib/features/work/work_purchase_entry_gateway.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/test/work_purchase_entry_gateway_test.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "backend/functions/src/assistant/domain_context.ts",
+        "backend/functions/src/assistant/domain_context_contract.ts",
+        "backend/functions/src/assistant/domain_context_integration.test.ts",
+        "backend/functions/src/index.ts",
+        "backend/functions/src/workspace/workspace_purchase_entry_repository.ts",
+        "backend/functions/src/workspace/workspace_purchase_entry_service.test.ts",
+        "backend/functions/src/workspace/workspace_purchase_entry_service.ts"
+      ],
+      "owners": [
+        {
+          "path": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+          "sha256": "BE4A5C1FCD45EA86BB1978C0E78A222DF18752E4887051F07543B2E108B56E76",
+          "gitBlobOid": "64be98ec1436affacf55b069854a4aecc95e1f8f"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+          "sha256": "9CC1B39FA675AB1E16ED14C7339826E517593DA60DD2531580222209C4408BFA",
+          "gitBlobOid": "9c633bf20631278188bc49034990419232543a98"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_purchase_entry_gateway.dart",
+          "sha256": "601C0E2594EBEEDB737C88E207BE5461AA79A8660E101805FCC5FB836B6DE1E9",
+          "gitBlobOid": "0e89f1ef413e0e44ffa673564b2e39457e2cda62"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_services.dart",
+          "sha256": "2DD93F8D2A290159A0AEC0395DAAE6AD4A9276E13EB422C6F3425E2A6D96E59B",
+          "gitBlobOid": "92082ee474d499ad3876dec1b2b46658905c3d30"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_session.dart",
+          "sha256": "7D9FE49B2F906787A1A835B9302FF4D3EEF48D04C29D74CA962D60A00BF9DE09",
+          "gitBlobOid": "b98ce7f86acfe652daa1a59824c6ba6c536960e3"
+        },
+        {
+          "path": "apps/mobile/test/work_purchase_entry_gateway_test.dart",
+          "sha256": "5B3866CA06A1CC53AFB64680224604EC6525D67E4A8D441009C4E35196B1A3E6",
+          "gitBlobOid": "9d10cb6a844ad8cd616456e00b3fd18d6e784a45"
+        },
+        {
+          "path": "apps/mobile/test/work_workspace_layout_safety_test.dart",
+          "sha256": "8BEC684EFFDD89607D2AD34635BCE647675EF9742369ED4AC1DA505D1E22F3BE",
+          "gitBlobOid": "a5abd7eeb750030948e5b4addc757bb3b4166071"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.ts",
+          "sha256": "E127DC176DB97158086C51B6417DAA73845C2965DE62B0D885C6740FB9636292",
+          "gitBlobOid": "0bd6ef6495c9c7bd26ac6a3f7b3bc10bb6b68437"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.ts",
+          "sha256": "C536DD9AB737E57F19F8C8C88A27B8795F880029710707C3D2C1220220BD4407",
+          "gitBlobOid": "7c87f486a8f16b41721aabfb185de036a0de9ae0"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_integration.test.ts",
+          "sha256": "02460EEE4C4284EDFBAA761F52DB2BCC309E353343F5D9DDB3AF19336424360D",
+          "gitBlobOid": "aa9b6cf667983f23150a9433f4f4cc833d621a7a"
+        },
+        {
+          "path": "backend/functions/src/index.ts",
+          "sha256": "2E87BAE8A6858CA092448381531CAA06E0C7BA195DA023E4AEA64695903F197C",
+          "gitBlobOid": "781a4a5d8ff55be24ab94f947234118b9a2fff43"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_repository.ts",
+          "sha256": "C1E60D05F49B7D751AC1599D1D53074B6762D8AC0C82A9F23DDB2BEA193118A5",
+          "gitBlobOid": "9e26460c27d4a0eb8f26f646a70bfd4205baa6bf"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_service.test.ts",
+          "sha256": "997DC49C43F9D7402F4FD30BEFC1FA20E6CF5D3BC33C4ED86E72B933E39A11F7",
+          "gitBlobOid": "88c1e4a2f01c62d2955e6d439f438dc1b7c91395"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_service.ts",
+          "sha256": "C7581A25FB7FAAA924BA381128E80ECAE16701336AE0EA5EE39F9D8436CF591F",
+          "gitBlobOid": "fbc168af43ccc3a480167e2060043360321cabb7"
+        }
+      ]
+    },
+    "disposition": {
+      "scope": "existing aggregate03 supplier/purchase-data original Save/read/status only",
+      "wholeAggregateComplete": false,
+      "hostQualified": true,
+      "oppoCurrentSourceQualified": false,
+      "oppoReason": "connected but locked; no fake runtime data or unlock bypass",
+      "originalRuntimeAuthorityAvailable": false,
+      "privateAttachmentUploadAvailable": false,
+      "legacyMigrationAvailable": false,
+      "automaticRestockSupplierRegistrationAvailable": false,
+      "financialOrStockPosting": false,
+      "remaining": [
+        "manual receipt review requires original supplier ledger and Stock consistency sources from aggregates04/01",
+        "current-source OPPO qualification after unlock",
+        "trusted final Restock placement/provenance in aggregate07",
+        "original membership reader/issuer; private-original media service; legacy original migration"
+      ]
+    },
+    "evidence": {
+      "backendContextPassed": 204,
+      "nativeProtocolPassed": 33,
+      "nativeFormPassed": 17,
+      "skippedInTheseRuns": 0,
+      "analyzerErrors": 0,
+      "analyzerWarnings": 0,
+      "analyzerInfos": 431,
+      "sourceOfEvidence": "isolated actual host SDK plus labelled fault fixtures; not authenticated phone execution",
+      "retainedFailedRuns": [
+        "agg03-purchase-draft-emulator-v2/tests.log",
+        "agg03-purchase-draft-emulator-v3/tests.log",
+        "agg03-draft-native-form-v1.jsonl"
+      ],
+      "files": [
+        {
+          "path": "agg03-draft-tsc-v5.log",
+          "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+        },
+        {
+          "path": "agg03-draft-bridge-analyzer-v2.log",
+          "sha256": "E7E014C10CF98E0DA7575B19200435CF8A5BDB93DBFAF4EA8FE329DE0A42D0E3"
+        },
+        {
+          "path": "agg03-purchase-draft-emulator-v4/tests.log",
+          "sha256": "1FA5961A47008B1549FD565F942CEBAD641139E83394E8C1CCB0FEC249A6D857"
+        },
+        {
+          "path": "agg03-purchase-draft-emulator-v4/RESULT.json",
+          "sha256": "75E5AC230445F93AEBA322B53CE636EA48895D3303BFD595792B659BD0F923EB"
+        },
+        {
+          "path": "agg03-purchase-draft-emulator-v4/STOPPED.json",
+          "sha256": "7BE7B52732DBE9315E839BE196AC5DDFC5D7F8E7167BD02A38A97576AC68A641"
+        },
+        {
+          "path": "agg03-draft-native-form-v3.jsonl",
+          "sha256": "426156547483DE59F4BAD7C7EC7DB557149F1F1BAB096ED223898879823E31F3"
+        },
+        {
+          "path": "agg03-draft-native-protocol-v3.jsonl",
+          "sha256": "6B4E644F21B8A60F7356576BA5B6F9C7F4181047D0818F5B80BB33B0996CDE33"
+        },
+        {
+          "path": "AGG03-TEST-INCIDENTS-v1.json",
+          "sha256": "326E32304D1B44E906E85389A71A6AE58722AE6DF6E624592D7AA68CA407E5FA"
+        },
+        {
+          "path": "AGG03-IMPLEMENTATION-PROGRESS-v5.json",
+          "sha256": "614600B4485735B4897F2B9C773310BA66137046B977E12654753D4BE6229CE5"
+        },
+        {
+          "path": "agg03-draft-bridge-gate-v1.log",
+          "sha256": "0D6F89F03A5B6AB6AC3965FCD6647899EA77A428BA1DA7E2DCF19B1CC291FD91"
+        }
+      ]
+    },
+    "sourceCommit": null
   }
 }

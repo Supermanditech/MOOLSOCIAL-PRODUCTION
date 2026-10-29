@@ -724,4 +724,28 @@ foreach($property in @('after','replacements','existingEntries','metadataCommitS
  $bad.evidencePathCorrection.$property=if($property -cin @('replacements','existingEntries')){99}else{'foreign'}
  Check (!(Test-AiDomainQuoteRecurrenceAdmission $bad)) "reject changed literal evidence correction $property"
 }
+$purchaseDataCheckpoint=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate03PurchaseDataCheckpoint
+Check (Test-AiDomainPurchaseDataCheckpoint $purchaseDataCheckpoint) 'exact host-qualified original purchase-data source checkpoint'
+Check (!(Test-AiDomainPurchaseDataCheckpoint $null)) 'reject absent original purchase-data checkpoint'
+Check (@(Get-AiDomainPurchaseDataStageOwners 0 $purchaseDataCheckpoint).Count -eq 3) 'three exact existing purchase-data checkpoint metadata owners'
+Check (@(Get-AiDomainPurchaseDataStageOwners 1 $purchaseDataCheckpoint).Count -eq 14) 'fourteen exact qualified source owners'
+Check (@(Get-AiDomainPurchaseDataStageOwners 2 $purchaseDataCheckpoint).Count -eq 1) 'one sanitized evidence owner'
+Check (@(Get-AiDomainPurchaseDataStageOwners 3 $purchaseDataCheckpoint).Count -eq 0) 'no extra checkpoint stage'
+foreach($property in @('sequence','baseline')) {
+ $bad=($purchaseDataCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainPurchaseDataCheckpoint $bad)) "reject changed purchase-data $property"
+}
+$bad=($purchaseDataCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.productionAcceptance=$true
+Check (!(Test-AiDomainPurchaseDataCheckpoint $bad)) 'host qualification is not production acceptance'
+foreach($property in @('wholeAggregateComplete','oppoCurrentSourceQualified','originalRuntimeAuthorityAvailable','privateAttachmentUploadAvailable','legacyMigrationAvailable','automaticRestockSupplierRegistrationAvailable','financialOrStockPosting')) {
+ $bad=($purchaseDataCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainPurchaseDataCheckpoint $bad)) "reject invented purchase-data qualification $property"
+}
+$bad=($purchaseDataCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('foreign')
+Check (!(Test-AiDomainPurchaseDataCheckpoint $bad)) 'reject expanded purchase-data owners'
+$bad=($purchaseDataCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.owners[0].sha256='foreign'
+Check (!(Test-AiDomainPurchaseDataCheckpoint $bad)) 'reject changed qualified source hash'
+$bad=($purchaseDataCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendContextPassed=0
+Check (!(Test-AiDomainPurchaseDataCheckpoint $bad)) 'reject changed purchase-data evidence'
+
 Write-Output "AI domain batch admission checks passed: $n."
