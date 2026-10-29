@@ -632,6 +632,35 @@ foreach($row in @(@(0,3),@(1,15),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainOriginalCatalogueStageOwners $row[0] $originalCatalogueSeal).Count -eq $row[1]) "original-catalogue checkpoint exact stage $($row[0]) owner count"
 }
 
+$typedPreviewSeal=$approval.aggregate02TypedPreviewCheckpoint
+Check (Test-AiDomainTypedPreviewCheckpoint $typedPreviewSeal) 'exact qualified typed-preview checkpoint'
+Check (@(Get-AiDomainTypedPreviewSealOwners).Count -eq 3) 'only three existing metadata owners for typed-preview seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($typedPreviewSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainTypedPreviewCheckpoint $bad)) "reject changed typed-preview seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($typedPreviewSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainTypedPreviewCheckpoint $bad)) "reject changed typed-preview qualified source $property"
+}
+$bad=($typedPreviewSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainTypedPreviewCheckpoint $bad)) 'reject typed-preview source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($typedPreviewSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainTypedPreviewCheckpoint $bad)) "reject expanded typed-preview qualification $property"
+}
+$bad=($typedPreviewSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.aggregateComplete=$true
+Check (!(Test-AiDomainTypedPreviewCheckpoint $bad)) 'reject fabricated typed-preview device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($typedPreviewSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainTypedPreviewCheckpoint $bad)) "reject changed typed-preview evidence $property"
+}
+foreach($row in @(@(0,3),@(1,21),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainTypedPreviewStageOwners $row[0] $typedPreviewSeal).Count -eq $row[1]) "typed-preview checkpoint exact stage $($row[0]) owner count"
+}
+
 $aggregateTwoSourceAdmission=$approval.aggregate02SourceAdmission
 Check (Test-AiDomainAggregateTwoSourceAdmission $aggregateTwoSourceAdmission) 'exact original catalogue and owned-draft source admission'
 Check (@($aggregateTwoSourceAdmission.additionalOwners).Count -eq 7) 'only seven necessary additional runtime/test owners'
