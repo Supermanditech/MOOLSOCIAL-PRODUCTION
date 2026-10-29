@@ -27470,7 +27470,12 @@ test('FE-PRODUCT remaining native fields reject raw sources and retain exact ref
   ]}), throwsFormatException);
   expect(() => StoreProductNativeInitial.fromFields('AI-ACT-370', {...refs,
     'warranty': {'Guaranteed refund': 'No native warranty field'}}), throwsFormatException);
-  expect(StoreProductNativeInitial.actions, isNot(contains('AI-ACT-229')));
+  expect(StoreProductNativeInitial.actions, contains('AI-ACT-229'));
+  expect(StoreProductNativeInitial.fromFields('AI-ACT-229', {'search': 'HOST चावल'}).catalogueSearch, 'HOST चावल');
+  for (final fields in <Map<String, Object?>>[{}, {'search': ' '}, {'search': 'x' * 161}, {'search': 'x\u0000'},
+    {'search': 'HOST', 'canonicalId': 'invented'}]) {
+    expect(() => StoreProductNativeInitial.fromFields('AI-ACT-229', fields), throwsFormatException);
+  }
   expect(StoreProductNativeInitial.actions, isNot(contains('AI-ACT-230')));
 });
 
@@ -27650,11 +27655,15 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
     await tester.pumpWidget(f.app); await tester.pumpAndSettle();
     final ids = f.adapters(tester).map((adapter) => adapter.actionId).toSet();
     expect(ids, containsAll(StoreProductNativeInitial.actions));
-    expect(ids, isNot(contains('AI-ACT-229')));
+    expect(ids, contains('AI-ACT-229'));
     expect(ids, contains('AI-ACT-230')); // Registered original-public-reader adapter; no private preview.
-    final adapter = f.adapters(tester).singleWhere((adapter) => adapter.actionId == 'AI-ACT-215');
-    final ctx = f.readContext(), product = f.work.workspaceCatalogueItems.first;
+    final variant = f.adapters(tester).singleWhere((adapter) => adapter.actionId == 'AI-ACT-215');
+    final adapter = f.adapters(tester).singleWhere((adapter) => adapter.actionId == 'AI-ACT-226');
+    final ctx = f.readContext(), product = f.work.workspaceCatalogueItems.firstWhere((item) => item.counterSaleAllowed);
     final writes = f.writes;
+    // 215 now owns a root group-selection intent; a per-SKU call must be denied.
+    // Exercise the existing per-SKU native confirmation through its actual 226 adapter.
+    expect(await variant.snapshot(ctx, product.id), isNull);
     final snapshot = await adapter.snapshot(ctx, product.id);
     expect(snapshot, isNotNull);
     expect(f.writes, writes);

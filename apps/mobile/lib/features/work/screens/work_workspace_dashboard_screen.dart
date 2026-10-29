@@ -18,7 +18,8 @@ import '../../../shared/commerce/commerce_downloads_screen.dart';
 import '../work_downloads.dart';
 import '../../../ui_v2/buy/buy_v2_screen.dart';
 import '../../../ui_v2/buy/buy_v2_views.dart'
-    show showMoolBusinessFinanceSheet, MoolBusinessFinancePrefill, moolBusinessFinanceFormRevision;
+    show showMoolBusinessFinanceSheet, MoolBusinessFinancePrefill, moolBusinessFinanceFormRevision, BuyV2ProductView;
+import '../../../ui_v2/buy/buy_v2_design.dart' show BuyV2ThemeScope, BuyV2ThemeSpec;
 import '../../../ui_v2/assistant/mool_assistant_v2.dart'
     show MoolAssistantHost, MoolAssistantNativeScope, MoolAssistantWorkspaceScope, MoolAssistantRouteBoundNativeAdapter;
 import '../../assistant/mool_assistant.dart';
@@ -6557,7 +6558,8 @@ bool _productSubmissionCaptureReady(WorkSession source, WorkspaceCatalogueItem p
 }
 bool _nativeProductReady(WorkSession source, String action, String? entity, {WorkspaceCatalogueItem? capturedProduct}) {
   if (StoreProductNativeInitial.catalogueActions.contains(action)) {
-    return entity == null && (action != 'AI-ACT-372' || source.workspaceCommodityPriceAttentionConfigured);
+    return entity == null && (action != 'AI-ACT-372' || source.workspaceCommodityPriceAttentionConfigured) &&
+      (action != 'AI-ACT-229' || source.workspaceMasterCatalogueConnectionConfigured);
   }
   final product = capturedProduct ?? _assistantProductTarget(source, false, entity);
   if (product == null) return false;
@@ -7238,6 +7240,11 @@ Future<MoolAssistantReviewResult> _openProductNative(BuildContext hostContext, W
       identical(_catalogueKey.currentState, catalogue) && identical(catalogue.widget.session, source) &&
       _view == _WorkspaceControlView.operation && _operation == _WorkspaceOperation.catalogue;
     if (!catalogueOwner() || !reviewCurrent()) return MoolAssistantReviewResult.stale;
+    if (action == 'AI-ACT-229') {
+      final opened = await catalogue!._openOriginalMasterCatalogue(search: initial.catalogueSearch!,
+        reviewCurrent: catalogueOwner, reviewChanges: changes);
+      return !owner() ? MoolAssistantReviewResult.stale : opened ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.unavailable;
+    }
     if (action == 'AI-ACT-369') {
       final opened = await catalogue!._scan(reviewCurrent: catalogueOwner, reviewChanges: changes);
       return !owner() ? MoolAssistantReviewResult.stale : opened ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.cancelled;
@@ -32235,17 +32242,20 @@ class _WorkspaceCatalogueSurfaceState
       defaults:defaults??widget.session.workspaceProductDefaults);
   }
 
-  Widget _addProductEntry() {
+  Widget _addProductEntry({String initialMasterSearch = '', String? initialMasterCode,
+      bool autoReviewSingleMasterMatch = false, bool Function()? reviewCurrent}) {
     final storeId =
         widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
     final inputContext = widget.session.tradingPreferencesContext;
     final defaults = widget.session.workspaceProductDefaults;
     var tab = 0;
-    var manualProduct = _blankProduct(defaults: defaults);
+    var manualProduct = _blankProduct(barcode: initialMasterCode ?? '', defaults: defaults);
     WorkspaceCatalogueItem? catalogueProduct;
+    WorkspaceMasterCatalogueOrigin? catalogueOrigin;
     var manualEditorKey = GlobalKey<_CatalogueProductEditorState>();
     var catalogueEditorKey = GlobalKey<_CatalogueProductEditorState>();
     bool storeUnchanged() {
+      if (reviewCurrent?.call() == false) return false;
       if (!mounted) return false;
       if (inputContext != widget.session.tradingPreferencesContext ||
           (widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
@@ -32274,6 +32284,7 @@ class _WorkspaceCatalogueSurfaceState
                 manualEditorKey = GlobalKey<_CatalogueProductEditorState>();
               } else if (tab == 0) {
                 catalogueProduct = null;
+                catalogueOrigin = null;
                 catalogueEditorKey = GlobalKey<_CatalogueProductEditorState>();
               }
               tab = index;
@@ -32291,6 +32302,19 @@ class _WorkspaceCatalogueSurfaceState
             StoreAddProductSheet(
               embedded: true,
               catalogue: widget.session.referenceCatalogue,
+              initialMasterSearch: initialMasterSearch,
+              initialMasterCode: initialMasterCode,
+              autoReviewSingleMasterMatch: autoReviewSingleMasterMatch,
+              masterLookup: widget.session.workspaceUsesOriginalMasterCatalogue
+                ? (search, code, cursor) => widget.session.readWorkspaceMasterCatalogue(search: search, code: code, cursor: cursor, current: storeUnchanged)
+                : null,
+              onMasterSelected: (source) {
+                if (!storeUnchanged()) return;
+                try {
+                  final prepared = source.prepareNewStoreDraft(_blankProduct(defaults: defaults));
+                  setPageState(() {catalogueProduct = prepared; catalogueOrigin = source.origin;});
+                } catch (_) {widget.session.showError('These catalogue details need review. Try another product or add it manually.');}
+              },
               isStoreCurrent: storeUnchanged,
               savedCatalogueKeys: widget.session.workspaceCatalogueShortlist,
               recentSearches: widget.session.workspaceCatalogueSearchHistory,
@@ -32355,6 +32379,7 @@ class _WorkspaceCatalogueSurfaceState
                 key: catalogueEditorKey,
                 session: widget.session,
                 product: catalogueProduct!,
+                masterOrigin: catalogueOrigin,
                 stockEntryMethod: WorkspaceStockEntryMethod.catalogue,
                 embeddedPage: true,
                 guardRouteExit: false,
@@ -32440,6 +32465,25 @@ class _WorkspaceCatalogueSurfaceState
     }
   }
 
+  bool _originalMasterOpen = false;
+  Future<bool> _openOriginalMasterCatalogue({String search = '', String? code,
+      bool Function()? reviewCurrent, Listenable? reviewChanges}) async {
+    if (_originalMasterOpen || !mounted || !widget.session.workspaceMasterCatalogueConnectionConfigured || reviewCurrent?.call() == false) return false;
+    final owner = widget.session.tradingPreferencesContext, store = widget.session.activeWorkspace?.id;
+    bool current() => mounted && reviewCurrent?.call() != false && widget.ownerCurrent?.call() != false &&
+      widget.session.workspaceMasterCatalogueConnectionConfigured && widget.session.tradingPreferencesContext == owner &&
+      widget.session.activeWorkspace?.id == store;
+    if (!current() || store == null) return false;
+    _originalMasterOpen = true;
+    try {
+      if (!await widget.session.loadWorkspaceProductDefaults(expectedStoreId: store) || !current()) return false;
+      await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => _StoreProductOwnerSurface(
+        current: current, changes: reviewChanges ?? widget.session,
+        child: _addProductEntry(initialMasterSearch: search, initialMasterCode: code,
+          autoReviewSingleMasterMatch: true, reviewCurrent: current))));
+      return true;
+    } finally {_originalMasterOpen = false;}
+  }
   Future<bool> _scan({bool Function()? reviewCurrent, Listenable? reviewChanges}) async {
     if (widget.ownerCurrent != null) {
       reviewCurrent ??= widget.ownerCurrent;
@@ -32452,6 +32496,17 @@ class _WorkspaceCatalogueSurfaceState
     if (reviewCurrent?.call() == false || !mounted || inputContext != widget.session.tradingPreferencesContext ||
         code == null || code.trim().isEmpty) { return false; }
     final normalized = code.trim().toLowerCase();
+    if (widget.session.workspaceUsesOriginalMasterCatalogue) {
+      final owned = widget.session.workspaceCatalogueItems.where((item) =>
+        item.barcode.toLowerCase() == normalized || item.sku.toLowerCase() == normalized).toList(growable: false);
+      if (owned.length > 1) {
+        widget.session.showError('This code matches several Store products. Choose the correct pack from Stock.'); return false;
+      }
+      if (owned.length == 1) {
+        await _edit(owned.single, reviewCurrent: reviewCurrent, reviewChanges: reviewChanges); return true;
+      }
+      return _openOriginalMasterCatalogue(code: code.trim(), reviewCurrent: reviewCurrent, reviewChanges: reviewChanges);
+    }
     final products = [
       ...widget.session.workspaceCatalogueItems,
       ...widget.session.referenceCatalogue,
@@ -35648,6 +35703,82 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
 
 /// Projects an existing saved SKU into Buy's renderer, without publishing it.
 /// The Store remains the data owner; this route has no commerce or review grant.
+/// Authenticated private original, rendered by the existing public read-only
+/// product view. It never supplies a public listing or touches the real Cart.
+class OwnedStoreProductCustomerPreview extends StatefulWidget {
+  const OwnedStoreProductCustomerPreview({super.key, required this.work, required this.controller,
+    required this.presentation, required this.sourceCurrent});
+  final WorkSession work;
+  final WorkspaceProductDraftController controller;
+  final WorkspaceProductDraftPresentation presentation;
+  final bool Function() sourceCurrent;
+  @override State<OwnedStoreProductCustomerPreview> createState() => _OwnedStoreProductCustomerPreviewState();
+}
+class _OwnedStoreProductCustomerPreviewState extends State<OwnedStoreProductCustomerPreview> {
+  late final Object _owner = widget.work.publicationPreferencesContext;
+  late final int? _navigation = widget.work.navigationScopeRevision;
+  late final String _fingerprint = widget.presentation.record.fingerprint;
+  Timer? _expiry;
+  bool _retired = false;
+  final _scroll = ScrollController();
+  bool get _current {
+    if (_retired) return false;
+    final valid = mounted && widget.sourceCurrent() && widget.controller.active && widget.controller.loaded && !widget.controller.busy &&
+      widget.work.workspaceStoreAuthoringAvailable && widget.work.gateway is! ReviewWorkGateway &&
+      widget.controller.pending == null && widget.controller.record?.fingerprint == _fingerprint &&
+      widget.work.publicationPreferencesContext == _owner && widget.work.navigationScopeRevision == _navigation &&
+      DateTime.now().toUtc().isBefore(widget.presentation.record.observedAt.add(const Duration(minutes: 5)));
+    if (!valid) _retired = true;
+    return valid;
+  }
+  late final BuySession _core = BuySession(orderGateway: const _SavedProductPreviewGateway(),
+    medicineGateway: const _SavedProductPreviewGateway());
+  late final _OwnedDraftProductSource _source = _OwnedDraftProductSource(widget.presentation, () => _current);
+  late final BuyV2Session _buy = BuyV2Session(core: _core, reviewDataEnabled: false,
+    cataloguePageSource: _source, productContentAdapter: _source,
+    marketplaceTrustAdapter: BuyV2CatalogueMarketplaceTrustAdapter(storeSource: (_) => null),
+    customerStateStore: _SavedProductPreviewStateStore('private-draft:${widget.controller.scope.account}:${widget.controller.scope.store}:${
+      widget.controller.scope.realm}:${widget.controller.scope.sku}:$_fingerprint', () => _current),
+    cartBenefitsAdapter: const BuyV2DisabledCartBenefitsAdapter(),
+    orderResolutionAdapter: const BuyV2UnavailableOrderResolutionAdapter(),
+    shoppingAlertsAdapter: const BuyV2UnavailableShoppingAlertsAdapter(), commerceAdapter: const BuyV2UnavailableCommerceAdapter());
+  @override void initState() {
+    super.initState(); _buy;
+    final remaining = widget.presentation.record.observedAt.add(const Duration(minutes: 5)).difference(DateTime.now().toUtc());
+    _expiry = Timer(remaining.isNegative ? Duration.zero : remaining, () {if (mounted) setState(() {});});
+  }
+  @override void dispose() {_expiry?.cancel(); _scroll.dispose(); _buy.dispose(); _core.dispose(); super.dispose();}
+  @override Widget build(BuildContext context) => Scaffold(body: SafeArea(child: AnimatedBuilder(
+    animation: Listenable.merge([widget.work, widget.controller]), builder: (context, _) {
+      if (!_current) return Center(child: Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Close this preview and reopen the saved product to check its latest details.'),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close preview'))])));
+      final product = widget.presentation.product;
+      return BuyV2ThemeScope(spec: BuyV2ThemeSpec.resolve(product.destination, BuyV2View.product), refinedCommerce: true,
+        child: BuyV2ProductView(session: _buy, capturedProduct: product, capturedCurrent: () => _current,
+          scrollController: _scroll, returnLabel: 'Close preview', onReturn: () => Navigator.pop(context),
+          trailingAction: const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('Unpublished', style: TextStyle(fontSize: 12)))));
+    })));
+}
+class _OwnedDraftProductSource implements BuyV2CataloguePageSource, BuyV2ProductContentAdapter {
+  _OwnedDraftProductSource(this.presentation, this.current);
+  final WorkspaceProductDraftPresentation presentation;
+  final bool Function() current;
+  String get _snapshot => 'private-original:${presentation.record.revision}:${presentation.record.fingerprint}';
+  @override Future<List<BuyV2Product>> resolveProducts(Set<String> ids) async =>
+    current() && ids.contains(presentation.product.id) ? [presentation.product] : [];
+  @override Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(BuyV2CatalogueQuery query,
+    {String? cursor, required int pageSize}) async => BuyV2CataloguePage(queryKey: query.key, snapshotId: _snapshot, startIndex: 0,
+      items: current() && cursor == null && query.destination == presentation.product.destination ? [presentation.product] : const []);
+  @override Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(BuyV2CatalogueQuery query,
+    {String? cursor, required int pageSize}) async => BuyV2CataloguePage(queryKey: query.key, snapshotId: _snapshot, startIndex: 0, items: const []);
+  @override BuyV2ProductContentSnapshot snapshotFor(BuyV2Product selected) => current() &&
+      selected.id == presentation.product.id && selected.storeId == presentation.product.storeId &&
+      selected.offerClass == presentation.product.offerClass && selected.canonicalId.isEmpty && selected.publicListingIdentity == null
+    ? presentation.content : BuyV2ProductContentSnapshot(productId: selected.id, state: BuyV2ProductContentState.unavailable,
+      sourceId: _snapshot);
+}
+
 class SavedStoreProductCustomerPreview extends StatefulWidget {
   const SavedStoreProductCustomerPreview({super.key, required this.work,
     required this.saved, this.channel = BuyV2Destination.shop});
@@ -35799,22 +35930,24 @@ class StoreProductVariantInitialDimension {
 class StoreProductNativeInitial {
   StoreProductNativeInitial._(this.actionId, this.references, this.dimensions,
     this.warranty, this.attachmentRef, this.visible, this.validityMinutes,
-    this.originalRequestId, this.sourcePhotoSha256);
+    this.originalRequestId, this.sourcePhotoSha256, this.catalogueSearch);
   final String actionId;
   final Map<String, Object?> references;
   final List<StoreProductVariantInitialDimension> dimensions;
   final Map<String, String> warranty;
   final String? attachmentRef, validityMinutes, originalRequestId, sourcePhotoSha256;
+  final String? catalogueSearch;
   final bool? visible;
-  static const catalogueActions = {'AI-ACT-228', 'AI-ACT-369', 'AI-ACT-372'};
+  static const catalogueActions = {'AI-ACT-228', 'AI-ACT-229', 'AI-ACT-369', 'AI-ACT-372'};
   static const actions = {'AI-ACT-215', 'AI-ACT-216', 'AI-ACT-217', 'AI-ACT-220',
     'AI-ACT-222', 'AI-ACT-223', 'AI-ACT-224', 'AI-ACT-225', 'AI-ACT-226', 'AI-ACT-227',
-    'AI-ACT-228', 'AI-ACT-369', 'AI-ACT-370', 'AI-ACT-371', 'AI-ACT-372', 'AI-ACT-373', 'AI-ACT-374'};
+    'AI-ACT-228', 'AI-ACT-229', 'AI-ACT-369', 'AI-ACT-370', 'AI-ACT-371', 'AI-ACT-372', 'AI-ACT-373', 'AI-ACT-374'};
   static Set<String> allowedFields(String action) => {
     if (!catalogueActions.contains(action)) ...StoreProductInitialData.referenceKeys,
     if (action == 'AI-ACT-215') 'dimensions',
     if (action == 'AI-ACT-216' || action == 'AI-ACT-228') 'attachmentRef',
     if (action == 'AI-ACT-217') 'sourcePhotoSha256',
+    if (action == 'AI-ACT-229') 'search',
     if (action == 'AI-ACT-220') 'validityMinutes',
     if (action == 'AI-ACT-222' || action == 'AI-ACT-371') 'visible',
     if (action == 'AI-ACT-370') 'warranty',
@@ -35887,8 +36020,11 @@ class StoreProductNativeInitial {
       visible = fields['visible'] as bool;
     }
     final original = text('originalRequestId', mustProvide: const {'AI-ACT-225','AI-ACT-373','AI-ACT-374'}.contains(action));
+    final search = text('search', mustProvide: action == 'AI-ACT-229');
+    if (search != null && (search.length > 160 || RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]').hasMatch(search) ||
+        utf8.decode(utf8.encode(search)) != search)) throw const FormatException('Use a complete catalogue search within 160 characters.');
     return StoreProductNativeInitial._(action, Map.unmodifiable(references), List.unmodifiable(dimensions),
-      Map.unmodifiable(warranty), attachment, visible, validity, original, photo);
+      Map.unmodifiable(warranty), attachment, visible, validity, original, photo, search);
   }
   bool matches(WorkspaceCatalogueItem product) => mapEquals(references, StoreProductInitialData.referenceFields(product));
 }
@@ -36241,8 +36377,10 @@ class _CatalogueProductEditor extends StatefulWidget {
     this.initialData, this.prefillCurrent, this.ownerCurrent, this.sourceCurrent,
     this.nativeReview, this.selectedPhoto, this.reviewChanges,
     this.stockAdjustmentInitial, this.stockAdjustmentCurrent,
+    this.masterOrigin,
   });
   final StoreStockAdjustmentInitialData? stockAdjustmentInitial;
+  final WorkspaceMasterCatalogueOrigin? masterOrigin;
   final bool Function()? stockAdjustmentCurrent;
 
   final StoreProductInitialData? initialData;
@@ -36999,7 +37137,35 @@ void _startNativeReview() {
       });
   }
 
+  Widget _productDraftControls() {
+    final controller = widget.session.workspaceSavedProductDraft(widget.product.id);
+    if (controller == null) return const SizedBox.shrink();
+    Future<void> check() async {
+      if (!_reviewEditorCurrent || controller.busy) return;
+      if (await controller.load() && controller.pending != null && _reviewEditorCurrent) await controller.recover();
+    }
+    return AnimatedBuilder(animation: controller, builder: (context, _) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (controller.busy) const LinearProgressIndicator(minHeight: 2),
+        Text(widget.session.workspaceSavedProductDraftMatchesLocal(widget.product.id)
+          ? 'Product sync confirmed.' : controller.pending != null
+          ? 'Check the previous Save before syncing again.' : 'Product sync is not confirmed.',
+          style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+        Wrap(spacing: 8, children: [
+          TextButton.icon(onPressed: controller.busy || !_reviewEditorCurrent || _savingInventory ? null : check,
+            icon: const Icon(Icons.sync, size: 18), label: const Text('Check sync')),
+          if (controller.pending != null && controller.state == WorkspaceProductDraftWriteState.notFound)
+            TextButton.icon(onPressed: controller.busy || !_reviewEditorCurrent || _hasUnsavedEdits || _savingInventory ? null : () async {
+              await controller.recover(retryOriginal: true);
+            }, icon: const Icon(Icons.replay, size: 18), label: const Text('Retry original Save')),
+        ]),
+      ])));
+  }
+  bool _openingCustomerPreview = false;
   Future<void> _openSavedCustomerPreview() async {
+    if (!mounted || _openingCustomerPreview || !_reviewEditorCurrent) return;
+    setState(() => _openingCustomerPreview = true);
+    try {
     if (!_reviewEditorCurrent || _hasUnsavedEdits || _savingInventory || !await widget.session.workspaceInventorySaved || !mounted || !_reviewEditorCurrent) return;
     final saved = widget.session.workspaceCatalogueItems.where((item) => item.id == widget.product.id).firstOrNull;
     if (saved == null) return;
@@ -37014,8 +37180,22 @@ void _startNativeReview() {
       ])));
     if (channel == null || !mounted || !_reviewEditorCurrent || _hasUnsavedEdits ||
         !identical(widget.session.workspaceCatalogueItems.where((item) => item.id == saved.id).firstOrNull, saved)) { return; }
+    if (widget.session.gateway is! ReviewWorkGateway) {
+      final kind = channel == BuyV2Destination.shop ? BuyV2OfferClass.retail
+        : saved.wholesaleOffer?.saleType == BuyV2WholesaleSaleType.bulk ? BuyV2OfferClass.bulk : BuyV2OfferClass.wholesale;
+      final source = await widget.session.readWorkspaceSavedProductPreview(saved.id, kind,
+        current: () => mounted && _reviewEditorCurrent && !_hasUnsavedEdits && !_savingInventory);
+      if (!mounted || !_reviewEditorCurrent) return;
+      if (source == null || !source.current()) {
+        widget.session.showError('The saved product could not be verified. Check product sync before previewing.'); return;
+      }
+      await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => OwnedStoreProductCustomerPreview(
+        work: widget.session, controller: source.controller, presentation: source.presentation, sourceCurrent: source.current)));
+      return;
+    }
     await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => SavedStoreProductCustomerPreview(
       work: widget.session, saved: saved, channel: channel)));
+    } finally {if (mounted) setState(() => _openingCustomerPreview = false);}
   }
 
   Future<void> _editVariantOptions({bool create = false, List<StoreProductVariantInitialDimension>? initialDimensions}) async {
@@ -37924,6 +38104,10 @@ void _startNativeReview() {
           return;
         }
       }
+      final productSync = await widget.session.syncWorkspaceSavedProductDraft(reviewedProduct.id, origin: widget.masterOrigin,
+        current: () => mounted && _reviewEditorCurrent &&
+          (widget.session.activeWorkspace?.id ?? widget.session.workspaceId) == _storeId);
+      if (!mounted || (widget.session.activeWorkspace?.id ?? widget.session.workspaceId) != _storeId) return;
       if (listingWasChanged && widget.purchaseScope == null && widget.onDraftReviewed == null) {
         // Inventory already belongs to its original native save. A follow-on
         // listing request needs the same assistant form owner, not a new actor.
@@ -37938,7 +38122,9 @@ void _startNativeReview() {
       if (widget.onSaved != null) {
         FocusManager.instance.primaryFocus?.unfocus();
         if (!listingWasChanged) {
-          widget.session.showNotice(widget.purchaseScope == null ? 'Saved to Store stock.'
+          widget.session.showNotice(productSync != null && productSync != WorkspaceProductDraftWriteState.saved
+              ? 'Product sync is unconfirmed. Check this product before continuing.'
+              : widget.purchaseScope == null ? 'Saved to Store stock.'
               : 'Product saved. Goods stay in your purchase draft until receipt.');
         }
         _finish(afterExit: widget.onSaved);
@@ -38690,12 +38876,16 @@ void _startNativeReview() {
                                     ? (value) => setState(() { _public = value; _listingIntentChanged = true; })
                                     : null,
                               ),
+                            if (_wasOwned && widget.session.workspaceProductDraftConnectionConfigured && widget.purchaseScope == null &&
+                                widget.importRow == null && widget.onDraftReviewed == null)
+                              _productDraftControls(),
                             if (_wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null)
                               _productSubmissionControls(),
-                            if (!_hasCapturedReview && kDebugMode && widget.session.gateway is ReviewWorkGateway && widget.session.localInventoryEnabled &&
+                            if (!_hasCapturedReview && ((kDebugMode && widget.session.gateway is ReviewWorkGateway && widget.session.localInventoryEnabled) ||
+                                widget.session.workspaceProductDraftConnectionConfigured) &&
                                 _wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null)
                               TextButton.icon(key: const Key('work-product-customer-preview'),
-                                onPressed: !_reviewEditorCurrent || _hasUnsavedEdits || _savingInventory ? null : _openSavedCustomerPreview,
+                                onPressed: !_reviewEditorCurrent || _hasUnsavedEdits || _savingInventory || _openingCustomerPreview ? null : _openSavedCustomerPreview,
                                 icon: const Icon(Icons.preview_outlined), label: const Text('Customer preview')),
                             if (_wasOwned && widget.product.wholesaleOffer?.enabled == true && widget.purchaseScope == null &&
                                 widget.importRow == null && widget.onDraftReviewed == null) ...[

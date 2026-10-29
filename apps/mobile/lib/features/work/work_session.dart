@@ -6,7 +6,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart' as crypto;
 import '../buy/buy_v2_content_contracts.dart' show BuyV2StoreListing;
-import '../buy/buy_v2_models.dart' show BuyV2Product, buyV2WholeRupees, buyV2ExactMinorAmount;
+import '../buy/buy_v2_models.dart' show BuyV2Product, BuyV2OfferClass, buyV2WholeRupees, buyV2ExactMinorAmount;
 
 import 'work_models.dart';
 import 'work_publication.dart';
@@ -1613,6 +1613,104 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
   }
+  final Map<WorkspaceProductSubmissionScope, WorkspaceProductDraftController> _productDrafts = {};
+  bool get workspaceUsesOriginalMasterCatalogue => _productionSession && gateway is! ReviewWorkGateway;
+  bool get workspaceMasterCatalogueConnectionConfigured => workspaceStoreAuthoringAvailable && gateway is! ReviewWorkGateway &&
+    catalogueGateway is AuthenticatedWorkspaceCatalogueGateway &&
+    (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).masterCatalogueSupported;
+  bool get workspaceProductDraftConnectionConfigured => workspaceStoreAuthoringAvailable && gateway is! ReviewWorkGateway &&
+    catalogueGateway is AuthenticatedWorkspaceCatalogueGateway &&
+    (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).productDraftSupported;
+  WorkspaceProductDraftInput _savedProductDraftInput(String skuId) {
+    final rows = workspaceCatalogueItems.where((item) => item.id == skuId).toList(growable: false);
+    if (rows.length != 1) throw const FormatException('The saved product changed.');
+    final item = rows.single, membership = item.variantMembership;
+    WorkspaceVariantFamily? family;
+    if (membership != null) {
+      for (final candidate in workspaceVariantFamilies) {
+        if (candidate.id == membership.familyId) {family = candidate; break;}
+      }
+    }
+    return WorkspaceProductDraftInput.fromSaved(item, family: family);
+  }
+  bool workspaceSavedProductDraftMatchesLocal(String skuId) {
+    final controller = workspaceSavedProductDraft(skuId), record = controller?.record;
+    if (controller == null || record == null || !controller.loaded || controller.pending != null || !controller.active) return false;
+    try {return jsonEncode(_savedProductDraftInput(skuId).toJson()) == jsonEncode(record.input.toJson());}
+    catch (_) {return false;}
+  }
+  Future<({WorkspaceProductDraftController controller, WorkspaceProductDraftPresentation presentation, bool Function() current})?>
+      readWorkspaceSavedProductPreview(String skuId, BuyV2OfferClass channel, {required bool Function() current}) async {
+    final controller = workspaceSavedProductDraft(skuId), name = activeWorkspace?.name;
+    if (controller == null || name == null || controller.busy || !current() || !await controller.load()) return null;
+    final record = controller.record;
+    if (record == null || controller.pending != null || !controller.active || !current()) return null;
+    final signature = jsonEncode(record.input.toJson());
+    bool valid() {
+      try {return current() && controller.active && controller.pending == null && controller.record?.fingerprint == record.fingerprint &&
+        activeWorkspace?.name == name && jsonEncode(_savedProductDraftInput(skuId).toJson()) == signature;}
+      catch (_) {return false;}
+    }
+    if (!valid()) return null;
+    try {
+      final presentation = WorkspaceProductDraftPresentation.fromRecord(record, controller.scope, storeName: name, channel: channel);
+      return valid() ? (controller: controller, presentation: presentation, current: valid) : null;
+    } catch (_) {return null;}
+  }
+  Future<WorkspaceMasterCataloguePage> readWorkspaceMasterCatalogue({String search = '', String? code,
+      int pageSize = 30, String? cursor, required bool Function() current}) async {
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
+    final epoch = navigationScopeRevision;
+    bool valid() => !_disposed && current() && workspaceStoreAuthoringAvailable &&
+      _contactAccountScope == account && activeWorkspace?.id == store && navigationScopeRevision == epoch;
+    if (account == null || account.isEmpty || store == null || !valid() || gateway is ReviewWorkGateway ||
+      source is! AuthenticatedWorkspaceCatalogueGateway || !source.masterCatalogueSupported) {
+      throw const FormatException('The master catalogue is not connected.');
+    }
+    return source.forOwnerAccount(account).readMasterCatalogue((account: account, store: store, realm: source.realm),
+      current: valid, search: search, code: code, pageSize: pageSize, cursor: cursor);
+  }
+  WorkspaceProductDraftController? workspaceSavedProductDraft(String skuId) {
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
+    if (_disposed || account == null || account.isEmpty || store == null || !workspaceStoreAuthoringAvailable ||
+      gateway is ReviewWorkGateway || source is! AuthenticatedWorkspaceCatalogueGateway || !source.productDraftSupported) return null;
+    final scope = (account: account, store: store, realm: source.realm, sku: skuId), epoch = navigationScopeRevision;
+    final previous = _productDrafts[scope];
+    if (previous != null && !previous.active) {
+      _productDrafts.remove(scope); previous.removeListener(notifyListeners); previous.dispose();
+    }
+    return _productDrafts.putIfAbsent(scope, () => WorkspaceProductDraftController(scope: scope,
+      gateway: source.forOwnerAccount(account), journal: SecureWorkProductDraftJournal(),
+      current: () => !_disposed && workspaceStoreAuthoringAvailable && _contactAccountScope == account &&
+        activeWorkspace?.id == store && navigationScopeRevision == epoch)..addListener(notifyListeners));
+  }
+  Future<WorkspaceProductDraftWriteState?> syncWorkspaceSavedProductDraft(String skuId,
+      {WorkspaceMasterCatalogueOrigin? origin, required bool Function() current}) async {
+    final controller = workspaceSavedProductDraft(skuId);
+    if (controller == null) return null;
+    if (!current() || !controller.active || controller.busy) return WorkspaceProductDraftWriteState.notSent;
+    if (!controller.loaded && !await controller.load()) return WorkspaceProductDraftWriteState.notSent;
+    if (!current() || !controller.active || controller.pending != null) return WorkspaceProductDraftWriteState.unknown;
+    final matches = workspaceCatalogueItems.where((item) => item.id == skuId).toList(growable: false);
+    if (matches.length != 1) return WorkspaceProductDraftWriteState.notSent;
+    final item = matches.single, membership = item.variantMembership;
+    WorkspaceVariantFamily? family;
+    if (membership != null) {
+      for (final candidate in workspaceVariantFamilies) {
+        if (candidate.id == membership.familyId) {family = candidate; break;}
+      }
+    }
+    try {
+      final input = WorkspaceProductDraftInput.fromSaved(item, family: family);
+      final selectedOrigin = origin ?? controller.record?.origin;
+      final signature = jsonEncode(input.toJson());
+      bool inputCurrent() => current() && controller.active && workspaceCatalogueItems.any((saved) =>
+        saved.id == skuId && jsonEncode(WorkspaceProductDraftInput.fromSaved(saved, family: family).toJson()) == signature);
+      if (controller.record != null && jsonEncode(controller.record!.input.toJson()) == signature &&
+        jsonEncode(controller.record!.origin?.toJson()) == jsonEncode(selectedOrigin?.toJson())) return WorkspaceProductDraftWriteState.saved;
+      return await controller.save(input, origin: selectedOrigin, idempotencyKey: _newCounterIdentity('product-draft'), inputCurrent: inputCurrent);
+    } catch (_) {return WorkspaceProductDraftWriteState.notSent;}
+  }
   final Map<WorkspaceProductSubmissionScope, WorkspaceProductSubmissionController> _productSubmissions = {};
   final Map<WorkspaceProductSubmissionScope, WorkspaceProductSubmissionController> _productSubmissionLoads = {};
   WorkspaceProductSubmissionController? workspaceProductSubmission(String skuId) {
@@ -2457,11 +2555,11 @@ class WorkSession extends ChangeNotifier {
   final Future<Directory> Function()? productPhotoSupportDirectory;
   List<WorkspaceCatalogueItem> get referenceCatalogue => List.unmodifiable(
     catalogueReference ??
-        (!_productionSession &&
-                SecureWorkReviewStoreSelectionStore.enabled &&
+        (_productionSession ? const <WorkspaceCatalogueItem>[] :
+        (SecureWorkReviewStoreSelectionStore.enabled &&
                 _selectedReviewSeed?.orderCount == 0
             ? storeEntryEvaluationCatalogue
-            : workspaceMasterCatalogue),
+            : workspaceMasterCatalogue)),
   );
   late final WorkInventoryStore _inventoryStorage =
       inventoryStore ??
@@ -15068,6 +15166,8 @@ class WorkSession extends ChangeNotifier {
     _variantFamilyPublishers.clear();
     for (final publisher in _productSubmissions.values) { publisher.dispose(); }
     _productSubmissions.clear();
+    for (final draft in _productDrafts.values) {draft.removeListener(notifyListeners); draft.dispose();}
+    _productDrafts.clear();
     for (final report in _storeStockControllers.values) { report.dispose(); }
     _storeStockControllers.clear();
     for (final visibility in _stockVisibilityControllers.values) { visibility.removeListener(notifyListeners); visibility.dispose(); }

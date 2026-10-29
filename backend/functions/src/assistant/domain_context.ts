@@ -800,6 +800,30 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
           return {entityId:null,sourceRevision:authoringRevision,fields:decodeAuthoring(args),title:'Review new product',
             summary:'Check the product details and save when ready.'};
         }}]),
+      ...(realm === null ? [] : [
+        ...(['AI-ACT-229', 'AI-ACT-369'] as const).map(actionId => {
+          const search = actionId === 'AI-ACT-229';
+          const sourceRevision = `store-master-${search ? 'search' : 'scan'}-owner:${realm}:` +
+            digest([actor.projectId, actor.uid, input.scope.storeId, authority.revision, realm, actionId]);
+          const validate = (fields: Readonly<Record<string, unknown>>) => search
+            ? Object.keys(fields).length === 1 && typeof fields.search === 'string' && fields.search.trim().length > 0 &&
+              fields.search.length <= 160 && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(fields.search) &&
+              Buffer.from(fields.search, 'utf8').toString('utf8') === fields.search
+            : Object.keys(fields).length === 0;
+          return {name: search ? 'store_search_original_master_catalogue' : 'store_scan_original_product_barcode', actionId,
+            entityId: null, sourceRevision,
+            description: 'Prepare the existing original-catalogue search or barcode reader. This preparation has not selected or imported a product. Native Review must read actual source matches, preserve ambiguity, and populate the existing editor from a verified original. Only the native final Save can store the chosen product; no Stock, publication or ordering is performed here.',
+            parameters: {type: 'object', properties: search ? {search: {type: 'string', minLength: 1, maxLength: 160}} : {},
+              required: search ? ['search'] : [], additionalProperties: false}, validate,
+            resolveTarget: (args: Readonly<Record<string, unknown>>) => {
+              if (!validate(args)) return fail('invalid_model_result');
+              return {entityId: null, sourceRevision, fields: search ? {search: args.search} : {},
+                title: search ? 'Search the master catalogue' : 'Scan product barcode',
+                summary: search ? `Search: ${args.search}. Review the original product and pack before saving.`
+                  : 'Read the physical product barcode and review its original matching product or pack.'};
+            }};
+        }),
+      ]),
       ...([['AI-ACT-225', 'store_review_original_listing_request'],
         ['AI-ACT-374', 'store_review_original_family_request']] as const).filter(() => realm !== null).map(([actionId, name]) => {
         const capture = input.nativeOriginalCaptures?.find(value => value.actionId === actionId)?.digest;

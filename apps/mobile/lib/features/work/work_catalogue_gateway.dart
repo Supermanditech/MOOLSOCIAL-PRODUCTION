@@ -12,6 +12,7 @@ import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_publication_data.dart';
 import 'work_models.dart' show WorkspaceVariantFamily, WorkspaceVariantMembership, WorkspaceCatalogueItem,
+  WorkspaceProductCompliance,
   WorkspaceSavedInventory, WorkspaceStockMode,
   WorkspaceAnalyticsRequest, WorkspaceAnalyticsSnapshot, WorkspaceAnalyticsState, WorkspaceAnalyticsCoverage,
   WorkspaceAnalyticsMetric, WorkspaceAnalyticsBasis, WorkspaceAnalyticsUnit, WorkspaceAnalyticsBreakdown,
@@ -1447,10 +1448,13 @@ class WorkspaceProductSubmissionInput {
   String get fingerprint => _encoded;
   String get authoredSha256 => _catalogueHash(Map<String, dynamic>.of(toJson())..remove('catalogueProductHint'));
   bool get mediaPending => toJson()['mediaIntent']['pendingUpload'] == true;
-  static WorkspaceProductSubmissionInput fromSaved(WorkspaceCatalogueItem item, {WorkspaceVariantFamily? family}) {
+  static WorkspaceProductSubmissionInput fromSaved(WorkspaceCatalogueItem item, {WorkspaceVariantFamily? family}) =>
+    fromJson(_savedBody(item, family: family));
+  static Map<String, dynamic> _savedBody(WorkspaceCatalogueItem item, {WorkspaceVariantFamily? family, bool privateDraft = false}) {
     if (!item.supplierTaxValid) throw const FormatException('Review the saved supplier tax and selling prices.');
     final origin = item.stockEntry, measure = item.packMeasure, membership = item.variantMembership;
-    if (origin?.valid != true || origin!.productId != item.id || measure?.valid != true) {
+    if (privateDraft && measure != null && !measure.valid) throw const FormatException('Review the saved pack quantity before syncing.');
+    if (!privateDraft && (origin?.valid != true || origin!.productId != item.id || measure?.valid != true)) {
       throw const FormatException('Save the product with its pack quantity before submitting.');
     }
     if (membership != null) {
@@ -1483,21 +1487,23 @@ class WorkspaceProductSubmissionInput {
     // This hashes selected-reference identity only. It is not verified file metadata.
     final selection = private != null ? {'privateSha256': private.sha256, 'skuId': item.id}
       : photo != null ? {'assetId': photo.assetId, 'revision': photo.revision, 'status': photo.status.name} : null;
-    return fromJson({'schemaVersion': 1, 'skuId': item.id, 'sku': item.sku, 'barcode': item.barcode,
+    return {'schemaVersion': 1, 'skuId': item.id, 'sku': item.sku, 'barcode': item.barcode,
       'catalogueProductHint': item.canonicalId.isEmpty ? null : item.canonicalId,
       'content': {'title': item.title, 'brand': item.brand, 'variant': item.variant, 'categoryId': item.categoryId,
         'description': item.content.description, 'highlights': item.content.highlights,
         'specifications': [for (final entry in item.content.specifications.entries) {'label': entry.key, 'value': entry.value}],
         if (!facts.isEmpty) 'productFacts': facts.toJson()},
-      'pack': {'label': item.pack, 'quantityMilli': measure!.quantityMilli, 'unit': measure.unitLabel == 'unit' ? 'count' : measure.unitLabel,
-        'unitsPerCase': measure.unitsPerCase}, 'channels': channels,
-      'provenance': {'entryMethod': origin.method.name, 'sourceRecordId': item.id},
+      'pack': {'label': item.pack, 'quantityMilli': measure?.valid == true ? measure!.quantityMilli : null,
+        'unit': measure?.valid == true ? (measure!.unitLabel == 'unit' ? 'count' : measure.unitLabel) : null,
+        'unitsPerCase': measure?.valid == true ? measure!.unitsPerCase : null}, 'channels': channels,
+      'provenance': origin?.valid == true && origin!.productId == item.id ? {'entryMethod': origin.method.name, 'sourceRecordId': item.id} : null,
       'mediaIntent': {'pendingUpload': pending,
         'pendingSelectionSha256': pending ? crypto.sha256.convert(utf8.encode(jsonEncode(_sorted(selection)))).toString().toUpperCase() : null,
         'publishedReferences': [if (!pending && photo != null) {'assetId': photo.assetId, 'revision': photo.revision}]},
-      'variantIntent': membership == null ? null : {'familyId': family!.id, 'localRevision': family.revision, 'selections': membership.selections}});
+      'variantIntent': membership == null ? null : {'familyId': family!.id, 'localRevision': family.revision, 'selections': membership.selections}};
   }
-  static WorkspaceProductSubmissionInput fromJson(Object? raw) {
+  static WorkspaceProductSubmissionInput fromJson(Object? raw) => _decode(raw);
+  static WorkspaceProductSubmissionInput _decode(Object? raw, {bool privateDraft = false}) {
     final p = _map(jsonDecode(jsonEncode(raw)));
     _keys(p, ['schemaVersion', 'skuId', 'sku', 'barcode', 'catalogueProductHint', 'content', 'pack', 'channels', 'provenance', 'mediaIntent', 'variantIntent']);
     if (p['schemaVersion'] is! int || p['schemaVersion'] != 1) throw const FormatException();
@@ -1513,8 +1519,14 @@ class WorkspaceProductSubmissionInput {
     }
     if (c.containsKey('productFacts')) { WorkspaceCatalogueProductFacts.fromJson(c['productFacts']); }
     final pack = _map(p['pack']); _keys(pack, ['label', 'quantityMilli', 'unit', 'unitsPerCase']);
-    _string(pack['label']); _int(pack['quantityMilli']); _int(pack['unitsPerCase']);
-    if (!{'kg', 'L', 'count'}.contains(pack['unit'])) throw const FormatException();
+    _string(pack['label']);
+    final unknownPack = privateDraft && [pack['quantityMilli'], pack['unitsPerCase'], pack['unit']].every((v) => v == null);
+    if (!unknownPack) {
+      final quantity = _int(pack['quantityMilli'], 1, privateDraft ? 999999999 : 100000000);
+      _int(pack['unitsPerCase'], 1, privateDraft ? 999999 : 100000000);
+      if (!{'kg', 'L', 'count'}.contains(pack['unit'])) throw const FormatException();
+      if (privateDraft && pack['unit'] == 'count' && quantity % 1000 != 0) throw const FormatException();
+    }
     final kinds = <String>{};
     final gstDeclarations = <String?>[];
     for (final raw in _list(p['channels'], 2)) {
@@ -1522,18 +1534,19 @@ class WorkspaceProductSubmissionInput {
         if (row.containsKey('supplierTax')) 'supplierTax']);
       final kind = _string(row['kind']);
       if (!{'retail', 'wholesale', 'bulk'}.contains(kind) || !kinds.add(kind)) throw const FormatException();
-      final price = _int(row['priceMinor']), minimum = _int(row['minimumOrder']), step = _int(row['quantityStep']);
+      final amountLimit = privateDraft ? 99999999900 : 100000000, quantityLimit = privateDraft ? 9007199254740991 : 100000000;
+      final price = _int(row['priceMinor'], 1, amountLimit), minimum = _int(row['minimumOrder'], 1, quantityLimit), step = _int(row['quantityStep'], 1, quantityLimit);
       final rawTax = row['supplierTax'];
       final gst = rawTax is Map && rawTax['version'] == 2 ? BuyV2SupplierGstRate.fromChannelJson(rawTax) : null;
       final tax = gst == null && row.containsKey('supplierTax') ? BuyV2SupplierTaxAmount.fromJson(rawTax) : null;
       gstDeclarations.add(gst == null ? null : jsonEncode(gst.toJson()));
       gst?.additionalMinorForSubtotal(price);
       if (row.containsKey('supplierTax') && tax == null && gst == null || tax?.validForPrice(price) == false) throw const FormatException();
-      if (row['mrpMinor'] != null) _int(row['mrpMinor'], price);
+      if (row['mrpMinor'] != null) _int(row['mrpMinor'], price, amountLimit);
       int? lastQuantity, lastPrice;
       for (final raw in _list(row['tiers'], 20)) {
         final tier = _map(raw); _keys(tier, ['minimumQuantity', 'unitPriceMinor']);
-        final q = _int(tier['minimumQuantity']), amount = _int(tier['unitPriceMinor']);
+        final q = _int(tier['minimumQuantity'], 1, quantityLimit), amount = _int(tier['unitPriceMinor'], 1, amountLimit);
         gst?.additionalMinorForSubtotal(amount);
         if (tax?.validForPrice(amount) == false) throw const FormatException();
         if ((q - minimum) % step != 0 || (lastQuantity == null ? q != minimum || amount != price : q <= lastQuantity || amount > lastPrice!)) {
@@ -1542,10 +1555,12 @@ class WorkspaceProductSubmissionInput {
         lastQuantity = q; lastPrice = amount;
       }
     }
-    if (kinds.isEmpty || kinds.contains('wholesale') && kinds.contains('bulk') ||
+    if (!privateDraft && kinds.isEmpty || kinds.contains('wholesale') && kinds.contains('bulk') ||
         gstDeclarations.any((g) => g != null) && gstDeclarations.toSet().length != 1) { throw const FormatException(); }
-    final origin = _map(p['provenance']); _keys(origin, ['entryMethod', 'sourceRecordId']);
-    if (!{'catalogue', 'manual', 'csv'}.contains(origin['entryMethod']) || origin['sourceRecordId'] != p['skuId']) throw const FormatException();
+    if (!privateDraft || p['provenance'] != null) {
+      final origin = _map(p['provenance']); _keys(origin, ['entryMethod', 'sourceRecordId']);
+      if (!{'catalogue', 'manual', 'csv'}.contains(origin['entryMethod']) || origin['sourceRecordId'] != p['skuId']) throw const FormatException();
+    }
     final media = _map(p['mediaIntent']); _keys(media, ['pendingUpload', 'pendingSelectionSha256', 'publishedReferences']);
     if (media['pendingUpload'] is! bool || (media['pendingUpload'] == true
       ? media['pendingSelectionSha256'] is! String || !RegExp(r'^[A-F0-9]{64}$').hasMatch(media['pendingSelectionSha256'] as String)
@@ -1566,6 +1581,357 @@ class WorkspaceProductSubmissionInput {
     if (utf8.encode(encoded).length > 384 * 1024) throw const FormatException();
     return WorkspaceProductSubmissionInput._(encoded);
   }
+}
+
+typedef WorkspaceMasterCatalogueScope = ({String account, String store, String realm});
+class WorkspaceMasterCatalogueItem {
+  WorkspaceMasterCatalogueItem._(this._encoded, this.origin);
+  final String _encoded;
+  final WorkspaceMasterCatalogueOrigin origin;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  String get title => toJson()['content']['title'] as String;
+  String get brand => toJson()['content']['brand'] as String;
+  String get packLabel => toJson()['pack']['label'] as String;
+  String get identityKey => jsonEncode([origin.toJson()['canonicalProductId'], origin.toJson()['verifiedPackId']]);
+  WorkspaceCatalogueItem prepareNewStoreDraft(WorkspaceCatalogueItem blank) {
+    if (blank.stockEntry != null || blank.stock != 0 || blank.cataloguePhoto != null || blank.privatePhoto != null) {
+      throw const FormatException('Start a new product before importing catalogue details.');
+    }
+    final value = toJson(), content = _map(value['content']), pack = _map(value['pack']);
+    final specifications = <String, String>{};
+    for (final raw in _list(content['specifications'], 40)) {
+      final row = _map(raw), label = row['label'] as String;
+      if (specifications.containsKey(label)) throw const FormatException('Review repeated specification names in the original catalogue.');
+      specifications[label] = row['value'] as String;
+    }
+    final facts = content['productFacts'] == null ? null : _map(content['productFacts']);
+    final compliance = facts == null ? null : _map(facts['compliance']);
+    final codes = _map(value['codes']);
+    var barcode = '';
+    for (final raw in [..._list(codes['pack'], 20), ..._list(codes['product'], 20)]) {
+      final code = _map(raw);
+      if ({'gtin', 'ean', 'upc'}.contains(code['type'])) {barcode = code['value'] as String; break;}
+    }
+    return blank.copyWith(canonicalId: value['canonicalProductId'] as String, categoryId: content['categoryId'] as String,
+      title: content['title'] as String, brand: content['brand'] as String, variant: content['variant'] as String,
+      pack: pack['label'] as String, barcode: barcode, purchasePriceMinor: 0, sellingPriceMinor: 0,
+      clearMrp: true, stock: 0, available: false, publicListing: false, retailEnabled: false,
+      clearWholesaleOffer: true, clearRetailTax: true, clearWholesaleTax: true, clearSupplierGst: true,
+      unitPrice: '', deliveryPromise: '', origin: '', catalogueFactsRequireReview: true,
+      content: WorkspaceProductContent(description: content['description'] as String,
+        highlights: List<String>.from(content['highlights'] as List), specifications: specifications),
+      packMeasure: WorkspacePackMeasure(quantityMilli: pack['quantityMilli'] as int, unitsPerCase: pack['unitsPerCase'] as int,
+        unit: switch (pack['unit']) {'kg' => BuyV2ComparisonUnit.kilogram, 'L' => BuyV2ComparisonUnit.litre, _ => BuyV2ComparisonUnit.count}),
+      compliance: compliance == null ? null : WorkspaceProductCompliance.fromJson({...compliance,
+        'manufacturedOrPackedOn': null, 'bestBeforeOrUseBy': null}),
+      composition: facts?['composition'] as String?, regulatoryNote: facts?['regulatoryNote'] as String?,
+      requiresPrescription: facts?['requiresPrescription'] == true);
+  }
+  factory WorkspaceMasterCatalogueItem.fromJson(Object? raw) {
+    final v = _map(raw);
+    _keys(v, ['selectionId', 'canonicalProductId', 'verifiedPackId', 'contentSha256', 'descriptorSha256',
+      'projectionFingerprint', 'content', 'pack', 'codes', 'mediaIncluded', 'sourceMediaCount']);
+    final selection = _string(v['selectionId']);
+    if (!RegExp(r'^master-[a-f0-9]{64}$').hasMatch(selection)) throw const FormatException();
+    final origin = WorkspaceMasterCatalogueOrigin.fromJson({for (final key in ['selectionId', 'canonicalProductId', 'verifiedPackId',
+      'contentSha256', 'descriptorSha256', 'projectionFingerprint']) key: v[key],
+      'snapshotId': selection.substring(7)});
+    final content = _map(v['content']);
+    _keys(content, ['title', 'brand', 'variant', 'categoryId', 'description', 'highlights', 'specifications',
+      if (content.containsKey('productFacts')) 'productFacts']);
+    _string(content['title']); _id(content['categoryId']);
+    _string(content['brand'], 240, content['categoryId'] == 'fruits-vegetables');
+    _string(content['variant'], 240, true); _string(content['description'], 4000, true);
+    for (final value in _list(content['highlights'], 20)) { _string(value, 500); }
+    for (final value in _list(content['specifications'], 40)) {
+      final row = _map(value); _keys(row, ['label', 'value']); _string(row['label']); _string(row['value'], 1000);
+    }
+    if (content.containsKey('productFacts')) { WorkspaceCatalogueProductFacts.fromJson(content['productFacts']); }
+    final pack = _map(v['pack']); _keys(pack, ['label', 'quantityMilli', 'unit', 'unitsPerCase']);
+    _string(pack['label']); _int(pack['quantityMilli']); _int(pack['unitsPerCase']);
+    if (!{'kg', 'L', 'count'}.contains(pack['unit'])) throw const FormatException();
+    final codes = _map(v['codes']); _keys(codes, ['product', 'pack']);
+    for (final key in ['product', 'pack']) {
+      final seen = <String>{};
+      final rows = _list(codes[key], 20);
+      if (rows.isEmpty) throw const FormatException();
+      for (final value in rows) {
+        final code = _map(value); _keys(code, ['type', 'value']);
+        final type = code['type'];
+        if (!{'gtin', 'ean', 'upc', 'internal', 'manufacturer'}.contains(type)) throw const FormatException();
+        final text = _string(code['value'], 64);
+        if (type == 'internal' || type == 'manufacturer') {
+          if (!RegExp(r'^[A-Z0-9][A-Z0-9._:/-]{2,63}$').hasMatch(text)) throw const FormatException();
+        } else {
+          final lengths = type == 'gtin' ? [8, 12, 13, 14] : type == 'ean' ? [8, 13] : [12];
+          if (!RegExp(r'^\d+$').hasMatch(text) || !lengths.contains(text.length)) throw const FormatException();
+          var sum = 0, weight = 3;
+          for (var index = text.length - 2; index >= 0; index--) {
+            sum += int.parse(text[index]) * weight; weight = weight == 3 ? 1 : 3;
+          }
+          if ((10 - sum % 10) % 10 != int.parse(text[text.length - 1])) throw const FormatException();
+        }
+        if (!seen.add('${code['type']}:$text')) throw const FormatException();
+      }
+    }
+    if (v['mediaIncluded'] != false || v['sourceMediaCount'] is! int) throw const FormatException();
+    _int(v['sourceMediaCount'], 0, 10);
+    if (_catalogueHash(pack) != v['descriptorSha256'] ||
+      _catalogueHash({'content': content, 'pack': pack, 'codes': codes}) != v['projectionFingerprint']) throw const FormatException();
+    return WorkspaceMasterCatalogueItem._(jsonEncode(_sorted(v)), origin);
+  }
+}
+class WorkspaceMasterCataloguePage {
+  WorkspaceMasterCataloguePage._({required this.items, required this.nextCursor, required this.snapshotId,
+    required this.missingSourceCount, required this.scannedCount, required this.verifiedPackCount});
+  final List<WorkspaceMasterCatalogueItem> items;
+  final String? nextCursor;
+  final String snapshotId;
+  final int missingSourceCount, scannedCount, verifiedPackCount;
+  factory WorkspaceMasterCataloguePage.decode(Object? raw, WorkspaceMasterCatalogueScope scope, DateTime now,
+    {required String search, required String? code, required int pageSize}) {
+    final v = _map(raw);
+    _keys(v, ['schemaVersion', 'masterCatalogueVersion', 'realm', 'storeId', 'observedAt', 'state', 'query', 'snapshotId',
+      'items', 'nextCursor', 'scannedCount', 'verifiedPackCount', 'missingSourceCount']);
+    final query = _map(v['query']); _keys(query, ['search', 'code']);
+    final at = _time(v['observedAt']);
+    if (v['schemaVersion'] is! int || v['masterCatalogueVersion'] is! int || v['schemaVersion'] != 1 || v['masterCatalogueVersion'] != 1 || v['realm'] != scope.realm || v['storeId'] != scope.store ||
+      v['state'] != 'ready' || at.isAfter(now.toUtc()) || query['search'] != search || query['code'] != code ||
+      v['snapshotId'] is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(v['snapshotId'] as String)) throw const FormatException();
+    final scanned = _int(v['scannedCount'], 0, pageSize), verified = _int(v['verifiedPackCount'], 0),
+      missing = _int(v['missingSourceCount'], 0, scanned);
+    final items = _list(v['items'], pageSize).map(WorkspaceMasterCatalogueItem.fromJson).toList(growable: false);
+    if (items.length + missing > scanned || scanned > verified || items.map((i) => i.origin.toJson()['selectionId']).toSet().length != items.length ||
+      items.map((i) => i.identityKey).toSet().length != items.length) throw const FormatException();
+    final cursor = v['nextCursor'] == null ? null : _string(v['nextCursor'], 2048);
+    if (cursor != null && scanned == 0) throw const FormatException();
+    return WorkspaceMasterCataloguePage._(items: List.unmodifiable(items), nextCursor: cursor, snapshotId: v['snapshotId'] as String,
+      missingSourceCount: missing, scannedCount: scanned, verifiedPackCount: verified);
+  }
+}
+abstract interface class WorkspaceMasterCatalogueGateway {
+  bool get masterCatalogueSupported;
+  Future<WorkspaceMasterCataloguePage> readMasterCatalogue(WorkspaceMasterCatalogueScope scope,
+    {required bool Function() current, String search = '', String? code, int pageSize = 30, String? cursor});
+}
+
+/// Private presentation Save. It does not submit, publish or change Stock.
+class WorkspaceProductDraftInput {
+  WorkspaceProductDraftInput._(this._encoded);
+  final String _encoded;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  String get skuId => toJson()['skuId'] as String;
+  factory WorkspaceProductDraftInput.fromJson(Object? raw) => WorkspaceProductDraftInput._(
+    jsonEncode(_sorted(WorkspaceProductSubmissionInput._decode(raw, privateDraft: true).toJson())));
+  factory WorkspaceProductDraftInput.fromSaved(WorkspaceCatalogueItem item, {WorkspaceVariantFamily? family}) =>
+    WorkspaceProductDraftInput.fromJson(WorkspaceProductSubmissionInput._savedBody(item, family: family, privateDraft: true));
+}
+class WorkspaceMasterCatalogueOrigin {
+  WorkspaceMasterCatalogueOrigin._(this._encoded);
+  final String _encoded;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  factory WorkspaceMasterCatalogueOrigin.fromJson(Object? raw) {
+    final v = _map(raw);
+    _keys(v, ['selectionId', 'canonicalProductId', 'verifiedPackId', 'contentSha256', 'descriptorSha256', 'projectionFingerprint', 'snapshotId']);
+    final selection = _string(v['selectionId']);
+    if (!RegExp(r'^master-[a-f0-9]{64}$').hasMatch(selection) || v['snapshotId'] != selection.substring(7)) throw const FormatException();
+    _id(v['canonicalProductId']); _id(v['verifiedPackId']);
+    for (final key in ['contentSha256', 'descriptorSha256', 'projectionFingerprint']) {
+      if (v[key] is! String || !RegExp(r'^[A-F0-9]{64}$').hasMatch(v[key] as String)) throw const FormatException();
+    }
+    return WorkspaceMasterCatalogueOrigin._(jsonEncode(_sorted(v)));
+  }
+}
+class WorkspaceProductDraftIntent {
+  WorkspaceProductDraftIntent({required this.scope, required this.expectedRevision, required this.idempotencyKey,
+    required WorkspaceProductDraftInput input, this.origin}) : input = WorkspaceProductDraftInput.fromJson(input.toJson()) {
+    for (final value in [scope.account, scope.store, scope.sku, idempotencyKey]) { _id(value); }
+    _int(expectedRevision, 0, 999999999);
+    if (!{'evaluation', 'production'}.contains(scope.realm) || scope.sku != input.skuId) throw const FormatException();
+  }
+  final WorkspaceProductSubmissionScope scope;
+  final int expectedRevision;
+  final String idempotencyKey;
+  final WorkspaceProductDraftInput input;
+  final WorkspaceMasterCatalogueOrigin? origin;
+  Map<String, Object?> get body => {'realm': scope.realm, 'storeId': scope.store, 'expectedRevision': expectedRevision,
+    'idempotencyKey': idempotencyKey, 'draft': input.toJson(), 'catalogueOrigin': origin?.toJson()};
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'accountId': scope.account, ...body};
+  String get fingerprint => _catalogueHash({'ownerUserId': scope.account, 'realm': scope.realm,
+    'storeId': scope.store, 'expectedRevision': expectedRevision, 'draft': input.toJson(), 'catalogueOrigin': origin?.toJson()});
+  factory WorkspaceProductDraftIntent.fromJson(Object? raw) {
+    final v = _map(raw); _keys(v, ['schemaVersion', 'accountId', 'realm', 'storeId', 'expectedRevision', 'idempotencyKey', 'draft', 'catalogueOrigin']);
+    if (v['schemaVersion'] is! int || v['schemaVersion'] != 1) throw const FormatException();
+    final input = WorkspaceProductDraftInput.fromJson(v['draft']);
+    return WorkspaceProductDraftIntent(scope: (account: _id(v['accountId']), realm: _string(v['realm']),
+      store: _id(v['storeId']), sku: input.skuId), expectedRevision: _int(v['expectedRevision'], 0, 999999999),
+      idempotencyKey: _id(v['idempotencyKey']), input: input,
+      origin: v['catalogueOrigin'] == null ? null : WorkspaceMasterCatalogueOrigin.fromJson(v['catalogueOrigin']));
+  }
+}
+class WorkspaceProductDraftRecord {
+  WorkspaceProductDraftRecord._(this._encoded, this.input, this.revision, this.fingerprint, this.origin, this.observedAt);
+  final String _encoded, fingerprint;
+  final int revision;
+  final WorkspaceProductDraftInput input;
+  final WorkspaceMasterCatalogueOrigin? origin;
+  final DateTime observedAt;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  factory WorkspaceProductDraftRecord.decode(Object? raw, WorkspaceProductSubmissionScope scope, DateTime now) {
+    final v = _map(raw);
+    _keys(v, ['schemaVersion', 'realm', 'storeId', 'skuId', 'revision', 'savedAt', 'savedBy', 'fingerprint', 'draft', 'catalogueOrigin']);
+    final input = WorkspaceProductDraftInput.fromJson(v['draft']), revision = _int(v['revision'], 1, 1000000000);
+    final time = _time(v['savedAt']);
+    final original = WorkspaceProductDraftIntent(scope: (account: _id(v['savedBy']), store: scope.store, realm: scope.realm, sku: scope.sku),
+      expectedRevision: revision - 1, idempotencyKey: 'validation-only', input: input,
+      origin: v['catalogueOrigin'] == null ? null : WorkspaceMasterCatalogueOrigin.fromJson(v['catalogueOrigin']));
+    if (v['schemaVersion'] is! int || v['schemaVersion'] != 1 || v['realm'] != scope.realm || v['storeId'] != scope.store || v['skuId'] != scope.sku ||
+      time.isAfter(now.toUtc()) || time.toIso8601String() != v['savedAt'] || v['fingerprint'] != original.fingerprint) throw const FormatException();
+    return WorkspaceProductDraftRecord._(jsonEncode(_sorted(v)), input, revision, original.fingerprint, original.origin, now.toUtc());
+  }
+  bool matches(WorkspaceProductDraftIntent original) => revision == original.expectedRevision + 1 &&
+    fingerprint == original.fingerprint && toJson()['savedBy'] == original.scope.account;
+}
+/// Descriptive content uses the same projection as original public readback.
+/// This object carries no public listing identity or purchasing entitlement.
+class WorkspaceProductDraftPresentation {
+  WorkspaceProductDraftPresentation._(this.record, this.product, this.content);
+  final WorkspaceProductDraftRecord record;
+  final BuyV2Product product;
+  final BuyV2ProductContentSnapshot content;
+  factory WorkspaceProductDraftPresentation.fromRecord(WorkspaceProductDraftRecord record,
+    WorkspaceProductSubmissionScope scope, {required String storeName, required BuyV2OfferClass channel}) {
+    record = WorkspaceProductDraftRecord.decode(record.toJson(), scope, record.observedAt);
+    _string(storeName, 240);
+    final input = record.input.toJson(), rawContent = _map(input['content']), pack = _map(input['pack']);
+    final channels = _list(input['channels'], 2).map(_map).where((row) => row['kind'] == channel.name).toList(growable: false);
+    if (channels.length != 1) throw const FormatException('This selling channel is not configured in the saved product.');
+    final terms = channels.single, facts = rawContent.containsKey('productFacts')
+      ? WorkspaceCatalogueProductFacts.fromJson(rawContent['productFacts']) : null;
+    final rawTax = terms['supplierTax'];
+    final gst = rawTax is Map && rawTax['version'] == 2 ? BuyV2SupplierGstRate.fromChannelJson(rawTax) : null;
+    final tax = rawTax != null && gst == null ? BuyV2SupplierTaxAmount.fromJson(rawTax) : null;
+    final id = 'private-draft-${record.fingerprint.toLowerCase()}-${channel.name}';
+    final structured = pack['quantityMilli'] != null;
+    final packTerms = !structured ? null : BuyV2PackTerms(skuId: id,
+      revision: 'private-${record.revision}-${record.fingerprint.toLowerCase()}', sellUnit: 'pack',
+      containedUnits: pack['unitsPerCase'] as int, netContentMilli: pack['quantityMilli'] as int,
+      contentUnit: pack['unit'] as String, quantityStep: terms['quantityStep'] as int,
+      supplierGst: gst, supplierTax: tax,
+      // Authored quantity prices remain visible in read-only details. No
+      // confirmation timestamp, validity window or Stock/delivery is invented.
+      priceTiers: List.unmodifiable(_list(terms['tiers'], 20).map((value) {
+        final row = _map(value);
+        return BuyV2PackPriceTier(minimumPacks: row['minimumQuantity'] as int, priceMinor: row['unitPriceMinor'] as int);
+      })));
+    final product = BuyV2Product(id: id, canonicalId: '', storeId: scope.store,
+      destination: channel == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale,
+      categoryId: rawContent['categoryId'] as String, brand: rawContent['brand'] as String,
+      title: rawContent['title'] as String, variant: rawContent['variant'] as String,
+      pack: pack['label'] as String, packTerms: packTerms, priceMinor: terms['priceMinor'] as int,
+      mrpMinor: terms['mrpMinor'] as int?, minimumOrder: terms['minimumOrder'] as int, offerClass: channel,
+      unitPrice: '', badge: '', seller: storeName, sellerType: 'Store',
+      deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: '',
+      compliance: facts?.compliance, composition: facts?.composition,
+      regulatoryNote: facts?.regulatoryNote, requiresPrescription: facts?.requiresPrescription ?? false,
+      catalogueListing: false);
+    final details = _authoredCatalogueDetails(rawContent);
+    return WorkspaceProductDraftPresentation._(record, product, BuyV2ProductContentSnapshot(productId: id,
+      state: BuyV2ProductContentState.ready,
+      sourceId: 'private-draft:${scope.realm}:${scope.store}:${scope.sku}:${record.revision}:${record.fingerprint}',
+      observedAt: record.observedAt, description: details.description,
+      highlights: details.highlights, specifications: details.specifications, media: const []));
+  }
+}
+enum WorkspaceProductDraftWriteState {notSent, rejected, unknown, saved, notFound}
+class WorkspaceProductDraftWriteResult {
+  const WorkspaceProductDraftWriteResult(this.state, [this.record]);
+  final WorkspaceProductDraftWriteState state;
+  final WorkspaceProductDraftRecord? record;
+}
+abstract interface class WorkspaceProductDraftGateway {
+  bool get productDraftSupported;
+  Future<WorkspaceProductDraftRecord?> readProductDraft(WorkspaceProductSubmissionScope scope, {required bool Function() current});
+  Future<WorkspaceProductDraftWriteResult> writeProductDraft(WorkspaceProductDraftIntent original,
+    {required bool Function() current, bool reconcile = false});
+}
+abstract interface class WorkspaceProductDraftJournal {
+  Future<WorkspaceProductDraftIntent?> readPending(WorkspaceProductSubmissionScope scope);
+  Future<void> savePending(WorkspaceProductDraftIntent original);
+  Future<void> removePending(WorkspaceProductDraftIntent original);
+}
+/// One explicit native Save per immutable pending original. Loading/Preview only
+/// reads; an unknown write never becomes an automatic retry or a new request.
+class WorkspaceProductDraftController extends ChangeNotifier {
+  WorkspaceProductDraftController({required this.scope, required this.gateway, required this.journal, required this.current});
+  final WorkspaceProductSubmissionScope scope;
+  final WorkspaceProductDraftGateway gateway;
+  final WorkspaceProductDraftJournal journal;
+  final bool Function() current;
+  bool _closed = false, busy = false, loaded = false;
+  bool get active => !_closed && current();
+  WorkspaceProductDraftIntent? pending;
+  WorkspaceProductDraftRecord? record;
+  WorkspaceProductDraftWriteState state = WorkspaceProductDraftWriteState.notSent;
+  bool get canSave => active && gateway.productDraftSupported && loaded && !busy && pending == null;
+  Future<bool> load() async {
+    if (!active || busy || !gateway.productDraftSupported) return false;
+    busy = true; loaded = false; notifyListeners();
+    try {
+      final original = await journal.readPending(scope).timeout(const Duration(seconds: 10));
+      if (!active) return false;
+      if (original != null && original.scope != scope) throw const FormatException();
+      pending = original;
+      if (original == null) {
+        final next = await gateway.readProductDraft(scope, current: () => active).timeout(const Duration(seconds: 25));
+        if (!active) return false;
+        record = next;
+      }
+      loaded = true; return true;
+    } catch (_) {return false;}
+    finally {busy = false; if (active) notifyListeners();}
+  }
+  Future<WorkspaceProductDraftWriteState> save(WorkspaceProductDraftInput input,
+      {required String idempotencyKey, WorkspaceMasterCatalogueOrigin? origin, required bool Function() inputCurrent}) async {
+    if (!canSave || !inputCurrent()) return WorkspaceProductDraftWriteState.notSent;
+    final original = WorkspaceProductDraftIntent(scope: scope, expectedRevision: record?.revision ?? 0,
+      idempotencyKey: idempotencyKey, input: input, origin: origin);
+    busy = true; notifyListeners();
+    try {
+      await journal.savePending(original).timeout(const Duration(seconds: 10));
+      pending = original;
+      if (!active || !inputCurrent()) return WorkspaceProductDraftWriteState.notSent;
+      return await _dispatch(original, reconcile: false, inputCurrent: inputCurrent);
+    } catch (_) {
+      if (pending == null) loaded = false;
+      state = WorkspaceProductDraftWriteState.unknown; return state;
+    }
+    finally {busy = false; if (active) notifyListeners();}
+  }
+  Future<WorkspaceProductDraftWriteState> recover({bool retryOriginal = false}) async {
+    final original = pending;
+    if (!active || busy || !loaded || original == null || !gateway.productDraftSupported ||
+      retryOriginal && state != WorkspaceProductDraftWriteState.notFound) return WorkspaceProductDraftWriteState.notSent;
+    busy = true; notifyListeners();
+    try {return await _dispatch(original, reconcile: !retryOriginal);}
+    catch (_) {state = WorkspaceProductDraftWriteState.unknown; return state;}
+    finally {busy = false; if (active) notifyListeners();}
+  }
+  Future<WorkspaceProductDraftWriteState> _dispatch(WorkspaceProductDraftIntent original,
+      {required bool reconcile, bool Function()? inputCurrent}) async {
+    final result = await gateway.writeProductDraft(original, current: () => active && inputCurrent?.call() != false, reconcile: reconcile)
+      .timeout(const Duration(seconds: 25));
+    if (!active) return WorkspaceProductDraftWriteState.unknown;
+    if (result.state == WorkspaceProductDraftWriteState.saved) {
+      final next = result.record;
+      if (next == null || !next.matches(original)) throw const FormatException();
+      await journal.removePending(original).timeout(const Duration(seconds: 10));
+      if (!active) return WorkspaceProductDraftWriteState.unknown;
+      pending = null; record = next;
+    }
+    state = result.state; return state;
+  }
+  @override void dispose() {_closed = true; super.dispose();}
 }
 
 class WorkspaceProductSubmissionIntent {
@@ -4840,6 +5206,8 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     unbrandedProduceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_UNBRANDED_PRODUCE_V1'),
     reviewedFamilyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_REVIEWED_FAMILIES_V1'),
     productSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_SUBMISSIONS_V1'),
+    productDraftSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_DRAFTS_V1'),
+    masterCatalogueSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_MASTER_CATALOGUE_V1'),
     productMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_PRODUCT_MEDIA_V1'),
     reviewedProductSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_REVIEW_V1'),
     reviewedProductMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_MEDIA_REVIEW_V1'),
@@ -5053,7 +5421,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway, WorkspaceCommodityPriceGateway,
       WorkspacePublicDetailsOwnerGateway, WorkspaceVariantFamilyOwnerGateway, WorkspaceProductSubmissionOwnerGateway,
       WorkspaceReviewedProductSubmissionGateway, WorkspaceProductMediaGateway, WorkspaceStoreStockOwnerGateway,
-      WorkspaceStockQuantityPublicGateway, WorkspaceStockVisibilityGateway {
+      WorkspaceStockQuantityPublicGateway, WorkspaceStockVisibilityGateway, WorkspaceProductDraftGateway, WorkspaceMasterCatalogueGateway {
   AuthenticatedWorkspaceCatalogueGateway({
     required this.endpoint,
     required this.credentials,
@@ -5066,6 +5434,8 @@ class AuthenticatedWorkspaceCatalogueGateway
     WorkspacePublicVariantSource? reviewedVariants,
     this.reviewedFamilyReadbackSupported = false,
     this.productSubmissionSupported = false,
+    this.productDraftSupported = false,
+    this.masterCatalogueSupported = false,
     this.productMediaSupported = false,
     WorkspaceProductMediaUploadTransport? productMediaTransport,
     this.reviewedProductSubmissionSupported = false,
@@ -5144,6 +5514,10 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool reviewedFamilyReadbackSupported;
   @override
   final bool productSubmissionSupported;
+  @override
+  final bool productDraftSupported;
+  @override
+  final bool masterCatalogueSupported;
   @override
   final bool productMediaSupported;
   final WorkspaceProductMediaUploadTransport? _productMediaTransportOverride;
@@ -5236,6 +5610,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       reviewedVariants: _reviewedVariantsOverride,
       reviewedFamilyReadbackSupported: reviewedFamilyReadbackSupported,
       productSubmissionSupported: productSubmissionSupported,
+      productDraftSupported: productDraftSupported,
+      masterCatalogueSupported: masterCatalogueSupported,
       productMediaSupported: productMediaSupported,
       productMediaTransport: _productMediaTransportOverride,
       reviewedProductSubmissionSupported: reviewedProductSubmissionSupported,
@@ -5337,6 +5713,73 @@ class AuthenticatedWorkspaceCatalogueGateway
     } catch (_) {
       return const BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.unavailable, procurementAccessOnly: true,
         customerMessage: 'Store purchasing approval could not be confirmed. Try again.');
+    }
+  }
+
+  @override
+  Future<WorkspaceMasterCataloguePage> readMasterCatalogue(WorkspaceMasterCatalogueScope scope,
+      {required bool Function() current, String search = '', String? code, int pageSize = 30, String? cursor}) async {
+    for (final value in [scope.account, scope.store]) { _id(value); }
+    _int(pageSize, 1, 50);
+    search = search.trim().replaceAll(RegExp(r'\s+'), ' '); _string(search, 160, true);
+    if (code != null) { code = code.trim(); _string(code, 128); }
+    if (cursor != null) { _string(cursor, 2048); }
+    bool valid() => current() && masterCatalogueSupported && scope.realm == realm && ownerAccountId == scope.account;
+    if (!valid()) throw const FormatException('The master catalogue is not connected.');
+    final response = await _ownerRequest({'operation': 'readStoreMasterCatalogue', 'masterCatalogueVersion': 1,
+      'realm': scope.realm, 'storeId': scope.store, 'query': {'search': search, 'code': code}, 'pageSize': pageSize, 'cursor': cursor}, valid, mutation: false);
+    if (!valid() || response?.statusCode != 200) throw const FormatException();
+    final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+    if (envelope['ok'] != true) throw const FormatException();
+    return WorkspaceMasterCataloguePage.decode(envelope['data'], scope, now(), search: search, code: code, pageSize: pageSize);
+  }
+
+  bool _productDraftOwner(WorkspaceProductSubmissionScope scope, bool Function() current) => current() &&
+    productDraftSupported && scope.realm == realm && ownerAccountId == scope.account;
+  WorkspaceProductDraftRecord? _productDraftResponse(Object? raw, WorkspaceProductSubmissionScope scope,
+    {WorkspaceProductDraftIntent? original, bool reconcile = false}) {
+    final v = _map(raw);
+    _keys(v, ['schemaVersion', 'productDraftVersion', 'realm', 'storeId', 'skuId', 'observedAt', 'state', 'record']);
+    final at = _time(v['observedAt']);
+    if (v['schemaVersion'] is! int || v['productDraftVersion'] is! int || v['schemaVersion'] != 1 || v['productDraftVersion'] != 1 || v['realm'] != scope.realm ||
+      v['storeId'] != scope.store || v['skuId'] != scope.sku || at.isAfter(now().toUtc())) throw const FormatException();
+    if (v['state'] == 'not_found') {
+      if (v['record'] != null || original != null && !reconcile) throw const FormatException();
+      return null;
+    }
+    if (v['state'] != 'saved') throw const FormatException();
+    final record = WorkspaceProductDraftRecord.decode(v['record'], scope, at);
+    if (original != null && !record.matches(original)) throw const FormatException();
+    return record;
+  }
+  @override
+  Future<WorkspaceProductDraftRecord?> readProductDraft(WorkspaceProductSubmissionScope scope, {required bool Function() current}) async {
+    bool valid() => _productDraftOwner(scope, current);
+    if (!valid()) throw const FormatException('Saved product sync is not connected.');
+    final response = await _ownerRequest({'operation': 'readStoreProductDraft', 'productDraftVersion': 1,
+      'realm': scope.realm, 'storeId': scope.store, 'skuId': scope.sku}, valid, mutation: false);
+    if (!valid() || response?.statusCode != 200) throw const FormatException();
+    final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+    if (envelope['ok'] != true) throw const FormatException();
+    return _productDraftResponse(envelope['data'], scope);
+  }
+  @override
+  Future<WorkspaceProductDraftWriteResult> writeProductDraft(WorkspaceProductDraftIntent original,
+      {required bool Function() current, bool reconcile = false}) async {
+    var dispatched = false;
+    try {
+      original = WorkspaceProductDraftIntent.fromJson(original.toJson());
+      bool valid() => _productDraftOwner(original.scope, current);
+      if (!valid()) return const WorkspaceProductDraftWriteResult(WorkspaceProductDraftWriteState.notSent);
+      final response = await _ownerRequest({'operation': reconcile ? 'reconcileStoreProductDraft' : 'saveStoreProductDraft',
+        'productDraftVersion': 1, ...original.body}, valid, mutation: !reconcile, onDispatch: () => dispatched = true);
+      if (!valid() || response?.statusCode != 200) throw const FormatException();
+      final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+      if (envelope['ok'] != true) throw const FormatException();
+      final record = _productDraftResponse(envelope['data'], original.scope, original: original, reconcile: reconcile);
+      return WorkspaceProductDraftWriteResult(record == null ? WorkspaceProductDraftWriteState.notFound : WorkspaceProductDraftWriteState.saved, record);
+    } catch (_) {
+      return WorkspaceProductDraftWriteResult(dispatched ? WorkspaceProductDraftWriteState.unknown : WorkspaceProductDraftWriteState.notSent);
     }
   }
 
@@ -6771,6 +7214,16 @@ void _ownerSkuInput(Map<String, dynamic> sku, String storeId) {
   _supplierTaxChannels(channels);
 }
 
+({String description, List<String> highlights, List<BuyV2ProductSpecification> specifications})
+  _authoredCatalogueDetails(Map<String, dynamic> content) => (
+    description: _string(content['description'], 4000, true),
+    highlights: List.unmodifiable(_list(content['highlights'], 20).map((value) => _string(value, 500))),
+    specifications: List.unmodifiable(_list(content['specifications'], 40).map((value) {
+      final row = _map(value); _keys(row, ['label', 'value']);
+      return BuyV2ProductSpecification(label: _string(row['label']), value: _string(row['value'], 1000));
+    })),
+  );
+
 WorkspaceCatalogueContentResult _decode(
   Map<String, dynamic> data,
   BuyV2Product product,
@@ -7065,6 +7518,7 @@ WorkspaceCatalogueContentResult _decode(
   if (policyExpiry != null && (validUntil == null || policyExpiry.isBefore(validUntil))) {
     validUntil = policyExpiry;
   }
+  final details = _authoredCatalogueDetails(content);
   final result = BuyV2ProductContentSnapshot(
     productId: product.id,
     state: BuyV2ProductContentState.ready,
@@ -7075,21 +7529,10 @@ WorkspaceCatalogueContentResult _decode(
     supplierPolicyAcceptanceRequired: policy?.required,
     supplierPolicyObservedAt: policy?.observed,
     supplierPolicyResolutionPending: policy?.pending ?? false,
-    description: _string(content['description'], 4000, true),
+    description: details.description,
     media: List.unmodifiable(media),
-    highlights: List.unmodifiable(
-      _list(content['highlights'], 20).map((h) => _string(h, 500)),
-    ),
-    specifications: List.unmodifiable(
-      _list(content['specifications'], 40).map((s) {
-        final item = _map(s);
-        _keys(item, ['label', 'value']);
-        return BuyV2ProductSpecification(
-          label: _string(item['label']),
-          value: _string(item['value'], 1000),
-        );
-      }),
-    ),
+    highlights: details.highlights,
+    specifications: details.specifications,
   );
   // Immutable SKU payload, excluding legitimately rotating governed term windows.
   final core = Map<String, dynamic>.of(row)..remove('supplierPolicy')..['channels'] = coreChannels;

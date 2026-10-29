@@ -1,9 +1,115 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/work/screens/store_add_product_sheet.dart';
 import 'package:moolsocial/features/work/work_models.dart';
+import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
 
 void main() {
+  final exportPath = Platform.environment['AGG02_ORIGINAL_RESPONSES'];
+  WorkspaceMasterCataloguePage originalPage({String search = '', String? code, bool next = false}) {
+    final capture = jsonDecode(File(exportPath!).readAsStringSync()) as Map<String, dynamic>;
+    final raw = Map<String, dynamic>.from(capture['page'] as Map);
+    raw['query'] = {'search': search, 'code': code};
+    if (!next) raw['nextCursor'] = null;
+    return WorkspaceMasterCataloguePage.decode(raw, (account: 'owner-two', store: 'store-two', realm: 'evaluation'),
+      DateTime.utc(2026, 10, 16, 12), search: search, code: code, pageSize: 30);
+  }
+  testWidgets('AGG02 original master picker searches and selects descriptive source without saving', (tester) async {
+    final calls = <(String, String?, String?)>[];
+    WorkspaceMasterCatalogueItem? selected;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreAddProductSheet(embedded: true,
+      catalogue: const [], ownedProducts: const [], createProduct: (_) => throw StateError('No native Save on source selection'),
+      scanBarcode: () async => 'PACK-001', isStoreCurrent: () => true,
+      masterLookup: (search, code, cursor) async {calls.add((search, code, cursor)); return originalPage(search: search, code: code);},
+      onMasterSelected: (source) => selected = source))));
+    await tester.pumpAndSettle();
+    expect(find.text('Host fixture oil'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('work-master-search')), 'oil');
+    await tester.pump(const Duration(milliseconds: 350)); await tester.pumpAndSettle();
+    expect(calls.last, ('oil', null, null));
+    await tester.tap(find.text('Host fixture oil')); await tester.pump();
+    expect(selected!.title, 'Host fixture oil');
+    expect(selected!.toJson().containsKey('channels'), isFalse);
+    await tester.tap(find.byTooltip('Scan product barcode')); await tester.pumpAndSettle();
+    expect(calls.last, ('', 'PACK-001', null));
+    expect(tester.takeException(), isNull);
+  }, skip: exportPath == null);
+  testWidgets('AGG02 original master picker ignores a late search and keeps narrow enlarged text readable', (tester) async {
+    tester.view.physicalSize = const Size(320, 640); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final held = Completer<WorkspaceMasterCataloguePage>();
+    await tester.pumpWidget(MaterialApp(home: MediaQuery(data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+      child: Scaffold(body: StoreAddProductSheet(embedded: true, catalogue: const [], ownedProducts: const [],
+        createProduct: (_) => throw StateError('No Save'), scanBarcode: () async => null,
+        masterLookup: (search, code, cursor) => search.isEmpty ? held.future : Future.value(originalPage(search: search)),
+        onMasterSelected: (_) {})))));
+    await tester.pump();
+    await tester.enterText(find.byKey(const Key('work-master-search')), 'new search');
+    await tester.pump(const Duration(milliseconds: 350)); await tester.pumpAndSettle();
+    expect(find.text('Host fixture oil'), findsOneWidget);
+    held.completeError(StateError('Old request failed after new results'));
+    await tester.pumpAndSettle();
+    expect(find.text('Host fixture oil'), findsOneWidget);
+    expect(find.text('Catalogue details could not be loaded. Try again.'), findsNothing);
+    expect(tester.takeException(), isNull);
+  }, skip: exportPath == null);
+  testWidgets('AGG02 original master error offers retry instead of bundled products', (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreAddProductSheet(embedded: true,
+      catalogue: [workspaceMasterCatalogue.first], ownedProducts: const [], createProduct: (_) => throw StateError('No Save'),
+      scanBarcode: () async => null, masterLookup: (search, code, cursor) async {
+        calls++; if (calls == 1) throw StateError('Isolated source unavailable'); return originalPage();
+      }, onMasterSelected: (_) {}))));
+    await tester.pumpAndSettle();
+    expect(find.text('Catalogue details could not be loaded. Try again.'), findsOneWidget);
+    expect(find.text(workspaceMasterCatalogue.first.title), findsNothing);
+    await tester.tap(find.text('Retry')); await tester.pumpAndSettle();
+    expect(calls, 2); expect(find.text('Host fixture oil'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  }, skip: exportPath == null);
+  WorkspaceMasterCataloguePage capturedPage(String key) {
+    final capture = jsonDecode(File(exportPath!).readAsStringSync()) as Map<String, dynamic>;
+    final raw = Map<String, dynamic>.from(capture[key] as Map);
+    final query = Map<String, dynamic>.from(raw['query'] as Map);
+    return WorkspaceMasterCataloguePage.decode(raw, (account: 'owner-two', store: 'store-two', realm: 'evaluation'),
+      DateTime.utc(2026, 10, 16, 12), search: query['search'] as String, code: query['code'] as String?, pageSize: 30);
+  }
+  testWidgets('AGG02 exact complete barcode match opens review once without saving', (tester) async {
+    var reviews = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreAddProductSheet(embedded: true,
+      catalogue: const [], ownedProducts: const [], createProduct: (_) => throw StateError('Review cannot Save'),
+      scanBarcode: () async => null, initialMasterCode: 'PACK-002', autoReviewSingleMasterMatch: true,
+      masterLookup: (_, __, ___) async => capturedPage('codePage'), onMasterSelected: (_) => reviews++))));
+    await tester.pumpAndSettle(); expect(reviews, 1);
+    await tester.pump(const Duration(seconds: 1)); expect(reviews, 1);
+    expect(tester.takeException(), isNull);
+  }, skip: exportPath == null);
+  testWidgets('AGG02 paged ambiguous search requires explicit selection after the complete scan', (tester) async {
+    var reviews = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreAddProductSheet(embedded: true,
+      catalogue: const [], ownedProducts: const [], createProduct: (_) => throw StateError('Review cannot Save'),
+      scanBarcode: () async => null, initialMasterSearch: 'Host fixture oil', autoReviewSingleMasterMatch: true,
+      masterLookup: (_, __, cursor) async => capturedPage(cursor == null ? 'searchPage' : 'searchNext'),
+      onMasterSelected: (_) => reviews++))));
+    await tester.pumpAndSettle(); expect(reviews, 0);
+    await tester.tap(find.text('Load more')); await tester.pumpAndSettle();
+    expect(reviews, 0); expect(find.widgetWithText(ListTile, 'Host fixture oil'), findsNWidgets(2));
+    await tester.tap(find.text('Host fixture oil').last); await tester.pumpAndSettle();
+    expect(reviews, 1); expect(tester.takeException(), isNull);
+  }, skip: exportPath == null);
+  testWidgets('AGG02 missing original evidence never becomes an automatic match or empty success', (tester) async {
+    var reviews = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreAddProductSheet(embedded: true,
+      catalogue: const [], ownedProducts: const [], createProduct: (_) => throw StateError('No Save'),
+      scanBarcode: () async => null, initialMasterCode: 'PACK-002', autoReviewSingleMasterMatch: true,
+      masterLookup: (_, __, ___) async => capturedPage('unavailableCode'), onMasterSelected: (_) => reviews++))));
+    await tester.pumpAndSettle(); expect(reviews, 0);
+    expect(find.text('Refresh catalogue'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  }, skip: exportPath == null);
   final master = workspaceMasterCatalogue.first;
   Future<void> open(
     WidgetTester tester, {

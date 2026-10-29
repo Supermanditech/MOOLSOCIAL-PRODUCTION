@@ -22,6 +22,9 @@ import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingB
   FirestoreWorkspaceCatalogueRepository, type StoreSkuRecord, type WorkspaceCatalogueRepository, type PublicCatalogueSource,
   planStorePublicDetailsSave, normalizeStorePublicDetails, type StorePublicDetailsCommand,
   normalizeSubmittedProduct, storeProductSubmission, storeProductSubmissionOperation, planStoreProductSubmission,
+  normalizeSavedProductDraft, storeProductDraft, productDraftOperation, planStoreProductDraft,
+  resolveStoreMasterCatalogueItem, storeMasterCatalogueOrigin,
+  type StoreProductDraftRecord, type StoreProductDraftReceipt, type StoreProductDraftCommand,
   submittedCatalogueInput, type CatalogueSubmissionReference,
   type StoreProductSubmissionInput, type StoreProductSubmissionRecord,
   type StorePublicDetailsRecord, type StorePublicDetailsReceipt,
@@ -1099,8 +1102,8 @@ test('LF-BULK HTTP dispatch keeps reads and recovery authenticated, namespace fe
     'readBulkSupplierQuote', 'listBuyerBulkSupplierQuotes', 'listStoreBulkSupplierQuotes', 'reconcileBulkSupplierQuote']) {
     const action = bulkSupplierQuoteOperation(operation); assert.ok(action);
     const writes: boolean = new Function('operation', 'variantFamilyOperation', 'productSubmissionOperation', 'stockOperation', 'stockVisibilityOperation',
-      'catalogueProductionAction', 'bulkQuoteAction',
-      `const commodityPriceMutation = ${commodityMutation}; return ${mutation}`)(operation, undefined, undefined, undefined, undefined, undefined, action);
+      'catalogueProductionAction', 'bulkQuoteAction', 'productDraftOperation',
+      `const commodityPriceMutation = ${commodityMutation}; const privateProductDraftOperation = productDraftOperation(operation); return ${mutation}`)(operation, undefined, undefined, undefined, undefined, undefined, action, productDraftOperation);
     assert.equal(writes, ['request', 'offer', 'accept', 'withdraw'].includes(action));
     const verify = new Function('getAuth', 'requireDefaultPurchaseTenant', 'operation', ...flags, `return async(token) => {${callback}}`)(
       () => ({verifyIdToken: async (token: object) => token}), requireDefaultPurchaseTenant, operation,
@@ -2196,6 +2199,107 @@ function submittedProduct(skuId = 'sku-one'): StoreProductSubmissionInput {
     provenance: {entryMethod: 'manual', sourceRecordId: skuId},
     mediaIntent: {pendingUpload: false, pendingSelectionSha256: null, publishedReferences: []}, variantIntent: null};
 }
+function privateDraftCommand(overrides: Record<string, unknown> = {}, owner = 'owner-one', time = at) {
+  return storeProductDraft(owner, 'evaluation', {storeId: 'store-one', expectedRevision: 0,
+    idempotencyKey: 'HOST-private-draft-one', draft: submittedProduct(), catalogueOrigin: null, ...overrides}, time);
+}
+test('AGG02 private Save preserves complete authored fields without becoming Submit', () => {
+  const input = submittedProduct(); input.content.title = 'HOST दाल · ચોખા'; input.barcode = 'HOST-code';
+  const draft = normalizeSavedProductDraft(input), command = privateDraftCommand({draft});
+  assert.deepEqual(draft, normalizeSubmittedProduct(input));
+  const record = planStoreProductDraft(command, profile);
+  assert.equal(record.skuId, input.skuId); assert.equal(record.revision, 1);
+  assert.deepEqual(record.draft, draft); assert.equal(record.catalogueOrigin, null);
+  assert.equal(Object.hasOwn(record, 'submittedAt'), false); assert.equal(Object.hasOwn(record, 'approved'), false);
+  assert.equal(productDraftOperation('saveStoreProductDraft'), 'save');
+  assert.equal(productDraftOperation('readStoreProductDraft'), 'read');
+  assert.equal(productDraftOperation('reconcileStoreProductDraft'), 'reconcile');
+  assert.equal(productDraftOperation('submitStoreProduct'), undefined);
+});
+test('AGG02 text-only pack and no selling channels remain private Save while Submit stays strict', () => {
+  const input = {...submittedProduct(), pack: {label: 'HOST hand-packed bag', quantityMilli: null, unit: null, unitsPerCase: null},
+    channels: [], provenance: null};
+  const draft = normalizeSavedProductDraft(input), record = planStoreProductDraft(privateDraftCommand({draft}), profile);
+  assert.deepEqual(record.draft.pack, input.pack); assert.deepEqual(record.draft.channels, []);
+  assert.equal(record.draft.provenance, null); assert.throws(() => normalizeSubmittedProduct(input));
+  for (const pack of [{...input.pack, unit: 'kg'}, {...input.pack, quantityMilli: 0}, {...input.pack, unitsPerCase: 1}]) {
+    assert.throws(() => normalizeSavedProductDraft({...input, pack}));
+  }
+  assert.throws(() => normalizeSavedProductDraft({...input, stock: 100}));
+  assert.throws(() => normalizeSavedProductDraft({...input, purchasePriceMinor: 100}));
+  assert.throws(() => normalizeSavedProductDraft({...input, approved: true}));
+});
+test('AGG02 private presentation preserves existing native amount and pack bounds without widening Submit', () => {
+  const source = submittedProduct();
+  source.channels[0]!.priceMinor = 900000000; source.channels[0]!.mrpMinor = 1000000000;
+  source.pack.quantityMilli = 999999999; source.pack.unitsPerCase = 999999;
+  assert.deepEqual(normalizeSavedProductDraft(source), source);
+  assert.throws(() => normalizeSubmittedProduct(source));
+  const overflow = structuredClone(source); overflow.channels[0]!.priceMinor = 99999999901;
+  assert.throws(() => normalizeSavedProductDraft(overflow));
+  const fractionalCount = structuredClone(source); fractionalCount.pack.unit = 'count'; fractionalCount.pack.quantityMilli = 1500;
+  assert.throws(() => normalizeSavedProductDraft(fractionalCount));
+});
+test('AGG02 private Save replay retains original time/revision after a newer Save', () => {
+  const command = privateDraftCommand(), original = planStoreProductDraft(command, profile);
+  const nextDraft = structuredClone(command.draft); nextDraft.content.description = 'HOST later edit';
+  const next = planStoreProductDraft(privateDraftCommand({draft: nextDraft, expectedRevision: 1,
+    idempotencyKey: 'HOST-private-draft-two'}, 'owner-one', '2026-10-16T12:01:00.000Z'), profile, original);
+  const replay = privateDraftCommand({}, 'owner-one', '2026-10-16T12:02:00.000Z');
+  assert.deepEqual(planStoreProductDraft(replay, profile, next, {fingerprint: command.fingerprint, record: original}), original);
+  assert.equal(original.savedAt, at); assert.equal(next.revision, 2);
+  assert.throws(() => planStoreProductDraft(command, profile, next));
+  const changed = privateDraftCommand({draft: nextDraft});
+  assert.throws(() => planStoreProductDraft(changed, profile, next, {fingerprint: command.fingerprint, record: original}));
+  assert.throws(() => planStoreProductDraft(command, {...profile, ownerUserId: 'other'}));
+  assert.throws(() => planStoreProductDraft(command, {...profile, status: 'suspended'}));
+  assert.throws(() => planStoreProductDraft(command, profile, undefined, {fingerprint: command.fingerprint,
+    record: {...original, storeId: 'foreign-store'}}));
+});
+test('AGG02 a client catalogue origin is provenance only and cannot admit itself', () => {
+  const hash = 'A'.repeat(64), key = 'a'.repeat(64);
+  const catalogueOrigin = {selectionId: 'master-' + key, canonicalProductId: 'HOST-product', verifiedPackId: 'HOST-pack',
+    contentSha256: hash, descriptorSha256: hash, projectionFingerprint: hash, snapshotId: key};
+  assert.throws(() => planStoreProductDraft(privateDraftCommand({catalogueOrigin}), profile));
+  assert.throws(() => privateDraftCommand({catalogueOrigin: {...catalogueOrigin, verified: true}}));
+  assert.throws(() => privateDraftCommand({catalogueOrigin: {...catalogueOrigin, snapshotId: 'b'.repeat(64)}}));
+});
+test('AGG02 draft handler never dispatches a write for Preview reads or reconciliation', async () => {
+  const saved = planStoreProductDraft(privateDraftCommand(), profile), calls: string[] = [];
+  const repository = Object.assign(new Memory(), {
+    async readProductDraft(store: string, sku: string, owner: string) {
+      assert.equal(store, 'store-one'); assert.equal(sku, saved.skuId); assert.equal(owner, 'owner-one');
+      calls.push('read'); return saved;
+    },
+    async listProductDrafts(store: string, owner: string, limit: number, after?: string) {
+      assert.equal(store, 'store-one'); assert.equal(owner, 'owner-one'); assert.equal(limit, 30); assert.equal(after, undefined);
+      calls.push('list'); return [saved];
+    },
+    async saveProductDraft(_command: StoreProductDraftCommand) {calls.push('save'); return saved;},
+    async reconcileProductDraft(_command: StoreProductDraftCommand) {calls.push('reconcile'); return saved;},
+  });
+  const service = subject(repository);
+  const read = await service.handleProductDraft('owner-one', 'readStoreProductDraft', {
+    productDraftVersion: 1, realm: 'evaluation', storeId: 'store-one', skuId: saved.skuId}) as {state: string; record: StoreProductDraftRecord};
+  assert.equal(read.state, 'saved'); assert.deepEqual(read.record, saved);
+  await service.handleProductDraft('owner-one', 'listStoreProductDrafts', {productDraftVersion: 1, realm: 'evaluation', storeId: 'store-one'});
+  const command = privateDraftCommand();
+  await service.handleProductDraft('owner-one', 'reconcileStoreProductDraft', {productDraftVersion: 1, realm: 'evaluation', storeId: command.storeId,
+    expectedRevision: command.expectedRevision, idempotencyKey: command.idempotencyKey, draft: command.draft, catalogueOrigin: null});
+  assert.deepEqual(calls, ['read', 'list', 'reconcile']);
+  await assert.rejects(service.handleProductDraft('owner-one', 'readStoreProductDraft', {
+    productDraftVersion: 1, realm: 'evaluation', storeId: 'store-one', skuId: saved.skuId, retry: true}));
+  await assert.rejects(service.handleProductDraft('owner-one', 'readStoreProductDraft', {
+    productDraftVersion: 2, storeId: 'store-one', skuId: saved.skuId}));
+  for (const realm of [undefined, 'production', 'unexpected']) {
+    await assert.rejects(service.handleProductDraft('owner-one', 'saveStoreProductDraft', {
+      productDraftVersion: 1, realm, storeId: command.storeId, expectedRevision: command.expectedRevision,
+      idempotencyKey: command.idempotencyKey, draft: command.draft, catalogueOrigin: null}));
+    await assert.rejects(service.readMasterCatalogue('owner-one', {
+      masterCatalogueVersion: 1, realm, storeId: 'store-one', query: {search: '', code: null}, pageSize: 30, cursor: null}));
+  }
+  assert.deepEqual(calls, ['read', 'list', 'reconcile'], 'Realm validation must precede repository access.');
+});
 for (const basis of ['included', 'additional']) for (const amountMinor of [0, 7]) {
   test(`LF-TAX channel tax survives submission and reviewed selling terms ${basis}/${amountMinor}`, () => {
     const tax = {version: 1, amountMinor, basis};
@@ -2700,6 +2804,188 @@ function produceAll(value = input(), canonicalBrandId: string | null = "brand-ho
   }
   return {aggregate: aggregate!, participant, receipts};
 }
+
+function agg02MasterOriginals() {
+  const submission = planStoreProductSubmission(productCommand(), profile);
+  const pin: CatalogueSubmissionReference = {realm: submission.realm, storeId: submission.storeId,
+    skuId: submission.skuId, revision: submission.revision, fingerprint: submission.fingerprint};
+  let aggregate: CatalogueAggregate | undefined;
+  const originals = new Map<string, {receipt: CatalogueProductionReceipt; revision: CatalogueAggregate; submission: StoreProductSubmissionRecord}>();
+  const participant = producerParticipant();
+  for (const command of productionCommands().slice(0, 5)) {
+    const sourced = ['propose_product', 'propose_pack'].includes(String(command.type));
+    let prepared = {...command};
+    if (sourced) {
+      delete prepared.contentSha256; delete prepared.descriptorSha256;
+      if (prepared.type === 'propose_product') delete prepared.categoryId;
+      prepared = submittedCatalogueInput(submission, prepared);
+    }
+    const authority = producerAuthority(sourced);
+    const result = planCatalogueProduction({operatorUserId: authority.userId, identity: catalogueIdentity,
+      input: prepared, observedAt: at, ...(sourced ? {submission: pin} : {})}, authority, aggregate, participant, profile);
+    aggregate = result.aggregate;
+    if (sourced) originals.set(String(command.type), {receipt: {fingerprint: result.fingerprint,
+      result: structuredClone(aggregate), input: prepared, submission: pin}, revision: structuredClone(aggregate), submission});
+  }
+  return {aggregate: aggregate!, product: originals.get('propose_product')!, pack: originals.get('propose_pack')!};
+}
+test('AGG02 master selection reconstructs reviewed facts from both immutable originals without supplier prices', () => {
+  const source = agg02MasterOriginals();
+  const item = resolveStoreMasterCatalogueItem('evaluation', catalogueIdentity, source.aggregate, 'pack-one', source.product, source.pack);
+  assert.ok(item);
+  assert.equal(item.content.title, source.product.submission.product.content.title);
+  assert.deepEqual(item.pack, source.pack.submission.product.pack);
+  assert.equal(item.mediaIncluded, false); assert.equal(item.sourceMediaCount, 0);
+  assert.equal(Object.hasOwn(item.content, 'media'), false);
+  assert.equal(Object.hasOwn(item, 'channels'), false);
+  const origin = storeMasterCatalogueOrigin(item);
+  const command = privateDraftCommand({catalogueOrigin: origin});
+  assert.throws(() => planStoreProductDraft(command, profile), {code: 'conflict'});
+  assert.deepEqual(planStoreProductDraft(command, profile, undefined, undefined, origin).catalogueOrigin, origin);
+});
+test('AGG02 master selection rejects absent, changed, foreign and forged source receipts', () => {
+  const source = agg02MasterOriginals();
+  const read = (product = source.product, pack = source.pack, realm: 'evaluation' | 'production' = 'evaluation') =>
+    resolveStoreMasterCatalogueItem(realm, catalogueIdentity, source.aggregate, 'pack-one', product, pack);
+  assert.equal(resolveStoreMasterCatalogueItem('evaluation', catalogueIdentity, source.aggregate, 'pack-one'), null);
+  assert.equal(read(source.product, source.pack, 'production'), null);
+  for (const mutate of [
+    (value: typeof source.product) => {value.submission.product.content.title = 'Tampered original';},
+    (value: typeof source.product) => {value.receipt.submission!.fingerprint = 'A'.repeat(64);},
+    (value: typeof source.product) => {value.receipt.input = {...value.receipt.input, codes: []};},
+    (value: typeof source.product) => {value.revision = {...value.revision, version: value.revision.version + 1};},
+  ]) {
+    const broken = structuredClone(source.product); mutate(broken); assert.equal(read(broken), null);
+  }
+  const legacy = structuredClone(source.product); delete legacy.receipt.input;
+  assert.ok(read(legacy));
+});
+test('AGG02 emulator original catalogue paging, owned import and durable private Save recovery', {
+  skip: process.env.FIRESTORE_EMULATOR_HOST === undefined,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-agg02-${randomUUID().slice(0, 8)}`}, `agg02-${randomUUID()}`);
+  const db = getFirestore(app), root = db.collection('workspaceCatalogues').doc('evaluation');
+  const repository = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
+  const service = () => new WorkspaceCatalogueService(repository(), catalogueIdentity, () => new Date(at));
+  const recipient = {...profile, caseId: 'case-two', workspaceId: 'store-two', ownerUserId: 'owner-two'};
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await db.collection('workspaceProfiles').doc(recipient.caseId).set(recipient);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    const saved = await repository().submitProduct(productCommand());
+    const pin: CatalogueSubmissionReference = {realm: 'evaluation', storeId: saved.storeId, skuId: saved.skuId,
+      revision: saved.revision, fingerprint: saved.fingerprint};
+    const commands = productionCommands().slice(0, 5);
+    for (const command of commands) {
+      if (command.type === 'propose_product' || command.type === 'propose_pack') {
+        const authored = {...command}; delete authored.contentSha256; delete authored.descriptorSha256;
+        if (authored.type === 'propose_product') delete authored.categoryId;
+        await repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, pin, authored);
+      } else await repository().produceCatalogue('reviewer-one', catalogueIdentity, command);
+    }
+    await repository().proposeSubmittedCatalogue('owner-one', catalogueIdentity, pin,
+      {type: 'propose_pack', commandId: 'agg02-second-pack', expectedVersion: 5,
+        productId: 'canonical-one', packId: 'pack-two', codes: [{type: 'internal', value: 'PACK-002'}]});
+    await repository().produceCatalogue('reviewer-one', catalogueIdentity,
+      {type: 'review_pack', commandId: 'agg02-second-review', expectedVersion: 6, packId: 'pack-two',
+        decision: 'verify', reasonCode: 'host-only', expectedDescriptorSha256: cataloguePayloadHash(saved.product.pack)});
+    const request = {masterCatalogueVersion: 1, realm: 'evaluation', storeId: 'store-two', query: {search: '', code: null}, pageSize: 1, cursor: null};
+    const page = await service().readMasterCatalogue('owner-two', request);
+    assert.equal(page.items.length, 1); assert.equal(page.missingSourceCount, 0); assert.ok(page.nextCursor);
+    assert.equal(page.verifiedPackCount, 2);
+    const next = await service().readMasterCatalogue('owner-two', {...request, cursor: page.nextCursor});
+    assert.equal(next.items.length, 1); assert.equal(next.nextCursor, null);
+    assert.notEqual(next.items[0]!.verifiedPackId, page.items[0]!.verifiedPackId);
+    await assert.rejects(service().readMasterCatalogue('owner-one', request), {code: 'not_found'});
+    await assert.rejects(service().readMasterCatalogue('owner-two', {...request, cursor: page.nextCursor,
+      query: {search: 'oil', code: null}}), {code: 'conflict'});
+    const exactCode = await service().readMasterCatalogue('owner-two', {...request, query: {search: '', code: 'PACK-002'}});
+    assert.equal(exactCode.items[0]!.verifiedPackId, 'pack-two');
+    const searchRequest = {...request, query: {search: 'Host fixture oil', code: null}};
+    const searchPage = await service().readMasterCatalogue('owner-two', searchRequest);
+    assert.ok(searchPage.nextCursor);
+    const searchNext = await service().readMasterCatalogue('owner-two', {...searchRequest, cursor: searchPage.nextCursor});
+    assert.equal(searchNext.nextCursor, null); assert.equal(searchNext.items.length, 1);
+    const unknownCode = await service().readMasterCatalogue('owner-two', {...request, query: {search: '', code: 'pack-imagined'}});
+    assert.deepEqual(unknownCode.items, []); assert.equal(unknownCode.scannedCount, 0);
+    const origin = storeMasterCatalogueOrigin(page.items[0]!);
+    const draft = {...submittedProduct('local-sku'), channels: [], catalogueProductHint: origin.canonicalProductId};
+    const body = {productDraftVersion: 1, realm: 'evaluation', storeId: 'store-two', expectedRevision: 0,
+      idempotencyKey: 'agg02-import-save', draft, catalogueOrigin: origin};
+    const first = await service().handleProductDraft('owner-two', 'saveStoreProductDraft', body) as {record: StoreProductDraftRecord};
+    assert.equal(first.record.revision, 1); assert.deepEqual(first.record.catalogueOrigin, origin);
+    const presentations: object[] = [];
+    for (const type of ['wholesale', 'bulk', 'unknown-pack', 'high-price'] as const) {
+      const skuId = `host-preview-${type}`, product = submittedProduct(skuId);
+      product.sku = skuId.toUpperCase();
+      if (type === 'unknown-pack') {
+        product.content.title = 'HOST दाल · ચોખા';
+        product.content.description = 'HOST original description\nकीमत ₹१२३ · ગુજરાતી';
+        product.content.highlights = ['HOST bilingual original'];
+        product.content.specifications = [{label: 'HOST आकार', value: 'મૂળ વિગત'}];
+        product.content.productFacts = {schemaVersion: 1, compliance: {genericName: 'HOST original product',
+          netQuantity: null, manufacturerName: 'HOST manufacturer', manufacturerAddress: 'HOST address',
+          packerName: null, packerAddress: null, importerName: null, importerAddress: null, countryOfOrigin: 'HOST origin',
+          manufacturedOrPackedOn: null, bestBeforeOrUseBy: null, fssaiLicenseNumber: null, consumerCare: null},
+          composition: 'HOST composition', regulatoryNote: 'HOST original note', requiresPrescription: false};
+      }
+      const draft = {...product, channels: type === 'unknown-pack' || type === 'high-price'
+        ? [{kind: 'retail', priceMinor: type === 'high-price' ? 900000000 : 33000,
+          mrpMinor: type === 'high-price' ? 1000000000 : 40000, minimumOrder: 1, quantityStep: 1, tiers: []}]
+        : [{kind: 'retail', priceMinor: 33000, mrpMinor: 40000, minimumOrder: 1, quantityStep: 1, tiers: []},
+          {kind: type, priceMinor: 30000, mrpMinor: 40000, minimumOrder: 10, quantityStep: 5,
+            tiers: [{minimumQuantity: 10, unitPriceMinor: 30000}, {minimumQuantity: 25, unitPriceMinor: 28000}]}],
+        ...(type === 'unknown-pack' ? {pack: {label: 'Host unmeasured carton', quantityMilli: null, unit: null, unitsPerCase: null}} : {})};
+      const previewBody = {productDraftVersion: 1, realm: 'evaluation', storeId: 'store-two', expectedRevision: 0,
+        idempotencyKey: `host-preview-save-${type}`, draft, catalogueOrigin: null};
+      await service().handleProductDraft('owner-two', 'saveStoreProductDraft', previewBody);
+      const response = await service().handleProductDraft('owner-two', 'readStoreProductDraft',
+        {productDraftVersion: 1, realm: 'evaluation', storeId: 'store-two', skuId}) as {record: StoreProductDraftRecord};
+      assert.equal(response.record.draft.channels[0]!.priceMinor, type === 'high-price' ? 900000000 : 33000);
+      presentations.push({type, body: previewBody, response});
+    }
+    assert.equal((await root.collection('stores').doc('store-two').collection('productSubmissions').get()).size, 0);
+    assert.equal((await root.collection('stores').doc('store-two').collection('skus').get()).size, 0);
+    const newer = {...body, expectedRevision: 1, idempotencyKey: 'agg02-later-save',
+      draft: {...draft, content: {...draft.content, description: 'Later private edit'}}};
+    await service().handleProductDraft('owner-two', 'saveStoreProductDraft', newer);
+    const recovered = await service().handleProductDraft('owner-two', 'reconcileStoreProductDraft', body) as {record: StoreProductDraftRecord};
+    assert.deepEqual(recovered.record, first.record);
+    const read = await service().handleProductDraft('owner-two', 'readStoreProductDraft',
+      {productDraftVersion: 1, realm: 'evaluation', storeId: 'store-two', skuId: 'local-sku'}) as {record: StoreProductDraftRecord};
+    assert.equal(read.record.revision, 2);
+    await assert.rejects(service().handleProductDraft('owner-two', 'saveStoreProductDraft', {...body, idempotencyKey: 'agg02-stale'}), {code: 'conflict'});
+    const producerReceipt = root.collection('canonicalCatalogues').doc(catalogueIdentity.catalogueId)
+      .collection('producerReceipts').doc(cataloguePayloadHash(['owner-one', 'producer-product']));
+    await producerReceipt.update({'input.codes': []});
+    const unavailable = await service().readMasterCatalogue('owner-two', request);
+    assert.deepEqual(unavailable.items, []); assert.equal(unavailable.missingSourceCount, 1);
+    const historical = await service().handleProductDraft('owner-two', 'reconcileStoreProductDraft', body) as {record: StoreProductDraftRecord};
+    assert.deepEqual(historical.record, first.record);
+    const privateEdit = await service().handleProductDraft('owner-two', 'saveStoreProductDraft',
+      {...newer, expectedRevision: 2, idempotencyKey: 'agg02-retain-historical-origin'}) as {record: StoreProductDraftRecord};
+    assert.equal(privateEdit.record.revision, 3);
+    assert.deepEqual(privateEdit.record.catalogueOrigin, origin);
+    assert.equal((await root.collection('stores').doc('store-two').collection('skus').get()).size, 0);
+    await assert.rejects(service().handleProductDraft('owner-two', 'saveStoreProductDraft',
+      {...body, expectedRevision: 3, idempotencyKey: 'agg02-forged-source',
+        catalogueOrigin: {...origin, projectionFingerprint: 'A'.repeat(64)}}), {code: 'conflict'});
+    const foreignSku = {...draft, skuId: 'another-private-sku', provenance: {entryMethod: 'manual', sourceRecordId: 'another-private-sku'}};
+    await assert.rejects(service().handleProductDraft('owner-two', 'saveStoreProductDraft',
+      {...body, draft: foreignSku, idempotencyKey: 'agg02-new-unverified-origin'}), {code: 'conflict'});
+    const unavailableCode = await service().readMasterCatalogue('owner-two', {...request, query: {search: '', code: 'PACK-002'}});
+    assert.equal(unavailableCode.nextCursor, null); assert.equal(unavailableCode.items.length, 0); assert.equal(unavailableCode.missingSourceCount, 1);
+    if (process.env.AGG02_CAPTURE_PATH) writeFileSync(process.env.AGG02_CAPTURE_PATH,
+      JSON.stringify({testData: 'isolated local emulator originals only', request, page, next, body, saved: first, presentations,
+        codePage: exactCode, searchPage, searchNext, unavailableCode}, null, 2));
+    await db.collection('workspaceProfiles').doc(recipient.caseId).update({ownerUserId: 'new-owner'});
+    await assert.rejects(service().readMasterCatalogue('owner-two', request), {code: 'not_found'});
+    await assert.rejects(service().handleProductDraft('owner-two', 'reconcileStoreProductDraft', body), {code: 'not_found'});
+  } finally {await db.terminate(); await deleteApp(app);}
+});
 
 function familyFixture() {
   const value = input(), other = input("sku-two");
@@ -4267,7 +4553,11 @@ for (const actionId of ['AI-ACT-225', 'AI-ACT-374']) {
 test('AI-DOMAIN owned Store original paged source handles 201 records without a second product master', async () => {
   const f = await assistantOwnedOriginalFixture(201), before = cataloguePayloadHash([...f.repository.records]);
   const context = await f.context.read(f.actor, {...f.request, actionId: null, entityId: null});
-  assert.equal(context.tools.length, 21); assert.equal(context.nativeTargets!.length, 1622);
+  assert.equal(context.tools.length, 23); assert.equal(context.nativeTargets!.length, 1624);
+  for (const actionId of ['AI-ACT-229', 'AI-ACT-369']) {
+    assert.equal(context.tools.filter(tool => tool.actionId === actionId && tool.entityId === null).length, 1);
+    assert.equal(context.nativeTargets!.filter(target => target.actionId === actionId && target.entityId === null).length, 1);
+  }
   assert.equal(f.calls.length, 10); assert.ok(f.calls.every(body => body.limit === 50));
   const result = context.tools[0]!.resolveTarget!({skuId: 'owned-sku-0201', changes: [{field: 'title', value: 'Last original product'}]});
   assert.equal(result.entityId, 'owned-sku-0201'); assert.equal(result.fields.sourceSku, 'OWNED-201');
@@ -4508,6 +4798,53 @@ test('AI-DOMAIN owned Store family review prepares only an owner capability and 
   f.revokeMember();await assert.rejects(make().handle(f.actor,{operation:'status',payload:{scope:payload.scope,requestId:payload.requestId}}));
 });
 
+for (const action of ['AI-ACT-229', 'AI-ACT-369'] as const) {
+  test(`AGG02 ${action} prepares only original search/capture intent and rechecks paid Store ownership`, async () => {
+    const f = await assistantOwnedOriginalFixture(0), request = {...f.request, actionId: action, entityId: null};
+    const context = await f.context.read(f.actor, request), tool = context.tools[0]!;
+    assert.equal(tool.actionId, action); assert.equal(tool.entityId, null); assertStrictSchema(tool.parameters);
+    assert.match(tool.sourceRevision, action === 'AI-ACT-229'
+      ? /^store-master-search-owner:evaluation:[a-f0-9]{64}$/u : /^store-master-scan-owner:evaluation:[a-f0-9]{64}$/u);
+    const fields = action === 'AI-ACT-229' ? {search: 'HOST चावल · ચોખા PACK-002'} : {};
+    const target = tool.resolveTarget!(fields);
+    assert.deepEqual(target.fields, fields); assert.equal(target.entityId, null);
+    assert.match(target.title!, action === 'AI-ACT-229' ? /Search/u : /Scan/u);
+    assert.equal(f.repository.records.size, 0);
+    assert.ok(f.calls.every(body => body.limit === 1), 'Preparation only confirms original Store ownership; native Review reads catalogue matches.');
+    for (const invalid of [{...fields, canonicalProductId: 'invented'}, {...fields, publish: true},
+      ...(action === 'AI-ACT-229' ? [{}, {search: ' '}, {search: 'x'.repeat(161)}, {search: '\ud800'}, {search: '\u0000'}] : [{search: 'invented scan'}])]) {
+      assert.throws(() => tool.resolveTarget!(invalid));
+    }
+    let models = 0, reservations = 0;
+    const rows = new Map<string, {fingerprint: string; state: PreparationState}>();
+    const requests: PreparationRequestStore = {
+      async claim(key, fingerprint) {const prior = rows.get(key); if (prior) return prior.fingerprint === fingerprint ? prior.state : {state: 'conflict'};
+        rows.set(key, {fingerprint, state: {state: 'pending'}}); return {state: 'claimed', lease: key};},
+      async read(key) {return rows.get(key)?.state;},
+      async finish(key, lease, state) {assert.equal(key, lease); rows.get(key)!.state = state; return state;},
+      async cancel(key) {const prior = rows.get(key); if (!prior) return undefined; prior.state = {state: 'cancelled'}; return prior.state;},
+    };
+    const make = () => new AssistantPreparationService({projectId: f.actor.projectId, plans: f.plans,
+      context: new CompositePreparationContext({original: f.authority, storeProducts: f.context}), requests, now: () => new Date(at),
+      usage: {async reserve() {reservations++; return {id: 'HOST-master-permit', validUntil: '2026-10-16T12:01:00.000Z'};}, async settle() {}},
+      model: {async prepare(_request, tools) {models++; assert.equal(tools.length, 1); assert.equal(tools[0]!.actionId, action);
+        return {kind: 'tool', name: tools[0]!.name, arguments: fields};}}});
+    const payload = {...request, requestId: `HOST-master-${action}`, nativeTargets: [{actionId: action, entityId: null}]};
+    const ready = await make().handle(f.actor, {operation: 'prepare', payload});
+    assert.equal(ready.state, 'ready');
+    if (ready.state === 'ready') {
+      assert.equal(ready.reply.outcome.kind, 'proposal');
+      if (ready.reply.outcome.kind === 'proposal') assert.deepEqual(ready.reply.outcome.fields, fields);
+    }
+    assert.deepEqual(await make().handle(f.actor, {operation: 'prepare', payload}), ready);
+    assert.deepEqual(await make().handle(f.actor, {operation: 'status', payload: {scope: request.scope, requestId: payload.requestId}}), ready);
+    assert.equal(models, 1); assert.equal(reservations, 1); assert.equal(f.repository.records.size, 0);
+    f.revokeMember(); await assert.rejects(f.context.read(f.actor, request));
+    await assert.rejects(make().handle(f.actor, {operation: 'status', payload: {scope: request.scope, requestId: payload.requestId}}));
+    const unpaid = await assistantOwnedOriginalFixture(0); unpaid.revokePaid();
+    await assert.rejects(unpaid.context.read(unpaid.actor, {...unpaid.request, actionId: action, entityId: null}));
+  });
+}
 test('AI-DOMAIN owned Store manual authoring prepares supplied fields without catalogue identity or domain writes', async () => {
   const f=await assistantOwnedOriginalFixture(0),input={...f.request,actionId:'AI-ACT-213',entityId:null};
   const context=await f.context.read(f.actor,input),tool=context.tools[0]!;
@@ -4702,7 +5039,7 @@ for (const channel of ['wholesale', 'bulk'] as const) {
     f.revokeMember(); await assert.rejects(f.context.read(f.actor, {...f.request, actionId: 'AI-ACT-220'}));
   });
 }
-test('AI-DOMAIN owned Store2500 actual metadata and preparation preserve25014 targets within original HTTP byte caps', async () => {
+test('AI-DOMAIN owned Store2500 actual metadata and preparation preserve25016 targets within original HTTP byte caps', async () => {
   const f = await assistantOwnedOriginalFixture(2500, 'wholesale', 'other');
   const context = new CompositePreparationContext({original: f.authority, storeProducts: f.context});
   const headers = {authorization: 'Bearer host-only-token', 'x-firebase-appcheck': 'host-only-proof'};
@@ -4715,7 +5052,9 @@ test('AI-DOMAIN owned Store2500 actual metadata and preparation preserve25014 ta
   assert.ok(Buffer.byteLength(JSON.stringify(metadata.body)) < 2 * 1024 * 1024);
   const original = await context.read(f.actor, {...f.request, actionId: null, entityId: null});
   const selection = storeNativeSelection(f.actor, f.request.scope, original);
-  assert.equal(selection.targets.length, 25014);
+  assert.equal(selection.targets.length, 25016);
+  for (const actionId of ['AI-ACT-229', 'AI-ACT-369'])
+    assert.equal(selection.targets.filter(target => target.actionId === actionId && target.entityId === null).length, 1);
   const index = selection.targets.findIndex(target => target.actionId === 'AI-ACT-214' && target.entityId === 'owned-sku-2500');
   assert.ok(index >= 0); const bytes = Buffer.alloc(Math.ceil(selection.targets.length / 8));
   bytes[index >> 3] = (bytes[index >> 3] ?? 0) | (1 << (index % 8));

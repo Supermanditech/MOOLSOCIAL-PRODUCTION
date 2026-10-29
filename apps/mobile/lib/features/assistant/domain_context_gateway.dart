@@ -24,7 +24,7 @@ List<String> assistantRetainedSupplierQuoteSelection(Object? value) {
 const assistantPrivateStarsContextActions={'AI-ACT-055'};
 const assistantStoreProductContextActions = {'AI-ACT-214', 'AI-ACT-221', 'AI-ACT-370', 'AI-ACT-220', 'AI-ACT-230', 'AI-ACT-222', 'AI-ACT-223', 'AI-ACT-226', 'AI-ACT-227', 'AI-ACT-371'};
 const assistantStoreDefaultContextActions = {'AI-ACT-218', 'AI-ACT-219'};
-const assistantStoreOwnerReadContextActions = {'AI-ACT-213', 'AI-ACT-215', 'AI-ACT-224', 'AI-ACT-372', 'AI-ACT-225', 'AI-ACT-374'};
+const assistantStoreOwnerReadContextActions = {'AI-ACT-213', 'AI-ACT-215', 'AI-ACT-224', 'AI-ACT-229', 'AI-ACT-369', 'AI-ACT-372', 'AI-ACT-225', 'AI-ACT-374'};
 const assistantStoreStockOwnerContextActions={'AI-ACT-231','AI-ACT-232','AI-ACT-233','AI-ACT-407','AI-ACT-408'};
 const assistantStoreRestockOwnerContextActions={'AI-ACT-234'};
 const assistantStoreOrderOriginalContextActions={'AI-ACT-274'};
@@ -181,6 +181,9 @@ class AssistantDomainContextGateway {
           entity == null && !(action=='AI-ACT-223'&&RegExp(r'^store-product-submission-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))) _invalid();
       if (assistantStoreOwnerContextActions.contains(action) &&
           (!context.inWorkspace || entity != null && !assistantStoreRestockOwnerContextActions.contains(action))) _invalid();
+      if (const {'AI-ACT-229', 'AI-ACT-369'}.contains(action) &&
+          (!context.workspaceApproved || !context.storeWorkspace || !revision.startsWith(action == 'AI-ACT-229' ? 'store-master-search-owner:' : 'store-master-scan-owner:') ||
+            !RegExp(r'^store-master-(search|scan)-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))) _invalid();
       if (assistantStoreRestockOwnerContextActions.contains(action) && (!context.workspaceApproved || !context.storeWorkspace ||
           (entity == null ? !RegExp(r'^store-restock-source:[a-f0-9]{64}$').hasMatch(revision) :
             selection == null || !selection.contains(entity) || !RegExp(r'^store-restock-product:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))) _invalid();

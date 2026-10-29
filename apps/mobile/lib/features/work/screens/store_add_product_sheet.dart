@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/design/mool_colors.dart';
@@ -7,6 +8,7 @@ import '../../../ui_v2/buy/buy_v2_category_sheet_policy.dart';
 import '../widgets/store_catalogue_categories.dart';
 import '../widgets/store_product_thumbnail.dart';
 import '../work_models.dart';
+import '../work_catalogue_gateway.dart';
 import '../work_stock_export.dart';
 
 /// Store-owned, context-specific browsing terms; never inventory or backend data.
@@ -1495,6 +1497,11 @@ class StoreAddProductSheet extends StatefulWidget {
     this.recentSearches,
     this.onBrowseChanged,
     this.isStoreCurrent,
+    this.masterLookup,
+    this.onMasterSelected,
+    this.initialMasterSearch = '',
+    this.initialMasterCode,
+    this.autoReviewSingleMasterMatch = false,
   });
 
   final List<WorkspaceCatalogueItem> catalogue;
@@ -1513,6 +1520,11 @@ class StoreAddProductSheet extends StatefulWidget {
   final List<String>? recentSearches;
   final VoidCallback? onBrowseChanged;
   final bool Function()? isStoreCurrent;
+  final Future<WorkspaceMasterCataloguePage> Function(String search, String? code, String? cursor)? masterLookup;
+  final ValueChanged<WorkspaceMasterCatalogueItem>? onMasterSelected;
+  final String initialMasterSearch;
+  final String? initialMasterCode;
+  final bool autoReviewSingleMasterMatch;
   final Widget Function(
     List<WorkspaceCatalogueItem>,
     String,
@@ -1534,6 +1546,16 @@ class StoreAddProductSheet extends StatefulWidget {
 }
 
 class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
+  Timer? _masterDebounce;
+  int _masterGeneration = 0;
+  bool _masterBusy = false;
+  String? _masterError, _masterCode;
+  WorkspaceMasterCataloguePage? _masterPage;
+  final _masterItems = <WorkspaceMasterCatalogueItem>[];
+  final _masterCursors = <String>{};
+  int _masterMissing = 0;
+  bool _autoReviewRequested = false, _autoReviewConsumed = false;
+  bool get _masterMode => !widget.stockOnly && widget.masterLookup != null;
   final _search = TextEditingController();
   final _searchFocus = FocusNode();
   final _localSaved = <String>{};
@@ -1567,6 +1589,12 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
     _listView = widget.stockOnly;
     _searchFocus.addListener(_focusChanged);
     _indexProducts();
+    if (_masterMode) {
+      _autoReviewRequested = widget.autoReviewSingleMasterMatch;
+      _masterCode = widget.initialMasterCode;
+      _search.text = _masterCode ?? widget.initialMasterSearch;
+      WidgetsBinding.instance.addPostFrameCallback((_) {if (mounted) unawaited(_loadMaster());});
+    }
   }
 
   void _focusChanged() {
@@ -1662,6 +1690,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
 
   @override
   void dispose() {
+    _masterDebounce?.cancel(); _masterGeneration++;
     _search.dispose();
     _searchFocus.dispose();
     _scroll.dispose();
@@ -1824,6 +1853,102 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
       product.stockMode == WorkspaceStockMode.exactQuantity &&
       product.stock <= product.lowStockThreshold;
 
+  void _masterSearchChanged(String value) {
+    _masterDebounce?.cancel(); _masterGeneration++;
+    setState(() {_masterCode = null; _autoReviewRequested = false; _masterPage = null; _masterItems.clear(); _masterCursors.clear();
+      _masterMissing = 0; _masterError = null; _masterBusy = false;});
+    _masterDebounce = Timer(const Duration(milliseconds: 300), () {if (mounted) unawaited(_loadMaster());});
+  }
+  Future<void> _loadMaster({bool more = false}) async {
+    if (!mounted || !_masterMode || _masterBusy || widget.isStoreCurrent?.call() == false) return;
+    final lookup = widget.masterLookup!, cursor = more ? _masterPage?.nextCursor : null;
+    if (more && cursor == null) return;
+    final generation = ++_masterGeneration, code = _masterCode;
+    final search = code == null ? _search.text.trim().replaceAll(RegExp(r'\s+'), ' ') : '';
+    setState(() {_masterBusy = true; _masterError = null;
+      if (!more) {_masterItems.clear(); _masterPage = null; _masterCursors.clear(); _masterMissing = 0;}});
+    try {
+      final page = await lookup(search, code, cursor);
+      if (!mounted || generation != _masterGeneration || widget.isStoreCurrent?.call() == false) return;
+      if (more && page.snapshotId != _masterPage?.snapshotId ||
+          page.nextCursor != null && (_masterCursors.contains(page.nextCursor) || page.nextCursor == cursor)) throw const FormatException();
+      final seen = _masterItems.map((item) => item.identityKey).toSet();
+      if (page.items.any((item) => !seen.add(item.identityKey))) throw const FormatException();
+      setState(() {_masterPage = page; _masterItems.addAll(page.items); _masterMissing += page.missingSourceCount;
+        if (cursor != null) _masterCursors.add(cursor);});
+      if (_autoReviewRequested && !_autoReviewConsumed && (search.isNotEmpty || code != null) &&
+          page.nextCursor == null && _masterMissing == 0 && _masterItems.length == 1 && widget.onMasterSelected != null &&
+          mounted && generation == _masterGeneration && widget.isStoreCurrent?.call() != false) {
+        _autoReviewConsumed = true;
+        _searchFocus.unfocus(); widget.onMasterSelected!(_masterItems.single);
+      }
+    } catch (_) {
+      if (mounted && generation == _masterGeneration) setState(() => _masterError = 'Catalogue details could not be loaded. Try again.');
+    } finally {
+      if (mounted && generation == _masterGeneration) setState(() => _masterBusy = false);
+    }
+  }
+  Future<void> _scanMaster() async {
+    if (_scanning || _masterBusy || widget.isStoreCurrent?.call() == false) return;
+    final generation = _masterGeneration;
+    setState(() => _scanning = true);
+    try {
+      final code = await widget.scanBarcode();
+      if (!mounted || generation != _masterGeneration || widget.isStoreCurrent?.call() == false || code == null || code.trim().isEmpty) return;
+      _masterDebounce?.cancel(); _masterCode = code.trim(); _search.text = _masterCode!;
+      _autoReviewRequested = widget.autoReviewSingleMasterMatch;
+      await _loadMaster();
+    } catch (_) {
+      if (mounted) setState(() => _masterError = 'Barcode could not be read. Search by product name instead.');
+    } finally {if (mounted) setState(() => _scanning = false);}
+  }
+  Widget _buildMasterCatalogue(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 4), child: TextField(
+      key: const Key('work-master-search'), controller: _search, focusNode: _searchFocus,
+      maxLength: 160, onChanged: _masterSearchChanged,
+      onSubmitted: (_) {_masterDebounce?.cancel(); unawaited(_loadMaster());},
+      decoration: InputDecoration(hintText: 'Search products or scan a barcode', counterText: '',
+        prefixIcon: const Icon(Icons.search, size: 20),
+        suffixIcon: IconButton(tooltip: 'Scan product barcode', onPressed: _scanning || _masterBusy ? null : _scanMaster,
+          icon: const Icon(Icons.qr_code_scanner, size: 22))))),
+    const Padding(padding: EdgeInsets.fromLTRB(16, 2, 16, 8),
+      child: Text('Choose a product, then enter your Store prices.', style: TextStyle(color: MoolColors.muted, fontSize: 12))),
+    if (_masterBusy) const LinearProgressIndicator(minHeight: 2),
+    if (_masterError != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Row(children: [
+      Expanded(child: Text(_masterError!, style: const TextStyle(fontSize: 13))),
+      TextButton(onPressed: _masterBusy ? null : () => _loadMaster(), child: const Text('Retry'))])),
+    if (_masterMissing > 0) const Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Text('Some product details need verification.', style: TextStyle(color: MoolColors.muted, fontSize: 12))),
+    Expanded(child: _masterItems.isEmpty && !_masterBusy && _masterError == null && _masterPage?.nextCursor == null
+      ? Center(child: Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(_masterPage == null ? 'Search the MoolSocial catalogue.' : _masterMissing > 0
+            ? 'Catalogue details could not be verified. Try again or add a product manually.'
+            : 'No matching catalogue products. Try another name or add a product manually.'),
+          if (_masterMissing > 0) TextButton(onPressed: () => _loadMaster(), child: const Text('Refresh catalogue')),
+        ])))
+      : ListView.separated(controller: _scroll, padding: const EdgeInsets.only(bottom: 8),
+        itemCount: _masterItems.length + (_masterPage?.nextCursor == null ? 0 : 1),
+        separatorBuilder: (_, _) => const Divider(height: 1, indent: 16, endIndent: 16),
+        itemBuilder: (_, index) {
+          if (index == _masterItems.length) return TextButton(onPressed: _masterBusy ? null : () => _loadMaster(more: true),
+            child: Text(_masterItems.isEmpty ? 'Search more catalogue entries' : 'Load more'));
+          final item = _masterItems[index];
+          return ListTile(dense: true, minVerticalPadding: 8,
+            key: ValueKey('work-master-${item.origin.toJson()['selectionId']}'),
+            title: Text(item.title, style: const TextStyle(fontSize: 14)),
+            subtitle: Text(_masterRowCaption(item), style: const TextStyle(fontSize: 12)),
+            trailing: const Icon(Icons.chevron_right, size: 20),
+            onTap: _masterBusy || widget.onMasterSelected == null ? null : () {
+              if (widget.isStoreCurrent?.call() != false) {_searchFocus.unfocus(); widget.onMasterSelected!(item);}
+            });
+        })),
+  ]);
+  String _masterRowCaption(WorkspaceMasterCatalogueItem item) {
+    final value = item.toJson(), pack = value['pack'] as Map, codes = (value['codes'] as Map)['pack'] as List;
+    return [item.brand, item.packLabel, if ((pack['unitsPerCase'] as int) > 1) '${pack['unitsPerCase']} per case',
+      if (codes.isNotEmpty) 'Code ${(codes.first as Map)['value']}'].where((s) => s.isNotEmpty).join(' · ');
+  }
+
   String _stockLabel(WorkspaceCatalogueItem product) =>
       product.stockMode == WorkspaceStockMode.availabilityOnly
       ? (product.available ? 'Available' : 'Unavailable')
@@ -1831,6 +1956,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
 
   @override
   Widget build(BuildContext context) {
+    if (_masterMode) return _buildMasterCatalogue(context);
     final query = _search.text.trim().toLowerCase();
     final modes = context
         .dependOnInheritedWidgetOfExactType<_StoreAddModeScope>();

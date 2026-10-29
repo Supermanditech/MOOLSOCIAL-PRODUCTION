@@ -3,8 +3,9 @@ import type {ServerResponse} from "node:http";
 import sharp from "sharp";
 import type {Bucket, File} from "@google-cloud/storage";
 import {FieldPath, type DocumentReference, type Firestore, type Transaction} from "firebase-admin/firestore";
-import {applyCatalogueCommand, createCatalogueAggregate, referencedOfferTermAt, reviewedCanonicalProduct,
-  type CatalogueAggregate, type CatalogueCommand} from "../commerce/catalogue_contract.js";
+import {applyCatalogueCommand, createCatalogueAggregate, referencedOfferTermAt, reviewedCanonicalProduct, normalizeCatalogueCode,
+  type CatalogueAggregate, type CatalogueCommand, type CatalogueAuditEvent, type CatalogueCodeReference,
+  type CanonicalProductRecord, type VerifiedPackRecord} from "../commerce/catalogue_contract.js";
 import {isSupplyCapabilityActive, type SupplyActor,
   type SupplyCapabilityQuery, type SupplyParticipantWorkspace} from "../commerce/supply_participant_contract.js";
 import {WorkspaceProfileError, type WorkspaceProfileRecord} from "./workspace_profile_service.js";
@@ -436,6 +437,54 @@ export interface StoreProductSubmissionCommand {
   product: StoreProductSubmissionInput;
 }
 export interface StoreProductSubmissionReceipt {fingerprint: string; record: StoreProductSubmissionRecord}
+/** Private Save presentation only: no Stock, review or public identity grant. */
+export type StoreProductDraftInput = Omit<StoreProductSubmissionInput, "pack" | "provenance"> & {
+  pack: {label: string; quantityMilli: number | null; unit: StoreSkuPack["unit"] | null; unitsPerCase: number | null};
+  provenance: StoreProductSubmissionInput["provenance"] | null;
+};
+export interface StoreMasterCatalogueOrigin {
+  selectionId: string; canonicalProductId: string; verifiedPackId: string;
+  contentSha256: string; descriptorSha256: string; projectionFingerprint: string; snapshotId: string;
+}
+export interface StoreProductDraftRecord {
+  schemaVersion: 1; realm: StoreProductSubmissionRecord["realm"]; storeId: string; skuId: string;
+  revision: number; savedAt: string; savedBy: string; fingerprint: string;
+  draft: StoreProductDraftInput; catalogueOrigin: StoreMasterCatalogueOrigin | null;
+}
+export interface StoreProductDraftCommand {
+  ownerUserId: string; realm: StoreProductDraftRecord["realm"]; storeId: string;
+  expectedRevision: number; idempotencyKey: string; savedAt: string; fingerprint: string;
+  draft: StoreProductDraftInput; catalogueOrigin: StoreMasterCatalogueOrigin | null;
+}
+export interface StoreProductDraftReceipt {fingerprint: string; record: StoreProductDraftRecord}
+export interface StoreMasterCatalogueItem {
+  selectionId: string; canonicalProductId: string; verifiedPackId: string;
+  contentSha256: string; descriptorSha256: string; projectionFingerprint: string;
+  content: Omit<StoreSkuContent, 'media'>; pack: StoreSkuPack;
+  codes: {product: CatalogueCodeReference[]; pack: CatalogueCodeReference[]};
+  mediaIncluded: false; sourceMediaCount: number;
+}
+export interface StoreMasterCatalogueQuery {search: string; code: string | null}
+export interface StoreMasterCatalogueRequest {
+  storeId: string; query: StoreMasterCatalogueQuery; pageSize: number; cursor: string | null;
+}
+export interface StoreMasterCataloguePage {
+  schemaVersion: 1; masterCatalogueVersion: 1; realm: StoreProductDraftRecord['realm']; storeId: string;
+  observedAt: string; state: 'ready'; query: StoreMasterCatalogueQuery; snapshotId: string;
+  items: StoreMasterCatalogueItem[]; nextCursor: string | null; scannedCount: number;
+  verifiedPackCount: number; missingSourceCount: number;
+}
+interface StoreMasterCatalogueOriginal {
+  receipt: CatalogueProductionReceipt; revision: CatalogueAggregate; submission: StoreProductSubmissionRecord;
+}
+interface StoreMasterCatalogueCandidate {
+  product: CanonicalProductRecord; pack: VerifiedPackRecord; contentSha256: string;
+  productEvent: CatalogueAuditEvent | null; packEvent: CatalogueAuditEvent | null;
+}
+export function productDraftOperation(operation: string): 'save' | 'read' | 'list' | 'reconcile' | undefined {
+  return operation === 'saveStoreProductDraft' ? 'save' : operation === 'readStoreProductDraft' ? 'read'
+    : operation === 'listStoreProductDrafts' ? 'list' : operation === 'reconcileStoreProductDraft' ? 'reconcile' : undefined;
+}
 /** Server-issued listing identity. Original Store SKU/Stock identity is unchanged. */
 export interface PublicCatalogueListingBinding {
   schemaVersion: 1; realm: "evaluation" | "production"; listingId: string;
@@ -566,6 +615,11 @@ export interface WorkspaceCatalogueRepository {
   submitProduct?(command: StoreProductSubmissionCommand): Promise<StoreProductSubmissionRecord>;
   reconcileProduct?(command: StoreProductSubmissionCommand): Promise<StoreProductSubmissionRecord | undefined>;
   readProductSubmission?(storeId: string, skuId: string, ownerUserId: string): Promise<StoreProductSubmissionRecord | undefined>;
+  saveProductDraft?(command: StoreProductDraftCommand, identity?: CatalogueIdentity): Promise<StoreProductDraftRecord>;
+  reconcileProductDraft?(command: StoreProductDraftCommand): Promise<StoreProductDraftRecord | undefined>;
+  readProductDraft?(storeId: string, skuId: string, ownerUserId: string): Promise<StoreProductDraftRecord | undefined>;
+  listProductDrafts?(storeId: string, ownerUserId: string, limit: number, after?: string): Promise<StoreProductDraftRecord[]>;
+  masterCataloguePage?(ownerUserId: string, identity: CatalogueIdentity, request: StoreMasterCatalogueRequest): Promise<StoreMasterCataloguePage>;
   productMedia?(ownerUserId: string, action: "prepare" | "confirm" | "read", request: StoreProductMediaRequest): Promise<object>;
   readReviewedProductSubmission?(storeId: string, skuId: string, ownerUserId: string,
     identity: CatalogueIdentity, includeMedia?: boolean): Promise<StoreProductReviewReadback>;
@@ -793,6 +847,9 @@ function submittedContent(source: StoreProductSubmissionRecord, productId: strin
 }
 export interface CatalogueProductionReceipt {
   fingerprint: string; result: CatalogueAggregate; submission?: CatalogueSubmissionReference;
+  /** Exact normalized command preserves original code spelling/order for source proof.
+   * Older receipts stay recoverable; master reads use a verified legacy fallback. */
+  input?: Readonly<Record<string, unknown>>;
 }
 export interface CatalogueProduction {
   operatorUserId: string; identity: CatalogueIdentity;
@@ -1372,6 +1429,55 @@ export class WorkspaceCatalogueService {
     const request = mediaRequest(structuredClone(body));
     if (!this.repository.productMedia) throw mediaUnavailable();
     return this.repository.productMedia(id(ownerUserId), action, request);
+  }
+
+  async readMasterCatalogue(ownerUserId: string, body: Readonly<Record<string, unknown>>): Promise<StoreMasterCataloguePage> {
+    if (body.realm !== this.repository.realm) invalid('The catalogue environment changed. Reopen this Store.');
+    const {realm: _, ...raw} = structuredClone(body);
+    const request = masterLookupRequest(raw);
+    if (!this.identity || !this.repository.masterCataloguePage) {
+      throw new WorkspaceProfileError('service_unavailable', 'The master catalogue is not connected.', 503, true);
+    }
+    return this.repository.masterCataloguePage(id(ownerUserId), this.identity, request);
+  }
+
+  /** Ordinary private Save and its read-only recovery, never Submit/publication. */
+  async handleProductDraft(ownerUserId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const action = productDraftOperation(operation), owner = id(ownerUserId);
+    if (!action || body.productDraftVersion !== 1 || body.realm !== this.repository.realm) invalid();
+    const {productDraftVersion: _, realm: _realm, ...request} = structuredClone(body);
+    if (action === 'list') {
+      exact(request, ['storeId'], ['limit', 'after']);
+      const storeId = id(request.storeId), limit = request.limit === undefined ? 30 : integer(request.limit, 1, 50);
+      const after = request.after === undefined ? undefined : id(request.after);
+      if (!this.repository.listProductDrafts) throw new WorkspaceProfileError('service_unavailable', 'Saved product sync is not connected.', 503, true);
+      const rows = await this.repository.listProductDrafts(storeId, owner, limit, after);
+      if (rows.length > limit) invalid('Saved product page is invalid.');
+      const items = rows.map(row => checkedProductDraft(row, this.repository.realm, storeId, row.skuId));
+      if (items.some((row, index) => Date.parse(row.savedAt) > this.now().getTime() ||
+          (index === 0 ? after !== undefined && row.skuId <= after : row.skuId <= items[index - 1]!.skuId))) invalid('Saved product page changed.');
+      return {schemaVersion: 1, productDraftVersion: 1, realm: this.repository.realm, storeId,
+        observedAt: this.now().toISOString(), state: 'ready', items, nextCursor: items.length === limit ? items.at(-1)!.skuId : null};
+    }
+    let storeId: string, skuId: string, record: StoreProductDraftRecord | undefined;
+    if (action === 'read') {
+      exact(request, ['storeId', 'skuId']); storeId = id(request.storeId); skuId = id(request.skuId);
+      if (!this.repository.readProductDraft) throw new WorkspaceProfileError('service_unavailable', 'Saved product sync is not connected.', 503, true);
+      record = await this.repository.readProductDraft(storeId, skuId, owner);
+    } else {
+      const command = storeProductDraft(owner, this.repository.realm, request, this.now().toISOString());
+      storeId = command.storeId; skuId = command.draft.skuId;
+      if (!this.repository.saveProductDraft || !this.repository.reconcileProductDraft) {
+        throw new WorkspaceProfileError('service_unavailable', 'Saved product sync is not connected.', 503, true);
+      }
+      record = action === 'save' ? await this.repository.saveProductDraft(command, this.identity) : await this.repository.reconcileProductDraft(command);
+    }
+    if (record) {
+      record = checkedProductDraft(record, this.repository.realm, storeId, skuId);
+      if (Date.parse(record.savedAt) > this.now().getTime()) invalid('Saved product time changed.');
+    }
+    return {schemaVersion: 1, productDraftVersion: 1, realm: this.repository.realm, storeId, skuId,
+      observedAt: this.now().toISOString(), state: record ? 'saved' : 'not_found', record: record ?? null};
   }
 
   async handleProductSubmission(ownerUserId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
@@ -2399,18 +2505,22 @@ function authoredText(c: Record<string, unknown>): Omit<StoreSkuContent, "media"
       const row = exact(s, ["label", "value"]); return {label: text(row.label), value: text(row.value, 1000)};
     })};
 }
-function authoredPack(value: unknown): StoreSkuPack {
+function authoredPack(value: unknown, privateDraft = false): StoreSkuPack {
   const p = exact(value, ["label", "quantityMilli", "unit", "unitsPerCase"]);
   if (typeof p.unit !== "string" || !["kg", "L", "count"].includes(p.unit)) invalid();
-  return {label: text(p.label), quantityMilli: integer(p.quantityMilli), unit: p.unit as StoreSkuPack["unit"], unitsPerCase: integer(p.unitsPerCase)};
+  const quantityMilli = integer(p.quantityMilli, 1, privateDraft ? 999999999 : 100000000);
+  if (privateDraft && p.unit === 'count' && quantityMilli % 1000 !== 0) invalid();
+  return {label: text(p.label), quantityMilli, unit: p.unit as StoreSkuPack["unit"],
+    unitsPerCase: integer(p.unitsPerCase, 1, privateDraft ? 999999 : 100000000)};
 }
-function authoredChannel(a: Record<string, unknown>): Omit<StoreSkuChannel, "offerId"> {
+function authoredChannel(a: Record<string, unknown>, privateDraft = false): Omit<StoreSkuChannel, "offerId"> {
   if (typeof a.kind !== "string" || !["retail", "wholesale", "bulk"].includes(a.kind)) invalid();
-  const priceMinor = integer(a.priceMinor), minimumOrder = integer(a.minimumOrder), quantityStep = integer(a.quantityStep);
-  const mrpMinor = a.mrpMinor === null ? null : integer(a.mrpMinor, priceMinor);
+  const amountLimit = privateDraft ? 99999999900 : 100000000, quantityLimit = privateDraft ? Number.MAX_SAFE_INTEGER : 100000000;
+  const priceMinor = integer(a.priceMinor, 1, amountLimit), minimumOrder = integer(a.minimumOrder, 1, quantityLimit), quantityStep = integer(a.quantityStep, 1, quantityLimit);
+  const mrpMinor = a.mrpMinor === null ? null : integer(a.mrpMinor, priceMinor, amountLimit);
   const tiers = list(a.tiers, 20).map(t => {
     const row = exact(t, ["minimumQuantity", "unitPriceMinor"]);
-    return {minimumQuantity: integer(row.minimumQuantity), unitPriceMinor: integer(row.unitPriceMinor)};
+    return {minimumQuantity: integer(row.minimumQuantity, 1, quantityLimit), unitPriceMinor: integer(row.unitPriceMinor, 1, amountLimit)};
   });
   if ((tiers.length && (tiers[0]!.minimumQuantity !== minimumOrder || tiers[0]!.unitPriceMinor !== priceMinor)) ||
       tiers.some((t, i) => (t.minimumQuantity - minimumOrder) % quantityStep !== 0 || i > 0 &&
@@ -2430,7 +2540,7 @@ function authoredChannel(a: Record<string, unknown>): Omit<StoreSkuChannel, "off
     } else {
       const tax = exact(rawTax, ["version", "amountMinor", "basis"]);
       if (tax.version !== 1 || typeof tax.basis !== "string" || !["included", "additional"].includes(tax.basis)) invalid();
-      const amountMinor = integer(tax.amountMinor, 0);
+      const amountMinor = integer(tax.amountMinor, 0, privateDraft ? Number.MAX_SAFE_INTEGER : 100000000);
       if ([priceMinor, ...tiers.map(t => t.unitPriceMinor)].some(price =>
         tax.basis === "included" ? amountMinor > price : amountMinor > Number.MAX_SAFE_INTEGER - price)) invalid();
       supplierTax = {version: 1, amountMinor, basis: tax.basis as "included" | "additional"};
@@ -2521,6 +2631,289 @@ export function normalizeSubmittedProduct(value: unknown): StoreProductSubmissio
   if (Buffer.byteLength(JSON.stringify(result), "utf8") > 384 * 1024) invalid("Product details are too large to submit.");
   return result;
 }
+/** Save supports unknown structured packs; Submit's stricter codec is unchanged. */
+export function normalizeSavedProductDraft(value: unknown): StoreProductDraftInput {
+  const p = exact(value, ['schemaVersion', 'skuId', 'sku', 'barcode', 'catalogueProductHint', 'content', 'pack',
+    'channels', 'provenance', 'mediaIntent', 'variantIntent']);
+  if (p.schemaVersion !== 1) invalid();
+  const skuId = id(p.skuId), c = exact(p.content,
+    ['title', 'brand', 'variant', 'categoryId', 'description', 'highlights', 'specifications'], ['productFacts']);
+  const rawPack = exact(p.pack, ['label', 'quantityMilli', 'unit', 'unitsPerCase']);
+  const unknownPack = [rawPack.quantityMilli, rawPack.unit, rawPack.unitsPerCase].every(v => v === null);
+  const pack = unknownPack ? {label: text(rawPack.label), quantityMilli: null, unit: null, unitsPerCase: null} : authoredPack(rawPack, true);
+  const channels = list(p.channels, 2).map(raw => authoredChannel(exact(raw,
+    ['kind', 'priceMinor', 'mrpMinor', 'minimumOrder', 'quantityStep', 'tiers'], ['supplierTax']), true));
+  if (channels.length) authoredChannelsValid(channels);
+  let provenance: StoreProductDraftInput['provenance'] = null;
+  if (p.provenance !== null) {
+    const origin = exact(p.provenance, ['entryMethod', 'sourceRecordId']);
+    if (!['catalogue', 'manual', 'csv'].includes(String(origin.entryMethod)) || origin.sourceRecordId !== skuId) invalid();
+    provenance = {entryMethod: origin.entryMethod as StoreSkuInput['provenance']['entryMethod'], sourceRecordId: skuId};
+  }
+  const media = exact(p.mediaIntent, ['pendingUpload', 'pendingSelectionSha256', 'publishedReferences']);
+  const pendingUpload = boolean(media.pendingUpload);
+  if (pendingUpload ? typeof media.pendingSelectionSha256 !== 'string' || !/^[A-F0-9]{64}$/u.test(media.pendingSelectionSha256)
+    : media.pendingSelectionSha256 !== null) invalid();
+  const references = list(media.publishedReferences, 10).map(raw => {
+    const asset = exact(raw, ['assetId', 'revision']); return {assetId: id(asset.assetId), revision: id(asset.revision)};
+  });
+  if (new Set(references.map(v => v.assetId)).size !== references.length) invalid();
+  let variantIntent: StoreProductDraftInput['variantIntent'] = null;
+  if (p.variantIntent !== null) {
+    const v = exact(p.variantIntent, ['familyId', 'localRevision', 'selections']), selections = object(v.selections);
+    if (!Object.keys(selections).length || Object.keys(selections).length > 6) invalid();
+    variantIntent = {familyId: id(v.familyId), localRevision: integer(v.localRevision, 1, 1000000000),
+      selections: Object.fromEntries(Object.entries(selections).map(([dimension, option]) => [id(dimension), id(option)]))};
+  }
+  const result: StoreProductDraftInput = {schemaVersion: 1, skuId, sku: text(p.sku, 80), barcode: text(p.barcode, 128, true),
+    catalogueProductHint: p.catalogueProductHint === null ? null : id(p.catalogueProductHint),
+    content: {...authoredText(c), ...(Object.hasOwn(c, 'productFacts') ? {productFacts: normalizeProductFacts(c.productFacts)} : {})},
+    pack, channels, provenance, mediaIntent: {pendingUpload,
+      pendingSelectionSha256: media.pendingSelectionSha256 as string | null, publishedReferences: references}, variantIntent};
+  if (Buffer.byteLength(JSON.stringify(result), 'utf8') > 384 * 1024) invalid('Saved product details are too large to sync.');
+  return result;
+}
+export function normalizeMasterCatalogueOrigin(raw: unknown): StoreMasterCatalogueOrigin | null {
+  if (raw === null) return null;
+  const value = exact(raw, ['selectionId', 'canonicalProductId', 'verifiedPackId', 'contentSha256',
+    'descriptorSha256', 'projectionFingerprint', 'snapshotId']);
+  if (typeof value.selectionId !== 'string' || !/^master-[a-f0-9]{64}$/u.test(value.selectionId) ||
+      typeof value.snapshotId !== 'string' || !/^[a-f0-9]{64}$/u.test(value.snapshotId) ||
+      value.snapshotId !== value.selectionId.slice('master-'.length)) invalid('Catalogue source reference changed.');
+  for (const key of ['contentSha256', 'descriptorSha256', 'projectionFingerprint']) {
+    if (typeof value[key] !== 'string' || !/^[A-F0-9]{64}$/u.test(value[key] as string)) invalid('Catalogue source reference changed.');
+  }
+  return {selectionId: value.selectionId, canonicalProductId: id(value.canonicalProductId), verifiedPackId: id(value.verifiedPackId),
+    contentSha256: value.contentSha256 as string, descriptorSha256: value.descriptorSha256 as string,
+    projectionFingerprint: value.projectionFingerprint as string, snapshotId: value.snapshotId};
+}
+function masterCodes(raw: readonly CatalogueCodeReference[]): CatalogueCodeReference[] {
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 20) invalid('Catalogue codes are unavailable.');
+  const codes = raw.map(normalizeCatalogueCode);
+  if (new Set(codes.map(code => `${code.type}:${code.value}`)).size !== codes.length) invalid('Catalogue codes changed.');
+  return codes;
+}
+function masterCodeMatches(codes: readonly CatalogueCodeReference[], value: string): boolean {
+  return codes.some(code => {
+    try {return normalizeCatalogueCode({type: code.type, value}).value === normalizeCatalogueCode(code).value;}
+    catch {return false;}
+  });
+}
+function masterProposalEvent(catalogue: CatalogueAggregate, kind: 'product' | 'pack', entityId: string,
+  hash: string, proposedAt: string, actorId?: string): CatalogueAuditEvent | null {
+  const matches = catalogue.auditEvents.filter(event => event.entityType === kind && event.entityId === entityId &&
+    event.occurredAt === proposedAt && (actorId === undefined || event.actorId === actorId) &&
+    (kind === 'pack' ? event.eventType === 'pack_proposed' :
+      ['product_proposed', 'product_content_revision_proposed'].includes(event.eventType)) &&
+    event.hashReferences.some(value => value.toUpperCase() === hash.toUpperCase()));
+  return matches.length === 1 ? matches[0]! : null;
+}
+function masterCandidates(catalogue: CatalogueAggregate, identity: CatalogueIdentity): StoreMasterCatalogueCandidate[] {
+  if (!catalogue || catalogue.schemaVersion !== 1 || catalogue.catalogueId !== identity.catalogueId ||
+      catalogue.tenantId !== identity.tenantId || !Number.isSafeInteger(catalogue.version) || catalogue.version < 1 ||
+      !Array.isArray(catalogue.products) || !Array.isArray(catalogue.packs) || !Array.isArray(catalogue.auditEvents) ||
+      !Array.isArray(catalogue.commandReceipts) || new Set(catalogue.products.map(p => p.productId)).size !== catalogue.products.length ||
+      new Set(catalogue.packs.map(p => p.packId)).size !== catalogue.packs.length) invalid('The original master catalogue is unavailable.');
+  const products = new Map<string, {product: CanonicalProductRecord; hash: string; event: CatalogueAuditEvent | null}>();
+  for (const original of catalogue.products as readonly CanonicalProductRecord[]) {
+    if (original.state !== 'verified') continue;
+    let hash = original.contentSha256, proposedAt = original.proposedAt, actor: string | undefined;
+    // The existing domain helper validates the complete revision chain; a
+    // pending/rejected revision never becomes the current master description.
+    reviewedCanonicalProduct(catalogue, id(original.productId), hash);
+    const latest = original.contentRevisions?.filter(revision => revision.state === 'verified').at(-1);
+    if (latest) {hash = latest.contentSha256; proposedAt = latest.proposedAt; actor = latest.proposedByActorId;}
+    const product = reviewedCanonicalProduct(catalogue, original.productId, hash);
+    if (!product) continue;
+    masterCodes(product.codes);
+    products.set(product.productId, {product, hash: hash.toUpperCase(),
+      event: masterProposalEvent(catalogue, 'product', product.productId, hash, proposedAt, actor)});
+  }
+  return catalogue.packs.filter(pack => pack.state === 'verified' && products.has(pack.productId)).map(pack => {
+    const source = products.get(pack.productId)!; id(pack.packId); masterCodes(pack.codes);
+    if (!/^[A-Fa-f0-9]{64}$/u.test(pack.descriptorSha256)) invalid('Catalogue pack source changed.');
+    return {product: source.product, pack, contentSha256: source.hash, productEvent: source.event,
+      packEvent: masterProposalEvent(catalogue, 'pack', pack.packId, pack.descriptorSha256, pack.proposedAt)};
+  }).sort((a, b) => a.product.productId < b.product.productId ? -1 : a.product.productId > b.product.productId ? 1 :
+    a.pack.packId < b.pack.packId ? -1 : a.pack.packId > b.pack.packId ? 1 : 0);
+}
+function checkedMasterOriginal(realm: StoreProductDraftRecord['realm'], identity: CatalogueIdentity,
+  catalogue: CatalogueAggregate, event: CatalogueAuditEvent | null, original: StoreMasterCatalogueOriginal | undefined): StoreProductSubmissionRecord | null {
+  if (!event || !original || !Number.isSafeInteger(event.aggregateVersion) || event.aggregateVersion < 1 ||
+      event.aggregateVersion > catalogue.version || event.catalogueId !== identity.catalogueId ||
+      event.tenantId !== identity.tenantId || !original.receipt?.submission) return null;
+  try {
+    const receipt = original.receipt, pinned = submissionReference(receipt.submission);
+    if (pinned.realm !== realm || !/^[A-F0-9]{64}$/u.test(receipt.fingerprint) ||
+        receipt.result.schemaVersion !== 1 || receipt.result.catalogueId !== identity.catalogueId ||
+        receipt.result.tenantId !== identity.tenantId || receipt.result.version !== event.aggregateVersion ||
+        cataloguePayloadHash(receipt.result) !== cataloguePayloadHash(original.revision)) return null;
+    const priorEvent = receipt.result.auditEvents.find(row => row.eventId === event.eventId);
+    const priorCommand = receipt.result.commandReceipts.find(row => row.commandId === event.commandId);
+    const currentCommand = catalogue.commandReceipts.find(row => row.commandId === event.commandId);
+    if (!priorEvent || !priorCommand || !currentCommand || cataloguePayloadHash(priorEvent) !== cataloguePayloadHash(event) ||
+        cataloguePayloadHash(priorCommand) !== cataloguePayloadHash(currentCommand)) return null;
+    const saved = checkedProductSubmission(original.submission, realm, pinned.storeId, pinned.skuId);
+    if (saved.revision !== pinned.revision || saved.fingerprint !== pinned.fingerprint || saved.submittedBy !== event.actorId) return null;
+    let raw: Record<string, unknown>;
+    if (receipt.input !== undefined) raw = structuredClone(receipt.input);
+    else {
+      const common = {commandId: event.commandId, expectedVersion: event.aggregateVersion - 1};
+      if (event.eventType === 'product_proposed') {
+        const product = receipt.result.products.find(row => row.productId === event.entityId);
+        if (!product) return null;
+        raw = {type: 'propose_product', ...common, productId: product.productId, categoryId: product.categoryId,
+          brandId: product.brandId, contentSha256: product.contentSha256, codes: product.codes};
+      } else if (event.eventType === 'product_content_revision_proposed') {
+        const product = receipt.result.products.find(row => row.productId === event.entityId);
+        const revision = product?.contentRevisions?.find(row => row.proposedAt === event.occurredAt && row.proposedByActorId === event.actorId);
+        if (!revision) return null;
+        raw = {type: 'propose_product_revision', ...common, productId: event.entityId,
+          previousContentSha256: revision.previousContentSha256, contentSha256: revision.contentSha256};
+      } else if (event.eventType === 'pack_proposed') {
+        const pack = receipt.result.packs.find(row => row.packId === event.entityId);
+        if (!pack) return null;
+        raw = {type: 'propose_pack', ...common, productId: pack.productId, packId: pack.packId,
+          descriptorSha256: pack.descriptorSha256, codes: pack.codes};
+      } else return null;
+    }
+    const input = productionInput(raw);
+    const expectedType = event.eventType === 'product_proposed' ? 'propose_product'
+      : event.eventType === 'pack_proposed' ? 'propose_pack' : 'propose_product_revision';
+    if (input.type !== expectedType || input.commandId !== event.commandId || input.expectedVersion !== event.aggregateVersion - 1 ||
+        (event.entityType === 'pack' ? input.packId : input.productId) !== event.entityId ||
+        cataloguePayloadHash({operator: event.actorId, identity, input, submission: pinned}) !== receipt.fingerprint) return null;
+    // Verify that stored command hashes really came from this pinned original.
+    // Legacy spelling/order that cannot reproduce the receipt is unavailable;
+    // it is never guessed or rewritten during a read.
+    const authored = {...input};
+    delete authored.contentSha256; delete authored.descriptorSha256;
+    if (input.type === 'propose_product') delete authored.categoryId;
+    if (cataloguePayloadHash(submittedCatalogueInput(saved, authored, pinned.media)) !== cataloguePayloadHash(input)) return null;
+    return saved;
+  } catch {return null;}
+}
+/** Recover only reviewed facts from actual immutable originals. No supplier price
+ * or media ownership is projected into another Store's master selection. */
+export function resolveStoreMasterCatalogueItem(realm: StoreProductDraftRecord['realm'], identity: CatalogueIdentity,
+  catalogue: CatalogueAggregate, packId: string, productOriginal?: StoreMasterCatalogueOriginal,
+  packOriginal?: StoreMasterCatalogueOriginal): StoreMasterCatalogueItem | null {
+  const candidate = masterCandidates(catalogue, identity).find(row => row.pack.packId === packId);
+  if (!candidate) return null;
+  const productSource = checkedMasterOriginal(realm, identity, catalogue, candidate.productEvent, productOriginal);
+  const packSource = checkedMasterOriginal(realm, identity, catalogue, candidate.packEvent, packOriginal);
+  if (!productSource || !packSource || !productOriginal || !packOriginal) return null;
+  try {
+    const content = submittedContent(productSource, candidate.product.productId, productOriginal.receipt.submission?.media);
+    const descriptor = authoredPack(packSource.product.pack);
+    if (cataloguePayloadHash(content) !== candidate.contentSha256 || !canonicalContentMatches(candidate.product, content) ||
+        cataloguePayloadHash(descriptor) !== candidate.pack.descriptorSha256.toUpperCase()) return null;
+    const {media, ...descriptive} = content;
+    const codes = {product: masterCodes(candidate.product.codes), pack: masterCodes(candidate.pack.codes)};
+    const projectionFingerprint = cataloguePayloadHash({content: descriptive, pack: descriptor, codes});
+    const selectionId = 'master-' + cataloguePayloadHash([realm, identity, candidate.product.productId,
+      candidate.pack.packId, candidate.contentSha256, candidate.pack.descriptorSha256.toUpperCase(), projectionFingerprint]).toLowerCase();
+    return {selectionId, canonicalProductId: candidate.product.productId, verifiedPackId: candidate.pack.packId,
+      contentSha256: candidate.contentSha256, descriptorSha256: candidate.pack.descriptorSha256.toUpperCase(), projectionFingerprint,
+      content: descriptive, pack: descriptor, codes, mediaIncluded: false, sourceMediaCount: media.length};
+  } catch {return null;}
+}
+export function storeMasterCatalogueOrigin(item: StoreMasterCatalogueItem): StoreMasterCatalogueOrigin {
+  return normalizeMasterCatalogueOrigin({selectionId: item.selectionId, canonicalProductId: item.canonicalProductId,
+    verifiedPackId: item.verifiedPackId, contentSha256: item.contentSha256, descriptorSha256: item.descriptorSha256,
+    projectionFingerprint: item.projectionFingerprint, snapshotId: item.selectionId.slice('master-'.length)})!;
+}
+function masterLookupRequest(body: Readonly<Record<string, unknown>>): StoreMasterCatalogueRequest {
+  exact(body, ['masterCatalogueVersion', 'storeId', 'query', 'pageSize', 'cursor']);
+  if (body.masterCatalogueVersion !== 1) invalid('Update MoolSocial to search the master catalogue.');
+  const query = exact(body.query, ['search', 'code']);
+  const search = text(query.search, 160, true).replace(/\s+/gu, ' ');
+  const code = query.code === null ? null : text(query.code, 128);
+  return {storeId: id(body.storeId), query: {search, code}, pageSize: integer(body.pageSize, 1, 50),
+    cursor: body.cursor === null ? null : text(body.cursor, 2048)};
+}
+function masterCatalogueScan(owner: string, realm: StoreProductDraftRecord['realm'], identity: CatalogueIdentity,
+  catalogue: CatalogueAggregate, request: StoreMasterCatalogueRequest) {
+  const all = masterCandidates(catalogue, identity);
+  const snapshotId = cataloguePayloadHash([realm, identity, all.map(row => [row.product.productId, row.pack.packId,
+    row.contentSha256, row.pack.descriptorSha256, masterCodes(row.product.codes), masterCodes(row.pack.codes),
+    row.productEvent?.eventId ?? null, row.packEvent?.eventId ?? null])]).toLowerCase();
+  const scopeFingerprint = cataloguePayloadHash([realm, id(owner), request.storeId, identity, request.query]);
+  const candidates = request.query.code === null ? all : all.filter(row =>
+    masterCodeMatches([...row.product.codes, ...row.pack.codes], request.query.code!));
+  let start = 0;
+  if (request.cursor !== null) {
+    let raw: unknown;
+    try {
+      const bytes = Buffer.from(request.cursor, 'base64url');
+      if (bytes.toString('base64url') !== request.cursor) invalid();
+      raw = JSON.parse(bytes.toString('utf8'));
+    } catch {return invalid('The catalogue page is invalid. Search again.');}
+    const cursor = exact(raw, ['schemaVersion', 'snapshotId', 'scopeFingerprint', 'after']);
+    if (cursor.schemaVersion !== 1 || cursor.snapshotId !== snapshotId || cursor.scopeFingerprint !== scopeFingerprint ||
+        !Array.isArray(cursor.after) || cursor.after.length !== 2) {
+      throw new WorkspaceProfileError('conflict', 'The catalogue or search changed. Search again.', 409, true);
+    }
+    const product = id(cursor.after[0]), pack = id(cursor.after[1]);
+    const previous = candidates.findIndex(row => row.product.productId === product && row.pack.packId === pack);
+    if (previous < 0) throw new WorkspaceProfileError('conflict', 'The catalogue page changed. Search again.', 409, true);
+    start = previous + 1;
+  }
+  const batch = candidates.slice(start, start + request.pageSize), last = batch.at(-1);
+  const nextCursor = start + batch.length < candidates.length && last ? Buffer.from(JSON.stringify({schemaVersion: 1,
+    snapshotId, scopeFingerprint, after: [last.product.productId, last.pack.packId]})).toString('base64url') : null;
+  return {batch, snapshotId, nextCursor, verifiedPackCount: all.length};
+}
+export function storeProductDraft(ownerUserId: string, realm: StoreProductDraftRecord['realm'],
+  body: Readonly<Record<string, unknown>>, at: string): StoreProductDraftCommand {
+  exact(body, ['storeId', 'expectedRevision', 'idempotencyKey', 'draft', 'catalogueOrigin']);
+  if (!['evaluation', 'production'].includes(realm) || !Number.isFinite(Date.parse(at)) || new Date(at).toISOString() !== at) invalid();
+  const command = {ownerUserId: id(ownerUserId), realm, storeId: id(body.storeId),
+    expectedRevision: integer(body.expectedRevision, 0, 999999999), idempotencyKey: id(body.idempotencyKey), savedAt: at,
+    draft: normalizeSavedProductDraft(body.draft), catalogueOrigin: normalizeMasterCatalogueOrigin(body.catalogueOrigin)};
+  return {...command, fingerprint: cataloguePayloadHash({ownerUserId: command.ownerUserId, realm, storeId: command.storeId,
+    expectedRevision: command.expectedRevision, draft: command.draft, catalogueOrigin: command.catalogueOrigin})};
+}
+function checkedProductDraft(raw: unknown, realm: StoreProductDraftRecord['realm'], storeId: string, skuId: string): StoreProductDraftRecord {
+  const r = exact(raw, ['schemaVersion', 'realm', 'storeId', 'skuId', 'revision', 'savedAt', 'savedBy', 'fingerprint', 'draft', 'catalogueOrigin']);
+  const original = storeProductDraft(id(r.savedBy), realm, {storeId, expectedRevision: integer(r.revision, 1, 1000000000) - 1,
+    idempotencyKey: 'validation-only', draft: r.draft, catalogueOrigin: r.catalogueOrigin}, text(r.savedAt, 32));
+  if (r.schemaVersion !== 1 || r.realm !== realm || r.storeId !== storeId || r.skuId !== skuId ||
+      original.draft.skuId !== skuId || r.fingerprint !== original.fingerprint) invalid('Saved product draft is invalid.');
+  return {schemaVersion: 1, realm, storeId, skuId, revision: original.expectedRevision + 1, savedAt: original.savedAt,
+    savedBy: original.ownerUserId, fingerprint: original.fingerprint, draft: original.draft, catalogueOrigin: original.catalogueOrigin};
+}
+export function planStoreProductDraft(command: StoreProductDraftCommand, profile: WorkspaceProfileRecord | undefined,
+  current?: StoreProductDraftRecord, receipt?: StoreProductDraftReceipt, admittedOrigin?: StoreMasterCatalogueOrigin): StoreProductDraftRecord {
+  requireStore(profile, command.storeId, command.ownerUserId);
+  const normalized = storeProductDraft(command.ownerUserId, command.realm, {storeId: command.storeId,
+    expectedRevision: command.expectedRevision, idempotencyKey: command.idempotencyKey,
+    draft: command.draft, catalogueOrigin: command.catalogueOrigin}, command.savedAt);
+  if (normalized.fingerprint !== command.fingerprint) invalid();
+  if (receipt) {
+    const record = checkedProductDraft(receipt.record, command.realm, command.storeId, command.draft.skuId);
+    if (receipt.fingerprint !== command.fingerprint || record.fingerprint !== command.fingerprint) {
+      throw new WorkspaceProfileError('conflict', 'The original saved-product request changed. Check its result.', 409);
+    }
+    return record;
+  }
+  const prior = current && checkedProductDraft(current, command.realm, command.storeId, command.draft.skuId);
+  // A previously accepted origin remains historical provenance for this exact
+  // private SKU. Editing its authored facts never renews catalogue approval.
+  const retainedOrigin = prior?.catalogueOrigin !== null && prior?.catalogueOrigin !== undefined &&
+    cataloguePayloadHash(prior.catalogueOrigin) === cataloguePayloadHash(command.catalogueOrigin);
+  if (command.catalogueOrigin !== null && !retainedOrigin && (!admittedOrigin ||
+      cataloguePayloadHash(normalizeMasterCatalogueOrigin(admittedOrigin)) !== cataloguePayloadHash(command.catalogueOrigin))) {
+    throw new WorkspaceProfileError('conflict', 'Refresh the original catalogue selection before syncing this product.', 409);
+  }
+  if (command.expectedRevision !== (prior?.revision ?? 0)) {
+    throw new WorkspaceProfileError('conflict', 'This saved product changed. Check its latest version.', 409);
+  }
+  return {schemaVersion: 1, realm: command.realm, storeId: command.storeId, skuId: command.draft.skuId,
+    revision: command.expectedRevision + 1, savedAt: command.savedAt, savedBy: command.ownerUserId,
+    fingerprint: command.fingerprint, draft: normalized.draft, catalogueOrigin: normalized.catalogueOrigin};
+}
+
 export function storeProductSubmission(ownerUserId: string, realm: StoreProductSubmissionRecord["realm"],
   body: Readonly<Record<string, unknown>>, at: string): StoreProductSubmissionCommand {
   exact(body, ["storeId", "expectedRevision", "idempotencyKey", "product"]);
@@ -3429,7 +3822,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       if (!result.replayed) {
         transaction.set(aggregateRef, result.aggregate);
         transaction.create(aggregateRef.collection("revisions").doc(String(result.aggregate.version)), result.aggregate);
-        transaction.create(receiptRef, {fingerprint: result.fingerprint, result: result.aggregate,
+        transaction.create(receiptRef, {fingerprint: result.fingerprint, result: result.aggregate, input: normalized,
           ...(pinned ? {submission: pinned} : {})});
         if (mediaIndex && !mediaIndex.exists) transaction.create(mediaIndex.ref, {schemaVersion: 1, source: pinned});
       }
@@ -3509,6 +3902,135 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       if (!current.exists || current.get('priceRevision') !== priceRevision) tx.set(ref,
         {schemaVersion: 1, realm: this.realm, storeId, skuId, priceRevision, requestedAt: this.now().toISOString()});
       return {schemaVersion: 1, realm: this.realm, storeId, skuId, priceRevision, state: 'recorded', orderingAvailable: false};
+    });
+  }
+  private productDraftHead(storeId: string, skuId: string) {
+    return this.root(id(storeId)).collection('productDrafts').doc(id(skuId));
+  }
+  private checkedDraftCommand(original: StoreProductDraftCommand): StoreProductDraftCommand {
+    const command = storeProductDraft(original.ownerUserId, original.realm, {storeId: original.storeId,
+      expectedRevision: original.expectedRevision, idempotencyKey: original.idempotencyKey,
+      draft: original.draft, catalogueOrigin: original.catalogueOrigin}, original.savedAt);
+    if (command.realm !== this.realm || command.fingerprint !== original.fingerprint) invalid();
+    return command;
+  }
+  private async masterOriginal(transaction: Transaction, identity: CatalogueIdentity,
+    event: CatalogueAuditEvent | null): Promise<StoreMasterCatalogueOriginal | undefined> {
+    if (!event) return undefined;
+    const aggregate = this.firestore.collection('workspaceCatalogues').doc(this.realm)
+      .collection('canonicalCatalogues').doc(id(identity.catalogueId));
+    const receiptDoc = await transaction.get(aggregate.collection('producerReceipts')
+      .doc(cataloguePayloadHash([event.actorId, event.commandId])));
+    if (!receiptDoc.exists) return undefined;
+    const receipt = receiptDoc.data() as CatalogueProductionReceipt;
+    let pin: CatalogueSubmissionReference;
+    try {pin = submissionReference(receipt.submission);} catch {return undefined;}
+    if (pin.realm !== this.realm || !Number.isSafeInteger(event.aggregateVersion) || event.aggregateVersion < 1) return undefined;
+    const [revision, submission] = await transaction.getAll(
+      aggregate.collection('revisions').doc(String(event.aggregateVersion)),
+      this.productSubmissionHead(pin.storeId, pin.skuId).collection('revisions').doc(String(pin.revision)));
+    if (!revision?.exists || !submission?.exists) return undefined;
+    return {receipt, revision: revision.data() as CatalogueAggregate, submission: submission.data() as StoreProductSubmissionRecord};
+  }
+  async masterCataloguePage(ownerUserId: string, identity: CatalogueIdentity,
+    request: StoreMasterCatalogueRequest): Promise<StoreMasterCataloguePage> {
+    ownerUserId = id(ownerUserId);
+    request = masterLookupRequest({masterCatalogueVersion: 1, ...request});
+    return this.firestore.runTransaction(async transaction => {
+      await this.productSubmissionOwner(transaction, request.storeId, ownerUserId);
+      const doc = await transaction.get(this.firestore.collection('workspaceCatalogues').doc(this.realm)
+        .collection('canonicalCatalogues').doc(id(identity.catalogueId)));
+      if (!doc.exists) throw new WorkspaceProfileError('service_unavailable', 'The original master catalogue is unavailable.', 503, true);
+      const catalogue = doc.data() as CatalogueAggregate, scan = masterCatalogueScan(ownerUserId, this.realm, identity, catalogue, request);
+      const originals = new Map<string, Promise<StoreMasterCatalogueOriginal | undefined>>();
+      const original = (event: CatalogueAuditEvent | null) => {
+        if (!event) return Promise.resolve(undefined);
+        const key = event.eventId;
+        if (!originals.has(key)) originals.set(key, this.masterOriginal(transaction, identity, event));
+        return originals.get(key)!;
+      };
+      let missingSourceCount = 0;
+      const items: StoreMasterCatalogueItem[] = [];
+      for (const candidate of scan.batch) {
+        const [product, pack] = await Promise.all([original(candidate.productEvent), original(candidate.packEvent)]);
+        const item = resolveStoreMasterCatalogueItem(this.realm, identity, catalogue, candidate.pack.packId, product, pack);
+        if (!item) {missingSourceCount++; continue;}
+        const search = request.query.search.toLocaleLowerCase('en-IN');
+        const textValues = (value: unknown): string[] => typeof value === 'string' ? [value]
+          : Array.isArray(value) ? value.flatMap(textValues)
+          : value !== null && typeof value === 'object' ? Object.values(value).flatMap(textValues) : [];
+        const searchable = [...textValues(item.content), item.pack.label,
+          ...item.codes.product.map(code => code.value), ...item.codes.pack.map(code => code.value)].join(' ').toLocaleLowerCase('en-IN');
+        if (search && !searchable.includes(search)) continue;
+        items.push(item);
+      }
+      return {schemaVersion: 1, masterCatalogueVersion: 1, realm: this.realm, storeId: request.storeId,
+        observedAt: this.now().toISOString(), state: 'ready', query: request.query, snapshotId: scan.snapshotId,
+        items, nextCursor: scan.nextCursor, scannedCount: scan.batch.length, verifiedPackCount: scan.verifiedPackCount, missingSourceCount};
+    });
+  }
+  async saveProductDraft(original: StoreProductDraftCommand, identity?: CatalogueIdentity): Promise<StoreProductDraftRecord> {
+    const command = this.checkedDraftCommand(original), head = this.productDraftHead(command.storeId, command.draft.skuId);
+    const receiptRef = head.collection('receipts').doc(cataloguePayloadHash([command.ownerUserId, command.idempotencyKey]));
+    return this.firestore.runTransaction(async transaction => {
+      const profile = await this.productSubmissionOwner(transaction, command.storeId, command.ownerUserId);
+      const [current, receipt] = await transaction.getAll(head, receiptRef);
+      let admittedOrigin: StoreMasterCatalogueOrigin | undefined;
+      const prior = !receipt?.exists && current?.exists
+        ? checkedProductDraft(current.data(), command.realm, command.storeId, command.draft.skuId) : undefined;
+      const retainedOrigin = prior?.catalogueOrigin !== null && prior?.catalogueOrigin !== undefined &&
+        cataloguePayloadHash(prior.catalogueOrigin) === cataloguePayloadHash(command.catalogueOrigin);
+      if (!receipt?.exists && !retainedOrigin && command.catalogueOrigin !== null && identity) {
+        const doc = await transaction.get(this.firestore.collection('workspaceCatalogues').doc(this.realm)
+          .collection('canonicalCatalogues').doc(id(identity.catalogueId)));
+        if (doc.exists) {
+          const catalogue = doc.data() as CatalogueAggregate;
+          const candidate = masterCandidates(catalogue, identity).find(row => row.pack.packId === command.catalogueOrigin!.verifiedPackId);
+          if (candidate) {
+            const [product, pack] = await Promise.all([this.masterOriginal(transaction, identity, candidate.productEvent),
+              this.masterOriginal(transaction, identity, candidate.packEvent)]);
+            const item = resolveStoreMasterCatalogueItem(this.realm, identity, catalogue, candidate.pack.packId, product, pack);
+            if (item) admittedOrigin = storeMasterCatalogueOrigin(item);
+          }
+        }
+      }
+      const result = planStoreProductDraft(command, profile,
+        prior,
+        receipt?.exists ? receipt.data() as StoreProductDraftReceipt : undefined, admittedOrigin);
+      if (!receipt?.exists) {
+        transaction.set(head, result);
+        transaction.create(head.collection('revisions').doc(String(result.revision)), result);
+        transaction.create(receiptRef, {fingerprint: command.fingerprint, record: result});
+      }
+      return result;
+    });
+  }
+  async reconcileProductDraft(original: StoreProductDraftCommand): Promise<StoreProductDraftRecord | undefined> {
+    const command = this.checkedDraftCommand(original), head = this.productDraftHead(command.storeId, command.draft.skuId);
+    const receiptRef = head.collection('receipts').doc(cataloguePayloadHash([command.ownerUserId, command.idempotencyKey]));
+    return this.firestore.runTransaction(async transaction => {
+      const profile = await this.productSubmissionOwner(transaction, command.storeId, command.ownerUserId);
+      const receipt = await transaction.get(receiptRef);
+      return receipt.exists ? planStoreProductDraft(command, profile, undefined, receipt.data() as StoreProductDraftReceipt) : undefined;
+    });
+  }
+  async readProductDraft(storeId: string, skuId: string, ownerUserId: string): Promise<StoreProductDraftRecord | undefined> {
+    storeId = id(storeId); skuId = id(skuId); ownerUserId = id(ownerUserId);
+    return this.firestore.runTransaction(async transaction => {
+      await this.productSubmissionOwner(transaction, storeId, ownerUserId);
+      const record = await transaction.get(this.productDraftHead(storeId, skuId));
+      return record.exists ? checkedProductDraft(record.data(), this.realm, storeId, skuId) : undefined;
+    });
+  }
+  async listProductDrafts(storeId: string, ownerUserId: string, limit: number, after?: string): Promise<StoreProductDraftRecord[]> {
+    storeId = id(storeId); ownerUserId = id(ownerUserId); limit = integer(limit, 1, 50);
+    if (after !== undefined) after = id(after);
+    let query = this.root(storeId).collection('productDrafts').orderBy(FieldPath.documentId()).limit(limit);
+    if (after !== undefined) query = query.startAfter(after);
+    return this.firestore.runTransaction(async transaction => {
+      await this.productSubmissionOwner(transaction, storeId, ownerUserId);
+      const page = await transaction.get(query);
+      return page.docs.map(doc => checkedProductDraft(doc.data(), this.realm, storeId, id(doc.id)));
     });
   }
   private productSubmissionHead(storeId: string, skuId: string) {

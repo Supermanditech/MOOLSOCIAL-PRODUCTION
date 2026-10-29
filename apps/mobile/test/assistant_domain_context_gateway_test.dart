@@ -476,7 +476,8 @@ void main() {
     final data = {..._data(), 'ownerKey': sha256.convert(utf8.encode(jsonEncode([
       'fixture-project', 'domain-host-a', 'workspace', 'store-one']))).toString(),
       'scope': {'audience': 'workspace', 'storeId': 'store-one'}, 'revisions': [
-        {'actionId': action, 'entityId': null, 'sourceRevision': assistantStoreSupplierDraftContextActions.contains(action)
+        {'actionId': action, 'entityId': null, 'sourceRevision': const {'AI-ACT-229', 'AI-ACT-369'}.contains(action)
+          ? 'store-master-${action == 'AI-ACT-229' ? 'search' : 'scan'}-owner:evaluation:${'a' * 64}' : assistantStoreSupplierDraftContextActions.contains(action)
           ? 'store-supplier-draft-owner:${'a' * 64}' : assistantStorePurchaseRootContextActions.contains(action)
           ? 'store-purchase-root-owner:${'a' * 64}' : assistantStoreOrderBoardContextActions.contains(action)
           ? 'store-order-board-owner:${'a' * 64}' : assistantStoreReportOwnerContextActions.contains(action)
@@ -486,6 +487,14 @@ void main() {
       ]};
     final value = await _source(_Wire(() => _ok(data))).read(store, () => true);
     expect(value.revisions.keys.single, (action, null));
+    if (const {'AI-ACT-229', 'AI-ACT-369'}.contains(action)) {
+      final other = action == 'AI-ACT-229' ? 'scan' : 'search';
+      for (final proof in ['store-master-$other-owner:evaluation:${'a' * 64}',
+        'store-master-search-owner:foreign:${'a' * 64}', 'store-master-search-owner:evaluation:invalid']) {
+        final invalid = {...data, 'revisions': [{'actionId': action, 'entityId': null, 'sourceRevision': proof}]};
+        await expectLater(_source(_Wire(() => _ok(invalid))).read(store, () => true), throwsA(isA<AssistantModelFailure>()));
+      }
+    }
     final wrongEntity = {...data, 'revisions': [
       {'actionId': action, 'entityId': 'owned-sku-one', 'sourceRevision': 'wrong-domain'},
     ]};

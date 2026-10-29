@@ -17,7 +17,7 @@ export function retainedSupplierQuoteSelection(value: unknown): readonly string[
 }
 export const storeProductActions = new Set(["AI-ACT-214", "AI-ACT-221", "AI-ACT-370", "AI-ACT-220", "AI-ACT-230", "AI-ACT-222", "AI-ACT-223", "AI-ACT-226", "AI-ACT-227", "AI-ACT-371"]);
 export const storeProductDefaultActions = new Set(["AI-ACT-218", "AI-ACT-219"]);
-export const storeProductOwnerReadActions = new Set(["AI-ACT-213", "AI-ACT-215", "AI-ACT-224", "AI-ACT-372", "AI-ACT-225", "AI-ACT-374"]);
+export const storeProductOwnerReadActions = new Set(["AI-ACT-213", "AI-ACT-215", "AI-ACT-224", "AI-ACT-229", "AI-ACT-369", "AI-ACT-372", "AI-ACT-225", "AI-ACT-374"]);
 export const storeProductOwnerActions = new Set([...storeProductDefaultActions, ...storeProductOwnerReadActions]);
 export const storeStockOwnerActions=new Set(['AI-ACT-231','AI-ACT-232','AI-ACT-233','AI-ACT-407','AI-ACT-408']);
 export const storeRestockOwnerActions=new Set(['AI-ACT-234']);

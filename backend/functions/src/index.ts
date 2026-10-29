@@ -150,6 +150,7 @@ import {
   WorkspaceCatalogueService,
   storeVariantFamilyOperation,
   storeProductSubmissionOperation,
+  productDraftOperation,
   catalogueProductionOperation,
   storeStockOperation,
   storeStockVisibilityOperation,
@@ -3174,6 +3175,7 @@ export const moolSocialWorkspace = onRequest(
         : "";
       const variantFamilyOperation = storeVariantFamilyOperation(operation);
       const productSubmissionOperation = storeProductSubmissionOperation(operation);
+      const privateProductDraftOperation = productDraftOperation(operation);
       const catalogueProductionAction = catalogueProductionOperation(operation);
       const bulkQuoteAction = bulkSupplierQuoteOperation(operation);
       const bulkQuoteOperation = bulkQuoteAction !== undefined;
@@ -3232,7 +3234,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "saveRetailerProduct" ||
         operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === "saveStorePublicDetails" ||
-        variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || stockOperation === "save" || stockVisibilityOperation === "save" || stockVisibilityOperation === "close" || catalogueProductionAction !== undefined ||
+        variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || privateProductDraftOperation === 'save' || stockOperation === "save" || stockVisibilityOperation === "save" || stockVisibilityOperation === "close" || catalogueProductionAction !== undefined ||
         ['request', 'offer', 'accept', 'withdraw'].includes(bulkQuoteAction ?? '') ||
         operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation' || operation === 'recordPublicStorePresentation' || operation === 'recordPublicCartAddition' || operation === 'recordPublicCheckoutEntry';
       const supplierPolicyOperation = ["readStoreSupplierPolicy", "saveStoreSupplierPolicy",
@@ -3243,8 +3245,8 @@ export const moolSocialWorkspace = onRequest(
       const catalogueOperation = storeProcurementRead || ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
         'confirmStoreCommodityPrice', 'readStoreCommodityPrice', 'reconcileStoreCommodityPrice',
         'requestPublicCommodityPriceRefresh',
-        "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery",
-        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation || stockOperation !== undefined || stockVisibilityOperation !== undefined || catalogueProductionAction !== undefined;
+        "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery", 'readStoreMasterCatalogue',
+        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || privateProductDraftOperation !== undefined || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation || stockOperation !== undefined || stockVisibilityOperation !== undefined || catalogueProductionAction !== undefined;
       const orderMutation = operation === "acceptRetailerOrder" ||
         operation === "packRetailerOrder" ||
         operation === "requestRetailerDelivery" ||
@@ -3333,6 +3335,10 @@ export const moolSocialWorkspace = onRequest(
         ? await workspacePromotionService().handleOperation(ownerUserId, operation, catalogueBody)
         : productMediaOperation
         ? await workspaceCatalogueService().handleProductMedia(ownerUserId, operation, catalogueBody)
+        : operation === 'readStoreMasterCatalogue'
+        ? await workspaceCatalogueService().readMasterCatalogue(ownerUserId, catalogueBody)
+        : privateProductDraftOperation !== undefined
+        ? await workspaceCatalogueService().handleProductDraft(ownerUserId, operation, catalogueBody)
         : productSubmissionOperation !== undefined
         ? await workspaceCatalogueService().handleProductSubmission(ownerUserId, operation, catalogueBody)
         : variantFamilyOperation === "public_read"
