@@ -795,4 +795,54 @@ Check (!(Test-AiDomainOriginalLedgerCheckpoint $bad)) 'reject changed qualified 
 $bad=($originalLedgerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendContextPassed=0
 Check (!(Test-AiDomainOriginalLedgerCheckpoint $bad)) 'reject changed original-ledger evidence'
 
+$supplierMoneyCheckpoint=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate05OriginalMoneyCheckpoint
+Check (Test-AiDomainSupplierMoneyCheckpoint $supplierMoneyCheckpoint) 'exact host-qualified original original-supplier-money source checkpoint'
+Check (!(Test-AiDomainSupplierMoneyCheckpoint $null)) 'reject absent original original-supplier-money checkpoint'
+Check (@(Get-AiDomainSupplierMoneyStageOwners 0 $supplierMoneyCheckpoint).Count -eq 5) 'five exact existing original-supplier-money checkpoint metadata owners'
+Check (@(Get-AiDomainSupplierMoneyStageOwners 1 $supplierMoneyCheckpoint).Count -eq 16) 'sixteen exact qualified source owners'
+Check (@(Get-AiDomainSupplierMoneyStageOwners 2 $supplierMoneyCheckpoint).Count -eq 1) 'one sanitized evidence owner'
+Check (@(Get-AiDomainSupplierMoneyStageOwners 3 $supplierMoneyCheckpoint).Count -eq 0) 'no extra checkpoint stage'
+foreach($property in @('sequence','baseline')) {
+ $bad=($supplierMoneyCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainSupplierMoneyCheckpoint $bad)) "reject changed original-supplier-money $property"
+}
+$bad=($supplierMoneyCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.productionAcceptance=$true
+Check (!(Test-AiDomainSupplierMoneyCheckpoint $bad)) 'host qualification is not production acceptance'
+foreach($property in @('wholeAggregateComplete','populatedStoreDeviceQualified','originalRuntimeAuthorityAvailable','legacyMigrationAvailable','standaloneRegisterCreation','syntheticFinanceSnapshot','cloudActivation','financialLivePosting','founderApprovalClaimed','productionAcceptance')) {
+ $bad=($supplierMoneyCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainSupplierMoneyCheckpoint $bad)) "reject invented original-supplier-money qualification $property"
+}
+$bad=($supplierMoneyCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('foreign')
+Check (!(Test-AiDomainSupplierMoneyCheckpoint $bad)) 'reject expanded original-supplier-money owners'
+$bad=($supplierMoneyCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.owners[0].sha256='foreign'
+Check (!(Test-AiDomainSupplierMoneyCheckpoint $bad)) 'reject changed qualified source hash'
+$bad=($supplierMoneyCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendContextPassed=0
+Check (!(Test-AiDomainSupplierMoneyCheckpoint $bad)) 'reject changed original-supplier-money evidence'
+
+$creditAdmission=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate05CreditDocumentAdmission
+Check (Test-AiDomainCreditDocumentAdmission $creditAdmission) 'exact existing credit model admission under standing authority'
+Check (!(Test-AiDomainCreditDocumentAdmission $null)) 'reject absent credit model admission'
+Check (@(Get-AiDomainCreditDocumentAdmissionOwners).Count -eq 5) 'only five existing metadata owners'
+foreach($property in @('ticketId','baseline','uiReferenceBaseline','authority','previousOwner','currentOwner')) {
+ $bad=($creditAdmission|ConvertTo-Json -Depth 30)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainCreditDocumentAdmission $bad)) "reject changed credit admission $property"
+}
+foreach($property in @('interimSourceCommits','productionAcceptance')) {
+ $bad=($creditAdmission|ConvertTo-Json -Depth 30)|ConvertFrom-Json;$bad.$property=$true
+ Check (!(Test-AiDomainCreditDocumentAdmission $bad)) "reject expanded credit authority $property"
+ $bad=($creditAdmission|ConvertTo-Json -Depth 30)|ConvertFrom-Json;$bad.$property='false'
+ Check (!(Test-AiDomainCreditDocumentAdmission $bad)) "reject non-boolean credit authority $property"
+}
+$bad=($creditAdmission|ConvertTo-Json -Depth 30)|ConvertFrom-Json;$bad.additionalOwners+=@('foreign')
+Check (!(Test-AiDomainCreditDocumentAdmission $bad)) 'reject extra credit runtime owner'
+$bad=($creditAdmission|ConvertTo-Json -Depth 30)|ConvertFrom-Json;$bad.metadataOwners+=@('foreign')
+Check (!(Test-AiDomainCreditDocumentAdmission $bad)) 'reject extra credit metadata owner'
+$bad=($creditAdmission|ConvertTo-Json -Depth 30)|ConvertFrom-Json;$bad.contract.text+='foreign'
+Check (!(Test-AiDomainCreditDocumentAdmission $bad)) 'reject changed credit preservation contract'
+$bad=($creditAdmission|ConvertTo-Json -Depth 30)|ConvertFrom-Json;$bad.contract.sha256='foreign'
+Check (!(Test-AiDomainCreditDocumentAdmission $bad)) 'reject changed credit contract hash'
+$bad=($creditAdmission|ConvertTo-Json -Depth 30)|ConvertFrom-Json;$bad|Add-Member -NotePropertyName unrelatedScope -NotePropertyValue $true
+Check (!(Test-AiDomainCreditDocumentAdmission $bad)) 'reject unrelated credit admission property'
+$creditRecord=Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json')|ConvertFrom-Json
+Check (@($creditRecord.backendAdmission.runtimeOwners).Count -eq 53) 'exact prior52 plus one existing credit model owner'
 Write-Output "AI domain batch admission checks passed: $n."

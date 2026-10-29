@@ -1509,7 +1509,14 @@ function Invoke-AiDomainOriginalLedgerCheckpoint($Checkpoint,[string]$Head,[stri
     (@(Get-OctoberCompatibilityGitLines @('hash-object',"--path=$($row.path)",$row.path))[0]) -ceq $row.gitBlobOid) 'Working original-ledger source differs from qualification.'}
   else{Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($chain[1]):$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Committed original-ledger source differs from qualification.'}
  }
+ $creditOwnerAdmission=if($approval.PSObject.Properties.Name -ccontains 'aggregate05CreditDocumentAdmission'){$approval.aggregate05CreditDocumentAdmission}else{$null}
+ if(!$Continuation -and $null -ne $creditOwnerAdmission){
+  Assert-Coordination ((Test-AiDomainCreditDocumentAdmission $creditOwnerAdmission) -and
+    $Head -ceq $creditOwnerAdmission.baseline -and $Phase -ceq 'implementation') 'Credit model admission is implementation-only at its exact existing checkpoint; no interim commit.'
+ }
  if(!$Continuation){foreach($owner in @(Get-AiDomainBatchMetadataOwners)){
+  if($null -ne $creditOwnerAdmission -and $owner -cin @(Get-AiDomainCreditDocumentAdmissionOwners)){continue}
+
   if(($chain.Count -eq 0 -and $owner -cin @(Get-AiDomainOriginalLedgerSealOwners)) -or
     ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit' -and $owner -ceq $approvalOwner)){continue}
   Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
@@ -1520,6 +1527,67 @@ function Invoke-AiDomainOriginalLedgerCheckpoint($Checkpoint,[string]$Head,[stri
  }
  if(!$Continuation -and $Phase -ceq 'pre_commit'){
   $expected=@(Get-AiDomainOriginalLedgerStageOwners $chain.Count $Checkpoint)
+  Assert-Coordination ($expected.Count -gt 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Only exact original-ledger-checkpoint stage may be committed.'
+  if($chain.Count -eq 1){foreach($row in $Checkpoint.manifest.owners){
+   Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',":$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Staged original-ledger source differs from qualification.'
+  }}
+ }
+}
+function Get-AiDomainSupplierMoneySealOwners {
+ @(Get-AiDomainCreditDocumentAdmissionOwners)
+}
+function Test-AiDomainSupplierMoneyCheckpoint($Checkpoint) {
+ if($null -eq $Checkpoint -or $Checkpoint.sequence -cne '05-original-supplier-money-credit-refund' -or
+   $Checkpoint.baseline -cne 'faff52ae2213fec49973f3c6c293f866607830cf' -or
+   $Checkpoint.namedBranchPushAuthorized -isnot [bool] -or !$Checkpoint.namedBranchPushAuthorized -or
+   $Checkpoint.productionAcceptance -isnot [bool] -or $Checkpoint.productionAcceptance){return $false}
+ $pins=@{manifest='E357C46A96ADBF8FEC1AF3C6CAD9500F83EECEAC88B443397C639AC2418BA38E';
+   disposition='A046541B7910973B0D95029C47F896317C73429A1B5D0564EE7E34AE003A387C';
+   evidence='62E5551DEEE23D4FE705CD8622309E73804D1FDDB33CBC541B4F945592187F9C'}
+ foreach($part in $pins.Keys){
+  $raw=$Checkpoint.$part|ConvertTo-Json -Depth 60 -Compress
+  if([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($raw))) -cne $pins[$part]){return $false}
+ }
+ return $true
+}
+function Get-AiDomainSupplierMoneyStageOwners([int]$Count,$Checkpoint) {
+ switch($Count){0{@(Get-AiDomainSupplierMoneySealOwners)}1{@($Checkpoint.manifest.changedOwners)}2{@('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')}default{@()}}
+}
+function Invoke-AiDomainSupplierMoneyCheckpoint($Checkpoint,[string]$Head,[string]$Phase,[switch]$Continuation) {
+ Assert-Coordination (Test-AiDomainSupplierMoneyCheckpoint $Checkpoint) 'Only the exact tested sixteen-owner original supplier money/credit/refund checkpoint is admitted.'
+ $base=$Checkpoint.baseline;$approvalOwner='docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json'
+ $chain=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"${base}..${Head}"))
+ Assert-Coordination ($chain.Count -le 3) 'Only exact original-ledger metadata, source and evidence commits are admitted.'
+ $subjects=@('coordination(ai-domain-batch-20261028): admit qualified original supplier money checkpoint',
+   'feat(ai-domain-batch-20261028): connect original supplier money credit and refund recovery',
+   'test(ai-domain-batch-20261028): record original supplier money qualification and limits')
+ for($i=0;$i -lt $chain.Count;$i++){
+  $parent=if($i -eq 0){$base}else{$chain[$i-1]};$expected=@(Get-AiDomainSupplierMoneyStageOwners $i $Checkpoint)
+  Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$chain[$i]))[0]) -ceq $parent -and
+   (@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$chain[$i]))[0]) -ceq $subjects[$i] -and
+   (@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$parent,$chain[$i])|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Original-ledger checkpoint parent, subject or exact owners changed.'
+ }
+ if($chain.Count -gt 0){
+  $sealed=(@(Get-OctoberCompatibilityGitLines @('show',"$($chain[0]):$approvalOwner"))-join "`n")|ConvertFrom-Json
+  Assert-Coordination (Test-AiDomainSupplierMoneyCheckpoint $sealed.aggregate05OriginalMoneyCheckpoint) 'Committed original supplier-money qualification changed.'
+ }
+ foreach($row in $Checkpoint.manifest.owners){
+  if($chain.Count -lt 2){Assert-Coordination ((Get-Sha256 (Join-Path $root $row.path)) -ceq $row.sha256 -and
+    (@(Get-OctoberCompatibilityGitLines @('hash-object',"--path=$($row.path)",$row.path))[0]) -ceq $row.gitBlobOid) 'Working original-ledger source differs from qualification.'}
+  else{Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($chain[1]):$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Committed original-ledger source differs from qualification.'}
+ }
+ if(!$Continuation){foreach($owner in @(Get-AiDomainBatchMetadataOwners)){
+
+  if(($chain.Count -eq 0 -and $owner -cin @(Get-AiDomainSupplierMoneySealOwners)) -or
+    ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit' -and $owner -ceq $approvalOwner)){continue}
+  Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
+ }
+ }
+ if($chain.Count -eq 3 -or ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit')){
+  Assert-Coordination ($Checkpoint.sourceCommit -ceq $chain[1]) 'Original-ledger evidence must name its qualified source commit before closure.'
+ }
+ if(!$Continuation -and $Phase -ceq 'pre_commit'){
+  $expected=@(Get-AiDomainSupplierMoneyStageOwners $chain.Count $Checkpoint)
   Assert-Coordination ($expected.Count -gt 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Only exact original-ledger-checkpoint stage may be committed.'
   if($chain.Count -eq 1){foreach($row in $Checkpoint.manifest.owners){
    Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',":$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Staged original-ledger source differs from qualification.'
@@ -1682,6 +1750,33 @@ function Invoke-AiDomainAggregateFourSourceAdmission($Admission,[string]$Head,[s
    (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($allowed|Sort-Object)-join '|')) 'Only the exact five-file original source admission metadata commit is permitted.'
  }
 }
+# Exact existing-owner reconciliation for the activated credit-document slice.
+function Get-AiDomainCreditDocumentAdmissionOwners {
+ @('config/codex-subagent-coordination-policy.json','docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json',
+   'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json','scripts/ai-domain-batch-admission.ps1',
+   'scripts/test-ai-domain-batch-admission.ps1')
+}
+function Test-AiDomainCreditDocumentAdmission($Admission) {
+ if($null -eq $Admission){return $false}
+ $keys=@('schemaVersion','ticketId','baseline','uiReferenceBaseline','authority','previousOwner','currentOwner',
+   'additionalOwners','metadataOwners','contract','interimSourceCommits','productionAcceptance')
+ if((@($Admission.PSObject.Properties.Name|Sort-Object)-join '|') -cne (@($keys|Sort-Object)-join '|') -or
+   $Admission.schemaVersion -ne 1 -or $Admission.ticketId -cne 'AI-AGG-05' -or
+   $Admission.baseline -cne 'faff52ae2213fec49973f3c6c293f866607830cf' -or
+   $Admission.uiReferenceBaseline -cne 'c9d03bb37b6115f7fe63f3f1dd819892dc037fc9' -or
+   $Admission.authority -cne 'founder_standing_exact_narrow_admission' -or
+   $Admission.previousOwner -cne '/root' -or $Admission.currentOwner -cne '/root/codex_backend_ai_domain_batch' -or
+   @($Admission.additionalOwners).Count -ne 1 -or
+   $Admission.additionalOwners[0] -cne 'apps/mobile/lib/features/work/work_models.dart' -or
+   (@($Admission.metadataOwners|Sort-Object)-join '|') -cne (@(Get-AiDomainCreditDocumentAdmissionOwners|Sort-Object)-join '|') -or
+   $Admission.interimSourceCommits -isnot [bool] -or $Admission.interimSourceCommits -or
+   $Admission.productionAcceptance -isnot [bool] -or $Admission.productionAcceptance){return $false}
+ $contract=$Admission.contract
+ if($null -eq $contract -or (@($contract.PSObject.Properties.Name|Sort-Object)-join '|') -cne 'sha256|text' -or
+   $contract.text -isnot [string] -or
+   $contract.sha256 -cne 'E803A08026056B959280C96419A7694F39CA17E8E2330D5EE28C5A48E323003C'){return $false}
+ return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($contract.text))) -ceq $contract.sha256
+}
 function Invoke-AiDomainBatchAdmission {
  $base='7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67';$contract='docs/quality/AI-DOMAIN-BATCH-CONTRACT-20261028.md';$hash='9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382';$recordOwner='docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json'
  $approval=Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json
@@ -1711,10 +1806,13 @@ function Invoke-AiDomainBatchAdmission {
  $purchaseDataCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'aggregate03PurchaseDataCheckpoint'){$approval.aggregate03PurchaseDataCheckpoint}else{$null}
  $aggregateFourAdmission=if($approval.PSObject.Properties.Name -ccontains 'aggregate04SourceAdmission'){$approval.aggregate04SourceAdmission}else{$null}
  $originalLedgerCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'aggregate04OriginalLedgerCheckpoint'){$approval.aggregate04OriginalLedgerCheckpoint}else{$null}
+ $creditDocumentAdmission=if($approval.PSObject.Properties.Name -ccontains 'aggregate05CreditDocumentAdmission'){$approval.aggregate05CreditDocumentAdmission}else{$null}
+ $supplierMoneyCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'aggregate05OriginalMoneyCheckpoint'){$approval.aggregate05OriginalMoneyCheckpoint}else{$null}
  $runtime=if($null -ne $privateStarsAdmission){@(Get-AiDomainPrivateStarsRuntimeOwners $privateStarsAdmission $cache)}elseif($null -ne $cache){@(Get-AiDomainCurrentRuntimeOwners $cache)}else{@(Get-AiDomainBatchRuntimeOwners)}
  if($null -ne $aggregateTwoAdmission){Assert-Coordination (Test-AiDomainAggregateTwoSourceAdmission $aggregateTwoAdmission) 'Exact seven original source owners required.';$runtime=@($runtime)+@($aggregateTwoAdmission.additionalOwners)}
  if($null -ne $aggregateThreeAdmission){Assert-Coordination (Test-AiDomainAggregateThreeSourceAdmission $aggregateThreeAdmission) 'Exact five original purchase-book source owners required.';$runtime=@($runtime)+@($aggregateThreeAdmission.additionalOwners)}
  if($null -ne $aggregateFourAdmission){Assert-Coordination (Test-AiDomainAggregateFourSourceAdmission $aggregateFourAdmission) 'Exact five original ledger source owners required.';$runtime=@($runtime)+@($aggregateFourAdmission.additionalOwners)}
+ if($null -ne $creditDocumentAdmission){Assert-Coordination (Test-AiDomainCreditDocumentAdmission $creditDocumentAdmission) 'Only exact existing credit document model owner is admitted.';$runtime=@($runtime)+@($creditDocumentAdmission.additionalOwners)}
  $metadata=@(Get-AiDomainBatchMetadataOwners);$bootstrap=@(Get-AiDomainBatchBootstrapOwners);$amend=@(Get-AiDomainBatchSelectorAmendOwners);$owners=$runtime+$metadata
  $branch=@(Get-OctoberCompatibilityGitLines @('branch','--show-current'))[0]
  Assert-Coordination (Test-AiDomainBatchIdentity @{Root=$root.Replace('\','/');Branch=$branch;Lane=$ProductionLane;Role=$AgentRole;Task=$AgentTask;WorkId=$ProductionWorkId;Ticket=$ProductionTicketId;Phase=$ProductionPhase}) 'Combined exact identity/phase required.'
@@ -1726,7 +1824,7 @@ function Invoke-AiDomainBatchAdmission {
  $scopeTwo = $approval.scope02Admission
  $scopeTwoCheckpoint = $approval.scope02Checkpoint
  $middle=if($approval.PSObject.Properties.Name -ccontains 'scope03Through07Checkpoint'){$approval.scope03Through07Checkpoint}else{$null}
- $metadataCount = if($null -ne $originalLedgerCheckpoint){36} elseif($null -ne $aggregateFourAdmission){35} elseif($null -ne $purchaseDataCheckpoint){34} elseif($null -ne $aggregateThreeAdmission){33} elseif($null -ne $typedPreviewCheckpoint){32} elseif($null -ne $aggregateTwoCheckpoint){31} elseif($null -ne $aggregateTwoAdmission){30} elseif($null -ne $expiredPriceCheckpoint){29} elseif($null -ne $selectedRestockCheckpoint){28} elseif($null -ne $retainedQuoteCheckpoint){27} elseif($null -ne $quoteRecurrence){26} elseif($null -ne $cartClearCheckpoint){24} elseif($null -ne $purchaseReferenceCheckpoint){23} elseif($null -ne $publicationReadyCheckpoint){22} elseif($null -ne $storeSettingsCheckpoint){21} elseif($null -ne $storeReportsCheckpoint){20} elseif($null -ne $storeCouponsCheckpoint){19} elseif($null -ne $storeOperationsCheckpoint){18} elseif($null -ne $originalReceivingCheckpoint){17} elseif($null -ne $purchaseRootCheckpoint){16} elseif($null -ne $supplierDraftCheckpoint){15} elseif($null -ne $privateStarsCheckpoint){14} elseif($null -ne $privateStarsAdmission){13} elseif($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
+ $metadataCount = if($null -ne $supplierMoneyCheckpoint){37} elseif($null -ne $originalLedgerCheckpoint){36} elseif($null -ne $aggregateFourAdmission){35} elseif($null -ne $purchaseDataCheckpoint){34} elseif($null -ne $aggregateThreeAdmission){33} elseif($null -ne $typedPreviewCheckpoint){32} elseif($null -ne $aggregateTwoCheckpoint){31} elseif($null -ne $aggregateTwoAdmission){30} elseif($null -ne $expiredPriceCheckpoint){29} elseif($null -ne $selectedRestockCheckpoint){28} elseif($null -ne $retainedQuoteCheckpoint){27} elseif($null -ne $quoteRecurrence){26} elseif($null -ne $cartClearCheckpoint){24} elseif($null -ne $purchaseReferenceCheckpoint){23} elseif($null -ne $publicationReadyCheckpoint){22} elseif($null -ne $storeSettingsCheckpoint){21} elseif($null -ne $storeReportsCheckpoint){20} elseif($null -ne $storeCouponsCheckpoint){19} elseif($null -ne $storeOperationsCheckpoint){18} elseif($null -ne $originalReceivingCheckpoint){17} elseif($null -ne $purchaseRootCheckpoint){16} elseif($null -ne $supplierDraftCheckpoint){15} elseif($null -ne $privateStarsCheckpoint){14} elseif($null -ne $privateStarsAdmission){13} elseif($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
  Assert-Coordination ($approval.acceptedUiCommit -ceq $base -and $approval.uiContractSha256 -ceq $hash -and $approval.founderAnswer -ceq 'EXECUTE' -and $approval.localMetadataCommits -eq $metadataCount -and !$approval.sourceFeatureCommits -and !$approval.backendBranchPush -and !$approval.deployment -and !$approval.productionAcceptance) 'Exact acceptance/authority differs.'
  if ($null -ne $checkpoint) {Assert-Coordination ($binding.id -ceq 'ai_domain_batch_20261028' -and $binding.state -ceq 'founder_authorized_2026_10_28') 'Correct current batch identity required; no stale Profile or History binding.'}
  Assert-Coordination ((Get-Sha256 (Join-Path $root 'docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md')) -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $record.backendAdmission.originalProviderTestAddendum.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $approval.originalProviderTestAdmission.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22') 'Exact original-provider test boundary changed.'
@@ -1776,7 +1874,8 @@ function Invoke-AiDomainBatchAdmission {
  if($null -ne $purchaseDataCheckpoint){Assert-Coordination ($null -ne $aggregateThreeAdmission -and (Test-AiDomainPurchaseDataCheckpoint $purchaseDataCheckpoint)) 'Exact host-qualified original purchase-data checkpoint required; OPPO and source dependencies stay unqualified.'}
  if($null -ne $aggregateFourAdmission){Assert-Coordination ($null -ne $purchaseDataCheckpoint -and (Test-AiDomainAggregateFourSourceAdmission $aggregateFourAdmission)) 'Exact sealed purchase data and original ledger source admission required.'}
  if($null -ne $originalLedgerCheckpoint){Assert-Coordination ($null -ne $aggregateFourAdmission -and (Test-AiDomainOriginalLedgerCheckpoint $originalLedgerCheckpoint)) 'Exact preserved original admission and tested ledger checkpoint required.'}
- $maximumCommits = if($null -ne $originalLedgerCheckpoint){82} elseif($null -ne $aggregateFourAdmission){79} elseif($null -ne $purchaseDataCheckpoint){78} elseif($null -ne $aggregateThreeAdmission){75} elseif($null -ne $typedPreviewCheckpoint){74} elseif($null -ne $aggregateTwoCheckpoint){71} elseif($null -ne $aggregateTwoAdmission){68} elseif($null -ne $expiredPriceCheckpoint){67} elseif($null -ne $selectedRestockCheckpoint){64} elseif($null -ne $retainedQuoteCheckpoint){61} elseif($null -ne $quoteRecurrence){58} elseif($null -ne $cartClearCheckpoint){56} elseif($null -ne $purchaseReferenceCheckpoint){53} elseif($null -ne $publicationReadyCheckpoint){50} elseif($null -ne $storeSettingsCheckpoint){47} elseif($null -ne $storeReportsCheckpoint){44} elseif($null -ne $storeCouponsCheckpoint){41} elseif($null -ne $storeOperationsCheckpoint){38} elseif($null -ne $originalReceivingCheckpoint){35} elseif($null -ne $purchaseRootCheckpoint){32} elseif($null -ne $supplierDraftCheckpoint){29} elseif($null -ne $privateStarsCheckpoint){26} elseif($null -ne $privateStarsAdmission){23} elseif($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
+ if($null -ne $supplierMoneyCheckpoint){Assert-Coordination ($null -ne $creditDocumentAdmission -and $null -ne $originalLedgerCheckpoint -and (Test-AiDomainSupplierMoneyCheckpoint $supplierMoneyCheckpoint)) 'Exact original credit admission and tested supplier money checkpoint required.'}
+ $maximumCommits = if($null -ne $supplierMoneyCheckpoint){85} elseif($null -ne $originalLedgerCheckpoint){82} elseif($null -ne $aggregateFourAdmission){79} elseif($null -ne $purchaseDataCheckpoint){78} elseif($null -ne $aggregateThreeAdmission){75} elseif($null -ne $typedPreviewCheckpoint){74} elseif($null -ne $aggregateTwoCheckpoint){71} elseif($null -ne $aggregateTwoAdmission){68} elseif($null -ne $expiredPriceCheckpoint){67} elseif($null -ne $selectedRestockCheckpoint){64} elseif($null -ne $retainedQuoteCheckpoint){61} elseif($null -ne $quoteRecurrence){58} elseif($null -ne $cartClearCheckpoint){56} elseif($null -ne $purchaseReferenceCheckpoint){53} elseif($null -ne $publicationReadyCheckpoint){50} elseif($null -ne $storeSettingsCheckpoint){47} elseif($null -ne $storeReportsCheckpoint){44} elseif($null -ne $storeCouponsCheckpoint){41} elseif($null -ne $storeOperationsCheckpoint){38} elseif($null -ne $originalReceivingCheckpoint){35} elseif($null -ne $purchaseRootCheckpoint){32} elseif($null -ne $supplierDraftCheckpoint){29} elseif($null -ne $privateStarsCheckpoint){26} elseif($null -ne $privateStarsAdmission){23} elseif($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
  Assert-Coordination ($commits.Count -le $maximumCommits -and @(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$base..$head")).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('ls-files','-v')|Where-Object {$_ -cmatch '^[a-zS] '}).Count -eq 0) 'Only exact admitted checkpoint history; no history/index overrides.'
  $changed=@(@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base))+@(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')))|Sort-Object -Unique
  Assert-AiDomainBatchOwners $changed $owners
@@ -1860,7 +1959,10 @@ function Invoke-AiDomainBatchAdmission {
                                  Invoke-AiDomainPurchaseDataCheckpoint $purchaseDataCheckpoint 'ba3ad6ad2f2c7dc7ca440f5d9724c5743ffe04ea' 'implementation' -Continuation
                                  if($null -ne $originalLedgerCheckpoint){
                                   Invoke-AiDomainAggregateFourSourceAdmission $aggregateFourAdmission 'c7f8ee9108afd27af5a2dc4d84d33246b8bb6ecd' 'implementation' -Continuation
-                                  Invoke-AiDomainOriginalLedgerCheckpoint $originalLedgerCheckpoint $head $ProductionPhase
+                                  if($null -ne $supplierMoneyCheckpoint){
+                                   Invoke-AiDomainOriginalLedgerCheckpoint $originalLedgerCheckpoint 'faff52ae2213fec49973f3c6c293f866607830cf' 'implementation' -Continuation
+                                   Invoke-AiDomainSupplierMoneyCheckpoint $supplierMoneyCheckpoint $head $ProductionPhase
+                                  }else{Invoke-AiDomainOriginalLedgerCheckpoint $originalLedgerCheckpoint $head $ProductionPhase}
                                  }else{Invoke-AiDomainAggregateFourSourceAdmission $aggregateFourAdmission $head $ProductionPhase}
                                 }else{Invoke-AiDomainPurchaseDataCheckpoint $purchaseDataCheckpoint $head $ProductionPhase}
                                }else{Invoke-AiDomainAggregateThreeSourceAdmission $aggregateThreeAdmission $head $ProductionPhase}

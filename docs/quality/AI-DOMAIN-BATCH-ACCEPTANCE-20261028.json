@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 36,
+  "localMetadataCommits": 37,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -8976,5 +8976,573 @@
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
     "sourceCommit": "beb3d4a4fd33f2fd0f988f868bd6beaca8258842"
+  },
+  "aggregate05CreditDocumentAdmission": {
+    "schemaVersion": 1,
+    "ticketId": "AI-AGG-05",
+    "baseline": "faff52ae2213fec49973f3c6c293f866607830cf",
+    "uiReferenceBaseline": "c9d03bb37b6115f7fe63f3f1dd819892dc037fc9",
+    "authority": "founder_standing_exact_narrow_admission",
+    "previousOwner": "/root",
+    "currentOwner": "/root/codex_backend_ai_domain_batch",
+    "additionalOwners": [
+      "apps/mobile/lib/features/work/work_models.dart"
+    ],
+    "metadataOwners": [
+      "config/codex-subagent-coordination-policy.json",
+      "docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json",
+      "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "scripts/ai-domain-batch-admission.ps1",
+      "scripts/test-ai-domain-batch-admission.ps1"
+    ],
+    "contract": {
+      "sha256": "E803A08026056B959280C96419A7694F39CA17E8E2330D5EE28C5A48E323003C",
+      "text": "# AI-AGG-05 credit document preservation contract addendum\r\n\r\nThis is the remaining activated supplier-credit slice. It preserves original credit-note document input in the same immutable request/proof as the monetary amount and source references. No new accounting/tax decision, GST return, ITC reversal, bank verification, Stock movement or live operation is authorised.\r\n\r\nExisting native input is WorkspaceSupplierCreditDocumentInput: version1/2, selected GST/commercial treatment, entered reasonCode, exact printed rate/taxable/CGST/SGST/IGST/cess rows and existing printed particulars (supplier/buyer identity/address/GSTIN/UIN, delivery/state, linked invoice references, title/signature/IRN/QR). Blank, incomplete or unreadable values must never become invented zero tax, a default commercial note or verified tax status. A draft codec is not financial posting authority.\r\n\r\nExtend the existing WorkspaceSupplierCreditIntent and WorkspaceSupplierCreditNote with the original structured document field and exact commit/status matching, while decoding legacy records without inventing classification. The current raw draft guard must be replaced only by an exact-match guard that proves structured document input was retained in the frozen request. Do not remove the guard to make posting pass. Printed amount comparison uses only explicit values; it is not a rate/tax calculation or filing decision.\r\n\r\nExisting original bill/opening/source revisions, cumulative credit/source quantities, duplicate references, stale identity, copied evidence, original status and encrypted request protections remain required. Existing financial supports and producers need explicit inspection. No fake receiving/return/shortage source may qualify posting. Price/tax/discount rules that are not accepted in the current financial contract must remain explicitly unresolved; do not silently invent a new accounting rule to avoid that dependency.\r\n\r\nThe current original backend shared history rejects opaque credits. Preserve that refusal until typed proofs/source validation are implemented. Positive manualBillSurplus must use exact source copy/revision and chronological financial prefix after typed credits; a net supplier balance is insufficient.\r\n\r\nNarrow owner needed next: apps/mobile/lib/features/work/work_models.dart. All other current source/test owners remain admitted. Standing exact necessary admission authority exists in the activated goal. Before editing this unadmitted owner, reconcile only its existing admission lists/checks, retain prior sealed manifests, validate exact scope/owner negatives, rerun the original gate. This is metadata reconciliation, not new governance or an unrestricted owner claim.\r\n"
+    },
+    "interimSourceCommits": false,
+    "productionAcceptance": false
+  },
+  "aggregate05OriginalMoneyCheckpoint": {
+    "sequence": "05-original-supplier-money-credit-refund",
+    "baseline": "faff52ae2213fec49973f3c6c293f866607830cf",
+    "manifest": {
+      "scope": "05-original-supplier-money-credit-refund",
+      "baseline": "faff52ae2213fec49973f3c6c293f866607830cf",
+      "branch": "work/codex-backend/ai-domain-batch-20261028",
+      "changedOwners": [
+        "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+        "apps/mobile/lib/features/work/work_ledger_gateway.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+        "apps/mobile/test/work_ledger_gateway_test.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "backend/functions/src/assistant/domain_context.ts",
+        "backend/functions/src/assistant/domain_context_contract.ts",
+        "backend/functions/src/workspace/workspace_ledger_repository.ts",
+        "backend/functions/src/workspace/workspace_ledger_service.test.ts",
+        "backend/functions/src/workspace/workspace_ledger_service.ts",
+        "backend/functions/src/workspace/workspace_purchase_entry_service.ts"
+      ],
+      "owners": [
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.ts",
+          "bytes": 11535,
+          "sha256": "5C1D0BE40D045C52F140416B00626E7FE555CBC976400BC0C58A47168E11AD23",
+          "gitBlobOid": "12a59d21a1958ee33bc70e0c53b3742d47743ad1"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.test.ts",
+          "bytes": 10479,
+          "sha256": "58517BA82EA4F68437C7011D7F109F09E073A33CF3E2CC4832671117EC7D8152",
+          "gitBlobOid": "8fa120c7a73697d966f2a09a30685b872bf45e37"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.ts",
+          "bytes": 270913,
+          "sha256": "2F34AB4DE4EE80D863C62A181C0D9AA675C7A6FEBB2CFF3E8779B8AC6A9F32F9",
+          "gitBlobOid": "a5bf4cec5170244c8ddc18a0fc2bef04b81db1a4"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.test.ts",
+          "bytes": 78634,
+          "sha256": "DDE6F1856B797EAAB1C7B0573088A712383D3262CE8A651A5EF6780C0FA7BE21",
+          "gitBlobOid": "36b70180c3fd0ff6bf412c2bb4771598065892e6"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.ts",
+          "bytes": 3373,
+          "sha256": "6F1FCAFAC94D0A8FDC35BD8C2E878B2D55418D8284A5DC710EB3BEE92855B07B",
+          "gitBlobOid": "9ca060984db51c54a93d3069d9ed96e7936cb435"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.test.ts",
+          "bytes": 5373,
+          "sha256": "CD77B75EF8E7EE01980DB7CC200233944C5CA60C88A454BF7F4E4B4242A25598",
+          "gitBlobOid": "aaec24000807da73e92fa7563fefa7a897ccfd57"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_integration.test.ts",
+          "bytes": 111069,
+          "sha256": "02460EEE4C4284EDFBAA761F52DB2BCC309E353343F5D9DDB3AF19336424360D",
+          "gitBlobOid": "aa9b6cf667983f23150a9433f4f4cc833d621a7a"
+        },
+        {
+          "path": "backend/functions/src/index.ts",
+          "bytes": 158257,
+          "sha256": "A7E541FFB5FB1957798AE9DD3E62639538940FC1BF23E8C4E404807909189F41",
+          "gitBlobOid": "c00ccc65be5f20ef6e4fa92f61ba244b03b84739"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+          "bytes": 18903,
+          "sha256": "FFBF332AD14CB4862AAF3833B86657ACF363F5AF4E0D738C2D57B399F98EC443",
+          "gitBlobOid": "5bf0ef8fbd5acfdce2b447fcc71aa9ffddf24279"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/profile_context.dart",
+          "bytes": 18946,
+          "sha256": "C61DAA145A9EDF785897069D217E54CC2CF8FE2F4600925200AFC14FAF0D1E41",
+          "gitBlobOid": "4b27303aa0a19f4078f89f73a3f170a8b2f562c6"
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+          "bytes": 91081,
+          "sha256": "F8ABB359ADF4714C9DD330AD17D34DAD5D441D6763D2902B9F0A177F5E4DD6A8",
+          "gitBlobOid": "0a1b8f3f814fbf517e8cd43e9b29563acdd99215"
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+          "bytes": 79399,
+          "sha256": "2570BB48BDFA8F9E9EA0D61348A0F1B3CD778105565FB8784C6FE156F5928342",
+          "gitBlobOid": "624089b250cb5cee594dbc7377302ed72ab6ecf3"
+        },
+        {
+          "path": "apps/mobile/lib/app/moolsocial_app.dart",
+          "bytes": 24302,
+          "sha256": "82EEADE801CB2A7C04AF8C95819FA6EC30B138357753F426EB95741EDA101FD6",
+          "gitBlobOid": "48928f20d1f30bfe9c417c037e3a13d334806a7d"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+          "bytes": 23682,
+          "sha256": "4DEDA735C5EDD84D830155B31F5E9E133E143EC5D897E820B46478DA3034C3B3",
+          "gitBlobOid": "6ef85365af9ee52511d3f8f32822957493897b56"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "bytes": 1286333,
+          "sha256": "9A3D5F14C5DE7BAC9853FCB847B6B41172E9406ED5B51786CB312B7F60C23F47",
+          "gitBlobOid": "9cc105b977dceccf75b1653744bcd31db33869cc"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+          "bytes": 208676,
+          "sha256": "5D3AAF88764035306EA953C003A3E8FD9CF97AD368C9F759ABB81F81FDEB5C89",
+          "gitBlobOid": "4bcecc4240109fd15eb3792e83a8b42bd44d75f8"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+          "bytes": 3127894,
+          "sha256": "15E1131FC2D1D067909157FCBAD99AD35BF07BA1E8D1F1706C8F39E35011ED7C",
+          "gitBlobOid": "73aa929220d15a430ac7521a3e879b666941aa2b"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+          "bytes": 73248,
+          "sha256": "D6F95CF378691C78A1A941038F5F1BBF0D4BC15A6EAEB46E00E768E8F1779163",
+          "gitBlobOid": "7595d9625de9c5f49d42eacc7717d00b2a61f3dd"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_guard_test.dart",
+          "bytes": 23093,
+          "sha256": "07FF247E0BD3D5723684EB9D2D964256FF412E8485563F2E86CC93B08018882A",
+          "gitBlobOid": "ba6eefe5ce1cd7ca1e4a258da52129ccd3cdb0bf"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_integration_test.dart",
+          "bytes": 28689,
+          "sha256": "62622ECDD2943569A447BBF67A97112238815D82D26A8D6BA41884F0D5BE1542",
+          "gitBlobOid": "ab63ef38408936a2af290c3aebc9e71d53fcb7da"
+        },
+        {
+          "path": "apps/mobile/test/assistant_profile_context_test.dart",
+          "bytes": 42768,
+          "sha256": "1ECF64F5F5616593D77A9F08056780AF1D2A9A4AFDFD1C9A4456E628E843FD8E",
+          "gitBlobOid": "c92a9cfd087af7007bcfdf64330dd2b586ab3f42"
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_flow_test.dart",
+          "bytes": 21891,
+          "sha256": "B28A93CB0D149BDE6D5F9626FB16A1735CAAFA7A92A85FCF54D2D95ED71DD045",
+          "gitBlobOid": "f10032c3246ec403981fa5e08caa9b406de4ba29"
+        },
+        {
+          "path": "apps/mobile/test/mool_assistant_test.dart",
+          "bytes": 209745,
+          "sha256": "243464A4A4BC28DF08880001EB54DD1305F4AB363359A7589AFF1292641A5F8B",
+          "gitBlobOid": "047997523bc4f1b5d1eb29be01791301ed527980"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.ts",
+          "bytes": 12863,
+          "sha256": "7EC95DF6BE7D93D97BC97E27282302244EB0C42581919125B979571ECDB007DE",
+          "gitBlobOid": "f5bdac2c5b88f765fd6a26fa4dcced6508f14119"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.test.ts",
+          "bytes": 8615,
+          "sha256": "18D92CB9E196D1F501B2F85A60875A4C48548EA4135F5952889EC60518EACC44",
+          "gitBlobOid": "cb55eec4c1059396702bc35740cb7de543668229"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.ts",
+          "bytes": 29625,
+          "sha256": "C60DE03603C933AC100E5983328BC49C065083A00285F3F311FBB52230D24031",
+          "gitBlobOid": "e0779ffb57b440cc5e20090d6385c1fb3d50cbef"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.test.ts",
+          "bytes": 37545,
+          "sha256": "CFE0386B8FFB2072089381FA5EF5AFD0933516C21B228CD35B172C3069F10F97",
+          "gitBlobOid": "cf09fe0a6095a6bb17cd2477dd39db97c1179fbf"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/model_gateway.dart",
+          "bytes": 24008,
+          "sha256": "4A9CD24EF2E358A4E0B0F448E102C1E9FAAFE6B0CBD96B354A169D8AC3A4D8BA",
+          "gitBlobOid": "aa3d4a5348f5a138bf0a6aa15f252142d032cb35"
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_gateway_test.dart",
+          "bytes": 16649,
+          "sha256": "EF8151C941E70B1309E1C3EADCFDE811D16213B44A380DF91DEDC8DC1D36A7C0",
+          "gitBlobOid": "ae8cb1b4359d2f159356f3b7b3374b7d72e1d17b"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+          "bytes": 109322,
+          "sha256": "19D16C732CD0393893DEBFCDAF3EBF3B3A9F8E89FF397E343D1C156E23A37D32",
+          "gitBlobOid": "bb133d828d23fb78a32496f8bb74bc39fd950e71"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+          "bytes": 578215,
+          "sha256": "A0768A986E677D4B6A65B656D6BF17D89A659F2E7C28301EE51724E575765600",
+          "gitBlobOid": "51c5b3a9fa0b15b49850304cd4c423a402cee2eb"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_session.dart",
+          "bytes": 937673,
+          "sha256": "CAFC4BDAFC8312B1EF5A81B76741B6C7DA86B6D6ECE69606969D876375DDB2C7",
+          "gitBlobOid": "d4b7aa07c9ea0c34a1ea42df81d40b5fd260f204"
+        },
+        {
+          "path": "apps/mobile/test/work_workspace_layout_safety_test.dart",
+          "bytes": 4762366,
+          "sha256": "9E34CAC1A1AF8335D00AA55D0E86CB92CC68D34153D98B497845A82A8B8266F9",
+          "gitBlobOid": "ac2b97fbe396226484ee3eeede556e8fbb7a936b"
+        },
+        {
+          "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "bytes": 875192,
+          "sha256": "57368C6E8B9E715CA3FA3383AE487FAE01F4113597695F0BD2F7BFC9E0AEAE18",
+          "gitBlobOid": "73c8a55421143413b70b9c6a827d34fc87eb7df0"
+        },
+        {
+          "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "bytes": 950105,
+          "sha256": "A8FBA26E9357025C951F6CF5904EA8F671AF5D2C19B8BE16F89DE323C1D90567",
+          "gitBlobOid": "00a2a79d20ba56c4d016af575c53aed838e7ab9d"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_catalogue_service.ts",
+          "bytes": 378735,
+          "sha256": "07F137C8FD2C0003AFC172972F74FBB72CB658EB7DB91913084FADE94127BCD3",
+          "gitBlobOid": "9ce8dae60885d4bd775cb198dbd1aeca7eab047b"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+          "bytes": 492306,
+          "sha256": "D70D98530F0B4AE63CC09FC227067E5442DD426CD39279882EED07DD28253D20",
+          "gitBlobOid": "d2fb57e091eaa605d9e9aac85c4ef488f8c00926"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_services.dart",
+          "bytes": 463710,
+          "sha256": "3343A79565F6BD6550548F07B0A9FD401E3EB9C5E8C6B27A8DA514A634153A2C",
+          "gitBlobOid": "efab56df9d3ab40e5655a4e2bc41c1221193772b"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+          "bytes": 130055,
+          "sha256": "84BE1755B4E2A2BCE00B31B4EE7B39E70A67A0CB73D2CA577DF41E76AAB785B3",
+          "gitBlobOid": "9f1c8ca8e01404bd9247d845ff0ef0cfa121e26e"
+        },
+        {
+          "path": "apps/mobile/test/work_catalogue_gateway_test.dart",
+          "bytes": 1212240,
+          "sha256": "D47442FFD100048BFA85FB01B2F92168A2F230958DCF2366A23EB72FC19F4D6A",
+          "gitBlobOid": "19da0eefa892b15793fb58e9c0d153d396e66342"
+        },
+        {
+          "path": "apps/mobile/test/store_add_product_sheet_test.dart",
+          "bytes": 15577,
+          "sha256": "68B2513FCC87FD68E70939D657701898AC95C1793440B19CB553858F4FD370DE",
+          "gitBlobOid": "89bd95cf1cbe62396c14bb2086c35c55d52bd386"
+        },
+        {
+          "path": "apps/mobile/test/work_saved_product_draft_test.dart",
+          "bytes": 29988,
+          "sha256": "1186C9D39107776FD88B4253C61F114C7C4050AB32DD0A5C67C6330D82BABA58",
+          "gitBlobOid": "7eaf0a479beac2f23be9d2240b28ef9afaae2922"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_service.ts",
+          "bytes": 44995,
+          "sha256": "57B426D7CF15A161BB6D660B1638C31C495F66C30DBD0C4CE36A3B8257DE0FA3",
+          "gitBlobOid": "87852c096ec134a73aaaac4010e30027e975bce9"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_repository.ts",
+          "bytes": 19418,
+          "sha256": "41224490B2B8C15760878AB0316B9E305BAA7E7FE8FB5E0B43449D7139A1C473",
+          "gitBlobOid": "f859d6e3e4cc17deb386d03d5c46abd64ae7c9d1"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_service.test.ts",
+          "bytes": 40256,
+          "sha256": "997DC49C43F9D7402F4FD30BEFC1FA20E6CF5D3BC33C4ED86E72B933E39A11F7",
+          "gitBlobOid": "88c1e4a2f01c62d2955e6d439f438dc1b7c91395"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_purchase_entry_gateway.dart",
+          "bytes": 41467,
+          "sha256": "A4F538F09F46C63625453ABEEF6C2E5C25BE35F20AC2A6148EF267A93D35E033",
+          "gitBlobOid": "13966bf7f0930f5769b8aa796af7c85c11d3eb48"
+        },
+        {
+          "path": "apps/mobile/test/work_purchase_entry_gateway_test.dart",
+          "bytes": 35352,
+          "sha256": "5B3866CA06A1CC53AFB64680224604EC6525D67E4A8D441009C4E35196B1A3E6",
+          "gitBlobOid": "9d10cb6a844ad8cd616456e00b3fd18d6e784a45"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_ledger_service.ts",
+          "bytes": 116606,
+          "sha256": "104FF6F5B16C8434500AF519D346B6DA4A71D09C452C3A6CBD1FD50DB3BCC556",
+          "gitBlobOid": "1edca9a4efcc95be07c18752866a3f573083809f"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_ledger_repository.ts",
+          "bytes": 58937,
+          "sha256": "C8CC64065187B0FD272C574D1F288EB697F609F6BECAA66E42C39EA8FC284CD8",
+          "gitBlobOid": "2c69448fe52599aa63df69e359ee9541a86cc8aa"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_ledger_service.test.ts",
+          "bytes": 254322,
+          "sha256": "94B4D5D7D58F2DB5E10D6C65B95A427CB25B93A9A73233D51D44F187A95F0C9C",
+          "gitBlobOid": "70621aab33ad7b2ec96bba63ebce8fa247f6d6ae"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_ledger_gateway.dart",
+          "bytes": 50487,
+          "sha256": "93AFA5BA18AE9B395A1EC3A7AF0CE7EA39D702C7059D88BC633A02C16C33A835",
+          "gitBlobOid": "add8d7107f0ba4814d12b6a2934fd4f1f5f4531e"
+        },
+        {
+          "path": "apps/mobile/test/work_ledger_gateway_test.dart",
+          "bytes": 136623,
+          "sha256": "01841ACF92815AC7A3ABB4CEDA76AFE28015154CE7B63FCB1F33EE7929CF60E6",
+          "gitBlobOid": "3b7a049d70eb9d6a823eebf414e41a318f34b019"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_models.dart",
+          "bytes": 651932,
+          "sha256": "BDE6F4F21F2DFAD5798AF82E11A586ED3AACCE043BB01A64F2A060AB80102AD0",
+          "gitBlobOid": "cb780cb50eb2b7aac692dae8c486ad7064f63c0d"
+        }
+      ]
+    },
+    "disposition": {
+      "wholeAggregateComplete": false,
+      "oppoCurrentSourceQualified": true,
+      "populatedStoreDeviceQualified": false,
+      "originalRuntimeAuthorityAvailable": false,
+      "legacyMigrationAvailable": false,
+      "standaloneRegisterCreation": false,
+      "syntheticFinanceSnapshot": false,
+      "cloudActivation": false,
+      "financialLivePosting": false,
+      "founderApprovalClaimed": false,
+      "productionAcceptance": false,
+      "implemented": [
+        "Original reviewed supplier manual payment/advance, bill confirmation and money, allocation and refund record/status/recovery with exact actor/Store/realm/source/revision/capacity identities.",
+        "Typed supplier credit document, printed GST/commercial particulars, original accepted physical proof history and financial-prefix validation; original receiver/status and duplicate prevention.",
+        "Native original secure preparation, confirmation, immutable pending attempts, read-only status, explicit identical retry and refused-input recovery; Review never posts.",
+        "Original AI259-267/375-379 prepares supplied values in existing native forms without inventing operation identities; exact copy-bound bill surplus joins and exhausted-source recovery."
+      ],
+      "checks": [
+        {
+          "log": "aggregate05-final-financial-native-v1.jsonl",
+          "passed": 139,
+          "skipped": [],
+          "sha256": "95dd37c06efc6f1e2a99ba88428f80de619e01968ba3f62ab7abe9e45ef7f7b7"
+        },
+        {
+          "log": "aggregate05-final-ledger-gateway-v3.jsonl",
+          "passed": 157,
+          "skipped": [],
+          "sha256": "ff066120d295e753098a5c64d46eb8d5382be74076906edc1c5340f9d179476e"
+        },
+        {
+          "log": "aggregate05-final-context-mobile-v1.jsonl",
+          "passed": 163,
+          "skipped": [
+            "Actual expired-price catalogue HTTP metadata decodes through the original mobile gateway",
+            "Original selected Restock service and native product bind exact Unicode pack and price",
+            "Original retained quote service metadata and full Unicode record retain the same mobile proof",
+            "Original backend Clear Cart permission metadata decodes through actual mobile gateway",
+            "Original backend purchase reference metadata decodes through actual mobile gateway",
+            "Actual original public-details metadata crosses the real mobile decoder without private draft values",
+            "Actual original 2500-product metadata crosses the real mobile decoder without trimming"
+          ],
+          "sha256": "f9d6e54af9b42c87bd8b2e6dbef19a69ed5ff0f0b6f9163373dc0fbbc3213c4d"
+        },
+        {
+          "log": "aggregate05-final-sdk-v1/tests.log",
+          "passed": 87,
+          "skipped": 0,
+          "actualLocalSDK": true,
+          "sha256": "7daeda3e549e905b28c68bc40fb52b9a3f65f590fc17021ff71b852fe0861345"
+        },
+        {
+          "log": "aggregate05-final-actual-sdk-v1/tests.log",
+          "passed": 35,
+          "skipped": 0,
+          "actualLocalSDK": true,
+          "sha256": "8eaeb535cf32df37c8f5a1838b09349f77a9a3b110860b653cd00a5ebc659cc5"
+        }
+      ],
+      "countsOverlap": true,
+      "analysis": {
+        "log": "aggregate05-final-analyze-v1.log",
+        "exitCode": 0,
+        "informationalFindingsRetained": true,
+        "backendCompile": "aggregate05-surplus-final-compile-v1.log",
+        "backendExitCode": 0
+      },
+      "oppo": {
+        "ticket": "AI-AGG-05",
+        "wholeTicketComplete": false,
+        "reachableCurrentSourceInspected": true,
+        "vmSourceOwnersVerified": 19,
+        "sourceOwnersPinned": 53,
+        "runtimeGate": "Exact evaluation hotrestart passed; registry4624/applicable488; Store/public preview parity22; no APK authority.",
+        "screens": [
+          "Retained Buy Cart recovery hold",
+          "Existing evaluation Workspace",
+          "Stock and purchase register navigation",
+          "Manage purchases and Payments & credits",
+          "Supplier credit bill selector",
+          "Retained credit draft top/lower",
+          "Decimal keyboard and dismissal",
+          "Close and return",
+          "Refund supplier selector and return",
+          "Mool AI unavailable state and Close"
+        ],
+        "visualAssessment": "No blocking visual defect observed in the credit draft, keyboard, supplier selector or AI-unavailable states inspected. Header/Close remain reachable; lower fields/actions and focused tax input remain above system/keyboard areas. Approved layouts preserved.",
+        "technicalAssessment": "All19 current Dart owners matched device VM. Navigation, Close and keyboard dismissal worked without data entry. Separate before/after receipt proves53 source pins and108 protected saved fingerprints unchanged.",
+        "refundObservation": "Selecting retained EVAL-ADV-SUPPLY-04OCT closed the selector and returned to purchase register; a second stable capture confirmed no refund dialog. This is not successful populated refund qualification. Original authenticated authority is not connected in this frontend evaluation session; the exact guard responsible for this return was not established on-device.",
+        "limitations": [
+          "TEST Store is frontend evaluation only, not authenticated original financial authority",
+          "No original successful/refused/unknown financial outcome was populated on OPPO",
+          "No phone records, auth, entitlement, Workspace approval or provider injected",
+          "Credit/refund/allocation full financial lifecycles are isolated host/SDK-qualified only",
+          "No input entered and no Save draft, Record or other financial confirmation pressed",
+          "Existing Buy Cart recovery hold preserved",
+          "Whole05 physical producers, nonphysical credit contract and incoming surplus local-calendar boundary remain named dependencies"
+        ],
+        "founderApproval": false,
+        "productionAcceptance": false,
+        "financialActionSubmitted": false,
+        "apkBuiltOrInstalled": false,
+        "previousFailedAttach": "../oppo-agg05-final-source-v1/ATTACH-FAILED.json; no restart sent;108 fingerprints preserved",
+        "hostCheckpoint": "../AGG05-IMPLEMENTATION-PROGRESS-v29.json"
+      },
+      "remainingIndependentCodeCorrectionDemonstrated": false,
+      "limits": [
+        "Physical receipt/return/shortage producer gaps remain original03 carry-forward dependencies; HOST SDK fixtures do not establish runtime physical authority.",
+        "Price/tax/discount/other nonphysical credit source and financial amount/tax contract absent; editable original document retained as draft and posting refused.",
+        "Refund of a bill funded through an incoming manualBillSurplus link lacks original local-calendar provenance; no UTC date invented.",
+        "Populated authenticated Store/model device qualification remains unavailable. Refund selection returned without a source dialog on evaluation OPPO; exact guard not established on device.",
+        "Prior01-04 qualification limits, including original runtime membership/migration and recorded broader-regression failures, remain unchanged.",
+        "Google deployment/credentials, payment integration, live model/API/media and APK/release qualification remain deferred."
+      ]
+    },
+    "evidence": {
+      "backendContextPassed": 87,
+      "records": [
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG05-IMPLEMENTATION-PROGRESS-v29.json",
+          "sha256": "A348B7990404857F9AB5F614C47E4328C457F5A1AAD0598D399BF00B961032AC"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG05-CREDIT-NONPHYSICAL-SOURCE-AUDIT-v1.json",
+          "sha256": "F1B177687747B8BD3E90F8EEBA00EBD7272AB385BFB28C51E2A262005821750B"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG05-FINAL-GATEWAY-MISSING-CAPTURES-v1.json",
+          "sha256": "765829BFE0F285F079D0CD617143164A6097ED98D5CA4A3138C494DA67FA2FB3"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG05-FINAL-GATEWAY-CAPTURE-FAMILY-v2.json",
+          "sha256": "3DEBC793591FDF1794D586B03244B9A3EB50BF5A9498B82C51E8195374673F35"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG05-FINAL-ATTACH-FAILURE-v1.json",
+          "sha256": "4FC252E876A54122C8D5CB511AD269B29A49ED7D833BEEA83C6F1A272941FE11"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate05-final-financial-native-v1.jsonl",
+          "sha256": "95DD37C06EFC6F1E2A99BA88428F80DE619E01968BA3F62AB7ABE9E45EF7F7B7"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate05-final-ledger-gateway-v3.jsonl",
+          "sha256": "FF066120D295E753098A5C64D46EB8D5382BE74076906EDC1C5340F9D179476E"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate05-final-context-mobile-v1.jsonl",
+          "sha256": "F9D6E54AF9B42C87BD8B2E6DBEF19A69ED5FF0F0B6F9163373DC0FBBC3213C4D"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate05-final-sdk-v1\\tests.log",
+          "sha256": "7DAEDA3E549E905B28C68BC40FB52B9A3F65F590FC17021FF71B852FE0861345"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate05-final-sdk-v1\\STOPPED.json",
+          "sha256": "EB6BF941DEC5A57D8FAF30D12449FBF6DC8753A887D0813466742BE6F6F87DDA"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate05-final-actual-sdk-v1\\tests.log",
+          "sha256": "8EAEB535CF32DF37C8F5A1838B09349F77A9A3B110860B653CD00A5EBC659CC5"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate05-final-actual-sdk-v1\\STOPPED.json",
+          "sha256": "080C4DD7E58CC7F673E69E60B3E3FF9C6389BA61A7883FE7DBC7C1D64529B6EE"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate05-final-analyze-v1.log",
+          "sha256": "8B37BAD39538DE2935C50825F2B87B08F3E1B91858F3368D3E4223479375C3FB"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate05-surplus-final-compile-v1.log",
+          "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg05-final-source-v2\\ASSESSMENT.json",
+          "sha256": "A47E9E92078A9E40CE48BA5F032860DD82AD97C78D73DB7F67B7A5F3282B476F"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg05-final-source-v2\\PRESERVATION.json",
+          "sha256": "19BD1CCB8E7347CECAAAC0A39DE9F76EA164A72AB42DADADAA19CC7D72656507"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg05-final-source-v2\\oppo-restart-gate.log",
+          "sha256": "4793AC24C95AC9C6A95DF6B785F79E49DDFB250C64E617879DF6168A4E11597D"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg05-final-source-v2\\SOURCE-RESTART.json",
+          "sha256": "5A5EB670E9C02C5D9CCB8A5487C2547607ADE18F3E82D7BE4D766B20ABD04063"
+        }
+      ]
+    },
+    "namedBranchPushAuthorized": true,
+    "productionAcceptance": false,
+    "sourceCommit": null
   }
 }
