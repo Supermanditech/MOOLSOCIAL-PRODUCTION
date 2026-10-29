@@ -218,7 +218,12 @@
       "backend/functions/src/workspace/workspace_ledger_service.test.ts",
       "apps/mobile/lib/features/work/work_ledger_gateway.dart",
       "apps/mobile/test/work_ledger_gateway_test.dart",
-      "apps/mobile/lib/features/work/work_models.dart"
+      "apps/mobile/lib/features/work/work_models.dart",
+      "backend/functions/src/workspace/workspace_customer_service.ts",
+      "backend/functions/src/workspace/workspace_customer_repository.ts",
+      "backend/functions/src/workspace/workspace_customer_service.test.ts",
+      "apps/mobile/lib/features/work/work_customer_gateway.dart",
+      "apps/mobile/test/work_customer_gateway_test.dart"
     ],
     "acceptedUiCommit": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
     "contractSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382",

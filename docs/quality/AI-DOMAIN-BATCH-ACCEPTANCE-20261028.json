@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 37,
+  "localMetadataCommits": 38,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -9544,5 +9544,47 @@
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
     "sourceCommit": "e9a9a6016e4e21c7edc7411fa17adb097a68e984"
+  },
+  "aggregate06SourceAdmission": {
+    "sequence": "06-original-counter-customer-source-admission",
+    "baseline": "5b4fd2160a2dca38f8ced15cd784b12f090553ce",
+    "uiReferenceBaseline": "c9d03bb37b6115f7fe63f3f1dd819892dc037fc9",
+    "scope": "activated aggregate06 existing Counter sale and customer-account original sources only",
+    "authority": "founder standing exact necessary admission/contract reconciliation within AI-DOMAIN-REMAINING-6",
+    "contract": {
+      "sha256": "342E6C90419CA97D00A657A499C9D7A8FD8BF1304492D512D09BE1F5F4DABFE1",
+      "text": "# AI-AGG-06 original Counter sale and customer-account contract\n\nActivated scope: existing AI-AGG-06 only. Starting clean/pushed source is\n`5b4fd2160a2dca38f8ced15cd784b12f090553ce`; accepted manual presentation remains\nthe existing Profile/Buy/Workspace baseline and its subsequent sealed source.\nStanding narrow implementation/admission/test/OPPO/scoped Git authority applies.\nThis contract adds no screen, accounting rule, plan, payment service or issuer.\n\n## Reuse and original records\n\nReuse WorkspaceCounterDraft and its existing account/Store/id/revision/stage,\ncustomer/billing, source, fulfilment, payment, address, line snapshots, discount\nand submitting-order identity. Preserve its existing native serializer exactly.\nRead the original server draft and revision; a device recovery draft is input,\nnot proof of an original sale, Stock quantity, payment or backend draft.\n\nReuse WorkspaceOrderRecord, WorkspaceCustomerInvoice.toLedgerJson,\nWorkspaceCustomerCollection.identityData, WorkspaceCustomerReturn.toJson,\nWorkspaceCustomerRefund.toJson and WorkspaceCustomerLedger/Entry formats.\nPreserve printed seller/buyer details and original discounted item snapshots;\nnever backfill historic documents from a renamed Store or today's catalogue.\nMissing tax/document evidence must stay missing, not become verified GST data.\n\nReuse the existing per-invoice financial validation and exact integer-paise\nallocation semantics. Collections cannot exceed that invoice's current due.\nReturns use cumulative original sold quantities and discounted original line\ntotals, not current prices. Refunds require the original invoice's refundable\ncredit and net recorded collections; a receipt-linked refund also fits its\nidentified original receipt. Cross-invoice credit appends the existing paired\ncreditUsed/creditReceived attribution, with one operation identity and exact\nsource/target capacities. It does not create another payment. All these are\nmanual records, not bank/provider verification or money movement.\n\n## Authority and storage\n\nUse the existing original transaction-bound actor/project/realm/Store authority.\nNo client role flag, review profile, plan payment or fixture grants approval.\nKeep paid-AI entitlement checks on AI preparation; manual Store permissions and\nsubscription/Workspace approval remain their separate existing checks.\n\nNo authenticated Counter/customer original backend currently exists. A single\nnew original Counter/customer record owner is necessary; it must not duplicate\nthe supplier ledger or turn marketplace purchase originals into Counter sales.\nStore immutable draft versions, sale/order/invoice originals and customer event\nrecords with scoped identities, CAS revisions and immutable request outcomes.\nUse paged records/immutable payload parts rather than a lifetime item/entry cap.\nReuse canonical hashing, existing HTTP credentials/error contracts and original\nauthority helpers. Initial absence is absence, not an imported synthetic book.\nRetained device records need guarded adoption/migration, never silent overwrite.\n\nExpose owned customer sections, not a fabricated WorkspaceFinanceSnapshot with\nzero settlement, fees, payouts or other unknown totals. A customer opening\nbalance remains null when unsupplied; current invoice capacity never borrows an\nopening balance or another invoice. Preserve complete/partial/unknown history\nand exact read revisions; do not turn an empty page into complete history.\n\n## Counter and Stock boundary\n\nPreparation reads existing originals only. Native Review fills the existing\nform without saving a draft, completing an order or reserving Stock. Only the\nexisting final confirmation may dispatch one frozen original request.\n\nCounter completion needs the exact reviewed draft/catalogue/Store particulars\nand an original transaction-bound Stock/operational anchor for the effects the\nexisting native flow requires. Public stockSnapshots are explicitly reports,\nnot an inventory-reservation authority, and cannot supply this anchor. Do not\ncreate a parallel Stock master or reopen prior01-05 to manufacture it. Implement\naccepted receiver/anchor hooks and independent original records, but fail closed\nwhere that original producer is genuinely absent. A host anchor fixture proves\nconsumer/transaction behaviour only, never a runtime producer or phone sale.\nReturn restock effects have the same original-source requirement. Financial-only\noperations must not invent Stock movement or depend on an unrelated producer.\n\nFor the original lane, don't call the local completion/reservation path first\nand later treat an invoice reply as authority. Adopt original confirmed records\nonly after a validated exact receiver/status response. Unknown outcomes retain\nthe frozen request and preserve records; they do not imply rollback or success.\nReview-only native behaviour remains explicitly labelled and contained.\n\n## Recovery and AI handoff\n\nEvery operation binds account/Store/realm, customer, original invoice/order,\nreviewed revisions, exact supplied fields and device-owned original request ID.\nKeep immutable saved/not_saved/unknown results and duplicate-fact protection.\nStatus reads are read-only; retry explicitly reuses the exact frozen request.\nNever regenerate a nonce, silently rebase, repeat an effect on chat reopen or\nclear an unknown request. Refused editing requires confirmed non-recording and\npreserves supplied fields/copies. Account/Store switches retire stale callbacks.\n\nWire only existing AI288-305/307/382-388 adapters with authentic available source\nrecords and exact native form fields. Missing source means unavailable, not a\nblank-form shortcut counted as automation. Model output cannot choose/mint a\nfinancial operation ID or publish a record. Preserve existing native final\nconfirmation and all existing Buy/Store context/access boundaries.\n\n## Qualification and necessary owners\n\nExisting native owners: work_models.dart, work_services.dart, work_session.dart,\nwork_workspace_dashboard_screen.dart, work_catalogue_gateway.dart and existing\nrelated tests. Existing backend/AI owners: index.ts, domain_context.ts and its\ncontract/tests, existing original authority/catalogue helpers where required.\n\nNecessary new owners, subject to exact admission before editing:\nworkspace_customer_service.ts (closed records/pure existing-rule validation and\nservice/receiver contract), workspace_customer_repository.ts (one original\nprivate transactional source/status owner), workspace_customer_service.test.ts\n(pure and actual local SDK acceptance); work_customer_gateway.dart and its test\n(owned-section decoding, original HTTP/journal boundaries). No new UI route.\nDuplicate search and native owner evidence: AGG06-ORIGINAL-SOURCE-AUDIT-v1.json.\n\nTests cover exact source/format parity, owner/Store/realm isolation, stale and\nrevoked sources, duplicate/concurrent requests, source exhaustion, quantities,\nprinted documents, cancel/timeout/restart/unknown status/retry and failed reads.\nHost financial data is isolated and labelled. OPPO uses current source with the\nrecorded evaluation settings and protected-data fingerprints, no injected\nauthority/records. Record reachable inspection and original-service limitations\nseparately. Preserve prior tickets' named dependencies and qualification limits.\nThen seal exact tested source/evidence, clean branch and independent remote\nreadback before07. No Google activation, payment integration, live financial\ntransactions, live model/media, admin, APK, policy/governance development or\nunrelated work. Self-assessment is not founder/live/production acceptance.\n"
+    },
+    "additionalOwners": [
+      "backend/functions/src/workspace/workspace_customer_service.ts",
+      "backend/functions/src/workspace/workspace_customer_repository.ts",
+      "backend/functions/src/workspace/workspace_customer_service.test.ts",
+      "apps/mobile/lib/features/work/work_customer_gateway.dart",
+      "apps/mobile/test/work_customer_gateway_test.dart"
+    ],
+    "metadataOwners": [
+      "docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json",
+      "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "config/codex-subagent-coordination-policy.json",
+      "scripts/ai-domain-batch-admission.ps1",
+      "scripts/test-ai-domain-batch-admission.ps1"
+    ],
+    "admissionCommitSubject": "coordination(ai-domain-batch-20261028): admit exact original counter customer source owners",
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "newScope": false,
+    "productionAcceptance": false,
+    "deployment": false,
+    "paymentIntegration": false,
+    "liveFinancialActions": false,
+    "admin": false,
+    "mediaActivation": false,
+    "apk": false,
+    "policyDevelopment": false,
+    "legacyMigration": false,
+    "runtimeMembershipSourceAvailable": false,
+    "standaloneRegisterCreation": false,
+    "syntheticFinanceSnapshot": false,
+    "financialOutcomeFixtures": "isolated labelled host only"
   }
 }
