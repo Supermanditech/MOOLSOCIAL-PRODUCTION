@@ -44,6 +44,199 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
+  const surplusExport = String.fromEnvironment('AI_DOMAIN_SURPLUS_CONTEXT_EXPORT_PATH');
+  for (final action in ['AI-ACT-262', 'AI-ACT-266', 'AI-ACT-267', 'AI-ACT-378']) {
+    test('Actual SDK original bill-surplus metadata $action preserves original copy and source ownership', () async {
+      final capture = jsonDecode(File('$surplusExport.$action.json').readAsStringSync()) as Map<String, dynamic>;
+      expect(capture['label'], 'ISOLATED SDK ORIGINAL BILL SURPLUS; NO RUNTIME AUTHORITY');
+      final actor = capture['actor'] as Map<String, dynamic>, request = capture['request'] as Map<String, dynamic>;
+      final scope = request['scope'] as Map<String, dynamic>, proposal = capture['proposal'] as Map<String, dynamic>;
+      final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String, tenantId: null, userId: actor['uid'] as String);
+      final context = MoolAssistantContext(accountScope: owner, authenticationRevision: 1).withWorkspace(
+        MoolAssistantWorkspace(id: scope['storeId'] as String, name: 'HOST original bill credit', profile: 'retailer-grocery',
+          revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+      final metadata = capture['metadata'] as Map<String, dynamic>, data = metadata['data'] as Map<String, dynamic>;
+      final gateway = AssistantDomainContextGateway(owner: owner, isCurrent: () => true, credentials: _Credentials(),
+        transport: _CapacityWire(metadata), compactStoreSelection: true,
+        clock: () => DateTime.parse(data['validUntil'] as String).subtract(const Duration(seconds: 30)));
+      addTearDown(gateway.dispose);
+      final result = await gateway.read(context, () => true);
+      expect(result.revisions, {(action, proposal['entityId'] as String?): proposal['sourceRevision']});
+      expect(assistantNativeTargetSelection([(actionId: action, entityId: proposal['entityId'] as String?)]), hasLength(1));
+      final fields = proposal['fields'] as Map<String, dynamic>;
+      if (action == 'AI-ACT-262' || action == 'AI-ACT-266') {
+        expect(fields['sourceKind'], 'manualBillSurplus'); expect(fields['amount'], '0.50');
+        expect(fields['sourceId'], 'HOST-original-bill-draft'); expect(fields['copyRevision'], isA<int>());
+        if (action == 'AI-ACT-266') expect(fields['copyId'], 'HOST-original-bill-copy');
+        else {expect(fields['copyId'], 'HOST-credit-target-copy'); expect(fields.containsKey('sourceCopyId'), false);}
+      } else {expect(fields, isEmpty);}
+      expect(jsonEncode(proposal), isNot(contains('idempotencyKey')));
+      expect(jsonEncode(metadata), isNot(contains('availableMinor')));
+      final other = context.withWorkspace(MoolAssistantWorkspace(id: 'HOST-other-store', name: 'HOST other', profile: 'retailer-grocery',
+        revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+      await expectLater(gateway.read(other, () => true), throwsA(isA<AssistantModelFailure>()));
+    }, skip: surplusExport.isEmpty ? 'Requires explicit actual local SDK bill-credit context capture' : false);
+  }
+  const creditExport = String.fromEnvironment('AI_DOMAIN_CREDIT_CONTEXT_EXPORT_PATH');
+  for (final kind in ['goodsReturned', 'arrivalDamage', 'shortage']) {
+    for (final treatment in ['gst', 'commercial']) {
+      for (final action in ['AI-ACT-264', treatment == 'gst' ? 'AI-ACT-375' : 'AI-ACT-376', 'AI-ACT-265', 'AI-ACT-379']) {
+        test('Actual SDK original credit metadata $kind $treatment $action preserves document and native request ownership', () async {
+          final capture = jsonDecode(File('$creditExport.$kind.$treatment.$action.json').readAsStringSync()) as Map<String, dynamic>;
+          expect(capture['label'], 'ISOLATED SDK ORIGINAL CREDIT PREPARATION; NO MODEL REQUEST ID OR FINANCIAL EFFECT');
+          final actor = capture['actor'] as Map<String, dynamic>, request = capture['request'] as Map<String, dynamic>;
+          final scope = request['scope'] as Map<String, dynamic>, proposal = capture['proposal'] as Map<String, dynamic>;
+          final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String, tenantId: null, userId: actor['uid'] as String);
+          final context = MoolAssistantContext(accountScope: owner, authenticationRevision: 1).withWorkspace(
+            MoolAssistantWorkspace(id: scope['storeId'] as String, name: 'HOST original credit Store', profile: 'retailer-grocery',
+              revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+          final metadata = capture['metadata'] as Map<String, dynamic>, data = metadata['data'] as Map<String, dynamic>;
+          final gateway = AssistantDomainContextGateway(owner: owner, isCurrent: () => true, credentials: _Credentials(),
+            transport: _CapacityWire(metadata), compactStoreSelection: true,
+            clock: () => DateTime.parse(data['validUntil'] as String).subtract(const Duration(seconds: 30)));
+          addTearDown(gateway.dispose);
+          final result = await gateway.read(context, () => true);
+          expect(result.revisions, {(action, proposal['entityId'] as String?): proposal['sourceRevision']});
+          expect(assistantNativeTargetSelection([(actionId: action, entityId: proposal['entityId'] as String?)]), hasLength(1));
+          final fields = proposal['fields'] as Map<String, dynamic>;
+          if (const {'AI-ACT-265', 'AI-ACT-379'}.contains(action)) {
+            expect(fields, isEmpty, reason: 'Only encrypted native input identifies an interrupted request.');
+          } else {
+            expect(fields['reference'], 'HOST-CN-ગુજરાતી'); expect(fields['amount'], '1.00');
+            final document = fields['documentInput'] as Map<String, dynamic>;
+            expect(document['treatment'], treatment); expect(document['version'], 2);
+            expect(document['particulars'], {'supplierName': 'HOST printed supplier', 'invoiceReferences': 'HOST-INV-1'});
+            final support = (fields['supports'] as List).single as Map<String, dynamic>;
+            expect((jsonDecode(support['id'] as String) as List).first, kind); expect(support['quantity'], '0.250');
+          }
+          expect(jsonEncode(proposal), isNot(contains('idempotencyKey')));
+          expect(jsonEncode(metadata), isNot(contains('availableMinor')));
+          final other = context.withWorkspace(MoolAssistantWorkspace(id: 'HOST-other-store', name: 'HOST other', profile: 'retailer-grocery',
+            revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+          await expectLater(gateway.read(other, () => true), throwsA(isA<AssistantModelFailure>()));
+        }, skip: creditExport.isEmpty ? 'Requires explicit actual local SDK credit context capture' : false);
+      }
+    }
+  }
+  const refundExport = String.fromEnvironment('AI_DOMAIN_REFUND_CONTEXT_EXPORT_PATH');
+  for (final kind in ['openingAdvance', 'accountAdvance']) {
+    for (final action in ['AI-ACT-266', 'AI-ACT-267', 'AI-ACT-378']) {
+      test('Actual SDK original refund metadata $kind $action preserves source and native request ownership', () async {
+        final export = jsonDecode(File('$refundExport.$kind.$action.json').readAsStringSync()) as Map<String, dynamic>;
+        expect(export['label'], 'ISOLATED SDK ORIGINAL REFUND PREPARATION; NO MODEL REQUEST ID OR FINANCIAL EFFECT');
+        final actor = export['actor'] as Map<String, dynamic>, request = export['request'] as Map<String, dynamic>;
+        final scope = request['scope'] as Map<String, dynamic>, proposal = export['proposal'] as Map<String, dynamic>;
+        final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String,
+          tenantId: null, userId: actor['uid'] as String);
+        final context = MoolAssistantContext(accountScope: owner, authenticationRevision: 1).withWorkspace(
+          MoolAssistantWorkspace(id: scope['storeId'] as String, name: 'HOST original refund Store', profile: 'retailer-grocery',
+            revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+        final metadata = export['metadata'] as Map<String, dynamic>, data = metadata['data'] as Map<String, dynamic>;
+        final gateway = AssistantDomainContextGateway(owner: owner, isCurrent: () => true,
+          credentials: _Credentials(), transport: _CapacityWire(metadata), compactStoreSelection: true,
+          clock: () => DateTime.parse(data['validUntil'] as String).subtract(const Duration(seconds: 30)));
+        addTearDown(gateway.dispose);
+        final result = await gateway.read(context, () => true);
+        expect(result.revisions, {(action, proposal['entityId'] as String?): proposal['sourceRevision']});
+        final hint = (actionId: action, entityId: proposal['entityId'] as String?);
+        expect(hint.entityId, matches(RegExp(r'^ledger-refund:[a-f0-9]{64}$')));
+        expect(assistantNativeTargetSelection([hint]), [hint]);
+        expect(() => assistantNativeTargetSelection([(actionId: action, entityId: '["HOST-source"]')]),
+          throwsA(isA<AssistantModelFailure>()));
+        final fields = proposal['fields'] as Map<String, dynamic>;
+        if (action == 'AI-ACT-266') {
+          expect(fields.keys.toSet(), {'supplierId', 'copyId', 'copyRevision', 'openingId', 'openingRevision', 'sourceKind', 'sourceId', 'amount', 'reference', 'channel', 'occurredOn'});
+          expect(fields['sourceKind'], kind); expect(fields['amount'], '2.50');
+          expect(fields['copyId'], isNull); expect(fields['copyRevision'], isNull);
+          expect(fields['channel'], 'Cash');
+        } else {expect(fields, isEmpty);}
+        expect(jsonEncode(proposal), isNot(contains('idempotencyKey')));
+        expect(jsonEncode(metadata), isNot(contains('availableMinor')));
+        final other = context.withWorkspace(MoolAssistantWorkspace(id: 'HOST-other-store', name: 'HOST other', profile: 'retailer-grocery',
+          revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+        await expectLater(gateway.read(other, () => true), throwsA(isA<AssistantModelFailure>()));
+      }, skip: refundExport.isEmpty ? 'Requires explicit isolated original refund SDK context export' : false);
+    }
+  }
+  const allocationExport = String.fromEnvironment('AI_DOMAIN_ALLOCATION_CONTEXT_EXPORT_PATH');
+  for (final kind in ['openingAdvance', 'accountPayment', 'accountAdvance']) {
+    for (final action in ['AI-ACT-262', 'AI-ACT-263', 'AI-ACT-377']) {
+      test('Actual SDK original allocation metadata $kind $action preserves source and native request ownership', () async {
+        final export = jsonDecode(File('$allocationExport.$kind.$action.json').readAsStringSync()) as Map<String, dynamic>;
+        expect(export['label'], 'ISOLATED SDK ORIGINAL ALLOCATION PREPARATION; NO MODEL REQUEST ID OR FINANCIAL EFFECT');
+        final actor = export['actor'] as Map<String, dynamic>, request = export['request'] as Map<String, dynamic>;
+        final scope = request['scope'] as Map<String, dynamic>, proposal = export['proposal'] as Map<String, dynamic>;
+        final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String,
+          tenantId: null, userId: actor['uid'] as String);
+        final context = MoolAssistantContext(accountScope: owner, authenticationRevision: 1).withWorkspace(
+          MoolAssistantWorkspace(id: scope['storeId'] as String, name: 'HOST original allocation Store', profile: 'retailer-grocery',
+            revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+        final metadata = export['metadata'] as Map<String, dynamic>, data = metadata['data'] as Map<String, dynamic>;
+        final gateway = AssistantDomainContextGateway(owner: owner, isCurrent: () => true,
+          credentials: _Credentials(), transport: _CapacityWire(metadata), compactStoreSelection: true,
+          clock: () => DateTime.parse(data['validUntil'] as String).subtract(const Duration(seconds: 30)));
+        addTearDown(gateway.dispose);
+        final result = await gateway.read(context, () => true);
+        expect(result.revisions, {(action, proposal['entityId'] as String?): proposal['sourceRevision']});
+        final fields = proposal['fields'] as Map<String, dynamic>;
+        if (action == 'AI-ACT-262') {
+          expect(fields.keys.toSet(), {'supplierId', 'copyId', 'copyRevision', 'openingId', 'openingRevision', 'sourceKind', 'sourceId', 'amount'});
+          expect(fields['sourceKind'], kind); expect(fields['amount'], '2.50');
+        } else {expect(fields, isEmpty);}
+        expect(jsonEncode(proposal), isNot(contains('idempotencyKey')));
+        expect(jsonEncode(metadata), isNot(contains('availableMinor')));
+        final other = context.withWorkspace(MoolAssistantWorkspace(id: 'HOST-other-store', name: 'HOST other', profile: 'retailer-grocery',
+          revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+        await expectLater(gateway.read(other, () => true), throwsA(isA<AssistantModelFailure>()));
+      }, skip: allocationExport.isEmpty ? 'Requires explicit isolated original allocation SDK context export' : false);
+    }
+  }
+  const billMoneyExport = String.fromEnvironment('AI_DOMAIN_BILL_MONEY_CONTEXT_EXPORT_PATH');
+  for (final action in ['AI-ACT-259', 'AI-ACT-260', 'AI-ACT-261']) {
+    test('Actual SDK confirmed-bill money metadata $action decodes through the original mobile source', () async {
+      final export = jsonDecode(File('$billMoneyExport.$action.json').readAsStringSync()) as Map<String, dynamic>;
+      expect(export['label'], 'ISOLATED SDK ORIGINAL BILL MONEY PREPARATION; NO LIVE MODEL OR AUTHORITY');
+      final actor = export['actor'] as Map<String, dynamic>, request = export['request'] as Map<String, dynamic>;
+      final scope = request['scope'] as Map<String, dynamic>, proposal = export['proposal'] as Map<String, dynamic>;
+      final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String,
+        tenantId: null, userId: actor['uid'] as String);
+      final context = MoolAssistantContext(accountScope: owner, authenticationRevision: 1).withWorkspace(
+        MoolAssistantWorkspace(id: scope['storeId'] as String, name: 'HOST original bill money Store', profile: 'retailer-grocery',
+          revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+      final metadata = export['metadata'] as Map<String, dynamic>, data = metadata['data'] as Map<String, dynamic>;
+      final gateway = AssistantDomainContextGateway(owner: owner, isCurrent: () => true,
+        credentials: _Credentials(), transport: _CapacityWire(metadata), compactStoreSelection: true,
+        clock: () => DateTime.parse(data['validUntil'] as String).subtract(const Duration(seconds: 30)));
+      final result = await gateway.read(context, () => true);
+      expect(result.revisions, {(action, proposal['entityId'] as String?): proposal['sourceRevision']});
+      expect(jsonEncode(metadata), isNot(contains('HOST explicit bill money reference')));
+      expect(jsonEncode(metadata), isNot(contains('notIncludedInOpening')));
+    }, skip: billMoneyExport.isEmpty ? 'Requires explicit isolated SDK bill-money context export' : false);
+  }
+  const moneyExport = String.fromEnvironment('AI_DOMAIN_ORIGINAL_MONEY_CONTEXT_EXPORT_PATH');
+  for (final action in ['AI-ACT-260', 'AI-ACT-261']) {
+    test('Actual SDK original supplier money metadata $action decodes through the mobile gateway', () async {
+      final export = jsonDecode(File('$moneyExport.$action.json').readAsStringSync()) as Map<String, dynamic>;
+      expect(export['label'], 'ISOLATED SDK ORIGINAL MONEY PREPARATION; NO LIVE MODEL OR AUTHORITY');
+      final actor = export['actor'] as Map<String, dynamic>, request = export['request'] as Map<String, dynamic>;
+      final scope = request['scope'] as Map<String, dynamic>, proposal = export['proposal'] as Map<String, dynamic>;
+      final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String,
+        tenantId: null, userId: actor['uid'] as String);
+      final context = MoolAssistantContext(accountScope: owner, authenticationRevision: 1).withWorkspace(
+        MoolAssistantWorkspace(id: scope['storeId'] as String, name: 'HOST original money Store', profile: 'retailer-grocery',
+          revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+      final metadata = export['metadata'] as Map<String, dynamic>, data = metadata['data'] as Map<String, dynamic>;
+      final credentials = _Credentials();
+      final gateway = AssistantDomainContextGateway(owner: owner, isCurrent: () => true,
+        credentials: credentials, transport: _CapacityWire(metadata), compactStoreSelection: true,
+        clock: () => DateTime.parse(data['validUntil'] as String).subtract(const Duration(seconds: 30)));
+      final result = await gateway.read(context, () => true);
+      expect(result.revisions, {(action, proposal['entityId'] as String?): proposal['sourceRevision']});
+      expect(credentials.modes, [SocialAppCheckTokenMode.standard]);
+      expect(jsonEncode(metadata), isNot(contains('HOST originally supplied payment')));
+      expect(jsonEncode(metadata), isNot(contains('notIncludedInOpening')));
+    }, skip: moneyExport.isEmpty ? 'Requires explicit isolated actual SDK money-context export' : false);
+  }
   const ledgerExport = String.fromEnvironment('AI_DOMAIN_LEDGER_CONTEXT_EXPORT_PATH');
   test('Actual SDK original ledger preparation metadata decodes through the mobile gateway', () async {
     final export = jsonDecode(File(ledgerExport).readAsStringSync()) as Map<String, dynamic>;

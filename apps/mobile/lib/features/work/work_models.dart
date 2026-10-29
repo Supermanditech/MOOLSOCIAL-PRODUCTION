@@ -3949,13 +3949,14 @@ class WorkspaceSupplierCreditNote {
     required this.openingRevision, required this.reference, required this.occurredOn,
     required this.reason, required this.amountMinor, required this.recordedAt,
     required this.committedRevision, required List<WorkspaceSupplierCreditSupport> supports,
-    this.requestedAt})
+    this.requestedAt, this.documentInput})
     : supports = List.unmodifiable(supports);
   final String operationId, accountScope, workspaceId, supplierId, billId, copyId,
     openingId, reference, occurredOn, reason;
   final int copyRevision, openingRevision, amountMinor, committedRevision;
   final DateTime recordedAt;
   final DateTime? requestedAt;
+  final WorkspaceSupplierCreditDocumentInput? documentInput;
   final List<WorkspaceSupplierCreditSupport> supports;
 
   DateTime? get day {
@@ -3973,6 +3974,7 @@ class WorkspaceSupplierCreditNote {
       amountMinor > 0 && _financeAmountValid(amountMinor) && date != null &&
       (requestedAt == null || !requestedAt!.isAfter(recordedAt)) &&
       !date.isAfter(DateTime.utc(committed.year, committed.month, committed.day)) &&
+      (documentInput == null || documentInput!.valid) &&
       supports.isNotEmpty && supports.every((s) => s.valid) &&
       supports.map((s) => s.sourceIdentity).toSet().length == supports.length;
   }
@@ -3982,14 +3984,15 @@ class WorkspaceSupplierCreditNote {
     'reference': reference, 'occurredOn': occurredOn, 'reason': reason, 'amountMinor': amountMinor,
     'recordedAt': recordedAt.toUtc().toIso8601String(), 'committedRevision': committedRevision,
     'supports': [for (final support in supports) support.toJson()],
-    if (requestedAt != null) 'requestedAt': requestedAt!.toUtc().toIso8601String()};
+    if (requestedAt != null) 'requestedAt': requestedAt!.toUtc().toIso8601String(),
+    if (documentInput != null) 'documentInput': documentInput!.toJson()};
   Map<String, Object?> intentToJson() => toJson()..remove('recordedAt')..remove('committedRevision');
   static WorkspaceSupplierCreditNote fromJson(Object? raw) {
     const keys = {'operationId', 'accountScope', 'workspaceId', 'supplierId', 'billId', 'copyId',
       'copyRevision', 'openingId', 'openingRevision', 'reference', 'occurredOn', 'reason',
       'amountMinor', 'recordedAt', 'committedRevision', 'supports'};
     if (raw is! Map || !keys.every(raw.containsKey) ||
-        !raw.keys.every((key) => keys.contains(key) || key == 'requestedAt') ||
+        !raw.keys.every((key) => keys.contains(key) || key == 'requestedAt' || key == 'documentInput') ||
         raw['supports'] is! List) {
       throw const FormatException('Invalid supplier credit note');
     }
@@ -4002,6 +4005,7 @@ class WorkspaceSupplierCreditNote {
       reason: raw['reason'] as String, amountMinor: raw['amountMinor'] as int,
       recordedAt: DateTime.parse(raw['recordedAt'] as String),
       requestedAt: raw.containsKey('requestedAt') ? DateTime.parse(raw['requestedAt'] as String) : null,
+      documentInput: raw.containsKey('documentInput') ? WorkspaceSupplierCreditDocumentInput.fromJson(raw['documentInput']) : null,
       committedRevision: raw['committedRevision'] as int,
       supports: [for (final support in raw['supports'] as List) WorkspaceSupplierCreditSupport.fromJson(support)]);
     if (!note.valid) throw const FormatException('Invalid supplier credit note');
@@ -4016,22 +4020,30 @@ class WorkspaceSupplierCreditIntent {
     required this.copyId, required this.copyRevision, required this.openingId,
     required this.openingRevision, required this.reference, required this.occurredOn,
     required this.reason, required this.amountMinor, required this.requestedAt,
-    required List<WorkspaceSupplierCreditSupport> supports}) : supports = List.unmodifiable(supports);
+    required List<WorkspaceSupplierCreditSupport> supports, this.documentInput}) : supports = List.unmodifiable(supports);
   final String operationId, accountScope, workspaceId, supplierId, billId, copyId,
     openingId, reference, occurredOn, reason;
   final int copyRevision, openingRevision, amountMinor;
   final DateTime requestedAt;
+  final WorkspaceSupplierCreditDocumentInput? documentInput;
   final List<WorkspaceSupplierCreditSupport> supports;
   WorkspaceSupplierCreditNote commit({required int revision, required DateTime at}) =>
     WorkspaceSupplierCreditNote(operationId: operationId, accountScope: accountScope,
       workspaceId: workspaceId, supplierId: supplierId, billId: billId, copyId: copyId,
       copyRevision: copyRevision, openingId: openingId, openingRevision: openingRevision,
       reference: reference, occurredOn: occurredOn, reason: reason, amountMinor: amountMinor,
-      recordedAt: at, committedRevision: revision, requestedAt: requestedAt, supports: supports);
+      recordedAt: at, committedRevision: revision, requestedAt: requestedAt, supports: supports, documentInput: documentInput);
   bool get valid => commit(revision: 2, at: requestedAt).valid;
   Map<String, Object?> toJson() => commit(revision: 2, at: requestedAt).intentToJson();
-  bool matches(WorkspaceSupplierCreditNote note) => valid && note.valid &&
-    jsonEncode(toJson()) == jsonEncode(note.intentToJson());
+  bool matches(WorkspaceSupplierCreditNote note) {
+    if (!valid || !note.valid || (documentInput == null) != (note.documentInput == null) ||
+        documentInput != null && !documentInput!.sameAs(note.documentInput!)) return false;
+    // Structured field order can differ after canonical backend serialization.
+    // The printed values and row order must still match exactly.
+    final input = toJson()..remove('documentInput');
+    final recorded = note.intentToJson()..remove('documentInput');
+    return jsonEncode(input) == jsonEncode(recorded);
+  }
   static WorkspaceSupplierCreditIntent fromJson(Object? raw) {
     if (raw is! Map || raw.containsKey('recordedAt') || raw.containsKey('committedRevision') ||
         !raw.containsKey('requestedAt')) { throw const FormatException('Invalid supplier credit request'); }
@@ -4041,7 +4053,7 @@ class WorkspaceSupplierCreditIntent {
       workspaceId: note.workspaceId, supplierId: note.supplierId, billId: note.billId,
       copyId: note.copyId, copyRevision: note.copyRevision, openingId: note.openingId,
       openingRevision: note.openingRevision, reference: note.reference, occurredOn: note.occurredOn,
-      reason: note.reason, amountMinor: note.amountMinor, requestedAt: note.requestedAt!, supports: note.supports);
+      reason: note.reason, amountMinor: note.amountMinor, requestedAt: note.requestedAt!, supports: note.supports, documentInput: note.documentInput);
     if (!intent.valid) throw const FormatException('Invalid supplier credit request');
     return intent;
   }
@@ -7748,6 +7760,11 @@ class WorkspaceSupplierCreditDocumentInput {
     }
     return total;
   }
+  bool sameAs(WorkspaceSupplierCreditDocumentInput other) => valid && other.valid &&
+    treatment == other.treatment && reasonCode == other.reasonCode && taxRows.length == other.taxRows.length &&
+    taxRows.indexed.every((row) => taxFields.every((key) => row.$2[key] == other.taxRows[row.$1][key])) &&
+    particulars.length == other.particulars.length &&
+    particulars.entries.every((entry) => other.particulars[entry.key] == entry.value);
   Map<String, Object?> toJson() => {'version': particulars.isEmpty ? 1 : 2, 'treatment': treatment,
     'reasonCode': reasonCode, 'taxRows': taxRows, if (particulars.isNotEmpty) 'particulars': particulars};
   static WorkspaceSupplierCreditDocumentInput fromJson(Object? raw) {
@@ -7876,10 +7893,9 @@ class WorkspaceLedgerFormDraft {
               ? entry.value.length <= 262144
               : entry.value.length <= 512) &&
       (key.kind != 'supplierMoney' || _supplierMoneyNamespaceValid) &&
-      // The accepted financial intent cannot preserve classification or taxes.
-      // New document input must remain an unsent draft until that contract exists.
-      (key.kind != 'supplierCredit' || !fields.containsKey('documentInput') ||
-        fields['attempt']?.isNotEmpty != true) &&
+      // A new frozen request must retain exactly the structured document.
+      // Legacy requests without document input remain unchanged.
+      _supplierCreditDocumentFrozenMatches &&
       (key.kind != 'supplierReceivingInput' ||
         (key.ledgerRevision == 1 && key.invoice == 'receiving-input' &&
           const ['receiving-input:qa', 'receiving-input:live'].contains(key.order) &&
@@ -8029,6 +8045,14 @@ class WorkspaceLedgerFormDraft {
     if (key.kind != 'supplierCredit' || text == null || text.isEmpty || text.length > 262144) return null;
     try { return WorkspaceSupplierCreditIntent.fromJson(jsonDecode(text)); }
     on Object { return null; }
+  }
+  bool get _supplierCreditDocumentFrozenMatches {
+    if (key.kind != 'supplierCredit' || fields['attempt']?.isNotEmpty != true) return true;
+    final intent = supplierCreditIntent;
+    if (intent == null) return false;
+    final document = supplierCreditDocumentInput;
+    if (intent.documentInput == null) return !fields.containsKey('documentInput');
+    return document != null && document.sameAs(intent.documentInput!);
   }
   bool _validSupplierCreditIntent(String text) {
     if (text.isEmpty) return true;

@@ -1230,6 +1230,50 @@ abstract interface class WorkSupplierMoneyDraftGuard {
   });
 }
 
+/// Retains the original request identity beside the existing encrypted form.
+/// It contains no authoritative financial result and cannot resolve a Save.
+abstract interface class WorkSupplierMoneyOriginalDraftGuard {
+  Future<WorkspaceLedgerIntent?> readOriginalSupplierMoneyAttempt(WorkspaceLedgerFormKey key,
+    WorkspaceSupplierMoneyAttempt attempt, {required WorkspaceLedgerScope scope, required String connectionId});
+  Future<void> retainOriginalSupplierMoneyAttempt(WorkspaceLedgerFormKey key,
+    WorkspaceSupplierMoneyAttempt attempt, WorkspaceLedgerIntent original,
+    {required WorkspaceLedgerScope scope, required String connectionId});
+  Future<void> resetRefusedSupplierMoneyDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision, required WorkspaceLedgerScope scope, required String connectionId,
+    required Future<bool> Function(WorkspaceSupplierMoneyAttempt attempt, WorkspaceLedgerIntent original) verifyNotRecorded,
+  });
+}
+
+/// Original request identity for attribution of money already recorded.
+abstract interface class WorkSupplierAllocationOriginalDraftGuard {
+  Future<WorkspaceLedgerIntent?> readOriginalSupplierAllocationAttempt(WorkspaceLedgerFormKey key,
+    WorkspaceSupplierMoneyAllocationIntent intent, {required WorkspaceLedgerScope scope, required String connectionId});
+  Future<void> retainOriginalSupplierAllocationAttempt(WorkspaceLedgerFormKey key,
+    WorkspaceSupplierMoneyAllocationIntent intent, WorkspaceLedgerIntent original,
+    {required WorkspaceLedgerScope scope, required String connectionId});
+  Future<void> resetRefusedSupplierAllocationDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision, required WorkspaceLedgerScope scope, required String connectionId,
+    required Future<bool> Function(WorkspaceSupplierMoneyAllocationIntent intent, WorkspaceLedgerIntent original) verifyNotRecorded,
+  });
+}
+
+/// Immutable original request beside the existing encrypted refund form.
+typedef WorkSupplierRefundRecoverySource = ({WorkspaceSupplierRefundSourceKind sourceKind, String sourceId,
+  String openingId, int openingRevision, String? copyId, int? copyRevision, bool qa, String reference});
+abstract interface class WorkSupplierRefundOriginalDraftGuard {
+  Future<List<WorkSupplierRefundRecoverySource>> readOriginalSupplierRefundSources(String supplierId,
+    {required WorkspaceLedgerScope scope, required String connectionId});
+  Future<WorkspaceLedgerIntent?> readOriginalSupplierRefundAttempt(WorkspaceLedgerFormKey key,
+    WorkspaceSupplierRefundIntent intent, {required WorkspaceLedgerScope scope, required String connectionId});
+  Future<void> retainOriginalSupplierRefundAttempt(WorkspaceLedgerFormKey key,
+    WorkspaceSupplierRefundIntent intent, WorkspaceLedgerIntent original,
+    {required WorkspaceLedgerScope scope, required String connectionId});
+  Future<void> resetRefusedSupplierRefundDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision, required WorkspaceLedgerScope scope, required String connectionId,
+    required Future<bool> Function(WorkspaceSupplierRefundIntent intent, WorkspaceLedgerIntent original) verifyNotRecorded,
+  });
+}
+
 /// Uses the existing encrypted draft storage approach; never financial authority.
 abstract interface class WorkSupplierAllocationDraftGuard {
   Future<bool> withFrozenSupplierAllocation(WorkspaceLedgerFormKey key, String intent,
@@ -1265,6 +1309,19 @@ abstract interface class WorkSupplierCreditDraftGuard {
   });
 }
 
+/// Exact original request retained beside the existing encrypted credit form.
+abstract interface class WorkSupplierCreditOriginalDraftGuard {
+  Future<WorkspaceLedgerIntent?> readOriginalSupplierCreditAttempt(WorkspaceLedgerFormKey key,
+    WorkspaceSupplierCreditIntent intent, {required WorkspaceLedgerScope scope, required String connectionId});
+  Future<void> retainOriginalSupplierCreditAttempt(WorkspaceLedgerFormKey key,
+    WorkspaceSupplierCreditIntent intent, WorkspaceLedgerIntent original,
+    {required WorkspaceLedgerScope scope, required String connectionId});
+  Future<void> resetRefusedSupplierCreditDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision, required WorkspaceLedgerScope scope, required String connectionId,
+    required Future<bool> Function(WorkspaceSupplierCreditIntent intent, WorkspaceLedgerIntent original) verifyNotRecorded,
+  });
+}
+
 abstract interface class WorkSupplierRefundDraftGuard {
   Future<bool> withFrozenSupplierRefund(WorkspaceLedgerFormKey key, String intent,
       Future<bool> Function() action);
@@ -1283,9 +1340,10 @@ abstract interface class WorkSupplierShortageDraftGuard {
   });
 }
 
-class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSupplierMoneyDraftGuard,
-    WorkSupplierAllocationDraftGuard, WorkSupplierGoodsReturnDraftGuard, WorkSupplierCreditDraftGuard,
-    WorkSupplierShortageDraftGuard, WorkSupplierRefundDraftGuard {
+class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSupplierMoneyDraftGuard, WorkSupplierMoneyOriginalDraftGuard,
+    WorkSupplierAllocationDraftGuard, WorkSupplierAllocationOriginalDraftGuard,
+    WorkSupplierGoodsReturnDraftGuard, WorkSupplierCreditDraftGuard, WorkSupplierCreditOriginalDraftGuard,
+    WorkSupplierShortageDraftGuard, WorkSupplierRefundDraftGuard, WorkSupplierRefundOriginalDraftGuard {
   SecureWorkLedgerFormDraftStore({
     required this.accountScope,
     FlutterSecureStorage? storage,
@@ -1399,6 +1457,13 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
       throw const WorkGatewayException(
         'Saved invoice input changed. Reopen it first.',
       );
+    }
+    if (draft.key.kind == 'supplierCredit' && draft.supplierCreditIntent != null) {
+      final document = previous?.supplierCreditDocumentInput;
+      final frozenDocument = draft.supplierCreditIntent!.documentInput;
+      if (document != null && (frozenDocument == null || !document.sameAs(frozenDocument))) {
+        throw const WorkGatewayException('Keep the exact credit-note document in this saved request.');
+      }
     }
     if ((previous?.supplierMoneyAttempt != null || previous?.supplierAllocationIntent != null ||
         previous?.supplierGoodsReturnIntent != null || previous?.supplierCreditIntent != null ||
@@ -1534,6 +1599,109 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
     return result;
   });
 
+  String _originalMoneyKey(WorkspaceLedgerFormKey key, WorkspaceSupplierMoneyAttempt attempt) =>
+    '${_key(key)}.original-request.${workspaceLedgerFingerprint(attempt.entry.operationId)}';
+  void _originalMoneyBinding(WorkspaceLedgerFormKey key, WorkspaceSupplierMoneyAttempt attempt,
+      WorkspaceLedgerScope scope, String connectionId, WorkspaceLedgerIntent original) {
+    _check(key);
+    if (key.kind != 'supplierMoney' || !attempt.valid || connectionId.trim().isEmpty ||
+        key.account != scope.account || key.store != scope.store || original.scope != scope ||
+        original.operation != 'recordStoreSupplierMoney' || original.targetId != key.customer ||
+        original.entryId != attempt.entry.operationId || original.data['expectedSupplierRevision'] != attempt.expectedRevision ||
+        workspaceLedgerFingerprint(original.input) != workspaceLedgerFingerprint(attempt.entry.toJson())) {
+      throw const WorkGatewayException('Keep the original supplier payment request.');
+    }
+    final entry = attempt.entry, review = entry.moneyReview!;
+    if (entry.origin == WorkspaceSupplierEntryOrigin.supplierAccount
+        ? key.invoice != review.openingId || key.ledgerRevision != review.openingRevision ||
+          key.order != 'account-${entry.kind == WorkspaceSupplierEntryKind.advance ? 'advance' : 'payment'}:${review.openingId}'
+        : key.invoice != entry.billId || key.order != 'manual-copy:${entry.purchaseId}') {
+      throw const WorkGatewayException('Keep the original supplier document and opening references.');
+    }
+  }
+  Future<WorkspaceLedgerIntent?> _readOriginalMoney(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAttempt attempt, WorkspaceLedgerScope scope, String connectionId) async {
+    _check(key);
+    final raw = await _storage.read(key: _originalMoneyKey(key, attempt));
+    _check(key);
+    if (raw == null) return null;
+    try {
+      final value = jsonDecode(raw);
+      if (value is! Map || value.length != 4 || value['schemaVersion'] != 1 ||
+          value['connectionId'] != connectionId || !value.keys.every(const {'schemaVersion', 'connectionId', 'original', 'frozenDraft'}.contains)) {
+        throw const FormatException();
+      }
+      final frozen = WorkspaceLedgerFormDraft.fromJson(value['frozenDraft']);
+      if (frozen == null || frozen.key != key || frozen.supplierMoneyAttempt == null ||
+          workspaceLedgerFingerprint(frozen.supplierMoneyAttempt!.toJson()) != workspaceLedgerFingerprint(attempt.toJson())) {
+        throw const FormatException();
+      }
+      final original = WorkspaceLedgerIntent.fromJson(value['original'], scope);
+      _originalMoneyBinding(key, attempt, scope, connectionId, original);
+      return original;
+    } on Object {
+      throw const WorkGatewayException('Saved payment identity could not be verified. Keep its original request.');
+    }
+  }
+  @override
+  Future<WorkspaceLedgerIntent?> readOriginalSupplierMoneyAttempt(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAttempt attempt, {required WorkspaceLedgerScope scope, required String connectionId}) =>
+    _serial(_key(key), () async {
+      final current = await _read(key);
+      if (current?.supplierMoneyAttempt == null) {
+        throw const WorkGatewayException('Reopen the saved payment input before checking its original request.');
+      }
+      if (workspaceLedgerFingerprint(current!.supplierMoneyAttempt!.toJson()) != workspaceLedgerFingerprint(attempt.toJson())) {
+        throw const WorkGatewayException('Reopen the current saved payment attempt.');
+      }
+      return _readOriginalMoney(key, attempt, scope, connectionId);
+    });
+  @override
+  Future<void> retainOriginalSupplierMoneyAttempt(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAttempt attempt, WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerScope scope, required String connectionId}) => _serial(_key(key), () async {
+    _originalMoneyBinding(key, attempt, scope, connectionId, original);
+    final current = await _read(key);
+    if (current?.supplierMoneyAttempt == null ||
+        workspaceLedgerFingerprint(current!.supplierMoneyAttempt!.toJson()) != workspaceLedgerFingerprint(attempt.toJson())) {
+      throw const WorkGatewayException('Save these exact payment inputs before submitting.');
+    }
+    final previous = await _readOriginalMoney(key, attempt, scope, connectionId);
+    if (previous != null) {
+      if (workspaceLedgerCanonical(previous.toJson()) != workspaceLedgerCanonical(original.toJson())) {
+        throw const WorkGatewayException('The original payment identity must not be replaced.');
+      }
+      return;
+    }
+    final encoded = jsonEncode({'schemaVersion': 1, 'connectionId': connectionId,
+      'original': original.toJson(), 'frozenDraft': current.toJson()});
+    _check(key); await _storage.write(key: _originalMoneyKey(key, attempt), value: encoded); _check(key);
+  });
+  @override
+  Future<void> resetRefusedSupplierMoneyDraft(WorkspaceLedgerFormDraft next, {
+      required int expectedRevision, required WorkspaceLedgerScope scope, required String connectionId,
+      required Future<bool> Function(WorkspaceSupplierMoneyAttempt attempt, WorkspaceLedgerIntent original) verifyNotRecorded,
+    }) => _serial(_key(next.key), () async {
+      _check(next.key);
+      if (next.key.kind != 'supplierMoney' || !next.valid || next.supplierMoneyAttempt != null ||
+          next.revision != expectedRevision + 1) throw const WorkGatewayException('Keep the saved payment input.');
+      final previous = await _read(next.key), encoded = jsonEncode(next.toJson());
+      if (previous != null && jsonEncode(previous.toJson()) == encoded) return;
+      if (previous?.revision != expectedRevision || previous?.supplierMoneyAttempt == null) {
+        throw const WorkGatewayException('Reopen the exact refused payment request.');
+      }
+      final fields = {...previous!.fields}..remove('attempt'); fields['notIncludedInOpening'] = 'false';
+      if (workspaceLedgerCanonical(next.fields) != workspaceLedgerCanonical(fields)) {
+        throw const WorkGatewayException('Keep the payment inputs and original supporting copies.');
+      }
+      final attempt = previous.supplierMoneyAttempt!;
+      final original = await _readOriginalMoney(next.key, attempt, scope, connectionId);
+      if (original == null || !await verifyNotRecorded(attempt, original)) {
+        throw const WorkGatewayException('Verify that this exact request was not recorded before reviewing it.');
+      }
+      _check(next.key); await _storage.write(key: _key(next.key), value: encoded); _check(next.key);
+    });
+
   @override
   Future<void> resetConfirmedSupplierMoneyDraft(WorkspaceLedgerFormDraft next, {
     required int expectedRevision,
@@ -1560,6 +1728,319 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
     await _storage.write(key: _key(next.key), value: encoded);
     _check(next.key);
   });
+
+  @override
+  Future<List<WorkSupplierRefundRecoverySource>> readOriginalSupplierRefundSources(String supplierId,
+      {required WorkspaceLedgerScope scope, required String connectionId}) async {
+    if (accountScope() != scope.account || supplierId.trim().isEmpty || connectionId.trim().isEmpty) {
+      throw const WorkGatewayException('Return to the original Store before opening saved refunds.');
+    }
+    final prefix = 'moolsocial.workspace.ledger-form.v1.${[scope.account, scope.store, supplierId].map(Uri.encodeComponent).join('/')}/';
+    final values = await _storage.readAll();
+    if (accountScope() != scope.account) throw const WorkGatewayException('Return to the original account.');
+    final sources = <WorkSupplierRefundRecoverySource>[];
+    for (final entry in values.entries) {
+      if (!entry.key.startsWith(prefix) || !entry.key.contains('/supplierRefund/') || entry.key.contains('.original-request.')) continue;
+      try {
+        final candidate = WorkspaceLedgerFormDraft.fromJson(jsonDecode(entry.value));
+        if (candidate == null || candidate.key.kind != 'supplierRefund' || entry.key != _key(candidate.key)) throw const FormatException();
+        final hint = await _serial<WorkSupplierRefundRecoverySource?>(_key(candidate.key), () async {
+          final current = await _read(candidate.key), intent = current?.supplierRefundIntent;
+          if (intent == null) return null;
+          final original = await _readOriginalRefund(candidate.key, intent, scope, connectionId);
+          if (original == null) return null;
+          _check(candidate.key);
+          return (sourceKind: intent.sourceKind, sourceId: intent.sourceId, openingId: intent.openingId,
+            openingRevision: intent.openingRevision, copyId: intent.copyId, copyRevision: intent.copyRevision,
+            qa: intent.qa, reference: intent.reference);
+        });
+        if (hint != null) sources.add(hint);
+      } on Object {
+        throw const WorkGatewayException('Saved refund sources could not be verified. Keep the original requests and retry.');
+      }
+    }
+    if (accountScope() != scope.account) throw const WorkGatewayException('Return to the original account.');
+    return List.unmodifiable(sources);
+  }
+  String _originalCreditKey(WorkspaceLedgerFormKey key, WorkspaceSupplierCreditIntent intent) =>
+    '${_key(key)}.original-request.${workspaceLedgerFingerprint(intent.operationId)}';
+  void _originalCreditBinding(WorkspaceLedgerFormKey key, WorkspaceSupplierCreditIntent intent,
+      WorkspaceLedgerScope scope, String connectionId, WorkspaceLedgerIntent original) {
+    _check(key);
+    if (key.kind != 'supplierCredit' || !intent.valid || intent.documentInput == null || connectionId.trim().isEmpty ||
+        key.account != scope.account || key.store != scope.store || original.scope != scope ||
+        intent.accountScope != key.account || intent.workspaceId != key.store || intent.supplierId != key.customer ||
+        intent.billId != key.invoice || intent.copyRevision != key.ledgerRevision || key.order != 'credit-copy:${intent.copyId}' ||
+        original.operation != 'recordStoreSupplierCreditNote' || original.targetId != key.customer ||
+        original.entryId != intent.operationId || workspaceLedgerFingerprint(original.input) != workspaceLedgerFingerprint(intent.toJson())) {
+      throw const WorkGatewayException('Keep the original credit note request and document details.');
+    }
+  }
+  Future<WorkspaceLedgerIntent?> _readOriginalCredit(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierCreditIntent intent, WorkspaceLedgerScope scope, String connectionId) async {
+    _check(key);
+    final raw = await _storage.read(key: _originalCreditKey(key, intent));
+    _check(key);
+    if (raw == null) return null;
+    try {
+      final value = jsonDecode(raw);
+      if (value is! Map || value.length != 4 || value['schemaVersion'] != 1 || value['connectionId'] != connectionId ||
+          !value.keys.every(const {'schemaVersion', 'connectionId', 'original', 'frozenDraft'}.contains)) throw const FormatException();
+      final frozen = WorkspaceLedgerFormDraft.fromJson(value['frozenDraft']);
+      if (frozen == null || frozen.key != key || frozen.supplierCreditIntent == null ||
+          workspaceLedgerFingerprint(frozen.supplierCreditIntent!.toJson()) != workspaceLedgerFingerprint(intent.toJson())) throw const FormatException();
+      final original = WorkspaceLedgerIntent.fromJson(value['original'], scope);
+      _originalCreditBinding(key, intent, scope, connectionId, original);
+      return original;
+    } on Object {
+      throw const WorkGatewayException('Saved credit note identity could not be verified. Keep its original request.');
+    }
+  }
+  @override
+  Future<WorkspaceLedgerIntent?> readOriginalSupplierCreditAttempt(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierCreditIntent intent, {required WorkspaceLedgerScope scope, required String connectionId}) =>
+    _serial(_key(key), () async {
+      final current = await _read(key);
+      if (current?.supplierCreditIntent == null ||
+          workspaceLedgerFingerprint(current!.supplierCreditIntent!.toJson()) != workspaceLedgerFingerprint(intent.toJson())) {
+        throw const WorkGatewayException('Reopen the current saved credit note.');
+      }
+      return _readOriginalCredit(key, intent, scope, connectionId);
+    });
+  @override
+  Future<void> retainOriginalSupplierCreditAttempt(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierCreditIntent intent, WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerScope scope, required String connectionId}) => _serial(_key(key), () async {
+    _originalCreditBinding(key, intent, scope, connectionId, original);
+    final current = await _read(key);
+    if (current?.supplierCreditIntent == null ||
+        workspaceLedgerFingerprint(current!.supplierCreditIntent!.toJson()) != workspaceLedgerFingerprint(intent.toJson())) {
+      throw const WorkGatewayException('Save these exact credit note inputs before submitting.');
+    }
+    final previous = await _readOriginalCredit(key, intent, scope, connectionId);
+    if (previous != null) {
+      if (workspaceLedgerCanonical(previous.toJson()) != workspaceLedgerCanonical(original.toJson())) {
+        throw const WorkGatewayException('The original credit note identity must not be replaced.');
+      }
+      return;
+    }
+    final encoded = jsonEncode({'schemaVersion': 1, 'connectionId': connectionId,
+      'original': original.toJson(), 'frozenDraft': current.toJson()});
+    _check(key); await _storage.write(key: _originalCreditKey(key, intent), value: encoded); _check(key);
+  });
+  @override
+  Future<void> resetRefusedSupplierCreditDraft(WorkspaceLedgerFormDraft next, {
+      required int expectedRevision, required WorkspaceLedgerScope scope, required String connectionId,
+      required Future<bool> Function(WorkspaceSupplierCreditIntent intent, WorkspaceLedgerIntent original) verifyNotRecorded,
+    }) => _serial(_key(next.key), () async {
+      _check(next.key);
+      if (next.key.kind != 'supplierCredit' || !next.valid || next.supplierCreditIntent != null ||
+          next.revision != expectedRevision + 1) throw const WorkGatewayException('Keep the saved credit note input.');
+      final previous = await _read(next.key), encoded = jsonEncode(next.toJson());
+      if (previous != null && jsonEncode(previous.toJson()) == encoded) return;
+      if (previous?.revision != expectedRevision || previous?.supplierCreditIntent == null) {
+        throw const WorkGatewayException('Reopen the exact unrecorded credit note request.');
+      }
+      final fields = {...previous!.fields}..remove('attempt');
+      if (workspaceLedgerCanonical(next.fields) != workspaceLedgerCanonical(fields)) {
+        throw const WorkGatewayException('Keep the credit note inputs and original supporting copies.');
+      }
+      final intent = previous.supplierCreditIntent!;
+      final original = await _readOriginalCredit(next.key, intent, scope, connectionId);
+      if (original == null || !await verifyNotRecorded(intent, original)) {
+        throw const WorkGatewayException('Verify that this exact credit note was not recorded before reviewing it.');
+      }
+      _check(next.key); await _storage.write(key: _key(next.key), value: encoded); _check(next.key);
+    });
+
+  String _originalRefundKey(WorkspaceLedgerFormKey key, WorkspaceSupplierRefundIntent intent) =>
+    '${_key(key)}.original-request.${workspaceLedgerFingerprint(intent.operationId)}';
+  void _originalRefundBinding(WorkspaceLedgerFormKey key, WorkspaceSupplierRefundIntent intent,
+      WorkspaceLedgerScope scope, String connectionId, WorkspaceLedgerIntent original) {
+    _check(key);
+    if (!intent.valid || key != intent.formKey || connectionId.trim().isEmpty ||
+        key.account != scope.account || key.store != scope.store || original.scope != scope ||
+        original.operation != 'recordStoreSupplierRefund' || original.targetId != key.customer ||
+        original.entryId != intent.operationId || workspaceLedgerFingerprint(original.input) != workspaceLedgerFingerprint(intent.toJson())) {
+      throw const WorkGatewayException('Keep the original supplier refund request and source.');
+    }
+  }
+  Future<WorkspaceLedgerIntent?> _readOriginalRefund(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierRefundIntent intent, WorkspaceLedgerScope scope, String connectionId) async {
+    _check(key);
+    final raw = await _storage.read(key: _originalRefundKey(key, intent));
+    _check(key);
+    if (raw == null) return null;
+    try {
+      final value = jsonDecode(raw);
+      if (value is! Map || value.length != 4 || value['schemaVersion'] != 1 || value['connectionId'] != connectionId ||
+          !value.keys.every(const {'schemaVersion', 'connectionId', 'original', 'frozenDraft'}.contains)) throw const FormatException();
+      final frozen = WorkspaceLedgerFormDraft.fromJson(value['frozenDraft']);
+      if (frozen == null || frozen.key != key || frozen.supplierRefundIntent == null ||
+          workspaceLedgerFingerprint(frozen.supplierRefundIntent!.toJson()) != workspaceLedgerFingerprint(intent.toJson())) throw const FormatException();
+      final original = WorkspaceLedgerIntent.fromJson(value['original'], scope);
+      _originalRefundBinding(key, intent, scope, connectionId, original);
+      return original;
+    } on Object {
+      throw const WorkGatewayException('Saved refund identity could not be verified. Keep its original request.');
+    }
+  }
+  @override
+  Future<WorkspaceLedgerIntent?> readOriginalSupplierRefundAttempt(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierRefundIntent intent, {required WorkspaceLedgerScope scope, required String connectionId}) =>
+    _serial(_key(key), () async {
+      final current = await _read(key);
+      if (current?.supplierRefundIntent == null ||
+          workspaceLedgerFingerprint(current!.supplierRefundIntent!.toJson()) != workspaceLedgerFingerprint(intent.toJson())) {
+        throw const WorkGatewayException('Reopen the current saved supplier refund.');
+      }
+      return _readOriginalRefund(key, intent, scope, connectionId);
+    });
+  @override
+  Future<void> retainOriginalSupplierRefundAttempt(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierRefundIntent intent, WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerScope scope, required String connectionId}) => _serial(_key(key), () async {
+    _originalRefundBinding(key, intent, scope, connectionId, original);
+    final current = await _read(key);
+    if (current?.supplierRefundIntent == null ||
+        workspaceLedgerFingerprint(current!.supplierRefundIntent!.toJson()) != workspaceLedgerFingerprint(intent.toJson())) {
+      throw const WorkGatewayException('Save these exact refund inputs before submitting.');
+    }
+    final previous = await _readOriginalRefund(key, intent, scope, connectionId);
+    if (previous != null) {
+      if (workspaceLedgerCanonical(previous.toJson()) != workspaceLedgerCanonical(original.toJson())) {
+        throw const WorkGatewayException('The original refund identity must not be replaced.');
+      }
+      return;
+    }
+    final encoded = jsonEncode({'schemaVersion': 1, 'connectionId': connectionId,
+      'original': original.toJson(), 'frozenDraft': current.toJson()});
+    _check(key); await _storage.write(key: _originalRefundKey(key, intent), value: encoded); _check(key);
+  });
+  @override
+  Future<void> resetRefusedSupplierRefundDraft(WorkspaceLedgerFormDraft next, {
+      required int expectedRevision, required WorkspaceLedgerScope scope, required String connectionId,
+      required Future<bool> Function(WorkspaceSupplierRefundIntent intent, WorkspaceLedgerIntent original) verifyNotRecorded,
+    }) => _serial(_key(next.key), () async {
+      _check(next.key);
+      if (next.key.kind != 'supplierRefund' || !next.valid || next.supplierRefundIntent != null ||
+          next.revision != expectedRevision + 1) throw const WorkGatewayException('Keep the saved refund input.');
+      final previous = await _read(next.key), encoded = jsonEncode(next.toJson());
+      if (previous != null && jsonEncode(previous.toJson()) == encoded) return;
+      if (previous?.revision != expectedRevision || previous?.supplierRefundIntent == null) {
+        throw const WorkGatewayException('Reopen the exact refused refund request.');
+      }
+      final fields = {...previous!.fields}..remove('attempt');
+      if (workspaceLedgerCanonical(next.fields) != workspaceLedgerCanonical(fields)) {
+        throw const WorkGatewayException('Keep the refund inputs and original supporting copies.');
+      }
+      final intent = previous.supplierRefundIntent!;
+      final original = await _readOriginalRefund(next.key, intent, scope, connectionId);
+      if (original == null || !await verifyNotRecorded(intent, original)) {
+        throw const WorkGatewayException('Verify that this exact refund was not recorded before reviewing it.');
+      }
+      _check(next.key); await _storage.write(key: _key(next.key), value: encoded); _check(next.key);
+    });
+
+  String _originalAllocationKey(WorkspaceLedgerFormKey key, WorkspaceSupplierMoneyAllocationIntent intent) =>
+    '${_key(key)}.original-request.${workspaceLedgerFingerprint(intent.operationId)}';
+  void _originalAllocationBinding(WorkspaceLedgerFormKey key, WorkspaceSupplierMoneyAllocationIntent intent,
+      WorkspaceLedgerScope scope, String connectionId, WorkspaceLedgerIntent original) {
+    _check(key);
+    if (key.kind != 'supplierAllocation' || !intent.valid || connectionId.trim().isEmpty ||
+        key.account != scope.account || key.store != scope.store || original.scope != scope ||
+        intent.accountScope != key.account || intent.workspaceId != key.store || intent.supplierId != key.customer ||
+        intent.billId != key.invoice || intent.copyRevision != key.ledgerRevision ||
+        key.order != 'allocation-copy:${intent.copyId}' ||
+        original.operation != 'recordStoreSupplierMoneyAllocation' || original.targetId != key.customer ||
+        original.entryId != intent.operationId ||
+        workspaceLedgerFingerprint(original.input) != workspaceLedgerFingerprint(intent.intentToJson())) {
+      throw const WorkGatewayException('Keep the original bill allocation request and document references.');
+    }
+  }
+  Future<WorkspaceLedgerIntent?> _readOriginalAllocation(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAllocationIntent intent, WorkspaceLedgerScope scope, String connectionId) async {
+    _check(key);
+    final raw = await _storage.read(key: _originalAllocationKey(key, intent));
+    _check(key);
+    if (raw == null) return null;
+    try {
+      final value = jsonDecode(raw);
+      if (value is! Map || value.length != 4 || value['schemaVersion'] != 1 ||
+          value['connectionId'] != connectionId ||
+          !value.keys.every(const {'schemaVersion', 'connectionId', 'original', 'frozenDraft'}.contains)) {
+        throw const FormatException();
+      }
+      final frozen = WorkspaceLedgerFormDraft.fromJson(value['frozenDraft']);
+      if (frozen == null || frozen.key != key || frozen.supplierAllocationIntent == null ||
+          workspaceLedgerFingerprint(frozen.supplierAllocationIntent!.intentToJson()) !=
+            workspaceLedgerFingerprint(intent.intentToJson())) throw const FormatException();
+      final original = WorkspaceLedgerIntent.fromJson(value['original'], scope);
+      _originalAllocationBinding(key, intent, scope, connectionId, original);
+      return original;
+    } on Object {
+      throw const WorkGatewayException('Saved allocation identity could not be verified. Keep its original request.');
+    }
+  }
+  @override
+  Future<WorkspaceLedgerIntent?> readOriginalSupplierAllocationAttempt(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAllocationIntent intent, {required WorkspaceLedgerScope scope, required String connectionId}) =>
+    _serial(_key(key), () async {
+      final current = await _read(key);
+      if (current?.supplierAllocationIntent == null ||
+          workspaceLedgerFingerprint(current!.supplierAllocationIntent!.intentToJson()) !=
+            workspaceLedgerFingerprint(intent.intentToJson())) {
+        throw const WorkGatewayException('Reopen the current saved bill allocation.');
+      }
+      return _readOriginalAllocation(key, intent, scope, connectionId);
+    });
+  @override
+  Future<void> retainOriginalSupplierAllocationAttempt(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAllocationIntent intent, WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerScope scope, required String connectionId}) => _serial(_key(key), () async {
+    _originalAllocationBinding(key, intent, scope, connectionId, original);
+    final current = await _read(key);
+    if (current?.supplierAllocationIntent == null ||
+        workspaceLedgerFingerprint(current!.supplierAllocationIntent!.intentToJson()) !=
+          workspaceLedgerFingerprint(intent.intentToJson())) {
+      throw const WorkGatewayException('Save these exact allocation inputs before submitting.');
+    }
+    final previous = await _readOriginalAllocation(key, intent, scope, connectionId);
+    if (previous != null) {
+      if (workspaceLedgerCanonical(previous.toJson()) != workspaceLedgerCanonical(original.toJson())) {
+        throw const WorkGatewayException('The original allocation identity must not be replaced.');
+      }
+      return;
+    }
+    final encoded = jsonEncode({'schemaVersion': 1, 'connectionId': connectionId,
+      'original': original.toJson(), 'frozenDraft': current.toJson()});
+    _check(key); await _storage.write(key: _originalAllocationKey(key, intent), value: encoded); _check(key);
+  });
+
+  @override
+  Future<void> resetRefusedSupplierAllocationDraft(WorkspaceLedgerFormDraft next, {
+      required int expectedRevision, required WorkspaceLedgerScope scope, required String connectionId,
+      required Future<bool> Function(WorkspaceSupplierMoneyAllocationIntent intent, WorkspaceLedgerIntent original) verifyNotRecorded,
+    }) => _serial(_key(next.key), () async {
+      _check(next.key);
+      if (next.key.kind != 'supplierAllocation' || !next.valid || next.supplierAllocationIntent != null ||
+          next.revision != expectedRevision + 1) throw const WorkGatewayException('Keep the saved allocation input.');
+      final previous = await _read(next.key), encoded = jsonEncode(next.toJson());
+      if (previous != null && jsonEncode(previous.toJson()) == encoded) return;
+      if (previous?.revision != expectedRevision || previous?.supplierAllocationIntent == null) {
+        throw const WorkGatewayException('Reopen the exact refused allocation request.');
+      }
+      final fields = {...previous!.fields}..remove('attempt');
+      if (workspaceLedgerCanonical(next.fields) != workspaceLedgerCanonical(fields)) {
+        throw const WorkGatewayException('Keep the allocation inputs and original supporting copies.');
+      }
+      final intent = previous.supplierAllocationIntent!;
+      final original = await _readOriginalAllocation(next.key, intent, scope, connectionId);
+      if (original == null || !await verifyNotRecorded(intent, original)) {
+        throw const WorkGatewayException('Verify that this exact allocation was not recorded before reviewing it.');
+      }
+      _check(next.key); await _storage.write(key: _key(next.key), value: encoded); _check(next.key);
+    });
 
   @override
   Future<bool> withFrozenSupplierAllocation(WorkspaceLedgerFormKey key, String intent,

@@ -8,7 +8,15 @@ import 'work_models.dart'
     show
         WorkspaceExpenseRecord,
         WorkspaceSupplierLedger,
+        WorkspaceSupplierBillAcceptance,
+        WorkspaceSupplierMoneyAllocationIntent,
+        WorkspaceSupplierBillMoneyAllocation,
+        WorkspaceSupplierRefundIntent,
+        WorkspaceSupplierRefund,
+        WorkspaceSupplierCreditIntent,
+        WorkspaceSupplierCreditNote,
         WorkspaceSupplierOpeningRecord,
+        WorkspaceSupplierMoneyAttempt,
         WorkspaceMoneyRegisterSnapshot;
 import 'work_purchase_entry_gateway.dart'
     show WorkspacePurchaseEntryScope, WorkspacePurchaseEntryRequest;
@@ -85,6 +93,11 @@ const _operations = {
   'recordStoreExpense',
   'confirmStoreSupplierOpening',
   'recordStoreMoneyRegisterEntry',
+  'recordStoreSupplierMoney',
+  'confirmStoreSupplierBill',
+  'recordStoreSupplierMoneyAllocation',
+  'recordStoreSupplierRefund',
+  'recordStoreSupplierCreditNote',
 };
 const _entryKeys = {'id', 'reference', 'occurredAt', 'deltaMinor'};
 const _headerKeys = {
@@ -183,6 +196,23 @@ void _expense(Map<String, Object?> value, WorkspaceLedgerScope scope) {
 }
 
 /// A deeply frozen native-confirmed command. Preparing it never saves a record.
+void _supplierMoneyEntry(Map<String, Object?> value) {
+  _keys(value, {
+    'operationId', 'orderId', 'origin', 'reference', 'billId', 'paymentMethod',
+    'moneyReview', 'kind', 'amountMinor', 'postedAt',
+    if (value['origin'] == 'manualPurchase') 'purchaseId',
+  });
+  _text(value['operationId']); _text(value['reference']); _time(value['postedAt']);
+  _integer(value['amountMinor'], minimum: 1);
+  if (!const {'UPI', 'Cheque', 'Bank transfer', 'NEFT', 'RTGS', 'Cash'}.contains(value['paymentMethod'])) {
+    throw const FormatException();
+  }
+  final native = WorkspaceSupplierMoneyAttempt.fromJson({'entry': value, 'expectedRevision': 1});
+  if (native == null || workspaceLedgerCanonical(native.entry.toJson()) != workspaceLedgerCanonical(value)) {
+    throw const FormatException();
+  }
+}
+
 class WorkspaceLedgerIntent {
   WorkspaceLedgerIntent._(this.scope, this.data, this.fingerprint);
   factory WorkspaceLedgerIntent.fromJson(
@@ -202,6 +232,18 @@ class WorkspaceLedgerIntent {
             'confirmedAt',
             'confirmedUtcOffsetMinutes',
           }
+        : operation == 'recordStoreSupplierMoney'
+        ? {'supplierId', 'expectedSupplierRevision', 'entry', 'confirmedUtcOffsetMinutes'}
+        : operation == 'confirmStoreSupplierBill'
+        ? {'supplierId', 'expectedSupplierRevision', 'expectedPurchaseRevision',
+            'expectedPurchaseFingerprint', 'bill', 'confirmedUtcOffsetMinutes'}
+        : operation == 'recordStoreSupplierMoneyAllocation'
+        ? {'supplierId', 'expectedSupplierRevision', 'intent'}
+        : operation == 'recordStoreSupplierRefund'
+        ? {'supplierId', 'expectedSupplierRevision', 'intent', 'confirmedUtcOffsetMinutes'}
+        : operation == 'recordStoreSupplierCreditNote'
+        ? {'supplierId', 'expectedSupplierRevision', 'intent', 'confirmedUtcOffsetMinutes',
+            'expectedPurchaseRevision', 'expectedPurchaseFingerprint'}
         : {'registerId', 'expectedRegisterRevision', 'entry', 'capturedAt'};
     _keys(value, {
       'scope',
@@ -226,6 +268,43 @@ class WorkspaceLedgerIntent {
       _time(value['confirmedAt']);
       if (_integer(value['confirmedUtcOffsetMinutes'], minimum: -720) > 840)
         throw const FormatException();
+    } else if (operation == 'recordStoreSupplierMoney') {
+      _text(value['supplierId']); _integer(value['expectedSupplierRevision'], minimum: 1);
+      _supplierMoneyEntry(_object(value['entry']));
+      if (_integer(value['confirmedUtcOffsetMinutes'], minimum: -720) > 840) throw const FormatException();
+    } else if (operation == 'confirmStoreSupplierBill') {
+      _text(value['supplierId']);
+      _integer(value['expectedSupplierRevision'], minimum: 1);
+      _integer(value['expectedPurchaseRevision'], minimum: 1);
+      _fingerprint(value['expectedPurchaseFingerprint']);
+      final bill = _object(value['bill']);
+      final accepted = WorkspaceSupplierBillAcceptance.fromJson(bill);
+      _time(bill['acceptedAt']);
+      if (accepted.copy.supplier.id != value['supplierId'] ||
+          _integer(value['confirmedUtcOffsetMinutes'], minimum: -720) > 840) {
+        throw const FormatException();
+      }
+    } else if (operation == 'recordStoreSupplierMoneyAllocation') {
+      _text(value['supplierId']); _integer(value['expectedSupplierRevision'], minimum: 1);
+      final raw = _object(value['intent']), intent = WorkspaceSupplierMoneyAllocationIntent.fromJson(raw);
+      _time(raw['requestedAt']);
+      if (intent.accountScope != scope.account || intent.workspaceId != scope.store || intent.supplierId != value['supplierId']) {
+        throw const FormatException();
+      }
+    } else if (operation == 'recordStoreSupplierRefund') {
+      _text(value['supplierId']); _integer(value['expectedSupplierRevision'], minimum: 1);
+      final raw = _object(value['intent']), intent = WorkspaceSupplierRefundIntent.fromJson(raw);
+      _time(raw['requestedAt']);
+      if (intent.accountScope != scope.account || intent.workspaceId != scope.store || intent.supplierId != value['supplierId'] ||
+          _integer(value['confirmedUtcOffsetMinutes'], minimum: -720) > 840) throw const FormatException();
+    } else if (operation == 'recordStoreSupplierCreditNote') {
+      _text(value['supplierId']); _integer(value['expectedSupplierRevision'], minimum: 1);
+      _integer(value['expectedPurchaseRevision'], minimum: 1); _fingerprint(value['expectedPurchaseFingerprint']);
+      final raw = _object(value['intent']), intent = WorkspaceSupplierCreditIntent.fromJson(raw);
+      _time(raw['requestedAt']);
+      if (intent.accountScope != scope.account || intent.workspaceId != scope.store || intent.supplierId != value['supplierId'] ||
+          intent.documentInput == null || intent.documentInput!.treatment.isEmpty || intent.documentInput!.reasonCode.isEmpty ||
+          _integer(value['confirmedUtcOffsetMinutes'], minimum: -720) > 840) throw const FormatException();
     } else {
       _text(value['registerId']);
       _integer(value['expectedRegisterRevision'], minimum: 1);
@@ -273,19 +352,29 @@ class WorkspaceLedgerIntent {
           ? 'expense'
           : operation == 'confirmStoreSupplierOpening'
           ? 'opening'
+          : operation == 'confirmStoreSupplierBill'
+          ? 'bill'
+          : operation == 'recordStoreSupplierMoneyAllocation' || operation == 'recordStoreSupplierRefund' || operation == 'recordStoreSupplierCreditNote'
+          ? 'intent'
           : 'entry'];
   String get targetKind => operation == 'recordStoreExpense'
       ? 'expense'
-      : operation == 'confirmStoreSupplierOpening'
+      : operation == 'confirmStoreSupplierOpening' || operation == 'recordStoreSupplierMoney' || operation == 'confirmStoreSupplierBill' || operation == 'recordStoreSupplierMoneyAllocation' || operation == 'recordStoreSupplierRefund' || operation == 'recordStoreSupplierCreditNote'
       ? 'supplierLedger'
       : 'moneyRegister';
   String get targetId => operation == 'recordStoreExpense'
       ? _object(input)['operationId']! as String
       : operation == 'confirmStoreSupplierOpening'
       ? _object(input)['supplierId']! as String
+      : operation == 'recordStoreSupplierMoney' || operation == 'confirmStoreSupplierBill' || operation == 'recordStoreSupplierMoneyAllocation' || operation == 'recordStoreSupplierRefund' || operation == 'recordStoreSupplierCreditNote'
+      ? data['supplierId']! as String
       : data['registerId']! as String;
   String? get entryId => operation == 'recordStoreMoneyRegisterEntry'
       ? _object(input)['id']! as String
+      : operation == 'recordStoreSupplierMoney' || operation == 'recordStoreSupplierMoneyAllocation' || operation == 'recordStoreSupplierRefund' || operation == 'recordStoreSupplierCreditNote'
+      ? _object(input)['operationId']! as String
+      : operation == 'confirmStoreSupplierBill'
+      ? _object(_object(_object(input)['copy'])['draft'])['id']! as String
       : null;
 }
 
@@ -427,6 +516,75 @@ class WorkspaceLedgerReadback {
             resultRevision == null ||
             current == null)
           throw const FormatException();
+        if (original.operation == 'recordStoreSupplierMoney') {
+          final entries = current.value['entries'];
+          if (entries is! List) throw const FormatException();
+          final matching = entries.where((entry) => entry is Map && entry['operationId'] == original.entryId).toList();
+          if (matching.length != 1 || workspaceLedgerFingerprint(matching.single) != receipt['inputFingerprint']) {
+            throw const FormatException();
+          }
+        }
+        if (original.operation == 'confirmStoreSupplierBill') {
+          final bill = _object(_object(current.value['purchaseBills'])[original.entryId]);
+          final accepted = WorkspaceSupplierBillAcceptance.fromJson(bill);
+          final entries = current.value['entries'];
+          if (accepted.billId != original.entryId ||
+              workspaceLedgerFingerprint(bill) != receipt['inputFingerprint'] || entries is! List) {
+            throw const FormatException();
+          }
+          final matching = entries.where((entry) => entry is Map &&
+              entry['kind'] == 'bill' && entry['billId'] == original.entryId).toList();
+          final expected = {
+            'operationId': 'manual-bill:${accepted.billId}', 'orderId': null,
+            'origin': 'manualPurchase', 'purchaseId': accepted.copy.id,
+            'reference': accepted.copy.draft.invoiceReference, 'billId': accepted.billId,
+            'kind': 'bill', 'amountMinor': accepted.amountMinor, 'postedAt': bill['acceptedAt'],
+          };
+          if (accepted.addsLiability
+              ? matching.length != 1 || workspaceLedgerFingerprint(matching.single) != workspaceLedgerFingerprint(expected)
+              : matching.isNotEmpty) throw const FormatException();
+        }
+        if (original.operation == 'recordStoreSupplierMoneyAllocation') {
+          final proofRaw = _object(_object(current.value['billMoneyAllocations'])[original.entryId]);
+          final proof = WorkspaceSupplierBillMoneyAllocation.fromJson(proofRaw);
+          _time(proofRaw['recordedAt']);
+          final input = Map<String, Object?>.from(proofRaw)
+            ..remove('committedRevision')..remove('recordedAt')..remove('sourceEntryCount');
+          if (proof.operationId != original.entryId || proof.supplierId != original.targetId ||
+              proof.accountScope != scope.account || proof.workspaceId != scope.store ||
+              proof.committedRevision > (current.data['revision']! as int) ||
+              proof.recordedAt.isAfter(_time(current.value['asOf'])) ||
+              workspaceLedgerFingerprint(input) != receipt['inputFingerprint']) throw const FormatException();
+        }
+        if (original.operation == 'recordStoreSupplierRefund') {
+          final raw = _object(_object(current.value['refunds'])[original.entryId]);
+          final proof = WorkspaceSupplierRefund.fromJson(raw), input = _object(raw['intent']);
+          final entries = current.value['entries'];
+          if (entries is! List) throw const FormatException();
+          final matching = entries.where((entry) => entry is Map && entry['operationId'] == original.entryId).toList();
+          final expected = Map<String, Object?>.from(proof.entry.toJson())..['postedAt'] = raw['recordedAt'];
+          if (proof.intent.operationId != original.entryId || proof.intent.supplierId != original.targetId ||
+              proof.intent.accountScope != scope.account || proof.intent.workspaceId != scope.store ||
+              proof.committedRevision > (current.data['revision']! as int) || proof.recordedAt.isAfter(_time(current.value['asOf'])) ||
+              workspaceLedgerFingerprint(input) != receipt['inputFingerprint'] || matching.length != 1 ||
+              workspaceLedgerFingerprint(matching.single) != workspaceLedgerFingerprint(expected)) throw const FormatException();
+        }
+        if (original.operation == 'recordStoreSupplierCreditNote') {
+          final raw = _object(_object(current.value['creditNotes'])[original.entryId]);
+          final proof = WorkspaceSupplierCreditNote.fromJson(raw);
+          final input = Map<String, Object?>.from(raw)..remove('recordedAt')..remove('committedRevision');
+          final entries = current.value['entries'];
+          if (entries is! List) throw const FormatException();
+          final matching = entries.where((entry) => entry is Map && entry['operationId'] == original.entryId).toList();
+          final expected = {'operationId': proof.operationId, 'orderId': null, 'reference': proof.reference,
+            'billId': proof.billId, 'origin': 'manualPurchase', 'purchaseId': proof.copyId,
+            'kind': 'creditNote', 'amountMinor': proof.amountMinor, 'postedAt': raw['recordedAt']};
+          if (proof.operationId != original.entryId || proof.supplierId != original.targetId ||
+              proof.accountScope != scope.account || proof.workspaceId != scope.store ||
+              proof.committedRevision > (current.data['revision']! as int) || proof.recordedAt.isAfter(_time(current.value['asOf'])) ||
+              workspaceLedgerFingerprint(input) != receipt['inputFingerprint'] || matching.length != 1 ||
+              workspaceLedgerFingerprint(matching.single) != workspaceLedgerFingerprint(expected)) throw const FormatException();
+        }
         if (original.operation == 'recordStoreExpense' &&
                 workspaceLedgerFingerprint(current.value) !=
                     receipt['inputFingerprint'] ||
@@ -470,6 +628,26 @@ Set<String> _reasons(String operation) => {
     'register_unavailable',
     'stale_register',
     'register_history_changed',
+  },
+  if (operation == 'recordStoreSupplierMoney') ...{
+    'supplier_unavailable', 'stale_supplier', 'opening_evidence_changed',
+    'supplier_capacity_changed', 'supplier_money_evidence_invalid',
+  },
+  if (operation == 'confirmStoreSupplierBill') ...{
+    'supplier_unavailable', 'stale_supplier', 'stale_evidence',
+    'bill_source_changed', 'bill_opening_evidence_changed', 'bill_confirmation_invalid',
+  },
+  if (operation == 'recordStoreSupplierMoneyAllocation') ...{
+    'supplier_unavailable', 'stale_supplier', 'opening_evidence_changed',
+    'allocation_source_changed', 'allocation_capacity_changed', 'allocation_confirmation_invalid',
+  },
+  if (operation == 'recordStoreSupplierRefund') ...{
+    'supplier_unavailable', 'stale_supplier', 'opening_evidence_changed',
+    'refund_source_changed', 'refund_capacity_changed', 'refund_confirmation_invalid', 'refund_reference_conflict',
+  },
+  if (operation == 'recordStoreSupplierCreditNote') ...{
+    'supplier_unavailable', 'stale_supplier', 'stale_evidence', 'opening_evidence_changed',
+    'credit_source_changed', 'credit_capacity_changed', 'credit_confirmation_invalid', 'credit_reference_conflict',
   },
 };
 Map<String, Object?> _frame(

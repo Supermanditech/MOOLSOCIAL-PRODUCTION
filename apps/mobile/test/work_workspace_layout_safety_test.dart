@@ -59,7 +59,7 @@ import 'work_order_identity_gateway_test.dart' as purchase_fixture;
 import 'ui_v2/buy/buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
 import 'package:moolsocial/features/work/work_purchase_entry_gateway.dart' show WorkspacePurchaseDraftSaveIntent, WorkspaceSupplierOpeningSaveIntent;
-import 'package:moolsocial/features/work/work_ledger_gateway.dart' show WorkspaceLedgerIntent, SecureWorkspaceLedgerJournal, WorkspaceLedgerSaveController, workspaceLedgerCanonical, workspaceLedgerFingerprint;
+import 'package:moolsocial/features/work/work_ledger_gateway.dart' show WorkspaceLedgerIntent, WorkspaceLedgerScope, SecureWorkspaceLedgerJournal, WorkspaceLedgerSaveController, workspaceLedgerCanonical, workspaceLedgerFingerprint;
 import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
 import 'package:moolsocial/features/work/widgets/workspace_purchase_originals.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart' show SocialContentResponse;
@@ -2763,8 +2763,470 @@ class _OriginalOpeningLedgerWire extends catalogue_fixture.Transport {
   }
 }
 
+// Isolated native bill transport. SDK transaction qualification is separate;
+// these records never become runtime approvals, supplier records or money.
+class _OriginalSupplierBillLedgerWire extends _OriginalOpeningLedgerWire {
+  _OriginalSupplierBillLedgerWire(super.account) {
+    final at = DateTime.now().toUtc().subtract(const Duration(minutes: 2));
+    final draft = WorkspacePurchaseEntryDraft(id: 'HOST-original-bill-draft', supplierId: supplier.id,
+      invoiceReference: 'HOST-BILL-1', invoiceDate: opening.asOfDate,
+      createdAt: at, updatedAt: at, details: const {'invoiceTotal': '10.00'},
+      goods: const [{'productId': '', 'name': 'HOST printed bill item', 'pack': '1 kg', 'quantity': '1', 'cost': '10.00'}]);
+    copy = WorkspacePurchaseSavedCopy(id: 'HOST-original-bill-copy', revision: 3,
+      supplier: supplier, draft: draft, savedAt: at, storeName: 'HOST native Store', labels: const {});
+    book = WorkspacePurchaseEntryBook(account: account, store: _OriginalOpeningLedgerWire.store,
+      qa: false, revision: 3, profiles: [supplier], openingRecords: [opening], copies: [copy]);
+    ledger = WorkspaceSupplierLedger.confirmedOpening(opening, accountScope: account,
+      workspaceId: _OriginalOpeningLedgerWire.store, supplierId: supplier.id,
+      supplierName: supplier.name, qa: false, confirmedAt: DateTime.now().toUtc());
+  }
+  late WorkspacePurchaseSavedCopy copy;
+  int billWrites = 0, billEffects = 0, billStatusReads = 0;
+  bool refuseRefresh = false;
+  void Function()? beforePurchaseRead;
+  WorkspaceLedgerIntent? billOriginal;
+  Map<String, Object?>? billReceipt;
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {
+    required Map<String, String> headers, required Map<String, Object?> body,
+  }) async {
+    if (body['operation'] == 'readStorePurchaseEntryBook') {
+      final before = beforePurchaseRead; beforePurchaseRead = null; before?.call();
+    }
+    if (body['operation'] == 'readStoreLedgerSource' && refuseRefresh && billOriginal != null) {
+      throw const SocketException('HOST bill source refresh unavailable');
+    }
+    if (!const {'confirmStoreSupplierBill', 'readStoreLedgerAttempt'}.contains(body['operation'])) {
+      return super.postJson(endpoint, headers: headers, body: body);
+    }
+    expect(connected, true); expect(body['scope'], sourceScope);
+    expect(headers['authorization'], 'Bearer isolated-host-token');
+    expect(headers['x-firebase-appcheck'], 'isolated-host-appcheck');
+    if (body['operation'] == 'confirmStoreSupplierBill') {
+      billWrites++;
+      final raw = Map<String, Object?>.from(body)..remove('schemaVersion')..remove('ledgerVersion');
+      final command = WorkspaceLedgerIntent.fromJson(raw,
+        (account: account, store: _OriginalOpeningLedgerWire.store, realm: 'evaluation'));
+      if (billOriginal != null) expect(command.toJson(), billOriginal!.toJson());
+      billOriginal = command;
+      expect(command.data['expectedPurchaseRevision'], book.revision);
+      expect(command.data['expectedPurchaseFingerprint'], bookDigest);
+      final bill = WorkspaceSupplierBillAcceptance.fromJson(command.input);
+      expect(bill.copy.toJson(), copy.toJson());
+      if (dropBeforeWrite) {dropBeforeWrite = false; throw TimeoutException('HOST bill dispatch without known write');}
+      if (refuseStaleEvidence) {
+        book = WorkspacePurchaseEntryBook.fromJson({...book.toJson(), 'revision': 4});
+        billReceipt = {'schemaVersion': 1, 'scope': sourceScope, 'operation': command.operation,
+          'idempotencyKey': command.idempotencyKey, 'fingerprint': command.fingerprint,
+          'inputFingerprint': workspaceLedgerFingerprint(command.input), 'status': 'not_saved', 'reason': 'bill_source_changed',
+          'changed': false, 'resultRevision': null, 'targetKind': 'supplierLedger',
+          'targetId': supplier.id, 'entryId': copy.draft.id, 'recordedAt': DateTime.now().toUtc().toIso8601String()};
+        return response({...frame, 'attempt': billReceipt, 'current': ledgerRow});
+      }
+      if (billReceipt == null) {
+        final updated = ledger!.acceptReviewedBill(bill, expectedRevision: ledger!.revision);
+        expect(updated, isNotNull); ledger = updated; billEffects++;
+        billReceipt = {'schemaVersion': 1, 'scope': sourceScope, 'operation': command.operation,
+          'idempotencyKey': command.idempotencyKey, 'fingerprint': command.fingerprint,
+          'inputFingerprint': workspaceLedgerFingerprint(command.input), 'status': 'saved', 'reason': null,
+          'changed': true, 'resultRevision': ledger!.revision, 'targetKind': 'supplierLedger',
+          'targetId': supplier.id, 'entryId': copy.draft.id, 'recordedAt': DateTime.now().toUtc().toIso8601String()};
+      }
+      if (loseAcknowledgement) {loseAcknowledgement = false; throw TimeoutException('HOST bill acknowledgement lost');}
+    } else {
+      billStatusReads++;
+      expect(body['idempotencyKey'], billOriginal!.idempotencyKey); expect(body['fingerprint'], billOriginal!.fingerprint);
+      if (statusUnavailable) throw const SocketException('HOST bill status unavailable');
+    }
+    return response({...frame, 'attempt': billReceipt, 'current': billReceipt == null ? null : ledgerRow});
+  }
+}
+
+// HOST-only native money states; real atomicity/receipts are independently
+// qualified against the original Firestore SDK receiver, never on the phone.
+class _OriginalSupplierMoneyLedgerWire extends _OriginalOpeningLedgerWire {
+  _OriginalSupplierMoneyLedgerWire(super.account, {bool withBill = false}) {
+    ledger = WorkspaceSupplierLedger.confirmedOpening(opening, accountScope: account,
+      workspaceId: _OriginalOpeningLedgerWire.store, supplierId: supplier.id, supplierName: supplier.name,
+      qa: false, confirmedAt: DateTime.now().toUtc());
+    if (withBill) {
+      final source = _OriginalSupplierBillLedgerWire(account);
+      supplier = source.supplier; opening = source.opening; book = source.book;
+      billCopy = source.copy;
+      ledger = source.ledger!.acceptReviewedBill(WorkspaceSupplierBillAcceptance(copy: source.copy,
+        acceptedAt: DateTime.now().toUtc(), openingTreatment: WorkspaceOpeningBillInclusion.excluded,
+        openingReview: WorkspaceSupplierBillOpeningReview(openingId: opening.id,
+          openingRevision: opening.revision, treatment: WorkspaceOpeningBillInclusion.excluded)), expectedRevision: 1);
+      expect(ledger, isNotNull);
+    }
+  }
+  WorkspacePurchaseSavedCopy? billCopy;
+  int moneyWrites = 0, moneyEffects = 0, moneyStatusReads = 0;
+  bool refuseMoney = false, refuseRefresh = false;
+  WorkspaceLedgerIntent? moneyOriginal;
+  Map<String, Object?>? moneyReceipt;
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {
+    required Map<String, String> headers, required Map<String, Object?> body,
+  }) async {
+    if (body['operation'] == 'readStoreLedgerSource' && refuseRefresh && moneyOriginal != null) {
+      throw const SocketException('HOST money source refresh unavailable');
+    }
+    if (!const {'recordStoreSupplierMoney', 'readStoreLedgerAttempt'}.contains(body['operation'])) {
+      return super.postJson(endpoint, headers: headers, body: body);
+    }
+    expect(connected, true); expect(body['scope'], sourceScope);
+    expect(headers['authorization'], 'Bearer isolated-host-token');
+    expect(headers['x-firebase-appcheck'], 'isolated-host-appcheck');
+    if (body['operation'] == 'recordStoreSupplierMoney') {
+      moneyWrites++;
+      final raw = Map<String, Object?>.from(body)..remove('schemaVersion')..remove('ledgerVersion');
+      final command = WorkspaceLedgerIntent.fromJson(raw,
+        (account: account, store: _OriginalOpeningLedgerWire.store, realm: 'evaluation'));
+      if (moneyOriginal != null) expect(command.toJson(), moneyOriginal!.toJson());
+      moneyOriginal = command;
+      if (dropBeforeWrite) {dropBeforeWrite = false; throw TimeoutException('HOST money dispatch unknown');}
+      if (moneyReceipt == null) {
+        final entry = WorkspaceSupplierMoneyAttempt.fromJson({'entry': command.input,
+          'expectedRevision': command.data['expectedSupplierRevision']})!;
+        expect(command.data['expectedRevision'], ledger!.revision);
+        final next = ledger!.recordReviewedMoney(entry.entry, expectedRevision: entry.expectedRevision);
+        expect(next, isNotNull);
+        if (!refuseMoney) {ledger = next; moneyEffects++;}
+        moneyReceipt = {'schemaVersion': 1, 'scope': sourceScope, 'operation': command.operation,
+          'idempotencyKey': command.idempotencyKey, 'fingerprint': command.fingerprint,
+          'inputFingerprint': workspaceLedgerFingerprint(command.input), 'status': refuseMoney ? 'not_saved' : 'saved',
+          'reason': refuseMoney ? 'supplier_capacity_changed' : null, 'changed': !refuseMoney,
+          'resultRevision': ledger!.revision, 'targetKind': 'supplierLedger', 'targetId': supplier.id,
+          'entryId': command.entryId, 'recordedAt': DateTime.now().toUtc().toIso8601String()};
+      }
+      if (loseAcknowledgement) {loseAcknowledgement = false; throw TimeoutException('HOST lost money reply');}
+    } else {
+      moneyStatusReads++;
+      expect(body['idempotencyKey'], moneyOriginal!.idempotencyKey);
+      expect(body['fingerprint'], moneyOriginal!.fingerprint);
+      if (statusUnavailable) throw const SocketException('HOST money status unavailable');
+    }
+    return response({...frame, 'attempt': moneyReceipt, 'current': moneyReceipt == null ? null : ledgerRow});
+  }
+}
+
+class _HeldOriginalAllocationDraftStore extends SecureWorkLedgerFormDraftStore {
+  _HeldOriginalAllocationDraftStore(String account) : super(accountScope: () => account);
+  Completer<void>? retained, release;
+  @override Future<void> retainOriginalSupplierAllocationAttempt(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAllocationIntent intent, WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerScope scope, required String connectionId}) async {
+    await super.retainOriginalSupplierAllocationAttempt(key, intent, original, scope: scope, connectionId: connectionId);
+    if (release != null) {retained!.complete(); await release!.future;}
+  }
+}
+
+// HOST-only native allocation transport. Actual SDK transaction evidence is
+// separate; these seed records never become phone records or authority.
+class _OriginalSupplierAllocationLedgerWire extends _OriginalSupplierMoneyLedgerWire {
+  _OriginalSupplierAllocationLedgerWire(super.account, {bool billSurplus = false}) : super(withBill: true) {
+    if (billSurplus) {
+      final source = _OriginalBillSurplusRefundWire(account);
+      final target = WorkspacePurchaseSavedCopy.fromJson({...billCopy!.toJson(),
+        'id': 'HOST-surplus-target-copy', 'supplier': source.supplier.toJson(),
+        'draft': {...billCopy!.draft.toJson(), 'id': 'HOST-surplus-target-bill', 'invoiceReference': 'HOST-TARGET-BILL'}});
+      supplier = source.supplier; opening = source.opening; surplusCopy = source.copy; billCopy = target;
+      book = WorkspacePurchaseEntryBook.fromJson({...source.book.toJson(), 'revision': source.book.revision + 1,
+        'copies': [source.copy.toJson(), target.toJson()]});
+      ledger = source.ledger!.acceptReviewedBill(WorkspaceSupplierBillAcceptance(copy: target,
+        acceptedAt: DateTime.now().toUtc(), openingTreatment: WorkspaceOpeningBillInclusion.excluded,
+        openingReview: WorkspaceSupplierBillOpeningReview(openingId: opening.id, openingRevision: opening.revision,
+          treatment: WorkspaceOpeningBillInclusion.excluded)), expectedRevision: source.ledger!.revision);
+      expect(ledger, isNotNull); return;
+    }
+    final entry = WorkspaceSupplierLedgerEntry(operationId: 'HOST-allocation-funding', reference: 'HOST recorded advance',
+      origin: WorkspaceSupplierEntryOrigin.supplierAccount, kind: WorkspaceSupplierEntryKind.advance,
+      amountMinor: 500, paymentMethod: 'Cash', postedAt: DateTime.now().toUtc(),
+      moneyReview: WorkspaceSupplierMoneyReview(occurredOn: opening.asOfDate, openingId: opening.id,
+        openingRevision: opening.revision, notIncludedInOpening: true));
+    ledger = ledger!.recordReviewedMoney(entry, expectedRevision: ledger!.revision);
+    expect(ledger, isNotNull);
+  }
+  int allocationWrites = 0, allocationEffects = 0, allocationStatusReads = 0;
+  WorkspacePurchaseSavedCopy? surplusCopy;
+  final allocationObservedOperations = <String>[];
+  final allocationHeaderChecks = <String, bool>{};
+  WorkspaceLedgerIntent? allocationOriginal;
+  Map<String, Object?>? allocationReceipt;
+  bool refuseAllocation = false, refuseAllocationRefresh = false;
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {
+    required Map<String, String> headers, required Map<String, Object?> body,
+  }) async {
+    allocationObservedOperations.add(body['operation']! as String);
+    if (body['operation'] == 'readStoreLedgerSource' && refuseAllocationRefresh && allocationOriginal != null) {
+      throw const SocketException('HOST allocation source refresh unavailable');
+    }
+    if (body['operation'] != 'recordStoreSupplierMoneyAllocation' &&
+        !(body['operation'] == 'readStoreLedgerAttempt' && body['idempotencyKey'] == allocationOriginal?.idempotencyKey)) {
+      return super.postJson(endpoint, headers: headers, body: body);
+    }
+    allocationHeaderChecks.addAll({'connected': connected, 'scope': workspaceLedgerCanonical(body['scope']) == workspaceLedgerCanonical(sourceScope),
+      'authorization': headers['authorization'] == 'Bearer isolated-host-token',
+      'appcheck': headers['x-firebase-appcheck'] == 'isolated-host-appcheck'});
+    expect(connected, true); expect(body['scope'], sourceScope);
+    expect(headers['authorization'], 'Bearer isolated-host-token');
+    expect(headers['x-firebase-appcheck'], 'isolated-host-appcheck');
+    if (body['operation'] == 'recordStoreSupplierMoneyAllocation') {
+      allocationWrites++;
+      final command = WorkspaceLedgerIntent.fromJson(Map<String, Object?>.from(body)
+        ..remove('schemaVersion')..remove('ledgerVersion'),
+        (account: account, store: _OriginalOpeningLedgerWire.store, realm: 'evaluation'));
+      if (allocationOriginal != null) expect(command.toJson(), allocationOriginal!.toJson());
+      allocationOriginal = command;
+      if (dropBeforeWrite) {dropBeforeWrite = false; throw TimeoutException('HOST allocation dispatch unknown');}
+      if (allocationReceipt == null) {
+        final intent = WorkspaceSupplierMoneyAllocationIntent.fromJson(command.input);
+        final next = ledger!.allocateRecordedMoney(intent.commit(revision: ledger!.revision + 1,
+          at: DateTime.now().toUtc(), sourceEntryCount: intent.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus
+            ? ledger!.entries.length : null), expectedRevision: command.data['expectedSupplierRevision']! as int);
+        expect(next, isNotNull);
+        if (!refuseAllocation) {ledger = next; allocationEffects++;}
+        allocationReceipt = {'schemaVersion': 1, 'scope': sourceScope, 'operation': command.operation,
+          'idempotencyKey': command.idempotencyKey, 'fingerprint': command.fingerprint,
+          'inputFingerprint': workspaceLedgerFingerprint(command.input), 'status': refuseAllocation ? 'not_saved' : 'saved',
+          'reason': refuseAllocation ? 'allocation_capacity_changed' : null, 'changed': !refuseAllocation,
+          'resultRevision': ledger!.revision, 'targetKind': 'supplierLedger', 'targetId': supplier.id,
+          'entryId': command.entryId, 'recordedAt': DateTime.now().toUtc().toIso8601String()};
+      }
+      if (loseAcknowledgement) {loseAcknowledgement = false; throw TimeoutException('HOST lost allocation reply');}
+    } else {
+      allocationStatusReads++;
+      expect(body['fingerprint'], allocationOriginal!.fingerprint);
+      if (statusUnavailable) throw const SocketException('HOST allocation status unavailable');
+    }
+    return response({...frame, 'attempt': allocationReceipt, 'current': allocationReceipt == null ? null : ledgerRow});
+  }
+}
+
 // HOST-only original wire for native expense confirmation/recovery. No runtime
 // provider is installed and real repository atomicity has separate SDK tests.
+// HOST-only native refund transport. Real SDK transaction/status qualification
+// is separate; these inputs never become phone records or runtime authority.
+class _OriginalSupplierRefundLedgerWire extends _OriginalOpeningLedgerWire {
+  _OriginalSupplierRefundLedgerWire(super.account, {this.accountAdvance = false}) : super(credit: true) {
+    if (accountAdvance) {
+      opening = WorkspaceSupplierOpeningRecord.fromJson({...opening.toJson(), 'amountMinor': 0, 'supplierCredit': false});
+      book = WorkspacePurchaseEntryBook.fromJson({...book.toJson(), 'openingRecords': [opening.toJson()]});
+    }
+    ledger = WorkspaceSupplierLedger.confirmedOpening(opening, accountScope: account,
+      workspaceId: _OriginalOpeningLedgerWire.store, supplierId: supplier.id, supplierName: supplier.name,
+      qa: false, confirmedAt: DateTime.now().toUtc());
+    if (accountAdvance) {
+      ledger = ledger!.recordReviewedMoney(WorkspaceSupplierLedgerEntry(operationId: refundSourceId,
+        reference: 'HOST original advance', origin: WorkspaceSupplierEntryOrigin.supplierAccount,
+        kind: WorkspaceSupplierEntryKind.advance, amountMinor: 1250, paymentMethod: 'Cash', postedAt: DateTime.now().toUtc(),
+        moneyReview: WorkspaceSupplierMoneyReview(occurredOn: opening.asOfDate, openingId: opening.id,
+          openingRevision: opening.revision, notIncludedInOpening: true)), expectedRevision: ledger!.revision);
+      expect(ledger, isNotNull);
+    }
+  }
+  final bool accountAdvance;
+  WorkspaceSupplierRefundSourceKind get refundSourceKind => accountAdvance
+    ? WorkspaceSupplierRefundSourceKind.accountAdvance : WorkspaceSupplierRefundSourceKind.openingAdvance;
+  String get refundSourceId => accountAdvance ? 'HOST-refund-source-advance' : opening.id;
+  int refundWrites = 0, refundEffects = 0, refundStatusReads = 0;
+  bool refuseRefund = false, refuseRefundRefresh = false;
+  WorkspaceLedgerIntent? refundOriginal;
+  Map<String, Object?>? refundReceipt;
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {
+    required Map<String, String> headers, required Map<String, Object?> body,
+  }) async {
+    if (body['operation'] == 'readStoreLedgerSource' && refuseRefundRefresh && refundOriginal != null) {
+      throw const SocketException('HOST refund source refresh unavailable');
+    }
+    if (body['operation'] != 'recordStoreSupplierRefund' &&
+        !(body['operation'] == 'readStoreLedgerAttempt' && body['idempotencyKey'] == refundOriginal?.idempotencyKey)) {
+      return super.postJson(endpoint, headers: headers, body: body);
+    }
+    expect(connected, true); expect(body['scope'], sourceScope);
+    expect(headers['authorization'], 'Bearer isolated-host-token'); expect(headers['x-firebase-appcheck'], 'isolated-host-appcheck');
+    if (body['operation'] == 'recordStoreSupplierRefund') {
+      refundWrites++;
+      final original = WorkspaceLedgerIntent.fromJson(Map<String, Object?>.from(body)
+        ..remove('schemaVersion')..remove('ledgerVersion'),
+        (account: account, store: _OriginalOpeningLedgerWire.store, realm: 'evaluation'));
+      if (refundOriginal != null) expect(original.toJson(), refundOriginal!.toJson());
+      refundOriginal = original;
+      if (dropBeforeWrite) {dropBeforeWrite = false; throw TimeoutException('HOST refund dispatch unknown');}
+      if (refundReceipt == null) {
+        final intent = WorkspaceSupplierRefundIntent.fromJson(original.input);
+        expect(original.data['expectedRevision'], ledger!.revision);
+        final next = ledger!.recordReviewedRefund(intent, expectedRevision: original.data['expectedSupplierRevision']! as int,
+          recordedAt: DateTime.now().toUtc());
+        expect(next, isNotNull);
+        if (!refuseRefund) {ledger = next; refundEffects++;}
+        refundReceipt = {'schemaVersion': 1, 'scope': sourceScope, 'operation': original.operation,
+          'idempotencyKey': original.idempotencyKey, 'fingerprint': original.fingerprint,
+          'inputFingerprint': workspaceLedgerFingerprint(original.input), 'status': refuseRefund ? 'not_saved' : 'saved',
+          'reason': refuseRefund ? 'refund_capacity_changed' : null, 'changed': !refuseRefund, 'resultRevision': ledger!.revision,
+          'targetKind': 'supplierLedger', 'targetId': supplier.id, 'entryId': original.entryId,
+          'recordedAt': DateTime.now().toUtc().toIso8601String()};
+      }
+      if (loseAcknowledgement) {loseAcknowledgement = false; throw TimeoutException('HOST lost refund reply');}
+    } else {
+      refundStatusReads++;
+      expect(body['fingerprint'], refundOriginal!.fingerprint);
+      if (statusUnavailable) throw const SocketException('HOST refund status unavailable');
+    }
+    return response({...frame, 'attempt': refundReceipt, 'current': refundReceipt == null ? null : ledgerRow});
+  }
+}
+// HOST-only native confirmation/recovery transport, never a runtime provider.
+// The actual SDK receiver has independent command/atomicity qualification.
+class _OriginalSupplierCreditLedgerWire extends _OriginalSupplierBillLedgerWire {
+  _OriginalSupplierCreditLedgerWire(super.account, {bool zeroOpening = false}) {
+    if (zeroOpening) {
+      opening = WorkspaceSupplierOpeningRecord.fromJson({...opening.toJson(), 'amountMinor': 0, 'supplierCredit': false});
+      book = WorkspacePurchaseEntryBook.fromJson({...book.toJson(), 'openingRecords': [opening.toJson()]});
+      ledger = WorkspaceSupplierLedger.confirmedOpening(opening, accountScope: account,
+        workspaceId: _OriginalOpeningLedgerWire.store, supplierId: supplier.id, supplierName: supplier.name,
+        qa: false, confirmedAt: DateTime.now().toUtc());
+    }
+    copy = WorkspacePurchaseSavedCopy.fromJson({...copy.toJson(), 'draft': {...copy.draft.toJson(),
+      'goods': [{...copy.draft.goods.single, 'productId': 'HOST-credit-product'}]}});
+    book = WorkspacePurchaseEntryBook.fromJson({...book.toJson(), 'copies': [copy.toJson()]});
+    final at = DateTime.now().toUtc();
+    ledger = ledger!.acceptReviewedBill(WorkspaceSupplierBillAcceptance(copy: copy, acceptedAt: at,
+      openingTreatment: WorkspaceOpeningBillInclusion.excluded,
+      openingReview: WorkspaceSupplierBillOpeningReview(openingId: opening.id, openingRevision: opening.revision,
+        treatment: WorkspaceOpeningBillInclusion.excluded)), expectedRevision: ledger!.revision);
+    expect(ledger, isNotNull);
+    final received = WorkspaceSupplierGoodsReceipt(id: 'HOST-credit-receipt', expectedDeliveryId: 'HOST-credit-delivery',
+      reference: 'HOST delivery original', deliveredOn: opening.asOfDate, recordedAt: at, lines: [
+        WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'HOST-credit-line', productId: 'HOST-credit-product',
+          productLabel: 'HOST printed bill item', purchaseUnit: '1 kg', stockUnit: '1 kg', unitsPerPack: 1,
+          deliveredMilli: 1000, acceptedMilli: 0, damagedMilli: 1000, shortMilli: 0, expectedMilli: 1000)]);
+    ledger = ledger!.receiveGoods(received, expectedRevision: ledger!.revision);
+    expect(ledger, isNotNull);
+    ledger = ledger!.allocateBillGoods(WorkspaceSupplierBillGoodsAllocation(operationId: 'HOST-credit-link',
+      receiptId: received.id, receiptLineId: received.lines.single.sourceLineId, billId: copy.draft.id,
+      copyId: copy.id, copyRevision: copy.revision, billLineIndex: 0, productId: 'HOST-credit-product',
+      billUnit: '1 kg', stockUnit: '1 kg', stockUnitsNumerator: 1, stockUnitsDenominator: 1,
+      billQuantityMilli: 1000, acceptedReceiptMilli: 0, damagedReceiptMilli: 1000,
+      conversionReviewed: true, linkedAt: at), expectedRevision: ledger!.revision);
+    expect(ledger, isNotNull);
+  }
+  int creditWrites = 0, creditEffects = 0, creditReads = 0;
+  bool refuseCredit = false;
+  WorkspaceLedgerIntent? creditOriginal;
+  Map<String, Object?>? creditReceipt;
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {
+    required Map<String, String> headers, required Map<String, Object?> body,
+  }) async {
+    if (body['operation'] != 'recordStoreSupplierCreditNote' &&
+        !(body['operation'] == 'readStoreLedgerAttempt' && body['idempotencyKey'] == creditOriginal?.idempotencyKey)) {
+      return super.postJson(endpoint, headers: headers, body: body);
+    }
+    expect(connected, true); expect(body['scope'], sourceScope);
+    expect(headers['authorization'], 'Bearer isolated-host-token'); expect(headers['x-firebase-appcheck'], 'isolated-host-appcheck');
+    if (body['operation'] == 'recordStoreSupplierCreditNote') {
+      creditWrites++;
+      final original = WorkspaceLedgerIntent.fromJson(Map<String, Object?>.from(body)
+        ..remove('schemaVersion')..remove('ledgerVersion'),
+        (account: account, store: _OriginalOpeningLedgerWire.store, realm: 'evaluation'));
+      if (creditOriginal != null) expect(original.toJson(), creditOriginal!.toJson());
+      creditOriginal = original;
+      if (dropBeforeWrite) {dropBeforeWrite = false; throw TimeoutException('HOST credit dispatch unknown');}
+      if (creditReceipt == null) {
+        final intent = WorkspaceSupplierCreditIntent.fromJson(original.input);
+        final next = ledger!.recordSupplierCredit(intent.commit(revision: ledger!.revision + 1,
+          at: DateTime.now().toUtc()), expectedRevision: original.data['expectedSupplierRevision']! as int);
+        expect(next, isNotNull);
+        if (!refuseCredit) {ledger = next; creditEffects++;}
+        creditReceipt = {'schemaVersion': 1, 'scope': sourceScope, 'operation': original.operation,
+          'idempotencyKey': original.idempotencyKey, 'fingerprint': original.fingerprint,
+          'inputFingerprint': workspaceLedgerFingerprint(original.input), 'status': refuseCredit ? 'not_saved' : 'saved',
+          'reason': refuseCredit ? 'credit_capacity_changed' : null, 'changed': !refuseCredit,
+          'resultRevision': ledger!.revision, 'targetKind': 'supplierLedger', 'targetId': supplier.id,
+          'entryId': original.entryId, 'recordedAt': DateTime.now().toUtc().toIso8601String()};
+      }
+      if (loseAcknowledgement) {loseAcknowledgement = false; throw TimeoutException('HOST credit lost acknowledgement');}
+    } else {
+      creditReads++;
+      expect(body['fingerprint'], creditOriginal!.fingerprint);
+      if (statusUnavailable) throw const SocketException('HOST credit status unavailable');
+    }
+    return response({...frame, 'attempt': creditReceipt, 'current': creditReceipt == null ? null : ledgerRow});
+  }
+}
+// HOST-only native bill-credit/refund lifecycle. Actual SDK financial history
+// and receiver semantics remain separately qualified; never installed on OPPO.
+class _OriginalBillSurplusRefundWire extends _OriginalSupplierCreditLedgerWire {
+  _OriginalBillSurplusRefundWire(super.account) : super(zeroOpening: true) {
+    final at = DateTime.now().toUtc();
+    ledger = ledger!.recordReviewedMoney(WorkspaceSupplierLedgerEntry(operationId: 'HOST-surplus-paid',
+      reference: 'HOST original bill payment', origin: WorkspaceSupplierEntryOrigin.manualPurchase,
+      purchaseId: copy.id, billId: copy.draft.id, kind: WorkspaceSupplierEntryKind.payment,
+      amountMinor: 1000, paymentMethod: 'Cash', postedAt: at,
+      moneyReview: WorkspaceSupplierMoneyReview(occurredOn: opening.asOfDate, openingId: opening.id,
+        openingRevision: opening.revision, notIncludedInOpening: true)), expectedRevision: ledger!.revision);
+    expect(ledger, isNotNull);
+    final input = WorkspaceSupplierCreditIntent(operationId: 'HOST-surplus-credit', accountScope: account,
+      workspaceId: _OriginalOpeningLedgerWire.store, supplierId: supplier.id, billId: copy.draft.id, copyId: copy.id,
+      copyRevision: copy.revision, openingId: opening.id, openingRevision: opening.revision,
+      reference: 'HOST-CN-SURPLUS', occurredOn: opening.asOfDate, reason: 'HOST original damage', amountMinor: 105,
+      requestedAt: at, supports: [ledger!.availableCreditSupports(copy.draft.id).single.$1],
+      documentInput: WorkspaceSupplierCreditDocumentInput(treatment: 'commercial', reasonCode: 'damage'));
+    ledger = ledger!.recordSupplierCredit(input.commit(revision: ledger!.revision + 1, at: at), expectedRevision: ledger!.revision);
+    expect(ledger, isNotNull); expect(ledger!.creditMinor, 105);
+  }
+  int refundWrites = 0, refundEffects = 0, refundReads = 0;
+  bool refuseRefund = false;
+  WorkspaceLedgerIntent? refundOriginal;
+  Map<String, Object?>? refundReceipt;
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {
+    required Map<String, String> headers, required Map<String, Object?> body,
+  }) async {
+    if (body['operation'] != 'recordStoreSupplierRefund' &&
+        !(body['operation'] == 'readStoreLedgerAttempt' && body['idempotencyKey'] == refundOriginal?.idempotencyKey)) {
+      return super.postJson(endpoint, headers: headers, body: body);
+    }
+    expect(connected, true); expect(body['scope'], sourceScope);
+    expect(headers['authorization'], 'Bearer isolated-host-token'); expect(headers['x-firebase-appcheck'], 'isolated-host-appcheck');
+    if (body['operation'] == 'recordStoreSupplierRefund') {
+      refundWrites++;
+      final original = WorkspaceLedgerIntent.fromJson(Map<String, Object?>.from(body)
+        ..remove('schemaVersion')..remove('ledgerVersion'),
+        (account: account, store: _OriginalOpeningLedgerWire.store, realm: 'evaluation'));
+      if (refundOriginal != null) expect(original.toJson(), refundOriginal!.toJson());
+      refundOriginal = original;
+      if (dropBeforeWrite) {dropBeforeWrite = false; throw TimeoutException('HOST bill-refund dispatch unknown');}
+      if (refundReceipt == null) {
+        final input = WorkspaceSupplierRefundIntent.fromJson(original.input);
+        expect(input.sourceKind, WorkspaceSupplierRefundSourceKind.manualBillSurplus);
+        expect(input.copyId, copy.id); expect(input.copyRevision, copy.revision);
+        final next = ledger!.recordReviewedRefund(input, expectedRevision: original.data['expectedSupplierRevision']! as int,
+          recordedAt: DateTime.now().toUtc()); expect(next, isNotNull);
+        if (!refuseRefund) {ledger = next; refundEffects++;}
+        refundReceipt = {'schemaVersion': 1, 'scope': sourceScope, 'operation': original.operation,
+          'idempotencyKey': original.idempotencyKey, 'fingerprint': original.fingerprint,
+          'inputFingerprint': workspaceLedgerFingerprint(original.input), 'status': refuseRefund ? 'not_saved' : 'saved',
+          'reason': refuseRefund ? 'refund_capacity_changed' : null, 'changed': !refuseRefund,
+          'resultRevision': ledger!.revision, 'targetKind': 'supplierLedger', 'targetId': supplier.id,
+          'entryId': original.entryId, 'recordedAt': DateTime.now().toUtc().toIso8601String()};
+      }
+      if (loseAcknowledgement) {loseAcknowledgement = false; throw TimeoutException('HOST bill-refund lost acknowledgement');}
+    } else {
+      refundReads++; expect(body['fingerprint'], refundOriginal!.fingerprint);
+      if (statusUnavailable) throw const SocketException('HOST bill-refund status unavailable');
+    }
+    return response({...frame, 'attempt': refundReceipt, 'current': refundReceipt == null ? null : ledgerRow});
+  }
+}
+class _HeldOriginalRefundDraftStore extends SecureWorkLedgerFormDraftStore {
+  _HeldOriginalRefundDraftStore(String account) : super(accountScope: () => account);
+  Completer<void>? retained, release;
+  @override Future<void> retainOriginalSupplierRefundAttempt(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierRefundIntent intent, WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerScope scope, required String connectionId}) async {
+    await super.retainOriginalSupplierRefundAttempt(key, intent, original, scope: scope, connectionId: connectionId);
+    if (release != null) {retained!.complete(); await release!.future;}
+  }
+}
 class _OriginalExpenseLedgerWire extends _OriginalOpeningLedgerWire {
   _OriginalExpenseLedgerWire(super.account);
   int saves = 0, expenseEffects = 0, expenseStatusReads = 0;
@@ -26305,21 +26767,23 @@ for (final change in ['Store', 'account']) {
           await enter('supplier-credit-amount', '25');
           FocusManager.instance.primaryFocus?.unfocus();
           await tester.pumpAndSettle();
-          // Upgrade fixture only: reconstruct an older saved request with its
-          // exact original contract. New classified input never invokes it.
+          // HOST retained request: keep the exact document already saved by
+          // this form. A recovery fixture cannot erase its classification.
           final priorInput = (await form.read(copyKey))!;
           final legacyIntent = WorkspaceSupplierCreditIntent(operationId: work.newWorkspaceSupplierCreditId(),
             accountScope: scope.$1, workspaceId: scope.$2, supplierId: supplier.id,
             billId: bill.id, copyId: copy.id, copyRevision: copy.revision,
             openingId: opening.id, openingRevision: opening.revision, reference: 'HOST-CN-UI',
             occurredOn: day, reason: 'Damaged goods', amountMinor: 2500,
-            requestedAt: DateTime.now().toUtc(), supports: [WorkspaceSupplierCreditSupport.fromJson({
+            requestedAt: DateTime.now().toUtc(), documentInput: priorInput.supplierCreditDocumentInput,
+            supports: [WorkspaceSupplierCreditSupport.fromJson({
               ...work.workspaceSupplierLedger(supplier.id)!.availableCreditSupports(bill.id).single.$1.toJson(),
               'quantityMilli': 500})]);
           final legacyDraft = WorkspaceLedgerFormDraft(key: copyKey, revision: priorInput.revision + 1,
             fields: {'reference': legacyIntent.reference, 'amount': '25.00', 'reason': legacyIntent.reason,
               'occurredOn': day, 'supports': jsonEncode(legacyIntent.supports.map((s) => s.toJson()).toList()),
               'attempt': jsonEncode(legacyIntent.toJson()),
+              'documentInput': jsonEncode(legacyIntent.documentInput!.toJson()),
               if (priorInput.fields['supportingCopies'] != null) 'supportingCopies': priorInput.fields['supportingCopies']!});
           expect(WorkspaceLedgerFormDraft(key: copyKey, revision: legacyDraft.revision,
             fields: {...legacyDraft.fields, 'documentInput': jsonEncode(WorkspaceSupplierCreditDocumentInput(treatment: 'gst').toJson())}).valid,
@@ -26339,7 +26803,8 @@ for (final change in ['Store', 'account']) {
             await form.save(legacyDraft, expectedRevision: priorInput.revision);
           }
           await tapVisible(find.byKey(const Key('supplier-credit-recover')));
-          expect(find.text('GST treatment not recorded'), findsOneWidget);
+          expect(find.byKey(const Key('supplier-credit-saved-treatment')), findsOneWidget);
+          expect(find.text('GST treatment not recorded'), findsNothing);
           expect(find.byKey(const Key('supplier-credit-type')), findsNothing);
           checkpoint.creditFailure = failure.startsWith('draft-')
               ? 'none'
@@ -30157,8 +30622,9 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
   Future<(_AuthenticatedNativeScopeFixture, _OriginalOpeningLedgerWire)> originalOpeningLedgerHost(String variant) async {
     late _OriginalOpeningLedgerWire wire;
     final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) async {
-      wire = _OriginalOpeningLedgerWire(contact.accountScope, unknownAmount: variant == 'unknown amount',
-        futureDate: variant == 'future date', credit: variant == 'supplier credit', zero: variant == 'zero balance');
+      wire = variant == 'bill money' ? _OriginalSupplierMoneyLedgerWire(contact.accountScope, withBill: true)
+        : _OriginalOpeningLedgerWire(contact.accountScope, unknownAmount: variant == 'unknown amount',
+          futureDate: variant == 'future date', credit: variant == 'supplier credit', zero: variant == 'zero balance');
       final gateway = AuthenticatedWorkspaceCatalogueGateway(
         endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
         credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation',
@@ -30173,6 +30639,985 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
     await host.ready();
     expect(await host.work.loadWorkspaceSuppliers(), true);
     return (host, wire);
+  }
+  Future<(_AuthenticatedNativeScopeFixture, _OriginalSupplierBillLedgerWire)> originalBillLedgerHost({
+    bool creditDraft = false, bool creditCommand = false, bool billRefund = false, SecureWorkLedgerFormDraftStore? creditForms,
+  }) async {
+    late _OriginalSupplierBillLedgerWire wire;
+    final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) async {
+      wire = billRefund ? _OriginalBillSurplusRefundWire(contact.accountScope)
+        : creditCommand ? _OriginalSupplierCreditLedgerWire(contact.accountScope) : _OriginalSupplierBillLedgerWire(contact.accountScope);
+      if (creditDraft) {
+        // HOST-only accepted original source. Never installed on OPPO; actual
+        // credit commands and receipts have separate Firestore SDK evidence.
+        wire.ledger = wire.ledger!.acceptReviewedBill(WorkspaceSupplierBillAcceptance(
+          copy: wire.copy, acceptedAt: DateTime.now().toUtc(),
+          openingTreatment: WorkspaceOpeningBillInclusion.excluded,
+          openingReview: WorkspaceSupplierBillOpeningReview(openingId: wire.opening.id,
+            openingRevision: wire.opening.revision, treatment: WorkspaceOpeningBillInclusion.excluded)),
+          expectedRevision: wire.ledger!.revision);
+        expect(wire.ledger, isNotNull);
+      }
+      final gateway = AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation',
+        purchaseEntrySupported: true, purchaseOpeningEvidenceSupported: true, ledgerSourceSupported: true);
+      final original = await RemoteWorkPurchaseEntryStore.openOriginal(
+        source: gateway.originalPurchaseEntrySource(accountId: contact.accountScope,
+          storeId: _OriginalOpeningLedgerWire.store, current: () => wire.connected)!,
+        retainedLocal: SecureWorkPurchaseEntryStore(accountScope: () => contact.accountScope), qa: false);
+      return WorkSession.production(gateway: ReviewWorkGateway(), contactDraftStore: contact,
+        purchaseEntryStore: original, inventoryStore: inventory, ledgerFormDraftStore: creditForms,
+        tradingPreferencesStoreFactory: (_) => trading, catalogueGateway: gateway);
+    });
+    await host.ready(); expect(await host.work.loadWorkspaceSuppliers(), true);
+    return (host, wire);
+  }
+  for (final variant in ['saved', 'AI review', 'lost reply']) {
+    testWidgets('AGG05 original bill-credit allocation lifecycle: $variant', (tester) async {
+      tester.view.physicalSize = const Size(390, 844); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      late _OriginalSupplierAllocationLedgerWire wire;
+      final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) async {
+        wire = _OriginalSupplierAllocationLedgerWire(contact.accountScope, billSurplus: true);
+        final gateway = AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation',
+          purchaseEntrySupported: true, purchaseOpeningEvidenceSupported: true, ledgerSourceSupported: true);
+        final original = await RemoteWorkPurchaseEntryStore.openOriginal(
+          source: gateway.originalPurchaseEntrySource(accountId: contact.accountScope,
+            storeId: _OriginalOpeningLedgerWire.store, current: () => wire.connected)!,
+          retainedLocal: SecureWorkPurchaseEntryStore(accountScope: () => contact.accountScope), qa: false);
+        return WorkSession.production(gateway: ReviewWorkGateway(), contactDraftStore: contact, purchaseEntryStore: original,
+          inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading, catalogueGateway: gateway);
+      });
+      assistant_guard.AssistantProfileContextGuard? guard;
+      await host.ready();
+      try {
+        expect(await host.work.loadWorkspaceSuppliers(), true);
+        await tester.pumpWidget(host.app); await tester.pumpAndSettle(); expect(await host.work.loadWorkspaceOriginalLedger(), true);
+        final copy = wire.billCopy!, source = wire.surplusCopy!, key = host.work.supplierAllocationFormKey(copy)!;
+        final forms = SecureWorkLedgerFormDraftStore(accountScope: () => key.account);
+        Future<MoolAssistantReviewResult>? pending;
+        if (variant == 'AI review') {
+          const action = 'AI-ACT-262';
+          final natives = host.adapters(tester).where((adapter) => adapter.actionId == action).toList(); expect(natives, hasLength(1));
+          guard = assistant_guard.AssistantProfileContextGuard(readContext: host.readContext,
+            ownerChanges: Listenable.merge([host.work, host.journey, host.mode]), nativeAdapters: natives,
+            canonicalActions: const {action}, recoverableActions: const {},
+            readCanonical: (ctx, current) async => assistant_guard.AssistantCanonicalContextSnapshot(binding: ctx.binding,
+              revisions: {(action, copy.id): 'store-original-ledger-v1:' + workspaceLedgerFingerprint([
+                key.account, key.store, 'evaluation', wire.ledger!.revision, wire.book.revision, action, copy.id])},
+              validUntil: DateTime.now().add(const Duration(minutes: 1))));
+          await guard.capture(host.readContext(), () => true);
+          final adapter = guard.adapters.single, snapshot = await guard.adapters.single.snapshot(host.readContext(), copy.id);
+          expect(snapshot, isNotNull);
+          pending = adapter.openReview(scope_contract.MoolAssistantProposal(id: 'HOST-bill-credit-allocation', actionId: action,
+            binding: host.readContext().binding, requestRevision: 1, entitlementRevision: 'HOST-paid-fixture',
+            sourceRevision: snapshot!.sourceRevision, entityId: copy.id, validUntil: DateTime.now().add(const Duration(minutes: 1)),
+            title: 'Review existing bill credit', summary: 'HOST native confirmation required', fields: {
+              'supplierId': wire.supplier.id, 'copyId': copy.id, 'copyRevision': copy.revision,
+              'openingId': wire.opening.id, 'openingRevision': wire.opening.revision,
+              'sourceKind': WorkspaceSupplierMoneySourceKind.manualBillSurplus.name, 'sourceId': source.draft.id, 'amount': '0.50'}), () => true);
+          await tester.pumpAndSettle(); expect(wire.allocationWrites, 0); expect(await forms.read(key), isNull);
+        } else {
+          for (final name in ['work-store-stock', 'work-incoming-purchases']) {
+            final target = find.byKey(Key(name)); await tester.ensureVisible(target); await tester.tap(target); await tester.pumpAndSettle();
+          }
+          final row = find.byKey(ValueKey('work-purchase-copy-${copy.id}'));
+          await tester.ensureVisible(row); await tester.tap(row); await tester.pumpAndSettle(); await openBillActions(tester);
+          final open = find.byKey(const Key('work-purchase-allocate-money'));
+          await tester.ensureVisible(open); await tester.tap(open); await tester.pumpAndSettle();
+          final selector = find.byType(DropdownButtonFormField<String>);
+          await tester.ensureVisible(selector); await tester.tap(selector); await tester.pumpAndSettle();
+          await tester.tap(find.textContaining('Bill credit · HOST-BILL-1').last); await tester.pumpAndSettle();
+          await tester.enterText(find.byKey(const Key('supplier-allocation-amount')), '0.50'); await tester.pumpAndSettle();
+        }
+        final balance = wire.ledger!.balanceMinor, entries = wire.ledger!.entries.length;
+        if (variant == 'lost reply') {wire.loseAcknowledgement = true; wire.statusUnavailable = true;}
+        final submit = find.byKey(const Key('supplier-allocation-submit'));
+        await tester.ensureVisible(submit); await tester.tap(submit); await tester.tap(submit); await tester.pumpAndSettle();
+        expect(wire.allocationWrites, 1); expect(wire.allocationEffects, 1);
+        final frozen = (await forms.read(key))!;
+        expect(frozen.supplierAllocationIntent!.sourceKind, WorkspaceSupplierMoneySourceKind.manualBillSurplus);
+        expect(frozen.supplierAllocationIntent!.sourceCopyId, source.id);
+        expect(frozen.supplierAllocationIntent!.sourceCopyRevision, source.revision);
+        if (variant == 'lost reply') {
+          await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle(); expect(wire.allocationWrites, 1);
+          wire.statusUnavailable = false;
+          await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle(); expect(wire.allocationWrites, 1);
+        }
+        final proof = wire.ledger!.billMoneyAllocations.values.single;
+        expect(proof.amountMinor, 50); expect(proof.sourceEntryCount, entries);
+        expect(wire.ledger!.balanceMinor, balance); expect(wire.ledger!.entries.length, entries);
+        expect(host.work.canRecordWorkspaceOriginalSupplierMoney(wire.supplier.id), true);
+        if (pending != null) {
+          final close = find.byKey(const Key('supplier-allocation-close'));
+          await tester.ensureVisible(close); await tester.tap(close); await tester.pumpAndSettle(); expect(await pending, MoolAssistantReviewResult.opened);
+        }
+        expect(tester.takeException(), isNull);
+      } finally {guard?.dispose(); await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+    });
+  }
+  for (final variant in ['saved', 'lost reply', 'dispatch without write', 'refused', 'AI review', 'AI recovery unknown']) {
+    testWidgets('AGG05 original bill-credit refund lifecycle: $variant', (tester) async {
+      tester.view.physicalSize = const Size(390, 844); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      final (host, source) = await originalBillLedgerHost(billRefund: true);
+      final wire = source as _OriginalBillSurplusRefundWire;
+      assistant_guard.AssistantProfileContextGuard? guard;
+      try {
+        await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+        expect(await host.work.loadWorkspaceOriginalLedger(), true);
+        expect(host.work.canRecordWorkspaceOriginalSupplierMoney(wire.supplier.id), true);
+        final key = host.work.supplierRefundRecoveryFormKey(supplierId: wire.supplier.id,
+          sourceKind: WorkspaceSupplierRefundSourceKind.manualBillSurplus, sourceId: wire.copy.draft.id,
+          openingRevision: wire.opening.revision, copyId: wire.copy.id, copyRevision: wire.copy.revision)!;
+        final forms = SecureWorkLedgerFormDraftStore(accountScope: () => key.account);
+        final entity = storeSupplierRefundSourceReference(supplierId: wire.supplier.id,
+          sourceKind: WorkspaceSupplierRefundSourceKind.manualBillSurplus, sourceId: wire.copy.draft.id,
+          copyId: wire.copy.id, original: true);
+        Future<scope_contract.MoolAssistantNativeAdapter> adapter(String action) async {
+          const ids = {'AI-ACT-266', 'AI-ACT-267', 'AI-ACT-378'};
+          final native = host.adapters(tester).where((adapter) => ids.contains(adapter.actionId)).toList();
+          guard?.dispose();
+          guard = assistant_guard.AssistantProfileContextGuard(readContext: host.readContext,
+            ownerChanges: Listenable.merge([host.work, host.journey, host.mode]), nativeAdapters: native,
+            canonicalActions: ids, recoverableActions: ids,
+            readCanonical: (ctx, current) async => assistant_guard.AssistantCanonicalContextSnapshot(binding: ctx.binding,
+              revisions: {for (final id in ids) (id, entity): 'store-original-ledger-v1:' + workspaceLedgerFingerprint([
+                key.account, key.store, 'evaluation', wire.ledger!.revision, wire.book.revision, id, entity])},
+              validUntil: DateTime.now().add(const Duration(minutes: 1))));
+          await guard!.capture(host.readContext(), () => true);
+          return guard!.adapters.singleWhere((adapter) => adapter.actionId == action);
+        }
+        Future<MoolAssistantReviewResult>? pending;
+        if (variant == 'AI review') {
+          final native = await adapter('AI-ACT-266'), snapshot = await native.snapshot(host.readContext(), entity);
+          expect(snapshot, isNotNull);
+          pending = native.openReview(scope_contract.MoolAssistantProposal(id: 'HOST-bill-refund-review', actionId: 'AI-ACT-266',
+            binding: host.readContext().binding, requestRevision: 1, entitlementRevision: 'HOST-paid-fixture',
+            sourceRevision: snapshot!.sourceRevision, entityId: entity, validUntil: DateTime.now().add(const Duration(minutes: 1)),
+            title: 'Review refund received', summary: 'HOST original bill credit only', fields: {
+              'supplierId': wire.supplier.id, 'openingId': wire.opening.id, 'openingRevision': wire.opening.revision,
+              'sourceKind': WorkspaceSupplierRefundSourceKind.manualBillSurplus.name, 'sourceId': wire.copy.draft.id,
+              'copyId': wire.copy.id, 'copyRevision': wire.copy.revision, 'amount': '0.50', 'reference': 'HOST bill refund',
+              'channel': 'Cash', 'occurredOn': wire.opening.asOfDate}), () => true);
+          await tester.pumpAndSettle(); expect(wire.refundWrites, 0); expect(await forms.read(key), isNull);
+        } else {
+          for (final name in ['work-store-stock', 'work-incoming-purchases']) {
+            final target = find.byKey(Key(name)); await tester.ensureVisible(target); await tester.tap(target); await tester.pumpAndSettle();
+          }
+          final row = find.byKey(ValueKey('work-purchase-copy-${wire.copy.id}'));
+          await tester.ensureVisible(row); await tester.tap(row); await tester.pumpAndSettle(); await openBillActions(tester);
+          final open = find.byKey(const Key('work-purchase-record-supplier-refund'));
+          await tester.ensureVisible(open); await tester.tap(open); await tester.pumpAndSettle();
+          await tester.enterText(find.byKey(const Key('supplier-refund-amount')), '0.50');
+          await tester.enterText(find.byKey(const Key('supplier-refund-reference')), 'HOST bill refund');
+          await tester.pumpAndSettle();
+        }
+        if (const {'lost reply', 'AI recovery unknown'}.contains(variant)) {wire.loseAcknowledgement = true; wire.statusUnavailable = true;}
+        if (variant == 'dispatch without write') wire.dropBeforeWrite = true;
+        if (variant == 'refused') wire.refuseRefund = true;
+        final submit = find.byKey(const Key('supplier-refund-submit'));
+        await tester.ensureVisible(submit); await tester.tap(submit); await tester.tap(submit); await tester.pumpAndSettle();
+        expect(wire.refundWrites, 1);
+        final retained = (await forms.read(key))!;
+        expect(retained.supplierRefundIntent?.sourceKind, WorkspaceSupplierRefundSourceKind.manualBillSurplus);
+        final original = wire.refundOriginal!.toJson();
+        if (variant == 'refused') {
+          expect(wire.refundEffects, 0);
+          final review = find.byKey(const Key('supplier-refund-review-refused'));
+          await tester.ensureVisible(review); await tester.tap(review); await tester.pumpAndSettle();
+          expect((await forms.read(key))!.supplierRefundIntent, isNull); expect(wire.refundWrites, 1);
+        } else if (variant == 'AI recovery unknown') {
+          final close = find.byKey(const Key('supplier-refund-close'));
+          await tester.ensureVisible(close); await tester.tap(close); await tester.pumpAndSettle();
+          final native = await adapter('AI-ACT-378'), snapshot = await native.snapshot(host.readContext(), entity);
+          expect(snapshot, isNotNull); expect(native.allowedFields, isEmpty);
+          pending = native.openReview(scope_contract.MoolAssistantProposal(id: 'HOST-bill-refund-recovery', actionId: 'AI-ACT-378',
+            binding: host.readContext().binding, requestRevision: 1, entitlementRevision: 'HOST-paid-fixture',
+            sourceRevision: snapshot!.sourceRevision, entityId: entity, validUntil: DateTime.now().add(const Duration(minutes: 1)),
+            title: 'Recover original refund', summary: 'HOST native request only', fields: const {}), () => true);
+          await tester.pumpAndSettle(); expect(wire.refundWrites, 1);
+          expect((await forms.read(key))!.toJson(), retained.toJson());
+          wire.statusUnavailable = false;
+          await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle();
+          expect(wire.refundWrites, 1);
+        } else if (variant == 'lost reply' || variant == 'dispatch without write') {
+          await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle(); expect(wire.refundWrites, 1);
+          wire.statusUnavailable = false;
+          final target = variant == 'dispatch without write' ? find.byKey(const Key('supplier-refund-retry-original')) : submit;
+          await tester.ensureVisible(target); await tester.tap(target); await tester.pumpAndSettle();
+          expect(wire.refundWrites, variant == 'dispatch without write' ? 2 : 1);
+        }
+        if (variant != 'refused') {
+          expect(wire.refundEffects, 1); expect(wire.ledger!.creditMinor, 55);
+          expect(host.work.canRecordWorkspaceOriginalSupplierMoney(wire.supplier.id), true,
+            reason: 'A verified bill-linked refund cannot disable later supported original records.');
+          expect(wire.refundOriginal!.toJson(), original);
+        }
+        if (pending != null) {
+          final close = find.byKey(const Key('supplier-refund-close'));
+          await tester.ensureVisible(close); await tester.tap(close); await tester.pumpAndSettle();
+          expect(await pending, MoolAssistantReviewResult.opened);
+        }
+        expect(tester.takeException(), isNull);
+      } finally {guard?.dispose(); await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+    });
+  }
+  for (final variant in ['GST review', 'commercial review', 'GST review record', 'commercial review record',
+      'stale after open', 'generic review', 'price draft', 'owner retired',
+      'source changed', 'draft arrived', 'status', 'recovery', 'recovery unknown']) {
+    testWidgets('AGG05 original credit AI handoff: $variant', (tester) async {
+      tester.view.physicalSize = const Size(390, 844); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      final (host, source) = await originalBillLedgerHost(creditCommand: true);
+      final wire = source as _OriginalSupplierCreditLedgerWire;
+      assistant_guard.AssistantProfileContextGuard? guard;
+      try {
+        await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+        expect(await host.work.loadWorkspaceOriginalLedger(), true);
+        final key = host.work.supplierCreditRecoveryFormKey(wire.copy)!;
+        final forms = SecureWorkLedgerFormDraftStore(accountScope: () => key.account);
+        final available = wire.ledger!.availableCreditSupports(wire.copy.draft.id).single.$1;
+        final document = WorkspaceSupplierCreditDocumentInput(
+          treatment: variant.startsWith('commercial review') ? 'commercial' : 'gst',
+          reasonCode: variant == 'price draft' ? 'price' : 'damage',
+          taxRows: const [{'rate': '5', 'taxable': '1.00', 'cgst': '0.03', 'sgst': '0.02', 'igst': '0', 'cess': '0'}],
+          particulars: const {'supplierName': 'HOST printed supplier', 'invoiceReferences': 'HOST-BILL-1'});
+        final recovery = const {'status', 'recovery', 'recovery unknown'}.contains(variant);
+        final action = variant == 'status' ? 'AI-ACT-265' : recovery ? 'AI-ACT-379'
+          : variant.startsWith('commercial review') ? 'AI-ACT-376' : const {'generic review', 'price draft'}.contains(variant) ? 'AI-ACT-264' : 'AI-ACT-375';
+        WorkspaceLedgerFormDraft? retained;
+        if (recovery) {
+          // HOST setup of an exact interrupted original. This does not qualify
+          // a user-confirmed device financial journey or create a runtime issuer.
+          final input = WorkspaceSupplierCreditIntent(operationId: 'HOST-AI-original-credit',
+            accountScope: key.account, workspaceId: key.store, supplierId: key.customer,
+            billId: wire.copy.draft.id, copyId: wire.copy.id, copyRevision: wire.copy.revision,
+            openingId: wire.opening.id, openingRevision: wire.opening.revision,
+            reference: 'HOST-AI-ORIGINAL', occurredOn: wire.opening.asOfDate, reason: 'HOST printed reason',
+            amountMinor: 105, requestedAt: DateTime.now().toUtc(), supports: [available], documentInput: document);
+          final original = await host.work.prepareWorkspaceOriginalSupplierCredit(key, input); expect(original, isNotNull);
+          retained = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+            'reference': input.reference, 'amount': '1.05', 'reason': input.reason, 'occurredOn': input.occurredOn,
+            'supports': jsonEncode([available.toJson()]), 'documentInput': jsonEncode(document.toJson()), 'attempt': jsonEncode(input.toJson())});
+          await forms.save(retained, expectedRevision: null);
+          if (variant == 'recovery unknown') {wire.loseAcknowledgement = true; wire.statusUnavailable = true;}
+          await host.work.recordWorkspaceOriginalSupplierCredit(original!, key: key, intent: input);
+          expect(wire.creditWrites, 1);
+        }
+        const ids = {'AI-ACT-264', 'AI-ACT-265', 'AI-ACT-375', 'AI-ACT-376', 'AI-ACT-379'};
+        final natives = host.adapters(tester).where((adapter) => ids.contains(adapter.actionId)).toList();
+        expect(natives.length, ids.length);
+        guard = assistant_guard.AssistantProfileContextGuard(readContext: host.readContext,
+          ownerChanges: Listenable.merge([host.work, host.journey, host.mode]), nativeAdapters: natives,
+          canonicalActions: ids, recoverableActions: const {'AI-ACT-265', 'AI-ACT-379'},
+          readCanonical: (ctx, current) async => assistant_guard.AssistantCanonicalContextSnapshot(binding: ctx.binding,
+            revisions: {for (final id in ids) (id, wire.copy.id): 'store-original-ledger-v1:' + workspaceLedgerFingerprint([
+              key.account, key.store, 'evaluation', wire.ledger!.revision, wire.book.revision, id, wire.copy.id])},
+            validUntil: DateTime.now().add(const Duration(minutes: 1))));
+        await guard.capture(host.readContext(), () => true);
+        final adapter = guard.adapters.singleWhere((adapter) => adapter.actionId == action);
+        final snapshot = await adapter.snapshot(host.readContext(), wire.copy.id); expect(snapshot, isNotNull);
+        if (recovery) expect(adapter.allowedFields, isEmpty, reason: 'Model text cannot choose the original operation ID.');
+        final fields = recovery ? <String, Object?>{} : <String, Object?>{
+          'supplierId': key.customer, 'copyId': wire.copy.id, 'billId': wire.copy.draft.id, 'copyRevision': wire.copy.revision,
+          'openingId': wire.opening.id, 'openingRevision': wire.opening.revision,
+          'reference': 'HOST-AI-ગુજરાતી', 'amount': '1.05', 'reason': 'HOST original reason', 'occurredOn': wire.opening.asOfDate,
+          'documentInput': document.toJson(), 'supports': variant == 'price draft' ? [] : [
+            {'id': jsonEncode([available.kind.name, available.receiptId, available.receiptLineId,
+              available.billLineIndex, available.returnOperationId, available.shortageClaimId]), 'quantity': '0.5'}]};
+        final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-credit-ai-review', actionId: action,
+          binding: host.readContext().binding, requestRevision: 1, entitlementRevision: 'HOST-paid-fixture',
+          sourceRevision: snapshot!.sourceRevision, entityId: wire.copy.id, validUntil: DateTime.now().add(const Duration(minutes: 1)),
+          title: 'Review original credit note', summary: 'HOST native confirmation required', fields: fields);
+        if (variant == 'owner retired') {host.work.remoteReviewStatus = WorkRemoteReviewStatus.pending; host.work.notifyListeners();}
+        if (variant == 'source changed') {
+          wire.book = WorkspacePurchaseEntryBook.fromJson({...wire.book.toJson(), 'revision': wire.book.revision + 1});
+          expect(await host.work.loadWorkspaceSuppliers(retry: true), true);
+        }
+        if (variant == 'draft arrived') {
+          retained = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {'reference': 'HOST-arrived-original'});
+          await forms.save(retained, expectedRevision: null);
+        }
+        var writes = wire.creditWrites, effects = wire.creditEffects;
+        final pending = adapter.openReview(proposal, () => true); await tester.pumpAndSettle();
+        if (const {'owner retired', 'source changed', 'draft arrived'}.contains(variant)) {
+          expect(await pending, MoolAssistantReviewResult.stale);
+          expect(find.byKey(const Key('supplier-credit-reference')), findsNothing);
+        } else {
+          expect(find.byKey(const Key('supplier-credit-reference')), findsOneWidget);
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).controller!.text,
+            recovery ? 'HOST-AI-ORIGINAL' : 'HOST-AI-ગુજરાતી');
+          if (variant == 'price draft') expect(find.text('Save draft'), findsOneWidget);
+          if (recovery) expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).enabled, false);
+          expect((await forms.read(key))?.toJson(), retained?.toJson());
+          if (variant.endsWith('review record') || variant == 'stale after open') {
+            if (variant == 'stale after open') {
+              wire.book = WorkspacePurchaseEntryBook.fromJson({...wire.book.toJson(), 'revision': wire.book.revision + 1});
+              expect(await host.work.loadWorkspaceSuppliers(retry: true), true);
+            }
+            final submit = find.byKey(const Key('supplier-credit-submit'));
+            await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle();
+            if (variant == 'stale after open') {
+              expect(wire.creditWrites, 0); expect((await forms.read(key))?.supplierCreditIntent, isNull);
+            } else {
+              expect(wire.creditWrites, 1); expect(wire.creditEffects, 1);
+              expect(find.text('Record another credit note'), findsOneWidget);
+              retained = await forms.read(key); expect(retained?.supplierCreditIntent, isNotNull);
+              expect(retained!.supplierCreditDocumentInput!.toJson(), document.toJson());
+              writes++; effects++;
+            }
+          }
+          final close = find.byKey(const Key('supplier-credit-close'));
+          await tester.ensureVisible(close); await tester.tap(close); await tester.pumpAndSettle();
+          expect(await pending, MoolAssistantReviewResult.opened);
+        }
+        expect(wire.creditWrites, writes); expect(wire.creditEffects, effects);
+        expect((await forms.read(key))?.toJson(), retained?.toJson()); expect(tester.takeException(), isNull);
+      } finally {guard?.dispose(); await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+    });
+  }
+  for (final variant in ['saved', 'lost reply', 'dispatch without write', 'refused', 'owner retired', 'close', 'GST total mismatch']) {
+    testWidgets('AGG05 original credit native confirmation: $variant', (tester) async {
+      tester.view.physicalSize = const Size(390, 844); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      final (host, source) = await originalBillLedgerHost(creditCommand: true);
+      final wire = source as _OriginalSupplierCreditLedgerWire;
+      try {
+        await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+        expect(await host.work.loadWorkspaceOriginalLedger(), true);
+        final key = host.work.supplierCreditRecoveryFormKey(wire.copy)!;
+        final forms = SecureWorkLedgerFormDraftStore(accountScope: () => key.account);
+        final support = wire.ledger!.availableCreditSupports(wire.copy.draft.id).single.$1;
+        final document = WorkspaceSupplierCreditDocumentInput(treatment: 'gst', reasonCode: 'damage',
+          taxRows: const [{'rate': '5', 'taxable': '1.00', 'cgst': '0.03', 'sgst': '0.02', 'igst': '0', 'cess': '0'}],
+          particulars: const {'supplierName': 'HOST printed supplier'});
+        final raw = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+          'reference': 'HOST-CN-REVIEW', 'amount': variant == 'GST total mismatch' ? '1.06' : '1.05',
+          'reason': 'HOST original damaged goods', 'occurredOn': wire.opening.asOfDate,
+          'supports': jsonEncode([{'support': support.toJson(), 'quantity': '0.5'}]),
+          'documentInput': jsonEncode(document.toJson()),
+        });
+        expect(raw.valid, true); await forms.save(raw, expectedRevision: null);
+        for (final name in ['work-store-stock', 'work-incoming-purchases']) {
+          final target = find.byKey(Key(name)); await tester.ensureVisible(target); await tester.tap(target); await tester.pumpAndSettle();
+        }
+        final row = find.byKey(ValueKey('work-purchase-copy-${wire.copy.id}'));
+        await tester.ensureVisible(row); await tester.tap(row); await tester.pumpAndSettle();
+        await openBillActions(tester);
+        final open = find.byKey(const Key('work-purchase-record-credit'));
+        await tester.ensureVisible(open); await tester.tap(open); await tester.pumpAndSettle();
+        expect(wire.creditWrites, 0); expect((await forms.read(key))!.toJson(), raw.toJson());
+        if (variant == 'close') {
+          final close = find.byKey(const Key('supplier-credit-close'));
+          await tester.ensureVisible(close); await tester.tap(close); await tester.pumpAndSettle();
+          expect(wire.creditWrites, 0); expect((await forms.read(key))!.toJson(), raw.toJson()); return;
+        }
+        if (variant == 'lost reply') {wire.loseAcknowledgement = true; wire.statusUnavailable = true;}
+        if (variant == 'dispatch without write') wire.dropBeforeWrite = true;
+        if (variant == 'refused') wire.refuseCredit = true;
+        if (variant == 'owner retired') {host.work.remoteReviewStatus = WorkRemoteReviewStatus.pending; host.work.notifyListeners();}
+        await tester.pumpAndSettle();
+        if (variant != 'owner retired') expect(host.work.canRecordWorkspaceOriginalSupplierMoney(wire.supplier.id), true,
+          reason: 'HOST original supplier source must be eligible before native confirmation.');
+        final readsBeforeConfirmation = wire.purchaseReads;
+        final submit = find.byKey(const Key('supplier-credit-submit'));
+        await tester.ensureVisible(submit); await tester.pumpAndSettle();
+        final callback = tester.widget<FilledButton>(submit).onPressed;
+        if (callback != null) {await tester.tap(submit); await tester.tap(submit); await tester.pumpAndSettle();}
+        if (variant == 'owner retired' || variant == 'GST total mismatch') {
+          expect(wire.creditWrites, 0); expect(wire.creditEffects, 0);
+          expect((await forms.read(key))!.supplierCreditIntent, isNull); return;
+        }
+        expect(wire.creditWrites, 1, reason: 'Original reads ${wire.purchaseReads - readsBeforeConfirmation}; ' + tester.widgetList<Text>(find.byType(Text))
+          .map((w) => w.data).whereType<String>().join(' | '));
+        final frozen = (await forms.read(key))!;
+        expect(frozen.supplierCreditIntent, isNotNull);
+        expect(frozen.supplierCreditDocumentInput!.toJson(), document.toJson());
+        final original = wire.creditOriginal!.toJson();
+        if (variant == 'refused') {
+          expect(wire.creditEffects, 0); expect(find.text('Review saved details'), findsOneWidget);
+          await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle();
+          final reset = (await forms.read(key))!;
+          expect(reset.supplierCreditIntent, isNull);
+          expect(reset.fields, {...frozen.fields}..remove('attempt'));
+          expect(wire.creditWrites, 1);
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).enabled, true);
+        } else if (variant == 'lost reply' || variant == 'dispatch without write') {
+          expect(find.text('Check status'), findsOneWidget);
+          await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle();
+          expect(wire.creditWrites, 1, reason: 'Status checks never replay the command.');
+          wire.statusUnavailable = false;
+          if (variant == 'dispatch without write') {
+            final retry = find.byKey(const Key('supplier-credit-retry-original'));
+            await tester.ensureVisible(retry); await tester.tap(retry); await tester.pumpAndSettle();
+            expect(wire.creditWrites, 2);
+          } else {
+            await tester.ensureVisible(submit); await tester.tap(submit); await tester.pumpAndSettle();
+          }
+          expect(wire.creditOriginal!.toJson(), original); expect(wire.creditEffects, 1);
+          expect(find.text('Record another credit note'), findsOneWidget);
+        } else {
+          expect(wire.creditEffects, 1); expect(find.text('Record another credit note'), findsOneWidget);
+        }
+        if (wire.creditEffects == 1) expect(host.work.canRecordWorkspaceOriginalSupplierMoney(wire.supplier.id), true,
+          reason: 'A verified original credit cannot disable subsequent supported supplier records.');
+        expect(tester.takeException(), isNull);
+      } finally {await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+    });
+  }
+  for (final variant in ['editable ISO', 'reset quantities', 'frozen GST', 'frozen commercial', 'source unavailable', 'large text']) {
+    testWidgets('AGG05 original credit input recovery: $variant', (tester) async {
+      tester.view.physicalSize = Size(variant == 'large text' ? 320 : 390, 844);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = variant == 'large text' ? 1.8 : 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final (host, wire) = await originalBillLedgerHost(creditDraft: true);
+      try {
+        await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+        expect(await host.work.loadWorkspaceOriginalLedger(), true);
+        final key = host.work.supplierCreditRecoveryFormKey(wire.copy)!;
+        final forms = SecureWorkLedgerFormDraftStore(accountScope: () => key.account);
+        final document = WorkspaceSupplierCreditDocumentInput(
+          treatment: variant == 'frozen commercial' ? 'commercial' : 'gst',
+          reasonCode: variant == 'reset quantities' ? 'damage' : 'tax',
+          taxRows: const [{'rate': '5', 'taxable': '1.00', 'cgst': '0.03', 'sgst': '0.02', 'igst': '0', 'cess': '0'}],
+          particulars: const {'supplierName': 'HOST printed supplier', 'invoiceReferences': 'HOST-BILL-1'});
+        const support = WorkspaceSupplierCreditSupport(kind: WorkspaceSupplierCreditSupportKind.arrivalDamage,
+          receiptId: 'HOST-retained-receipt', receiptLineId: 'HOST-retained-line', billLineIndex: 0, quantityMilli: 500);
+        final frozen = variant.startsWith('frozen');
+        final intent = WorkspaceSupplierCreditIntent(operationId: 'HOST-retained-credit-input',
+          accountScope: key.account, workspaceId: key.store, supplierId: key.customer,
+          billId: wire.copy.draft.id, copyId: wire.copy.id, copyRevision: wire.copy.revision,
+          openingId: wire.opening.id, openingRevision: wire.opening.revision,
+          reference: 'HOST-CN-INPUT', occurredOn: wire.opening.asOfDate, reason: 'HOST printed reason',
+          amountMinor: 105, requestedAt: DateTime.now().toUtc(), supports: const [support], documentInput: document);
+        final raw = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+          'reference': intent.reference, 'amount': '1.05', 'reason': intent.reason, 'occurredOn': intent.occurredOn,
+          'supports': jsonEncode(variant == 'reset quantities' || frozen ? [support.toJson()] : []),
+          'documentInput': jsonEncode(document.toJson()), if (frozen) 'attempt': jsonEncode(intent.toJson()),
+        });
+        expect(raw.valid, true);
+        await forms.save(raw, expectedRevision: null);
+        final book = wire.rawBook, ledger = wire.ledger!.toJson();
+        for (final name in ['work-store-stock', 'work-incoming-purchases']) {
+          final target = find.byKey(Key(name)); await tester.ensureVisible(target); await tester.tap(target); await tester.pumpAndSettle();
+        }
+        final row = find.byKey(ValueKey('work-purchase-copy-${wire.copy.id}'));
+        await tester.ensureVisible(row); await tester.tap(row); await tester.pumpAndSettle();
+        await openBillActions(tester);
+        final credit = find.byKey(const Key('work-purchase-record-credit'));
+        await tester.ensureVisible(credit); await tester.tap(credit); await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-date'))).controller!.text,
+          '${intent.occurredOn.substring(8)}/${intent.occurredOn.substring(5, 7)}/${intent.occurredOn.substring(0, 4)}');
+        expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).controller!.text, intent.reference);
+        expect(find.byKey(const Key('supplier-credit-unknown-treatment')), findsNothing);
+        if (frozen) {
+          expect(find.byKey(const Key('supplier-credit-saved-treatment')), findsOneWidget);
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).enabled, false);
+          expect(find.text('Check status'), findsOneWidget);
+          expect(find.byKey(const Key('supplier-credit-retry-original')), findsNothing,
+            reason: 'Missing retained original wrapper must not generate a new request identity.');
+        } else {
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).enabled, true);
+          expect(find.text('Save draft'), findsOneWidget,
+            reason: 'Tax-only financial admission remains unavailable; its complete input stays draftable.');
+        }
+        if (variant == 'reset quantities') {
+          final quantities = find.byWidgetPredicate((w) => w is TextField && w.key.toString().contains('supplier-credit-qty-'));
+          expect(quantities, findsOneWidget);
+          expect(tester.widget<TextField>(quantities).controller!.text, '0.5');
+        }
+        if (variant == 'source unavailable') {
+          wire.ledger = null;
+          final recover = find.byKey(const Key('supplier-credit-recover'));
+          await tester.ensureVisible(recover); await tester.tap(recover); await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).controller!.text, intent.reference);
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).enabled, true);
+        }
+        expect((await forms.read(key))!.toJson(), raw.toJson(), reason: 'Opening and recovery cannot save or replace original input.');
+        expect(wire.billWrites, 0); expect(wire.rawBook, book);
+        if (variant != 'source unavailable') expect(wire.ledger!.toJson(), ledger);
+        expect(tester.takeException(), isNull);
+      } finally {await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+    });
+  }
+  for (final variant in ['saved', 'lost reply', 'reopen pending', 'reopen unavailable', 'dispatch without write', 'refused',
+      'refused refresh unavailable', 'refresh unavailable', 'record another', 'older request newer journal',
+      'owner retired', 'principal retired', 'principal during retain', 'source during retain', 'large text', 'close',
+      'AI review', 'AI close', 'AI stale source', 'AI draft changed', 'AI status', 'AI recovery', 'AI recovery unknown',
+      'AI recovery draft changed', 'AI recovery owner retired', 'AI recovery source changed']) {
+    testWidgets('AGG05 original allocation native form: $variant', (tester) async {
+      tester.view.physicalSize = Size(variant == 'large text' ? 320 : 390, 844); tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = variant == 'large text' ? 1.8 : 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      late _OriginalSupplierAllocationLedgerWire wire;
+      late _HeldOriginalAllocationDraftStore forms;
+      assistant_guard.AssistantProfileContextGuard? guard;
+      final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) async {
+        wire = _OriginalSupplierAllocationLedgerWire(contact.accountScope);
+        forms = _HeldOriginalAllocationDraftStore(contact.accountScope);
+        if (variant.endsWith('during retain')) {forms.retained = Completer<void>(); forms.release = Completer<void>();}
+        final gateway = AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation',
+          purchaseEntrySupported: true, purchaseOpeningEvidenceSupported: true, ledgerSourceSupported: true);
+        final original = await RemoteWorkPurchaseEntryStore.openOriginal(
+          source: gateway.originalPurchaseEntrySource(accountId: contact.accountScope,
+            storeId: _OriginalOpeningLedgerWire.store, current: () => wire.connected)!,
+          retainedLocal: SecureWorkPurchaseEntryStore(accountScope: () => contact.accountScope), qa: false);
+        return WorkSession.production(gateway: ReviewWorkGateway(), contactDraftStore: contact, purchaseEntryStore: original,
+          inventoryStore: inventory, ledgerFormDraftStore: forms,
+          tradingPreferencesStoreFactory: (_) => trading, catalogueGateway: gateway);
+      });
+      await host.ready();
+      Future<void> tap(Finder target) async {
+        expect(target, findsOneWidget); await tester.ensureVisible(target); await tester.pumpAndSettle();
+        await tester.tap(target); await tester.pumpAndSettle();
+      }
+      try {
+        expect(await host.work.loadWorkspaceSuppliers(), true);
+        await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+        for (final key in ['work-store-stock', 'work-incoming-purchases']) {await tap(find.byKey(Key(key)));}
+        await tap(find.byKey(ValueKey('work-purchase-copy-${wire.billCopy!.id}')));
+        expect(host.work.workspaceSupplierOpeningConfirmationAvailable, false);
+        final open = find.byKey(const Key('work-purchase-allocate-money'));
+        final key = host.work.supplierAllocationFormKey(wire.billCopy!)!;
+        Future<MoolAssistantReviewResult>? aiReview;
+        if (const {'AI review', 'AI close', 'AI stale source', 'AI draft changed'}.contains(variant)) {
+          final ids = {'AI-ACT-262', 'AI-ACT-263', 'AI-ACT-377'}, copy = wire.billCopy!;
+          final natives = host.adapters(tester).where((adapter) => ids.contains(adapter.actionId)).toList();
+          expect(natives.length, 3);
+          String proof(String action) => 'store-original-ledger-v1:' + workspaceLedgerFingerprint([
+            key.account, key.store, 'evaluation', wire.ledger!.revision, wire.book.revision, action, copy.id]);
+          guard = assistant_guard.AssistantProfileContextGuard(readContext: host.readContext,
+            ownerChanges: Listenable.merge([host.work, host.journey, host.mode]), nativeAdapters: natives,
+            canonicalActions: ids, recoverableActions: ids,
+            readCanonical: (ctx, current) async => assistant_guard.AssistantCanonicalContextSnapshot(binding: ctx.binding,
+              revisions: {for (final action in ids) (action, copy.id): proof(action)},
+              validUntil: DateTime.now().add(const Duration(minutes: 1))));
+          await guard.capture(host.readContext(), () => true);
+          final adapter = guard.adapters.singleWhere((adapter) => adapter.actionId == 'AI-ACT-262');
+          final snapshot = await adapter.snapshot(host.readContext(), copy.id);
+          expect(snapshot!.sourceRevision, proof('AI-ACT-262'));
+          final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-original-allocation-review', actionId: 'AI-ACT-262',
+            binding: host.readContext().binding, requestRevision: 1, entitlementRevision: 'HOST-paid-fixture',
+            sourceRevision: snapshot.sourceRevision, entityId: copy.id,
+            validUntil: DateTime.now().add(const Duration(minutes: 1)), title: 'Review allocation', summary: 'HOST native confirmation only',
+            fields: {'supplierId': wire.supplier.id, 'copyId': copy.id, 'copyRevision': copy.revision,
+              'openingId': wire.opening.id, 'openingRevision': wire.opening.revision,
+              'sourceKind': 'accountAdvance', 'sourceId': 'HOST-allocation-funding', 'amount': '2.50'});
+          if (variant == 'AI stale source') {
+            // The original server changed while the native cache stayed put.
+            wire.book = WorkspacePurchaseEntryBook.fromJson({...wire.book.toJson(), 'revision': wire.book.revision + 1});
+          }
+          if (variant == 'AI draft changed') await forms.save(WorkspaceLedgerFormDraft(key: key, revision: 1,
+            fields: const {'amount': '1.00', 'sourceKind': 'accountAdvance', 'sourceId': 'HOST-allocation-funding'}), expectedRevision: null);
+          aiReview = adapter.openReview(proposal, () => true);
+          if (variant == 'AI stale source' || variant == 'AI draft changed') {
+            expect(await aiReview, MoolAssistantReviewResult.stale);
+            expect(wire.allocationWrites, 0);
+            if (variant == 'AI draft changed') expect((await forms.read(key))!.fields['amount'], '1.00');
+            else expect(await forms.read(key), null);
+            return;
+          }
+          await tester.pumpAndSettle();
+          expect(await forms.read(key), null); expect(wire.allocationWrites, 0);
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-allocation-amount'))).controller!.text, '2.50');
+          if (variant == 'AI close') {
+            await tap(find.byKey(const Key('supplier-allocation-close')));
+            expect(await aiReview, MoolAssistantReviewResult.opened);
+            expect(await forms.read(key), null); expect(wire.allocationWrites, 0); return;
+          }
+        } else {
+          await tap(open);
+          expect(await host.work.readLedgerForm(key), null); expect(wire.allocationWrites, 0);
+          await tap(find.byType(DropdownButtonFormField<String>));
+          await tap(find.textContaining('HOST recorded advance').last);
+          await tester.enterText(find.byKey(const Key('supplier-allocation-amount')), '2.50'); await tester.pumpAndSettle();
+        }
+        if (variant == 'close') {
+          await tap(find.byKey(const Key('supplier-allocation-close')));
+          expect((await host.work.readLedgerForm(key))!.supplierAllocationIntent, null);
+          expect(wire.allocationWrites, 0); return;
+        }
+        final before = wire.rawBook, balance = wire.ledger!.payableMinor, entryCount = wire.ledger!.entries.length;
+        if (variant == 'lost reply' || variant == 'reopen pending' || variant == 'reopen unavailable' || variant == 'AI recovery unknown') {
+          wire.loseAcknowledgement = true; wire.statusUnavailable = true;
+        }
+        if (variant == 'dispatch without write') wire.dropBeforeWrite = true;
+        if (variant.startsWith('refused')) wire.refuseAllocation = true;
+        if (variant == 'refused refresh unavailable') wire.refuseAllocationRefresh = true;
+        if (variant == 'refresh unavailable') wire.refuseAllocationRefresh = true;
+        final submit = find.byKey(const Key('supplier-allocation-submit'));
+        await tester.ensureVisible(submit); await tester.pumpAndSettle();
+        final callback = tester.widget<FilledButton>(submit).onPressed!;
+        if (variant == 'owner retired') {host.work.remoteReviewStatus = WorkRemoteReviewStatus.pending; host.work.notifyListeners();}
+        if (variant == 'principal retired') {host.principal.identity = null; host.principal.changes.add(null);}
+        if (const {'owner retired', 'principal retired'}.contains(variant)) {
+          await tester.pumpAndSettle(); await (callback as dynamic)(); await tester.pumpAndSettle();
+          expect(wire.allocationWrites, 0); return;
+        }
+        final saving = (callback as dynamic)();
+        (callback as dynamic)();
+        if (variant.endsWith('during retain')) {
+          await forms.retained!.future;
+          if (variant == 'principal during retain') {host.principal.identity = null; host.principal.changes.add(null);}
+          else {
+            final entry = WorkspaceSupplierLedgerEntry(operationId: 'HOST-concurrent-funding', reference: 'HOST changed source',
+              origin: WorkspaceSupplierEntryOrigin.supplierAccount, kind: WorkspaceSupplierEntryKind.advance,
+              amountMinor: 100, paymentMethod: 'Cash', postedAt: DateTime.now().toUtc(),
+              moneyReview: WorkspaceSupplierMoneyReview(occurredOn: wire.opening.asOfDate, openingId: wire.opening.id,
+                openingRevision: wire.opening.revision, notIncludedInOpening: true));
+            wire.ledger = wire.ledger!.recordReviewedMoney(entry, expectedRevision: wire.ledger!.revision);
+            expect(await host.work.loadWorkspaceOriginalLedger(retry: true), true);
+          }
+          forms.release!.complete(); await saving; await tester.pumpAndSettle();
+          expect(wire.allocationWrites, 0); expect(wire.allocationEffects, 0);
+          expect((await forms.read(key))!.supplierAllocationIntent, isNotNull); return;
+        }
+        await saving; await tester.pumpAndSettle();
+        expect(wire.allocationWrites, 1, reason: jsonEncode({
+          'originalError': host.work.workspaceOriginalLedgerError,
+          'canPrepare': host.work.canRecordWorkspaceOriginalSupplierMoney(wire.supplier.id),
+          'hasOriginal': wire.allocationOriginal != null,
+          'observedOperations': wire.allocationObservedOperations,
+          'headerChecks': wire.allocationHeaderChecks,
+          'messages': tester.widgetList<Text>(find.byType(Text)).map((t) => t.data)
+            .whereType<String>().where((t) => t.contains('changed') || t.contains('request') || t.contains('Choose')).toList(),
+        }));
+        if (variant == 'AI status' || variant.startsWith('AI recovery')) {
+          final original = wire.allocationOriginal!.toJson();
+          await tap(find.byKey(const Key('supplier-allocation-close')));
+          final ids = {'AI-ACT-263', 'AI-ACT-377'}, copy = wire.billCopy!;
+          final natives = host.adapters(tester).where((adapter) => ids.contains(adapter.actionId)).toList();
+          String proof(String action) => 'store-original-ledger-v1:' + workspaceLedgerFingerprint([
+            key.account, key.store, 'evaluation', wire.ledger!.revision, wire.book.revision, action, copy.id]);
+          guard = assistant_guard.AssistantProfileContextGuard(readContext: host.readContext,
+            ownerChanges: Listenable.merge([host.work, host.journey, host.mode]), nativeAdapters: natives,
+            canonicalActions: ids, recoverableActions: ids,
+            readCanonical: (ctx, current) async => assistant_guard.AssistantCanonicalContextSnapshot(binding: ctx.binding,
+              revisions: {for (final action in ids) (action, copy.id): proof(action)},
+              validUntil: DateTime.now().add(const Duration(minutes: 1))));
+          await guard.capture(host.readContext(), () => true);
+          final action = variant == 'AI status' ? 'AI-ACT-263' : 'AI-ACT-377';
+          final adapter = guard.adapters.singleWhere((adapter) => adapter.actionId == action);
+          expect(adapter.allowedFields, isEmpty);
+          expect(adapter.validateFields({'operationId': wire.allocationOriginal!.entryId}), isNotNull);
+          final snapshot = await adapter.snapshot(host.readContext(), copy.id);
+          expect(snapshot, isNotNull);
+          final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-allocation-recovery-review', actionId: action,
+            binding: host.readContext().binding, requestRevision: 1, entitlementRevision: 'HOST-paid-fixture',
+            sourceRevision: snapshot!.sourceRevision, entityId: copy.id, validUntil: DateTime.now().add(const Duration(minutes: 1)),
+            title: 'Check original allocation', summary: 'HOST original request only', fields: const {});
+          if (variant == 'AI recovery draft changed') {
+            final saved = (await forms.read(key))!;
+            final next = WorkspaceLedgerFormDraft(key: key, revision: saved.revision + 1,
+              fields: const {'amount': '', 'sourceKind': '', 'sourceId': ''});
+            expect(await host.work.resetConfirmedWorkspaceSupplierAllocationDraft(next,
+              expectedRevision: saved.revision, original: wire.allocationOriginal), true);
+          }
+          if (variant == 'AI recovery owner retired') {host.mode.value = 'buyer'; await tester.pumpAndSettle();}
+          if (variant == 'AI recovery source changed') {
+            final entry = WorkspaceSupplierLedgerEntry(operationId: 'HOST-later-source', reference: 'HOST later advance',
+              origin: WorkspaceSupplierEntryOrigin.supplierAccount, kind: WorkspaceSupplierEntryKind.advance,
+              amountMinor: 100, paymentMethod: 'Cash', postedAt: DateTime.now().toUtc(),
+              moneyReview: WorkspaceSupplierMoneyReview(occurredOn: wire.opening.asOfDate, openingId: wire.opening.id,
+                openingRevision: wire.opening.revision, notIncludedInOpening: true));
+            wire.ledger = wire.ledger!.recordReviewedMoney(entry, expectedRevision: wire.ledger!.revision);
+          }
+          final reviewing = adapter.openReview(proposal, () => true);
+          if (variant == 'AI recovery draft changed' || variant == 'AI recovery owner retired' || variant == 'AI recovery source changed') {
+            expect(await reviewing, MoolAssistantReviewResult.stale);
+            expect(wire.allocationWrites, 1); expect(wire.allocationEffects, 1);
+            expect(find.byKey(const Key('supplier-allocation-amount')), findsNothing);
+            if (variant == 'AI recovery draft changed') expect((await forms.read(key))!.supplierAllocationIntent, null);
+            else expect((await forms.read(key))!.supplierAllocationIntent!.operationId, wire.allocationOriginal!.entryId);
+            return;
+          }
+          await tester.pumpAndSettle();
+          expect(wire.allocationWrites, 1); expect(wire.allocationEffects, 1);
+          expect(wire.allocationStatusReads, greaterThan(0));
+          expect((await forms.read(key))!.supplierAllocationIntent!.operationId, wire.allocationOriginal!.entryId);
+          if (variant == 'AI recovery unknown') {
+            expect(host.work.workspaceOriginalLedgerPending, isNotNull);
+            wire.statusUnavailable = false;
+            final checking = tester.widget<TextButton>(find.byKey(const Key('supplier-allocation-recover'))).onPressed!;
+            await (checking as dynamic)(); await tester.pumpAndSettle();
+          }
+          expect(find.textContaining('Allocation recorded'), findsOneWidget);
+          expect(wire.allocationOriginal!.toJson(), original); expect(wire.allocationWrites, 1);
+          expect(wire.ledger!.payableMinor, balance); expect(wire.ledger!.entries.length, entryCount);
+          expect(wire.rawBook, before);
+          await tap(find.byKey(const Key('supplier-allocation-close')));
+          expect(await reviewing, MoolAssistantReviewResult.opened); return;
+        }
+        if (variant.startsWith('refused')) {
+          expect(wire.allocationEffects, 0);
+          if (variant == 'refused refresh unavailable') {
+            await tap(find.byKey(const Key('supplier-allocation-review-refused')));
+            expect((await host.work.readLedgerForm(key))!.supplierAllocationIntent, isNotNull);
+            wire.refuseAllocationRefresh = false;
+          }
+          await tap(find.byKey(const Key('supplier-allocation-review-refused')));
+          expect((await host.work.readLedgerForm(key))!.supplierAllocationIntent, null);
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-allocation-amount'))).controller!.text, '2.50');
+          expect(wire.allocationWrites, 1); return;
+        }
+        if (variant == 'lost reply' || variant == 'reopen pending' || variant == 'reopen unavailable' || variant == 'dispatch without write') {
+          final original = wire.allocationOriginal!.toJson();
+          expect(host.work.workspaceOriginalLedgerPending, isNotNull);
+          if (variant == 'reopen pending' || variant == 'reopen unavailable') {
+            if (variant == 'reopen unavailable') wire.refuseAllocationRefresh = true;
+            await tap(find.byKey(const Key('supplier-allocation-close'))); await tap(open);
+            expect((await host.work.readLedgerForm(key))!.supplierAllocationIntent, isNotNull);
+          }
+          wire.refuseAllocationRefresh = false;
+          wire.statusUnavailable = false;
+          await tap(find.byKey(const Key('supplier-allocation-recover')));
+          if (variant == 'dispatch without write') await tap(find.byKey(const Key('supplier-allocation-retry-original')));
+          expect(wire.allocationOriginal!.toJson(), original);
+          expect(wire.allocationWrites, variant == 'dispatch without write' ? 2 : 1);
+        }
+        expect(wire.allocationEffects, 1);
+        expect(find.textContaining('Allocation recorded'), findsOneWidget);
+        if (variant == 'record another') {
+          final reset = tester.widget<FilledButton>(find.byKey(const Key('supplier-allocation-submit'))).onPressed!;
+          await (reset as dynamic)(); await tester.pumpAndSettle();
+          expect((await host.work.readLedgerForm(key))!.supplierAllocationIntent, null);
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-allocation-amount'))).controller!.text, '');
+          expect(wire.allocationWrites, 1);
+        }
+        if (variant == 'older request newer journal') {
+          await tap(find.byKey(const Key('supplier-allocation-close')));
+          final newer = host.work.prepareWorkspaceOriginalExpense(key: host.work.expenseFormKey()!, amountMinor: 100,
+            category: 'Other', method: 'Cash', reference: 'HOST unavailable expense request', note: 'HOST no effect')!;
+          expect(await host.work.recordWorkspaceOriginalExpense(newer), null);
+          expect(host.work.workspaceOriginalLedgerPending!.toJson(), newer.toJson());
+          await tap(open);
+          expect(find.textContaining('Allocation recorded'), findsOneWidget);
+          expect(host.work.workspaceOriginalLedgerPending!.toJson(), newer.toJson());
+          expect(wire.allocationWrites, 1);
+        }
+        expect(wire.ledger!.payableMinor, balance); expect(wire.ledger!.entries.length, entryCount);
+        expect(wire.ledger!.manualBillRemainingMinor(wire.billCopy!.draft.id), 750);
+        expect(wire.rawBook, before); expect(tester.takeException(), isNull);
+        if (aiReview != null) {
+          await tap(find.byKey(const Key('supplier-allocation-close')));
+          expect(await aiReview, MoolAssistantReviewResult.opened);
+        }
+      } finally {
+        if (forms.release != null && !forms.release!.isCompleted) forms.release!.complete();
+        guard?.dispose();
+        await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();
+      }
+    });
+  }
+
+  for (final variant in ['excluded', 'included', 'cancel', 'lost reply', 'dispatch without write',
+      'stale book', 'large text', 'source refused', 'refresh unavailable', 'owner retired', 'principal retired', 'principal during read']) {
+    testWidgets('AGG05 original bill native confirmation and recovery: $variant', (tester) async {
+      tester.view.physicalSize = const Size(390, 844); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      tester.platformDispatcher.textScaleFactorTestValue = variant == 'large text' ? 1.8 : 1;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final (host, wire) = await originalBillLedgerHost();
+      try {
+        await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+        for (final key in ['work-store-stock', 'work-incoming-purchases']) {
+          final control = find.byKey(Key(key)); await tester.ensureVisible(control);
+          await tester.tap(control); await tester.pumpAndSettle();
+        }
+        final row = find.byKey(ValueKey('work-purchase-copy-${wire.copy.id}'));
+        await tester.ensureVisible(row); await tester.tap(row); await tester.pumpAndSettle();
+        expect(host.work.workspaceSupplierOpeningConfirmationAvailable, false);
+        expect(host.work.workspaceOriginalSupplierBillConfirmationAvailable, true,
+          reason: host.work.workspaceOriginalLedgerError);
+        final before = wire.rawBook, balance = wire.ledger!.payableMinor!;
+        final confirm = find.byKey(const Key('work-purchase-bill-confirm'));
+        await tester.ensureVisible(confirm); await tester.tap(confirm); await tester.pumpAndSettle();
+        expect(wire.billWrites, 0);
+        await tester.tap(find.text(variant == 'included' ? 'Whole bill already included' : 'Not included — add bill amount'));
+        await tester.pumpAndSettle(); expect(wire.billWrites, 0);
+        if (variant == 'cancel') {
+          await tester.tap(find.text('Cancel').last); await tester.pumpAndSettle();
+          expect(wire.billWrites, 0); expect(host.work.workspaceOriginalLedgerPending, null); return;
+        }
+        if (variant == 'lost reply') {wire.loseAcknowledgement = true; wire.statusUnavailable = true;}
+        if (variant == 'dispatch without write') wire.dropBeforeWrite = true;
+        if (variant == 'stale book') wire.book = WorkspacePurchaseEntryBook.fromJson({...wire.book.toJson(), 'revision': 4});
+        if (variant == 'source refused') wire.refuseStaleEvidence = true;
+        if (variant == 'refresh unavailable') wire.refuseRefresh = true;
+        if (variant == 'owner retired') {host.work.remoteReviewStatus = WorkRemoteReviewStatus.pending; host.work.notifyListeners();}
+        if (variant == 'principal retired') {host.principal.identity = null; host.principal.changes.add(null);}
+        if (variant == 'principal during read') wire.beforePurchaseRead = () {
+          host.principal.identity = null; host.principal.changes.add(null);
+        };
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-purchase-bill-confirm-accept'))); await tester.pumpAndSettle();
+        if (variant == 'owner retired' || variant == 'principal retired' || variant == 'principal during read') {
+          expect(wire.billWrites, 0); expect(wire.billEffects, 0);
+          expect(host.work.workspaceOriginalLedgerPending, null); return;
+        }
+        if (variant == 'stale book' || variant == 'source refused') {
+          expect(wire.billWrites, variant == 'stale book' ? 0 : 1); expect(wire.billEffects, 0);
+          expect(host.work.workspaceOriginalLedgerPending, null); expect(host.work.workspaceSupplierRecoveryRequired, true);
+          return;
+        }
+        if (variant == 'refresh unavailable') {
+          expect(wire.billWrites, 1); expect(wire.billEffects, 1); expect(wire.rawBook, before);
+          expect(host.work.workspaceOriginalLedgerPending, null);
+          expect(host.work.workspaceOriginalLedgerResolution!.status, 'saved');
+          expect(host.work.workspaceOriginalLedgerError, contains('refreshing'));
+          wire.refuseRefresh = false;
+          expect(await host.work.loadWorkspaceOriginalLedger(retry: true), true);
+        }
+        expect(wire.billWrites, 1);
+        if (variant == 'lost reply' || variant == 'dispatch without write') {
+          final frozen = host.work.workspaceOriginalLedgerPending!.toJson();
+          final close = find.byKey(const Key('work-purchase-copy-close'));
+          await tester.ensureVisible(close); await tester.tap(close); await tester.pumpAndSettle();
+          await tester.ensureVisible(row); await tester.tap(row); await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-purchase-bill-confirm')), findsNothing);
+          final check = find.byKey(const Key('work-purchase-bill-check-status'));
+          await tester.ensureVisible(check); await tester.tap(check); await tester.pumpAndSettle();
+          expect(wire.billWrites, 1); expect(host.work.workspaceOriginalLedgerPending!.toJson(), frozen);
+          if (variant == 'dispatch without write') {
+            final retry = find.byKey(const Key('work-purchase-bill-retry-original'));
+            await tester.ensureVisible(retry); await tester.tap(retry); await tester.pumpAndSettle();
+            expect(wire.billWrites, 2); expect(wire.billOriginal!.toJson(), frozen);
+          } else {
+            wire.statusUnavailable = false;
+            await tester.ensureVisible(check); await tester.tap(check); await tester.pumpAndSettle();
+            expect(wire.billWrites, 1);
+          }
+        }
+        expect(wire.billEffects, 1); expect(host.work.workspaceOriginalLedgerPending, null);
+        expect(wire.rawBook, before, reason: 'Ledger confirmation never republishes the original copy.');
+        expect(wire.ledger!.payableMinor, balance + (variant == 'included' ? 0 : 1000));
+        expect(host.work.workspaceSupplierLedger(wire.supplier.id)!.purchaseBills, contains(wire.copy.draft.id));
+        expect(tester.takeException(), null);
+      } finally {await tester.pumpWidget(const SizedBox.shrink()); host.work.dispose();}
+    });
+  }
+  for (final variant in ['saved', 'lost reply', 'overpayment', 'principal retired', 'large text', 'refresh unavailable',
+      'AI review', 'AI close', 'AI stale source']) {
+    testWidgets('AGG05 original bill payment native form: $variant', (tester) async {
+      tester.view.physicalSize = const Size(390, 844); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      tester.platformDispatcher.textScaleFactorTestValue = variant == 'large text' ? 1.8 : 1;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final (host, base) = await originalOpeningLedgerHost('bill money');
+      final wire = base as _OriginalSupplierMoneyLedgerWire;
+      Future<void> tap(String key) async {
+        final target = find.byKey(Key(key)); expect(target, findsOneWidget);
+        await tester.ensureVisible(target); await tester.pumpAndSettle();
+        await tester.tap(target); await tester.pumpAndSettle();
+      }
+      try {
+        await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+        Future<MoolAssistantReviewResult>? review;
+        if (variant.startsWith('AI')) {
+          expect(await host.work.loadWorkspaceOriginalLedger(), true);
+          final adapter = host.adapters(tester).singleWhere((value) => value.actionId == 'AI-ACT-259');
+          final snapshot = await adapter.snapshot(host.readContext(), wire.billCopy!.id);
+          expect(snapshot, isNotNull);
+          expect(snapshot!.sourceRevision, 'store-original-ledger-v1:' + workspaceLedgerFingerprint([
+            host.work.workspaceSupplierScope!.$1, host.work.workspaceSupplierScope!.$2, 'evaluation',
+            host.work.workspaceOriginalLedgerSections!.revision, host.work.workspacePurchaseEntryRevision,
+            'AI-ACT-259', wire.billCopy!.id]));
+          if (variant == 'AI stale source') {
+            wire.book = WorkspacePurchaseEntryBook.fromJson({...wire.book.toJson(), 'revision': 4});
+            expect(await host.work.loadWorkspaceSuppliers(retry: true), true);
+          }
+          review = adapter.openReview(scope_contract.MoolAssistantProposal(id: 'HOST-bill-money-review', actionId: 'AI-ACT-259',
+            binding: host.readContext().binding, requestRevision: 0, entitlementRevision: 'HOST-fixture-only',
+            sourceRevision: snapshot.sourceRevision, validUntil: DateTime.now().add(const Duration(minutes: 5)),
+            entityId: wire.billCopy!.id, title: 'HOST original bill money review', summary: 'HOST final native Save required',
+            fields: {'supplierId': wire.supplier.id, 'openingId': wire.opening.id, 'openingRevision': wire.opening.revision,
+              'copyId': wire.billCopy!.id, 'amount': '5.00', 'reference': 'HOST recorded bill payment',
+              'channel': 'Cash', 'occurredOn': wire.opening.asOfDate}), () => true);
+          await tester.pumpAndSettle(); expect(wire.moneyWrites, 0);
+          if (variant == 'AI stale source') {
+            expect(await review, MoolAssistantReviewResult.stale);
+            expect(find.byKey(const Key('supplier-payment-amount')), findsNothing); return;
+          }
+        } else {
+          await tap('work-store-stock'); await tap('work-incoming-purchases');
+          await tap('work-purchase-copy-${wire.billCopy!.id}');
+        }
+        expect(host.work.workspaceSupplierAllocationInputAvailable, true,
+          reason: 'Typed original allocation uses its own receiver; QA receiving/Stock permission remains false.');
+        expect(host.work.workspaceSupplierOpeningAccountLoaded, true, reason: host.work.workspaceOriginalLedgerError);
+        expect(host.work.workspaceSupplierLedger(wire.supplier.id)?.purchaseBills, contains(wire.billCopy!.draft.id),
+          reason: host.work.workspaceOriginalLedgerError);
+        expect(host.work.workspaceSupplierMoneyInputAvailable, true);
+        expect(host.work.workspaceSupplierRecoveryRequired, false, reason: host.work.workspaceSupplierError);
+        final acceptedCopy = host.work.workspaceSupplierLedger(wire.supplier.id)!.purchaseBills[wire.billCopy!.draft.id]!.copy;
+        expect(acceptedCopy.toJson(), wire.billCopy!.toJson(), reason: 'Equal fields survive original-source/ledger map ordering.');
+        expect(jsonEncode(acceptedCopy.toJson()), isNot(jsonEncode(wire.billCopy!.toJson())),
+          reason: 'Reproduce the original source and ledger key-order difference without changing fields.');
+        if (!variant.startsWith('AI')) await tap('work-purchase-record-payment');
+        final amount = find.byKey(const Key('supplier-payment-amount'));
+        final reference = find.byKey(const Key('supplier-payment-reference'));
+        expect(wire.moneyWrites, 0);
+        if (variant.startsWith('AI')) {
+          expect(tester.widget<TextField>(amount).controller!.text, '5.00');
+          expect(tester.widget<TextField>(reference).controller!.text, 'HOST recorded bill payment');
+          expect(tester.widget<CheckboxListTile>(find.byKey(const Key('supplier-money-opening-excluded'))).value, false);
+          final inputKey = host.work.supplierMoneyFormKey(wire.supplier.id, copy: wire.billCopy);
+          expect(inputKey, isNotNull); expect(await host.work.readLedgerForm(inputKey!), null);
+          if (variant == 'AI close') {
+            await tap('supplier-money-close'); expect(await review, MoolAssistantReviewResult.opened);
+            expect(await host.work.readLedgerForm(inputKey), null);
+            expect(wire.moneyWrites, 0); expect(wire.moneyEffects, 0); return;
+          }
+        } else {
+          await tester.enterText(amount, variant == 'overpayment' ? '10.01' : '5.00'); await tester.pumpAndSettle();
+          await tester.enterText(reference, 'HOST recorded bill payment'); await tester.pumpAndSettle();
+        }
+        await tap('supplier-money-opening-excluded');
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+        final button = find.byKey(const Key('supplier-money-submit'));
+        await tester.ensureVisible(button); final oldSave = tester.widget<FilledButton>(button).onPressed;
+        if (variant == 'overpayment') {
+          if (oldSave != null) {await (oldSave as dynamic)(); await tester.pumpAndSettle();}
+          expect(wire.moneyWrites, 0); expect(wire.moneyEffects, 0); return;
+        }
+        expect(oldSave, isNotNull);
+        if (variant == 'principal retired') {
+          host.principal.identity = null; host.principal.changes.add(null); await tester.pumpAndSettle();
+          await (oldSave as dynamic)(); await tester.pumpAndSettle();
+          expect(wire.moneyWrites, 0); return;
+        }
+        final originalBook = wire.rawBook;
+        if (variant == 'lost reply') {wire.loseAcknowledgement = true; wire.statusUnavailable = true;}
+        if (variant == 'refresh unavailable') wire.refuseRefresh = true;
+        final first = (oldSave as dynamic)(), second = (oldSave as dynamic)();
+        await first; await second; await tester.pumpAndSettle();
+        expect(wire.moneyWrites, 1); expect(wire.moneyEffects, 1);
+        expect(wire.moneyOriginal!.data['expectedSupplierRevision'], 2);
+        expect(wire.ledger!.manualBillRemainingMinor(wire.billCopy!.draft.id), 500);
+        if (variant == 'lost reply') {
+          final original = host.work.workspaceOriginalLedgerPending!.toJson();
+          await tap('supplier-money-close');
+          await tap('work-purchase-record-payment');
+          expect(tester.widget<TextField>(amount).controller!.text, '5.00');
+          expect(tester.widget<TextField>(amount).enabled, false);
+          await tap('supplier-money-check-status');
+          expect(host.work.workspaceOriginalLedgerPending!.toJson(), original);
+          wire.statusUnavailable = false; await tap('supplier-money-check-status');
+          expect(wire.moneyWrites, 1);
+        }
+        expect(host.work.workspaceOriginalLedgerPending, null);
+        expect(wire.rawBook, originalBook); expect(tester.takeException(), null);
+      } finally {await tester.pumpWidget(const SizedBox.shrink()); host.work.dispose();}
+    });
   }
   Future<void> revealOriginalOpening(WidgetTester tester, Finder target, {bool towardTop = false}) async {
     final scroll = find.descendant(of: find.byKey(const Key('work-opening-dues-form')), matching: find.byType(Scrollable)).first;
@@ -30196,6 +31641,416 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
     expect(host.work.workspaceOriginalSupplierOpeningConfigured, true);
     expect(host.work.workspaceSupplierOpeningConfirmationAvailable, false,
       reason: 'Original opening access must never unlock QA receiving/Stock writers.');
+  }
+  for (final caseLabel in ['saved', 'lost reply', 'reopen pending', 'reopen unavailable', 'dispatch without write',
+      'refused', 'refused refresh unavailable', 'refresh unavailable', 'record another', 'older request newer journal',
+      'owner retired', 'principal retired', 'principal during retain', 'source during retain', 'large text', 'close',
+      'account advance', 'account advance reopen unavailable', 'account advance older request newer journal',
+      'AI review', 'AI close', 'AI stale source', 'AI draft changed', 'AI stale after open',
+      'AI status', 'AI recovery', 'AI recovery unknown', 'AI recovery draft changed', 'AI recovery owner retired',
+      'account advance AI recovery newer journal']) {
+    testWidgets('AGG05 original refund native form: $caseLabel', (tester) async {
+      final accountAdvance = caseLabel.startsWith('account advance');
+      final variant = accountAdvance ? caseLabel == 'account advance' ? 'saved' : caseLabel.substring('account advance '.length) : caseLabel;
+      tester.view.physicalSize = Size(variant == 'large text' ? 320 : 390, 844); tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = variant == 'large text' ? 1.8 : 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      late _OriginalSupplierRefundLedgerWire wire;
+      late _HeldOriginalRefundDraftStore forms;
+      assistant_guard.AssistantProfileContextGuard? guard;
+      final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) async {
+        wire = _OriginalSupplierRefundLedgerWire(contact.accountScope, accountAdvance: accountAdvance);
+        forms = _HeldOriginalRefundDraftStore(contact.accountScope);
+        if (variant.endsWith('during retain')) {forms.retained = Completer<void>(); forms.release = Completer<void>();}
+        final gateway = AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation',
+          purchaseEntrySupported: true, purchaseOpeningEvidenceSupported: true, ledgerSourceSupported: true);
+        final original = await RemoteWorkPurchaseEntryStore.openOriginal(
+          source: gateway.originalPurchaseEntrySource(accountId: contact.accountScope,
+            storeId: _OriginalOpeningLedgerWire.store, current: () => wire.connected)!,
+          retainedLocal: SecureWorkPurchaseEntryStore(accountScope: () => contact.accountScope), qa: false);
+        return WorkSession.production(gateway: ReviewWorkGateway(), contactDraftStore: contact, purchaseEntryStore: original,
+          inventoryStore: inventory, ledgerFormDraftStore: forms,
+          tradingPreferencesStoreFactory: (_) => trading, catalogueGateway: gateway);
+      });
+      await host.ready();
+      Future<void> tap(Finder target) async {
+        expect(target, findsOneWidget); await tester.ensureVisible(target); await tester.pumpAndSettle();
+        await tester.tap(target); await tester.pumpAndSettle();
+      }
+      Future<void> openRefund() async {
+        final open = find.byKey(const Key('work-opening-record-refund'));
+        await revealOriginalOpening(tester, open); await tap(open);
+        await tap(find.byKey(const ValueKey('supplier-refund-source-0')));
+      }
+      try {
+        expect(await host.work.loadWorkspaceSuppliers(), true);
+        await openOriginalOpening(tester, host, wire);
+        expect(host.work.workspaceSupplierOpeningConfirmationAvailable, false);
+        expect(host.work.workspaceOriginalSupplierRefundConfigured, true);
+        final key = host.work.supplierRefundRecoveryFormKey(supplierId: wire.supplier.id,
+          sourceKind: wire.refundSourceKind, sourceId: wire.refundSourceId,
+          openingRevision: wire.opening.revision)!;
+        expect(key.order, contains('supplier-refund:live:${wire.refundSourceKind.name}:'));
+        final entity = storeSupplierRefundSourceReference(supplierId: wire.supplier.id,
+          sourceKind: wire.refundSourceKind, sourceId: wire.refundSourceId, original: true);
+        Future<scope_contract.MoolAssistantNativeAdapter> originalAdapter(String action) async {
+          final ids = {'AI-ACT-266', 'AI-ACT-267', 'AI-ACT-378'};
+          final natives = host.adapters(tester).where((adapter) => ids.contains(adapter.actionId)).toList();
+          expect(natives.length, 3);
+          String proof(String id) => 'store-original-ledger-v1:' + workspaceLedgerFingerprint([
+            key.account, key.store, 'evaluation', wire.ledger!.revision, wire.book.revision, id, entity]);
+          guard?.dispose();
+          guard = assistant_guard.AssistantProfileContextGuard(readContext: host.readContext,
+            ownerChanges: Listenable.merge([host.work, host.journey, host.mode]), nativeAdapters: natives,
+            canonicalActions: ids, recoverableActions: ids,
+            readCanonical: (ctx, current) async => assistant_guard.AssistantCanonicalContextSnapshot(binding: ctx.binding,
+              revisions: {for (final id in ids) (id, entity): proof(id)},
+              validUntil: DateTime.now().add(const Duration(minutes: 1))));
+          await guard!.capture(host.readContext(), () => true);
+          return guard!.adapters.singleWhere((adapter) => adapter.actionId == action);
+        }
+        Future<MoolAssistantReviewResult>? aiReview;
+        if (const {'AI review', 'AI close', 'AI stale source', 'AI draft changed', 'AI stale after open'}.contains(variant)) {
+          final adapter = await originalAdapter('AI-ACT-266'), snapshot = await adapter.snapshot(host.readContext(), entity);
+          expect(snapshot, isNotNull);
+          final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-original-refund-review', actionId: 'AI-ACT-266',
+            binding: host.readContext().binding, requestRevision: 1, entitlementRevision: 'HOST-paid-fixture',
+            sourceRevision: snapshot!.sourceRevision, entityId: entity, validUntil: DateTime.now().add(const Duration(minutes: 1)),
+            title: 'Review supplier refund', summary: 'HOST original native confirmation only',
+            fields: {'supplierId': wire.supplier.id, 'openingId': wire.opening.id, 'openingRevision': wire.opening.revision,
+              'sourceKind': wire.refundSourceKind.name, 'sourceId': wire.refundSourceId, 'copyId': null, 'copyRevision': null,
+              'amount': '2.50', 'reference': 'HOST original refund receipt', 'channel': 'Cash', 'occurredOn': wire.opening.asOfDate});
+          if (variant == 'AI stale source') {
+            wire.book = WorkspacePurchaseEntryBook.fromJson({...wire.book.toJson(), 'revision': wire.book.revision + 1});
+          }
+          if (variant == 'AI draft changed') await forms.save(WorkspaceLedgerFormDraft(key: key, revision: 1,
+            fields: const {'amount': '1.00', 'reference': 'HOST existing input'}), expectedRevision: null);
+          aiReview = adapter.openReview(proposal, () => true);
+          if (variant == 'AI stale source' || variant == 'AI draft changed') {
+            expect(await aiReview, MoolAssistantReviewResult.stale); expect(wire.refundWrites, 0);
+            if (variant == 'AI draft changed') expect((await forms.read(key))!.fields['amount'], '1.00');
+            else expect(await forms.read(key), null);
+            return;
+          }
+          await tester.pumpAndSettle();
+          expect(await forms.read(key), null); expect(wire.refundWrites, 0);
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-amount'))).controller!.text, '2.50');
+          if (variant == 'AI close') {
+            await tap(find.byKey(const Key('supplier-refund-close')));
+            expect(await aiReview, MoolAssistantReviewResult.opened); expect(await forms.read(key), null);
+            expect(wire.refundWrites, 0); return;
+          }
+          if (variant == 'AI stale after open') {
+            wire.book = WorkspacePurchaseEntryBook.fromJson({...wire.book.toJson(), 'revision': wire.book.revision + 1});
+            expect(await host.work.loadWorkspaceSuppliers(retry: true), true);
+            final save = tester.widget<FilledButton>(find.byKey(const Key('supplier-refund-submit'))).onPressed!;
+            await (save as dynamic)(); await tester.pumpAndSettle();
+            expect(wire.refundWrites, 0); expect(await forms.read(key), null);
+            expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-amount'))).controller!.text, '2.50'); return;
+          }
+        } else {
+          await openRefund();
+          expect(await host.work.readLedgerForm(key), null); expect(wire.refundWrites, 0);
+          await tester.enterText(find.byKey(const Key('supplier-refund-amount')), '2.50');
+          await tester.enterText(find.byKey(const Key('supplier-refund-reference')), 'HOST original refund receipt');
+          await tester.pumpAndSettle();
+        }
+        if (variant == 'close') {
+          await tap(find.byKey(const Key('supplier-refund-close')));
+          expect((await forms.read(key))!.supplierRefundIntent, null); expect(wire.refundWrites, 0); return;
+        }
+        final before = wire.rawBook, initialEntries = wire.ledger!.entries.length;
+        if (const {'lost reply', 'reopen pending', 'reopen unavailable', 'AI recovery unknown'}.contains(variant)) {
+          wire.loseAcknowledgement = true; wire.statusUnavailable = true;
+        }
+        if (variant == 'dispatch without write') wire.dropBeforeWrite = true;
+        if (variant.startsWith('refused')) wire.refuseRefund = true;
+        if (variant == 'refused refresh unavailable' || variant == 'refresh unavailable') wire.refuseRefundRefresh = true;
+        final submit = find.byKey(const Key('supplier-refund-submit'));
+        await tester.ensureVisible(submit); await tester.pumpAndSettle();
+        final callback = tester.widget<FilledButton>(submit).onPressed!;
+        if (variant == 'owner retired') {host.work.remoteReviewStatus = WorkRemoteReviewStatus.pending; host.work.notifyListeners();}
+        if (variant == 'principal retired') {host.principal.identity = null; host.principal.changes.add(null);}
+        if (const {'owner retired', 'principal retired'}.contains(variant)) {
+          await tester.pumpAndSettle(); await (callback as dynamic)(); await tester.pumpAndSettle();
+          expect(wire.refundWrites, 0); return;
+        }
+        final saving = (callback as dynamic)(); (callback as dynamic)();
+        if (variant.endsWith('during retain')) {
+          await forms.retained!.future;
+          if (variant == 'principal during retain') {host.principal.identity = null; host.principal.changes.add(null);}
+          else {
+            final entry = WorkspaceSupplierLedgerEntry(operationId: 'HOST-refund-source-change', reference: 'HOST additional advance',
+              origin: WorkspaceSupplierEntryOrigin.supplierAccount, kind: WorkspaceSupplierEntryKind.advance, amountMinor: 100,
+              paymentMethod: 'Cash', postedAt: DateTime.now().toUtc(), moneyReview: WorkspaceSupplierMoneyReview(
+                occurredOn: wire.opening.asOfDate, openingId: wire.opening.id, openingRevision: wire.opening.revision, notIncludedInOpening: true));
+            wire.ledger = wire.ledger!.recordReviewedMoney(entry, expectedRevision: wire.ledger!.revision);
+            expect(await host.work.loadWorkspaceOriginalLedger(retry: true), true);
+          }
+          forms.release!.complete(); await saving; await tester.pumpAndSettle();
+          expect(wire.refundWrites, 0); expect(wire.refundEffects, 0);
+          expect((await forms.read(key))!.supplierRefundIntent, isNotNull); return;
+        }
+        await saving; await tester.pumpAndSettle();
+        expect(wire.refundWrites, 1, reason: jsonEncode({'error': host.work.workspaceOriginalLedgerError,
+          'messages': tester.widgetList<Text>(find.byType(Text)).map((text) => text.data).whereType<String>()
+            .where((text) => text.contains('refund') || text.contains('changed') || text.contains('request')).toList()}));
+        final original = wire.refundOriginal!.toJson();
+        if (variant == 'AI status' || variant.startsWith('AI recovery')) {
+          await tap(find.byKey(const Key('supplier-refund-close')));
+          WorkspaceLedgerIntent? newer;
+          if (variant == 'AI recovery newer journal') {
+            newer = host.work.prepareWorkspaceOriginalExpense(key: host.work.expenseFormKey()!, amountMinor: 100,
+              category: 'Other', method: 'Cash', reference: 'HOST later unknown expense', note: 'HOST no effect')!;
+            expect(await host.work.recordWorkspaceOriginalExpense(newer), null);
+          }
+          final action = variant == 'AI status' ? 'AI-ACT-267' : 'AI-ACT-378', adapter = await originalAdapter(action);
+          expect(adapter.allowedFields, isEmpty); expect(adapter.validateFields({}), null);
+          expect(adapter.validateFields({'operationId': wire.refundOriginal!.entryId}), isNotNull);
+          final snapshot = await adapter.snapshot(host.readContext(), entity); expect(snapshot, isNotNull);
+          final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-original-refund-recovery', actionId: action,
+            binding: host.readContext().binding, requestRevision: 1, entitlementRevision: 'HOST-paid-fixture',
+            sourceRevision: snapshot!.sourceRevision, entityId: entity, validUntil: DateTime.now().add(const Duration(minutes: 1)),
+            title: 'Check original refund', summary: 'HOST exact native request only', fields: const {});
+          if (variant == 'AI recovery draft changed') {
+            final saved = (await forms.read(key))!;
+            expect(await host.work.resetConfirmedWorkspaceSupplierRefundDraft(
+              WorkspaceLedgerFormDraft(key: key, revision: saved.revision + 1, fields: const {}),
+              expectedRevision: saved.revision, original: wire.refundOriginal), true);
+          }
+          if (variant == 'AI recovery owner retired') {host.mode.value = 'buyer'; await tester.pumpAndSettle();}
+          final reviewing = adapter.openReview(proposal, () => true);
+          if (variant == 'AI recovery draft changed' || variant == 'AI recovery owner retired') {
+            expect(await reviewing, MoolAssistantReviewResult.stale); expect(wire.refundWrites, 1); return;
+          }
+          await tester.pumpAndSettle();
+          expect(wire.refundWrites, 1); expect(wire.refundEffects, 1);
+          expect((await forms.read(key))!.supplierRefundIntent!.operationId, wire.refundOriginal!.entryId);
+          if (variant == 'AI recovery unknown') {
+            wire.statusUnavailable = false;
+            await tap(find.byKey(const Key('supplier-refund-recover')));
+          }
+          expect(find.textContaining('Refund recorded'), findsWidgets);
+          if (newer != null) expect(host.work.workspaceOriginalLedgerPending!.toJson(), newer.toJson());
+          expect(wire.refundOriginal!.toJson(), original); expect(wire.rawBook, before);
+          await tap(find.byKey(const Key('supplier-refund-close')));
+          expect(await reviewing, MoolAssistantReviewResult.opened); return;
+        }
+        if (variant.startsWith('refused')) {
+          expect(wire.refundEffects, 0); expect(find.byKey(const Key('supplier-refund-review-refused')), findsOneWidget);
+          await tap(find.byKey(const Key('supplier-refund-review-refused')));
+          if (variant == 'refused refresh unavailable') {
+            expect((await forms.read(key))!.supplierRefundIntent, isNotNull);
+            wire.refuseRefundRefresh = false;
+            await tap(find.byKey(const Key('supplier-refund-review-refused')));
+          }
+          expect((await forms.read(key))!.supplierRefundIntent, null);
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-amount'))).controller!.text, '2.50');
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-date'))).controller!.text,
+            '${wire.opening.asOfDate.substring(8)}/${wire.opening.asOfDate.substring(5, 7)}/${wire.opening.asOfDate.substring(0, 4)}');
+          expect(wire.refundWrites, 1); return;
+        }
+        if (variant == 'refresh unavailable') {
+          expect(find.textContaining('Refund recorded'), findsWidgets); expect(wire.refundEffects, 1);
+          wire.refuseRefundRefresh = false;
+        }
+        if (const {'reopen pending', 'reopen unavailable'}.contains(variant)) {
+          await tap(find.byKey(const Key('supplier-refund-close')));
+          if (variant == 'reopen unavailable') wire.refuseRefundRefresh = true;
+          await openRefund();
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-amount'))).controller!.text, '2.50');
+          wire.refuseRefundRefresh = false;
+        }
+        if (wire.statusUnavailable || variant == 'dispatch without write') {
+          expect(find.textContaining('Refund recorded'), findsNothing);
+          wire.statusUnavailable = false;
+          await tap(find.byKey(const Key('supplier-refund-recover')));
+          if (variant == 'dispatch without write') await tap(find.byKey(const Key('supplier-refund-retry-original')));
+          expect(wire.refundOriginal!.toJson(), original); expect(wire.refundWrites, variant == 'dispatch without write' ? 2 : 1);
+        }
+        expect(wire.refundEffects, 1); expect(find.textContaining('Refund recorded'), findsWidgets);
+        expect(wire.ledger!.balanceMinor, -1000); expect(wire.ledger!.entries.length, initialEntries + 1);
+        expect(wire.rawBook, before);
+        if (variant == 'record another') {
+          final reset = tester.widget<FilledButton>(find.byKey(const Key('supplier-refund-submit'))).onPressed!;
+          await (reset as dynamic)(); await tester.pumpAndSettle();
+          expect((await forms.read(key))!.supplierRefundIntent, null);
+          expect(tester.widget<TextField>(find.byKey(const Key('supplier-refund-amount'))).controller!.text, '');
+          expect(wire.refundWrites, 1);
+        }
+        if (variant == 'older request newer journal') {
+          await tap(find.byKey(const Key('supplier-refund-close')));
+          final newer = host.work.prepareWorkspaceOriginalExpense(key: host.work.expenseFormKey()!, amountMinor: 100,
+            category: 'Other', method: 'Cash', reference: 'HOST later unresolved expense', note: 'HOST no effect')!;
+          expect(await host.work.recordWorkspaceOriginalExpense(newer), null);
+          expect(host.work.workspaceOriginalLedgerPending!.toJson(), newer.toJson());
+          await openRefund();
+          expect(find.textContaining('Refund recorded'), findsWidgets);
+          expect(host.work.workspaceOriginalLedgerPending!.toJson(), newer.toJson()); expect(wire.refundWrites, 1);
+        }
+        expect(tester.takeException(), isNull);
+      } finally {
+        guard?.dispose();
+        if (forms.release?.isCompleted == false) forms.release!.complete();
+        await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();
+      }
+    });
+  }
+  for (final variant in ['saved', 'advance', 'AI review', 'AI advance', 'AI close', 'AI stale source', 'lost reply', 'lost reply enlarged', 'reopen pending',
+      'dispatch without write', 'refused', 'refused refresh unavailable', 'refresh unavailable', 'owner retired', 'principal retired']) {
+    testWidgets('AGG05 original supplier money native form: $variant', (tester) async {
+      tester.view.physicalSize = Size(variant.endsWith('enlarged') ? 320 : 360, 780); tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = variant.endsWith('enlarged') ? 2 : 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      late _OriginalSupplierMoneyLedgerWire wire;
+      final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) async {
+        wire = _OriginalSupplierMoneyLedgerWire(contact.accountScope);
+        final gateway = AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation',
+          purchaseEntrySupported: true, purchaseOpeningEvidenceSupported: true, ledgerSourceSupported: true);
+        final original = await RemoteWorkPurchaseEntryStore.openOriginal(
+          source: gateway.originalPurchaseEntrySource(accountId: contact.accountScope,
+            storeId: _OriginalOpeningLedgerWire.store, current: () => wire.connected)!,
+          retainedLocal: SecureWorkPurchaseEntryStore(accountScope: () => contact.accountScope), qa: false);
+        return WorkSession.production(gateway: ReviewWorkGateway(), contactDraftStore: contact, purchaseEntryStore: original,
+          inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading, catalogueGateway: gateway);
+      });
+      await host.ready();
+      Future<void> tap(Finder target) async {
+        expect(target, findsOneWidget); await tester.ensureVisible(target); await tester.pumpAndSettle();
+        await tester.tap(target); await tester.pumpAndSettle();
+      }
+      Future<void> statusAction(String key) async {
+        final target = find.byKey(Key(key)); expect(target, findsOneWidget);
+        await tester.ensureVisible(target); await tester.pumpAndSettle();
+        final callback = tester.widget<TextButton>(target).onPressed!;
+        await (callback as dynamic)(); await tester.pumpAndSettle();
+      }
+      try {
+        final work = host.work; expect(await work.loadWorkspaceSuppliers(), true);
+        await openOriginalOpening(tester, host, wire);
+        expect(work.workspaceSupplierMoneyInputAvailable, true);
+        expect(work.workspaceSupplierAllocationInputAvailable, true,
+          reason: 'Original allocation availability does not unlock QA opening or inventory writers.');
+        final advance = variant == 'advance' || variant == 'AI advance';
+        final open = find.byKey(Key(advance ? 'work-opening-record-advance' : 'work-opening-record-payment'));
+        Future<MoolAssistantReviewResult>? review;
+        final originalKey = work.supplierMoneyFormKey(wire.supplier.id, advance: advance)!;
+        if (variant.startsWith('AI')) {
+          final action = advance ? 'AI-ACT-260' : 'AI-ACT-261';
+          final adapter = host.adapters(tester).where((a) => a.actionId == action).single;
+          final ctx = host.readContext(), snapshot = await adapter.snapshot(host.readContext(), wire.supplier.id);
+          expect(snapshot, isNotNull);
+          expect(snapshot!.sourceRevision, 'store-original-ledger-v1:' + workspaceLedgerFingerprint([
+            work.workspaceSupplierScope!.$1, work.workspaceSupplierScope!.$2, 'evaluation',
+            work.workspaceOriginalLedgerSections!.revision, work.workspacePurchaseEntryRevision, action, wire.supplier.id]));
+          if (variant == 'AI stale source') {
+            wire.book = WorkspacePurchaseEntryBook.fromJson({...wire.book.toJson(), 'revision': wire.book.revision + 1});
+            expect(await work.loadWorkspaceSuppliers(retry: true), true);
+          }
+          review = adapter.openReview(scope_contract.MoolAssistantProposal(id: 'HOST-money-review', actionId: action,
+            binding: ctx.binding, requestRevision: 0, entitlementRevision: 'HOST-fixture-only',
+            sourceRevision: snapshot.sourceRevision, validUntil: DateTime.now().add(const Duration(minutes: 5)),
+            entityId: wire.supplier.id, title: 'HOST original money review', summary: 'HOST native final Save is required',
+            fields: {'supplierId': wire.supplier.id, 'openingId': wire.opening.id, 'openingRevision': wire.opening.revision,
+              'amount': '5.00', 'reference': 'HOST native original money', 'channel': 'Cash', 'occurredOn': wire.opening.asOfDate}), () => true);
+          if (variant == 'AI stale source') {
+            expect(await review, MoolAssistantReviewResult.stale); await tester.pumpAndSettle();
+            expect(find.byKey(const Key('supplier-payment-amount')), findsNothing);
+            expect(wire.moneyWrites, 0); expect(await work.readLedgerForm(originalKey), null); return;
+          }
+          await tester.pumpAndSettle();
+          expect(await work.readLedgerForm(originalKey), null);
+          expect(wire.moneyWrites, 0); expect(wire.moneyEffects, 0);
+        } else {await revealOriginalOpening(tester, open); await tap(open);}
+        final amount = find.byKey(const Key('supplier-payment-amount'));
+        final reference = find.byKey(const Key('supplier-payment-reference'));
+        if (variant.startsWith('AI')) {
+          expect(tester.widget<TextField>(amount).controller!.text, '5.00');
+          expect(tester.widget<TextField>(reference).controller!.text, 'HOST native original money');
+          expect(tester.widget<CheckboxListTile>(find.byKey(const Key('supplier-money-opening-excluded'))).value, false);
+          if (variant == 'AI close') {
+            await tap(find.byKey(const Key('supplier-money-close')));
+            expect(await review, MoolAssistantReviewResult.opened); expect(await work.readLedgerForm(originalKey), null);
+            expect(wire.moneyWrites, 0); expect(wire.moneyEffects, 0); expect(tester.takeException(), null); return;
+          }
+        } else {
+          await tester.enterText(amount, '5.00'); await tester.pumpAndSettle();
+          await tester.enterText(reference, 'HOST native original money'); await tester.pumpAndSettle();
+        }
+        await tap(find.byKey(const Key('supplier-money-opening-excluded')));
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+        final button = find.byKey(const Key('supplier-money-submit'));
+        await tester.ensureVisible(button); await tester.pumpAndSettle();
+        final oldSave = tester.widget<FilledButton>(button).onPressed!;
+        if (variant == 'owner retired' || variant == 'principal retired') {
+          if (variant == 'owner retired') {work.remoteReviewStatus = WorkRemoteReviewStatus.pending; work.notifyListeners();}
+          else {host.principal.identity = null; host.principal.changes.add(null);}
+          await tester.pumpAndSettle();
+          await (oldSave as dynamic)(); await tester.pumpAndSettle();
+          expect(wire.moneyWrites, 0); expect(find.byKey(const Key('supplier-payment-amount')), findsNothing);
+        } else {
+          wire.loseAcknowledgement = variant.startsWith('lost reply') || variant == 'reopen pending';
+          wire.dropBeforeWrite = variant == 'dispatch without write';
+          wire.refuseMoney = variant.startsWith('refused'); wire.refuseRefresh = variant.contains('refresh unavailable');
+          final first = (oldSave as dynamic)(), second = (oldSave as dynamic)();
+          await first; await second; await tester.pumpAndSettle();
+          expect(wire.moneyWrites, 1, reason: work.workspaceOriginalLedgerError);
+          final original = wire.moneyOriginal!;
+          expect(original.input, isNotNull);
+          if (variant.startsWith('lost reply') || variant == 'dispatch without write' || variant == 'reopen pending') {
+            expect(work.workspaceOriginalLedgerPending!.fingerprint, original.fingerprint);
+            if (variant == 'reopen pending') {
+              wire.statusUnavailable = true;
+              await tap(find.byKey(const Key('supplier-money-close')));
+              final recovery = find.byKey(const Key('work-opening-pending-money'));
+              await revealOriginalOpening(tester, recovery); await tap(recovery);
+              expect(tester.widget<TextField>(amount).controller!.text, '5.00');
+              expect(tester.widget<TextField>(amount).enabled, false);
+              await statusAction('supplier-money-check-status');
+              expect(work.workspaceOriginalLedgerPending!.fingerprint, original.fingerprint);
+              expect(wire.moneyWrites, 1); wire.statusUnavailable = false;
+            }
+            await statusAction('supplier-money-check-status');
+            expect(wire.moneyWrites, 1);
+            if (variant == 'dispatch without write') {
+              await statusAction('supplier-money-retry-original');
+              expect(wire.moneyWrites, 2); expect(wire.moneyOriginal!.fingerprint, original.fingerprint);
+            }
+          }
+          if (variant.startsWith('refused')) {
+            expect(wire.moneyEffects, 0);
+            await statusAction('supplier-money-review-refused');
+            if (variant == 'refused refresh unavailable') {
+              expect(tester.widget<TextField>(amount).enabled, false);
+              expect(find.byKey(const Key('supplier-money-review-refused')), findsOneWidget);
+              wire.refuseRefresh = false;
+              await statusAction('supplier-money-review-refused');
+            }
+            expect(wire.moneyWrites, 1); expect(wire.moneyStatusReads, variant == 'refused' ? 1 : 2);
+            expect(tester.widget<TextField>(amount).controller!.text, '5.00');
+            expect(tester.widget<CheckboxListTile>(find.byKey(const Key('supplier-money-opening-excluded'))).value, false);
+            expect(work.workspaceOriginalLedgerPending, null);
+          } else {
+            expect(wire.moneyEffects, 1); expect(wire.ledger!.entries.length, 1);
+            expect(wire.ledger!.entries.single.kind, advance ? WorkspaceSupplierEntryKind.advance : WorkspaceSupplierEntryKind.payment);
+            expect(find.textContaining('recorded ·'), findsOneWidget);
+            expect(work.workspaceInvoiceHistoryLoaded, false); expect(work.workspaceFinance, null);
+            if (variant == 'saved') {
+              await (oldSave as dynamic)(); await tester.pumpAndSettle(); expect(wire.moneyWrites, 1);
+              await (tester.widget<FilledButton>(button).onPressed! as dynamic)(); await tester.pumpAndSettle();
+              expect(tester.widget<TextField>(amount).controller!.text, ''); expect(wire.moneyEffects, 1);
+            }
+          }
+        }
+        expect(tester.takeException(), null);
+      } finally {wire.connected = false; await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+    });
   }
   for (final variant in ['saved', 'AI review', 'supplier credit', 'zero balance', 'lost reply', 'lost reply enlarged',
       'dispatch without write', 'stale book', 'refused stale source', 'unknown amount', 'future date']) {

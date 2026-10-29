@@ -2,14 +2,20 @@ import {createHash} from 'node:crypto';
 import {FieldPath, type DocumentReference, type Firestore, type Transaction} from 'firebase-admin/firestore';
 import {WorkspaceProfileError} from './workspace_profile_service.js';
 import type {PurchaseEntryTransactionAuthority} from './workspace_purchase_entry_repository.js';
-import {checkedPurchaseEntryScope, checkedPurchaseEntryCopy, purchaseEntryFingerprint, purchaseEntryId, purchaseEntryRevision,
+import {checkedPurchaseEntryScope, checkedPurchaseEntryCopy, purchaseEntryFingerprint, purchaseEntryId, purchaseEntryRevision, purchaseEntryInvoiceFinancialYear,
   type PurchaseEntryBook} from './workspace_purchase_entry_service.js';
-import {checkedLedgerCommand, checkedLedgerOpening, checkedLedgerReceipt, checkedLedgerRegisterHeader,
+import {checkedLedgerCommand, checkedLedgerOpening, checkedLedgerReceipt, checkedLedgerRegisterHeader, checkedLedgerSupplierMoneyEntry,
+  checkedLedgerSupplierBillAcceptance, ledgerBillLiabilityEntry, ledgerBillOpeningMatches, ledgerPrintedPaise, ledgerReviewedCopyMatches,
+  checkedLedgerSupplierAllocationProof, ledgerSupplierAllocationInput, ledgerSupplierFinancialHistory,
+  checkedLedgerSupplierRefundProof, ledgerSupplierRefundEntry,
+  checkedLedgerSupplierCreditProof, ledgerSupplierCreditInput, ledgerSupplierCreditEntry, ledgerSupplierCreditPrintedTotal,
   checkedLedgerRow, ledgerCanonical, ledgerClone, ledgerCommandInput, ledgerCommandTarget,
   ledgerConfirmedOpening, ledgerCount, ledgerError, ledgerHash, ledgerMicros,
   type LedgerActor, type LedgerCommand, type LedgerExpenseCommand, type LedgerKind,
   type LedgerOpeningCommand, type LedgerPage, type LedgerReceipt, type LedgerRegisterCommand,
-  type LedgerRepository, type LedgerRow, type LedgerScope, type LedgerStatus} from './workspace_ledger_service.js';
+  type LedgerRepository, type LedgerRow, type LedgerScope, type LedgerStatus, type LedgerSupplierMoneyCommand,
+  type LedgerSupplierBillCommand, type LedgerSupplierBillAcceptance, type LedgerSupplierAllocationCommand, type LedgerSupplierRefundCommand, type LedgerSupplierCreditCommand,
+  type LedgerSupplierAllocationProof, type LedgerSupplierMoneySourceKind} from './workspace_ledger_service.js';
 
 /** Only the existing original purchase repository may supply this anchor.
  * assertCurrent must read that original head and current authority through the
@@ -70,6 +76,13 @@ export class FirestoreWorkspaceLedgerRepository implements LedgerRepository {
   private attemptRef(scope: LedgerScope, key: string): DocumentReference {
     return this.root(scope).collection('attempts').doc(ledgerHash({key: purchaseEntryId(key)}));
   }
+  /** Duplicate-fact index inside the original ledger; never a second balance. */
+  private supplierEntryIdentityRef(scope: LedgerScope, id: string): DocumentReference {
+    return this.root(scope).collection('supplierEntryIdentities').doc(ledgerHash({id}));
+  }
+  private supplierBillIdentityRef(scope: LedgerScope, id: string): DocumentReference {
+    return this.root(scope).collection('supplierBillIdentities').doc(ledgerHash({id}));
+  }
   private identity(meta: RecordMeta): object {
     return {schemaVersion: 1, projectId: this.projectId, scope: meta.scope, kind: meta.kind,
       id: meta.id, parentId: meta.parentId};
@@ -106,11 +119,24 @@ export class FirestoreWorkspaceLedgerRepository implements LedgerRepository {
   private async head(tx: Transaction, scope: LedgerScope): Promise<Head | null> {
     const doc = await tx.get(this.root(scope));
     if (doc.exists) return this.checkedHead(doc.data(), scope);
-    const [identities, receipts] = await Promise.all([
-      tx.get(this.root(scope).collection('recordIdentities').limit(1)),
-      tx.get(this.root(scope).collection('attempts').where('status', '==', 'saved').limit(1)),
-    ]);
-    if (!identities.empty || !receipts.empty) ledgerError('service_unavailable', 503);
+    // Keep query guards serial on this transaction. Under competing first
+    // publications, a second in-flight query can surface a closed-transaction
+    // error after the SDK rolls back the first, masking its contention retry.
+    try {
+      const identities = await tx.get(this.root(scope).collection('recordIdentities').limit(1));
+      const receipts = await tx.get(this.root(scope).collection('attempts').where('status', '==', 'saved').limit(1));
+      if (!identities.empty || !receipts.empty) ledgerError('service_unavailable', 503);
+    } catch (error) {
+      const failure = error as {code?: unknown; details?: unknown} | null;
+      // The emulator reports a lock-aborted query with this exact code/detail.
+      // No transaction write has been queued at this read boundary. Classify
+      // only that failed read as ABORTED so the SDK uses its bounded transaction
+      // retry; never retry a command or reinterpret an unknown commit result.
+      if (failure?.code === 3 && failure.details === 'Transaction is invalid or closed.') {
+        throw Object.assign(new Error('Original ledger transaction read aborted', {cause: error}), {code: 10});
+      }
+      throw error;
+    }
     // Orphan staged immutable payloads do not establish a published source.
     return null;
   }
@@ -277,14 +303,57 @@ export class FirestoreWorkspaceLedgerRepository implements LedgerRepository {
         if (receipt.operation === 'recordStoreExpense' && captured.row.fingerprint !== receipt.inputFingerprint ||
             receipt.operation === 'confirmStoreSupplierOpening' &&
             ledgerHash(JSON.parse(captured.row.json).openingRecord) !== receipt.inputFingerprint) ledgerError('service_unavailable', 503);
-        if (receipt.entryId !== null) {
+        if (receipt.operation === 'recordStoreSupplierMoney') {
+          const entries = (JSON.parse(captured.row.json) as {entries: unknown[]}).entries;
+          const matching = entries.filter(value => (value as {operationId?: unknown})?.operationId === receipt!.entryId);
+          try {
+            if (matching.length !== 1 || ledgerHash(checkedLedgerSupplierMoneyEntry(matching[0])) !== receipt.inputFingerprint) {
+              ledgerError('service_unavailable', 503);
+            }
+          } catch {ledgerError('service_unavailable', 503);}
+        } else if (receipt.operation === 'confirmStoreSupplierBill') {
+          try {
+            const ledger = JSON.parse(captured.row.json) as Record<string, unknown>;
+            const bill = checkedLedgerSupplierBillAcceptance((ledger.purchaseBills as Record<string, unknown> | undefined)?.[receipt.entryId!]);
+            const wanted = ledgerBillLiabilityEntry(bill), entries = ledger.entries as Record<string, unknown>[];
+            const matching = entries.filter(entry => entry.kind === 'bill' && entry.billId === receipt!.entryId);
+            if (bill.copy.draft.id !== receipt.entryId || ledgerHash(bill) !== receipt.inputFingerprint ||
+                (wanted ? matching.length !== 1 || !equal(matching[0], wanted) : matching.length !== 0)) ledgerError('service_unavailable', 503);
+          } catch {ledgerError('service_unavailable', 503);}
+        } else if (receipt.operation === 'recordStoreSupplierMoneyAllocation') {
+          try {
+            const ledger = JSON.parse(captured.row.json);
+            const proof = checkedLedgerSupplierAllocationProof(ledger.billMoneyAllocations?.[receipt.entryId!], scope);
+            if (proof.operationId !== receipt.entryId || proof.supplierId !== receipt.targetId || proof.committedRevision > captured.row.revision ||
+                ledgerHash(ledgerSupplierAllocationInput(proof)) !== receipt.inputFingerprint ||
+                ledgerMicros(proof.recordedAt) > ledgerMicros(ledger.asOf)) ledgerError('service_unavailable', 503);
+          } catch {ledgerError('service_unavailable', 503);}
+        } else if (receipt.operation === 'recordStoreSupplierRefund') {
+          try {
+            const ledger = JSON.parse(captured.row.json), proof = checkedLedgerSupplierRefundProof(ledger.refunds?.[receipt.entryId!], scope);
+            const matching = (ledger.entries as Record<string, unknown>[]).filter(entry => entry.operationId === receipt!.entryId);
+            if (proof.intent.operationId !== receipt.entryId || proof.intent.supplierId !== receipt.targetId ||
+                proof.committedRevision > captured.row.revision || ledgerHash(proof.intent) !== receipt.inputFingerprint ||
+                ledgerMicros(proof.recordedAt) > ledgerMicros(ledger.asOf) || matching.length !== 1 ||
+                !equal(matching[0], ledgerSupplierRefundEntry(proof))) ledgerError('service_unavailable', 503);
+          } catch {ledgerError('service_unavailable', 503);}
+        } else if (receipt.operation === 'recordStoreSupplierCreditNote') {
+          try {
+            const ledger = JSON.parse(captured.row.json), proof = checkedLedgerSupplierCreditProof(ledger.creditNotes?.[receipt.entryId!], scope);
+            const matching = (ledger.entries as Record<string, unknown>[]).filter(entry => entry.operationId === receipt!.entryId);
+            if (proof.operationId !== receipt.entryId || proof.supplierId !== receipt.targetId ||
+                proof.committedRevision > captured.row.revision || ledgerHash(ledgerSupplierCreditInput(proof)) !== receipt.inputFingerprint ||
+                ledgerMicros(proof.recordedAt) > ledgerMicros(ledger.asOf) || matching.length !== 1 ||
+                !equal(matching[0], ledgerSupplierCreditEntry(proof))) ledgerError('service_unavailable', 503);
+          } catch {ledgerError('service_unavailable', 503);}
+        } else if (receipt.operation === 'recordStoreMoneyRegisterEntry') {
           const entry = await this.db.runTransaction(async tx => {await this.authority!.assertCurrent(tx, actor, scope);
             return this.meta(tx, scope, 'moneyEntry', receipt!.entryId!, receipt!.targetId);});
           const header = checkedLedgerRegisterHeader(JSON.parse(captured.row.json), scope);
           if (!entry || entry.payload.fingerprint !== receipt.inputFingerprint || entry.ordinal! > header.entryCount ||
               entry.writeRevision > captured.head!.revision) ledgerError('service_unavailable', 503);
           await this.load(entry);
-        }
+        } else if (receipt.entryId !== null) ledgerError('service_unavailable', 503);
       }
       return {revision: captured.head?.revision ?? null, receipt, current: captured.row};
     }
@@ -293,6 +362,206 @@ export class FirestoreWorkspaceLedgerRepository implements LedgerRepository {
   recordExpense(actor: LedgerActor, command: LedgerExpenseCommand): Promise<LedgerStatus> {return this.save(actor, command);}
   confirmOpening(actor: LedgerActor, command: LedgerOpeningCommand): Promise<LedgerStatus> {return this.save(actor, command);}
   recordRegisterEntry(actor: LedgerActor, command: LedgerRegisterCommand): Promise<LedgerStatus> {return this.save(actor, command);}
+  recordSupplierMoney(actor: LedgerActor, command: LedgerSupplierMoneyCommand): Promise<LedgerStatus> {return this.save(actor, command);}
+  confirmSupplierBill(actor: LedgerActor, command: LedgerSupplierBillCommand): Promise<LedgerStatus> {return this.save(actor, command);}
+  allocateSupplierMoney(actor: LedgerActor, command: LedgerSupplierAllocationCommand): Promise<LedgerStatus> {return this.save(actor, command);}
+  recordSupplierRefund(actor: LedgerActor, command: LedgerSupplierRefundCommand): Promise<LedgerStatus> {return this.save(actor, command);}
+  recordSupplierCredit(actor: LedgerActor, command: LedgerSupplierCreditCommand): Promise<LedgerStatus> {return this.save(actor, command);}
+  private supplierFinancialHistory(ledger: Record<string, unknown>, scope: LedgerScope, supplierId: string) {
+    return ledgerSupplierFinancialHistory(ledger, scope, supplierId);
+  }
+  private async supplierBillPlan(actor: LedgerActor, command: LedgerSupplierBillCommand, captured: Snapshot): Promise<Plan> {
+    const result = (reason: string | null, writes: PlannedWrite[] = [], purchase: PurchaseEntryBook | null = null): Plan => ({reason, writes, purchase});
+    if (!captured.row) return result('supplier_unavailable');
+    const ledger = JSON.parse(captured.row.json) as Record<string, unknown>;
+    if (!ledger.openingRecord || ledger.historyComplete !== true || ledger.openingBalanceMinor === null) return result('bill_opening_evidence_changed');
+    const {opening, bills, parsed, balance} = this.supplierFinancialHistory(ledger, command.scope, command.supplierId);
+    const bill = command.bill, id = bill.copy.draft.id, previous = parsed.get(id);
+    if (previous) return result(equal(previous, bill) ? null : 'record_identity_conflict');
+    if ((captured.head?.revision ?? null) !== command.expectedRevision) return result('stale_ledger');
+    if (captured.row.revision !== command.expectedSupplierRevision) return result('stale_supplier');
+    if (!this.purchase) ledgerError('service_unavailable', 503);
+    const book = await this.purchase.capture(actor, command.scope);
+    if (!book || book.revision !== command.expectedPurchaseRevision || ledgerHash(book) !== command.expectedPurchaseFingerprint) return result('stale_evidence');
+    let copies: ReturnType<typeof checkedPurchaseEntryCopy>[];
+    try {copies = (book.copies ?? []).map(value => checkedPurchaseEntryCopy(value, false));} catch {ledgerError('service_unavailable', 503);}
+    const exact = copies.filter(copy => copy.id === bill.copy.id);
+    if (exact.length !== 1 || !ledgerReviewedCopyMatches(exact[0]!, bill.copy) || !book.profiles.some(profile => profile.id === command.supplierId) ||
+        copies.some(copy => copy.draft.id === id && copy.revision > bill.copy.revision) || parsed.size >= 1000) return result('bill_source_changed');
+    const yearKey = (copy: typeof bill.copy) => `${purchaseEntryInvoiceFinancialYear(copy.draft.invoiceDate)}:${copy.draft.invoiceReference.trim().toUpperCase()}`;
+    const latest = copies.filter(copy => !copies.some(other => other.draft.id === copy.draft.id && other.revision > copy.revision));
+    if (latest.some(copy => copy.draft.id !== id && copy.supplier.id === command.supplierId && yearKey(copy) === yearKey(bill.copy)) ||
+        [...parsed.values()].some(other => yearKey(other.copy) === yearKey(bill.copy))) return result('bill_source_changed');
+    if (!ledgerBillOpeningMatches(bill, opening, command.confirmedUtcOffsetMinutes)) return result('bill_opening_evidence_changed');
+    if (ledgerMicros(bill.acceptedAt) > ledgerMicros(this.now().toISOString())) return result('bill_confirmation_invalid');
+    const entry = ledgerBillLiabilityEntry(bill), revision = next(captured.row.revision);
+    if (entry && (ledger.entries as Record<string, unknown>[]).some(value => value.operationId === entry.operationId)) return result('record_identity_conflict');
+    if (!Number.isSafeInteger(balance + (entry?.amountMinor as number | undefined ?? 0))) return result('bill_confirmation_invalid');
+    const updated = {...ledger, revision, asOf: ledgerMicros(bill.acceptedAt) > ledgerMicros(ledger.asOf) ? bill.acceptedAt : ledger.asOf,
+      purchaseBills: {...bills, [id]: bill}, entries: [...ledger.entries as unknown[], ...(entry ? [entry] : [])]};
+    return result(null, [{row: this.row('supplierLedger', command.supplierId, updated, revision),
+      ref: this.recordRef(command.scope, 'supplierLedger', command.supplierId), first: false}], book);
+  }
+  private supplierMoneyPlan(command: LedgerSupplierMoneyCommand, captured: Snapshot): Plan {
+    const result = (reason: string | null, writes: PlannedWrite[] = []): Plan => ({reason, writes, purchase: null});
+    if (!captured.row) return result('supplier_unavailable');
+    const ledger = JSON.parse(captured.row.json) as Record<string, unknown>, entries = ledger.entries as unknown[];
+    if (!ledger.openingRecord || ledger.historyComplete !== true || ledger.openingBalanceMinor === null) {
+      return result('opening_evidence_changed');
+    }
+    // The original bill, typed credit and money history jointly prove capacity.
+    // An opaque map is never an available balance source.
+    const history = this.supplierFinancialHistory(ledger, command.scope, command.supplierId);
+    const {opening, parsed, balance} = history;
+    const existing = (entries as Record<string, unknown>[]).filter(value => value.operationId === command.entry.operationId);
+    if (existing.length > 1) ledgerError('service_unavailable', 503);
+    if (existing.length) return result(equal(existing[0], command.entry) ? null : 'record_identity_conflict');
+    if ((captured.head?.revision ?? null) !== command.expectedRevision) return result('stale_ledger');
+    if (captured.row.revision !== command.expectedSupplierRevision) return result('stale_supplier');
+    const entry = command.entry;
+    if (entry.moneyReview.openingId !== opening.id || entry.moneyReview.openingRevision !== opening.revision) {
+      return result('opening_evidence_changed');
+    }
+    const local = new Date(Number(ledgerMicros(entry.postedAt) / 1000n) + command.confirmedUtcOffsetMinutes * 60000);
+    const localDay = local.toISOString().slice(0, 10);
+    if (ledgerMicros(entry.postedAt) > ledgerMicros(this.now().toISOString()) || entry.moneyReview.occurredOn > localDay) {
+      return result('supplier_money_evidence_invalid');
+    }
+    if (entry.origin === 'manualPurchase') {
+      const bill = parsed.get(entry.billId!);
+      if (!bill || bill.openingTreatment !== 'excluded' || bill.copy.id !== entry.purchaseId ||
+          ledgerMicros(entry.postedAt) < ledgerMicros(bill.acceptedAt)) return result('supplier_money_evidence_invalid');
+      const remaining = history.billRemaining(entry.billId!);
+      if (remaining === null || entry.amountMinor > remaining) {
+        return result('supplier_capacity_changed');
+      }
+    }
+    if (!Number.isSafeInteger(balance - entry.amountMinor) || entry.kind === 'payment' && entry.amountMinor > Math.max(balance, 0)) {
+      return result('supplier_capacity_changed');
+    }
+    const revision = next(captured.row.revision), updated = {...ledger, revision,
+      asOf: ledgerMicros(entry.postedAt) > ledgerMicros(ledger.asOf) ? entry.postedAt : ledger.asOf,
+      entries: [...entries, entry]};
+    this.supplierFinancialHistory(updated, command.scope, command.supplierId);
+    return result(null, [{row: this.row('supplierLedger', command.supplierId, updated, revision),
+      ref: this.recordRef(command.scope, 'supplierLedger', command.supplierId), first: false}]);
+  }
+  private supplierAllocationPlan(command: LedgerSupplierAllocationCommand, captured: Snapshot): Plan {
+    const result = (reason: string | null, writes: PlannedWrite[] = []): Plan => ({reason, writes, purchase: null});
+    if (!captured.row) return result('supplier_unavailable');
+    const ledger = JSON.parse(captured.row.json) as Record<string, unknown>;
+    if (!ledger.openingRecord || ledger.historyComplete !== true || ledger.openingBalanceMinor === null) return result('opening_evidence_changed');
+    const history = this.supplierFinancialHistory(ledger, command.scope, command.supplierId), intent = command.intent;
+    const old = history.allocations.get(intent.operationId);
+    if (old) return result(equal(ledgerSupplierAllocationInput(old), intent) ? null : 'record_identity_conflict');
+    if (history.entryById.has(intent.operationId)) return result('record_identity_conflict');
+    if ((captured.head?.revision ?? null) !== command.expectedRevision) return result('stale_ledger');
+    if (captured.row.revision !== command.expectedSupplierRevision) return result('stale_supplier');
+    const opening = history.opening, bill = history.parsed.get(intent.billId), recordedAt = this.now().toISOString();
+    if (intent.openingId !== opening.id || intent.openingRevision !== opening.revision) return result('opening_evidence_changed');
+    if (!bill || bill.openingTreatment !== 'excluded' || bill.copy.id !== intent.copyId || bill.copy.revision !== intent.copyRevision) return result('allocation_source_changed');
+    const sourceAmount = history.sourceAmount(intent.sourceKind, intent.sourceId),
+      sourceEntry = history.entryById.get(intent.sourceId);
+    if (sourceAmount === null) return result('allocation_source_changed');
+    if (intent.sourceKind === 'manualBillSurplus') {
+      const sourceBill = history.parsed.get(intent.sourceId);
+      if (!sourceBill || sourceBill.copy.id !== intent.sourceCopyId || sourceBill.copy.revision !== intent.sourceCopyRevision) return result('allocation_source_changed');
+    }
+    if (ledgerMicros(recordedAt) < ledgerMicros(intent.requestedAt) || ledgerMicros(recordedAt) < ledgerMicros(ledger.asOf) ||
+        ledgerMicros(recordedAt) < ledgerMicros(bill.acceptedAt) || ledgerMicros(recordedAt) < ledgerMicros(opening.savedAt) ||
+        intent.sourceKind !== 'openingAdvance' && intent.sourceKind !== 'manualBillSurplus' &&
+          (!sourceEntry || ledgerMicros(sourceEntry.postedAt) > ledgerMicros(recordedAt))) return result('allocation_confirmation_invalid');
+    const remaining = history.billRemaining(intent.billId), available = history.sourceAvailable(intent.sourceKind, intent.sourceId);
+    if (remaining === null || available === null || intent.amountMinor > remaining || intent.amountMinor > available) return result('allocation_capacity_changed');
+    if (history.allocations.size >= 10000) return result('allocation_capacity_changed');
+    const revision = next(captured.row.revision), proof = checkedLedgerSupplierAllocationProof({...intent,
+      committedRevision: revision, recordedAt,
+      ...(intent.sourceKind === 'manualBillSurplus' ? {sourceEntryCount: (ledger.entries as unknown[]).length} : {})}, command.scope);
+    const updated = {...ledger, revision, asOf: recordedAt,
+      billMoneyAllocations: {...ledger.billMoneyAllocations as object, [intent.operationId]: proof}};
+    this.supplierFinancialHistory(updated, command.scope, command.supplierId);
+    return result(null, [{row: this.row('supplierLedger', command.supplierId, updated, revision),
+      ref: this.recordRef(command.scope, 'supplierLedger', command.supplierId), first: false}]);
+  }
+  private supplierRefundPlan(command: LedgerSupplierRefundCommand, captured: Snapshot): Plan {
+    const result = (reason: string | null, writes: PlannedWrite[] = []): Plan => ({reason, writes, purchase: null});
+    if (!captured.row) return result('supplier_unavailable');
+    const ledger = JSON.parse(captured.row.json) as Record<string, unknown>;
+    if (!ledger.openingRecord || ledger.historyComplete !== true || ledger.openingBalanceMinor === null) return result('opening_evidence_changed');
+    const history = this.supplierFinancialHistory(ledger, command.scope, command.supplierId), intent = command.intent;
+    const old = history.refunds.get(intent.operationId);
+    if (old) return result(equal(old.intent, intent) ? null : 'record_identity_conflict');
+    if (history.entryById.has(intent.operationId) || history.allocations.has(intent.operationId) ||
+        ['goodsReturns', 'shortageClaims'].some(key => Object.hasOwn((ledger[key] ?? {}) as object, intent.operationId))) return result('record_identity_conflict');
+    if ((captured.head?.revision ?? null) !== command.expectedRevision) return result('stale_ledger');
+    if (captured.row.revision !== command.expectedSupplierRevision) return result('stale_supplier');
+    const opening = history.opening, recordedAt = this.now().toISOString();
+    if (intent.openingId !== opening.id || intent.openingRevision !== opening.revision || intent.qa !== opening.qa) return result('opening_evidence_changed');
+    const localDay = new Date(Number(ledgerMicros(intent.requestedAt) / 1000n) + command.confirmedUtcOffsetMinutes * 60000).toISOString().slice(0, 10);
+    if (intent.occurredOn < opening.asOfDate || intent.occurredOn > localDay ||
+        ledgerMicros(intent.requestedAt) > ledgerMicros(recordedAt) || ledgerMicros(recordedAt) < ledgerMicros(ledger.asOf)) return result('refund_confirmation_invalid');
+    // The native source contract has no accountPayment refund source. Bill
+    // surplus is derived from its exact typed prefix, never net credit alone.
+    const source = history.entryById.get(intent.sourceId), sourceAmount = history.sourceAmount(intent.sourceKind, intent.sourceId);
+    const surplusCapacity = intent.sourceKind === 'manualBillSurplus'
+      ? history.refundSurplusCapacity(intent, (ledger.entries as unknown[]).length, Number(ledger.revision) + 1, recordedAt) : null;
+    if (sourceAmount === null || intent.sourceKind === 'manualBillSurplus' && surplusCapacity === null || intent.sourceKind === 'accountAdvance' &&
+        (!source || intent.occurredOn < (source.moneyReview as {occurredOn: string}).occurredOn ||
+          ledgerMicros(source.postedAt) > ledgerMicros(recordedAt))) return result('refund_source_changed');
+    if ([...history.refunds.values()].some(value => value.intent.reference.toUpperCase() === intent.reference.toUpperCase())) return result('refund_reference_conflict');
+    const available = intent.sourceKind === 'manualBillSurplus' ? surplusCapacity : history.sourceAvailable(intent.sourceKind, intent.sourceId);
+    if (available === null || history.refunds.size >= 10000 || intent.amountMinor > available || intent.amountMinor > Math.max(-history.balance, 0) ||
+        !Number.isSafeInteger(history.balance + intent.amountMinor)) return result('refund_capacity_changed');
+    const revision = next(captured.row.revision), proof = checkedLedgerSupplierRefundProof({intent, committedRevision: revision, recordedAt}, command.scope);
+    const updated = {...ledger, revision, asOf: recordedAt, refunds: {...ledger.refunds as object, [intent.operationId]: proof},
+      entries: [...ledger.entries as unknown[], ledgerSupplierRefundEntry(proof)]};
+    this.supplierFinancialHistory(updated, command.scope, command.supplierId);
+    return result(null, [{row: this.row('supplierLedger', command.supplierId, updated, revision),
+      ref: this.recordRef(command.scope, 'supplierLedger', command.supplierId), first: false}]);
+  }
+  private async supplierCreditPlan(actor: LedgerActor, command: LedgerSupplierCreditCommand, captured: Snapshot): Promise<Plan> {
+    const result = (reason: string | null, writes: PlannedWrite[] = [], purchase: PurchaseEntryBook | null = null): Plan => ({reason, writes, purchase});
+    if (!captured.row) return result('supplier_unavailable');
+    const ledger = JSON.parse(captured.row.json) as Record<string, unknown>;
+    if (!ledger.openingRecord || ledger.historyComplete !== true || ledger.openingBalanceMinor === null) return result('opening_evidence_changed');
+    const history = this.supplierFinancialHistory(ledger, command.scope, command.supplierId), intent = command.intent;
+    const old = history.credits.get(intent.operationId);
+    if (old) return result(equal(ledgerSupplierCreditInput(old), intent) ? null : 'record_identity_conflict');
+    if (history.entryById.has(intent.operationId) || history.allocations.has(intent.operationId) ||
+        ['goodsReturns', 'shortageClaims'].some(key => Object.hasOwn((ledger[key] ?? {}) as object, intent.operationId))) return result('record_identity_conflict');
+    if ((captured.head?.revision ?? null) !== command.expectedRevision) return result('stale_ledger');
+    if (captured.row.revision !== command.expectedSupplierRevision) return result('stale_supplier');
+    const bill = history.parsed.get(intent.billId), opening = history.opening, recordedAt = this.now().toISOString();
+    if (intent.openingId !== opening.id || intent.openingRevision !== opening.revision) return result('opening_evidence_changed');
+    if (!bill || bill.openingTreatment !== 'excluded' || bill.copy.id !== intent.copyId || bill.copy.revision !== intent.copyRevision) return result('credit_source_changed');
+    if (!['return', 'shortage', 'damage'].includes(intent.documentInput.reasonCode)) return result('credit_source_changed');
+    if (!this.purchase) ledgerError('service_unavailable', 503);
+    const book = await this.purchase.capture(actor, command.scope);
+    if (!book || book.revision !== command.expectedPurchaseRevision || ledgerHash(book) !== command.expectedPurchaseFingerprint) return result('stale_evidence');
+    let copies: ReturnType<typeof checkedPurchaseEntryCopy>[];
+    try {copies = (book.copies ?? []).map(value => checkedPurchaseEntryCopy(value, false));} catch {ledgerError('service_unavailable', 503);}
+    const matching = copies.filter(copy => copy.id === intent.copyId);
+    if (matching.length !== 1 || !ledgerReviewedCopyMatches(matching[0]!, bill.copy) || !book.profiles.some(profile => profile.id === command.supplierId) ||
+        copies.some(copy => copy.draft.id === intent.billId && copy.revision > intent.copyRevision)) return result('credit_source_changed');
+    const localDay = new Date(Number(ledgerMicros(intent.requestedAt) / 1000n) + command.confirmedUtcOffsetMinutes * 60000).toISOString().slice(0, 10);
+    const printedTotal = ledgerSupplierCreditPrintedTotal(intent.documentInput);
+    if (intent.occurredOn > localDay || ledgerMicros(intent.requestedAt) > ledgerMicros(recordedAt) ||
+        ledgerMicros(recordedAt) < ledgerMicros(ledger.asOf) || ledgerMicros(recordedAt) < ledgerMicros(opening.savedAt) ||
+        intent.documentInput.treatment === 'gst' && (printedTotal === null || printedTotal !== intent.amountMinor)) return result('credit_confirmation_invalid');
+    if ([...history.credits.values()].some(note => note.reference.toUpperCase() === intent.reference.toUpperCase())) return result('credit_reference_conflict');
+    if (history.credits.size >= 10000 || intent.amountMinor + (history.credited.get(intent.billId) ?? 0) >
+        ledgerPrintedPaise(bill.copy.draft.details?.invoiceTotal)!) return result('credit_capacity_changed');
+    const revision = next(captured.row.revision), proof = checkedLedgerSupplierCreditProof({...intent, recordedAt, committedRevision: revision}, command.scope);
+    const updated = {...ledger, revision, asOf: recordedAt, creditNotes: {...ledger.creditNotes as object, [intent.operationId]: proof},
+      entries: [...ledger.entries as unknown[], ledgerSupplierCreditEntry(proof)]};
+    try {this.supplierFinancialHistory(updated, command.scope, command.supplierId);}
+    catch (error) {
+      if (error instanceof WorkspaceProfileError && error.code === 'service_unavailable') return result('credit_source_changed');
+      throw error;
+    }
+    return result(null, [{row: this.row('supplierLedger', command.supplierId, updated, revision),
+      ref: this.recordRef(command.scope, 'supplierLedger', command.supplierId), first: false}], book);
+  }
   private async plan(actor: LedgerActor, command: LedgerCommand, captured: Snapshot): Promise<Plan> {
     const {scope} = command, target = ledgerCommandTarget(command);
     const result = (reason: string | null, writes: PlannedWrite[] = [], purchase: PurchaseEntryBook | null = null): Plan => ({reason, writes, purchase});
@@ -338,6 +607,11 @@ export class FirestoreWorkspaceLedgerRepository implements LedgerRepository {
       return result(null, [{row: this.row('supplierLedger', target.id, value, 1),
         ref: this.recordRef(scope, 'supplierLedger', target.id), first: true}], book);
     }
+    if (command.operation === 'recordStoreSupplierMoney') return this.supplierMoneyPlan(command, captured);
+    if (command.operation === 'confirmStoreSupplierBill') return this.supplierBillPlan(actor, command, captured);
+    if (command.operation === 'recordStoreSupplierMoneyAllocation') return this.supplierAllocationPlan(command, captured);
+    if (command.operation === 'recordStoreSupplierRefund') return this.supplierRefundPlan(command, captured);
+    if (command.operation === 'recordStoreSupplierCreditNote') return this.supplierCreditPlan(actor, command, captured);
     if (!captured.row) return result('register_unavailable');
     const header = checkedLedgerRegisterHeader(JSON.parse(captured.row.json), scope);
     const previous = await this.db.runTransaction(async tx => {await this.authority!.assertCurrent(tx, actor, scope);
@@ -384,6 +658,22 @@ export class FirestoreWorkspaceLedgerRepository implements LedgerRepository {
             else throw error;
           }
         }
+        const financialEntry = command.operation === 'recordStoreSupplierMoney' ? command.entry
+          : command.operation === 'confirmStoreSupplierBill' ? ledgerBillLiabilityEntry(command.bill)
+          : command.operation === 'recordStoreSupplierMoneyAllocation' || command.operation === 'recordStoreSupplierRefund' || command.operation === 'recordStoreSupplierCreditNote' ? command.intent : null;
+        const moneyIdentityRef = financialEntry ? this.supplierEntryIdentityRef(scope, financialEntry.operationId as string) : null;
+        const moneyIdentity = moneyIdentityRef === null ? null : await tx.get(moneyIdentityRef);
+        const expectedMoneyIdentity = financialEntry && (command.operation === 'recordStoreSupplierMoney' || command.operation === 'confirmStoreSupplierBill' || command.operation === 'recordStoreSupplierMoneyAllocation' || command.operation === 'recordStoreSupplierRefund' || command.operation === 'recordStoreSupplierCreditNote')
+          ? {schemaVersion: 1, projectId: this.projectId, scope, supplierId: command.supplierId,
+            operationId: financialEntry.operationId, inputFingerprint: ledgerHash(financialEntry)} : null;
+        if (moneyIdentity?.exists && !equal(moneyIdentity.data(), expectedMoneyIdentity)) reason = 'record_identity_conflict';
+        const billIdentityRef = command.operation === 'confirmStoreSupplierBill'
+          ? this.supplierBillIdentityRef(scope, command.bill.copy.draft.id) : null;
+        const billIdentity = billIdentityRef ? await tx.get(billIdentityRef) : null;
+        const expectedBillIdentity = command.operation === 'confirmStoreSupplierBill'
+          ? {schemaVersion: 1, projectId: this.projectId, scope, supplierId: command.supplierId,
+            billId: command.bill.copy.draft.id, copyId: command.bill.copy.id, inputFingerprint: ledgerHash(command.bill)} : null;
+        if (billIdentity?.exists && !equal(billIdentity.data(), expectedBillIdentity)) reason = 'record_identity_conflict';
         // Validate every first-record slot before any publication write.
         for (const write of plan.writes) if (write.first) {
           const existing = await this.meta(tx, scope, write.row.kind, write.row.id, write.row.parentId);
@@ -397,6 +687,8 @@ export class FirestoreWorkspaceLedgerRepository implements LedgerRepository {
           targetKind: target.kind, targetId: target.id, entryId: target.entryId, recordedAt};
         checkedLedgerReceipt(receipt, scope, command.idempotencyKey, command.fingerprint);
         if (changed) {
+          if (moneyIdentityRef !== null && !moneyIdentity?.exists) tx.create(moneyIdentityRef, expectedMoneyIdentity!);
+          if (billIdentityRef !== null && !billIdentity?.exists) tx.create(billIdentityRef, expectedBillIdentity!);
           const counts = {...(head?.counts ?? {supplierLedger: 0, expense: 0, moneyRegister: 0, moneyEntry: 0})};
           for (let index = 0; index < plan.writes.length; index++) {
             const write = plan.writes[index]!, meta = staged[index]!;

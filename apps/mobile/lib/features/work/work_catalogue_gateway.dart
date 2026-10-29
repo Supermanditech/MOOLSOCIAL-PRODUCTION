@@ -5686,7 +5686,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   static const _privateOriginalOperations = {'readStorePurchaseEntryBook', 'readStorePurchaseEntryAttempt',
     'saveStoreSupplierProfile', 'saveStorePurchaseDraft', 'saveStoreSupplierOpeningEvidence',
     'readStoreLedgerSource', 'readStoreLedgerAttempt', 'recordStoreExpense',
-    'confirmStoreSupplierOpening', 'recordStoreMoneyRegisterEntry'};
+    'confirmStoreSupplierOpening', 'recordStoreMoneyRegisterEntry', 'recordStoreSupplierMoney', 'confirmStoreSupplierBill', 'recordStoreSupplierMoneyAllocation', 'recordStoreSupplierRefund', 'recordStoreSupplierCreditNote'};
   SocialContentTransport get _privateOriginalTransport {
     if (_privateOriginalTransportOverride case final configured?) return configured;
     final base = transport;

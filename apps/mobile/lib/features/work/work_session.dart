@@ -3409,8 +3409,71 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
-  /// Accept the exact reviewed bill into the supplier account, without receipt
-  /// or payment effects. Production requires the future authoritative adapter.
+  bool get workspaceOriginalSupplierBillConfirmationAvailable =>
+    workspaceOriginalSupplierOpeningConfirmationAvailable &&
+    const {WorkRemoteReviewStatus.approved, WorkRemoteReviewStatus.live}.contains(remoteReviewStatus);
+
+  Future<bool> _confirmWorkspaceOriginalPurchaseBill(WorkspacePurchaseSavedCopy copy, {
+    required (String, String, bool) scope, required int expectedPurchaseRevision,
+    required int expectedLedgerRevision, required WorkspaceOpeningBillInclusion openingTreatment,
+    required DateTime confirmedAt, WorkspaceSupplierBillOpeningReview? openingReview,
+    bool Function()? ownerCurrent,
+  }) async {
+    final key = _supplierKey, data = _storeData, purchase = _supplierStorage,
+      owned = _storeData.originalLedger, publication = publicationPreferencesContext;
+    if (ownerCurrent?.call() == false || key == null || key != scope || key.$3 || !workspaceOriginalSupplierBillConfirmationAvailable ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving || _supplierLoads.containsKey(key) ||
+        workspaceSupplierRecoveryRequired || purchase is! RemoteWorkPurchaseEntryStore ||
+        owned == null || !owned.current || purchase.controller.source.scope != owned.source.scope ||
+        purchase.controller.source.connectionId != owned.source.connectionId || !copy.valid) return false;
+    bool current() => _originalMoneySourceCurrent(data, owned, publication) &&
+      _supplierKey == key && purchase.sourceCurrent && ownerCurrent?.call() != false;
+    bool reject(String message) {
+      if (current()) {_supplierValidationErrors[key] = message; notifyListeners();}
+      return false;
+    }
+    final bill = WorkspaceSupplierBillAcceptance(copy: copy, acceptedAt: confirmedAt,
+      openingTreatment: openingTreatment, openingReview: openingReview);
+    if (!bill.valid) return reject('Check the supplier invoice number, date, items and invoice total before confirming the bill.');
+    final ledger = owned.snapshot?.suppliers[bill.copy.supplier.id];
+    if (ledger == null || ledger.revision != expectedLedgerRevision ||
+        ledger.acceptReviewedBill(bill, expectedRevision: expectedLedgerRevision) == null) {
+      return reject('Review the latest supplier account and this bill’s starting-balance inclusion before confirming.');
+    }
+    _supplierWrites.add(key); _supplierValidationErrors.remove(key); notifyListeners();
+    try {
+      // Preserve the digest of the original source bytes. Normalised native
+      // copies validate the reviewed fields but never replace that source pin.
+      final proof = await purchase.controller.source.readBook();
+      if (!current()) return false;
+      final book = proof.book, fingerprint = proof.bookFingerprint;
+      final latest = book?.latestReviewedCopies.where((item) => item.draft.id == bill.billId).toList();
+      if (book == null || fingerprint == null || book.revision != expectedPurchaseRevision ||
+          latest?.length != 1 || workspaceLedgerCanonical(latest!.single.toJson()) != workspaceLedgerCanonical(bill.copy.toJson()) ||
+          book.duplicateInvoice(bill.copy.draft) != null ||
+          owned.snapshot?.suppliers[bill.copy.supplier.id]?.revision != expectedLedgerRevision) {
+        _supplierNeedsReload.add(key);
+        return reject('Saved bill or supplier account changed. Reopen the latest records before confirming.');
+      }
+      final original = WorkspaceLedgerIntent.prepare(scope: owned.source.scope,
+        operation: 'confirmStoreSupplierBill', expectedRevision: owned.snapshot!.revision,
+        idempotencyKey: _newCounterIdentity('supplier-bill-confirm'), fields: {
+          'supplierId': bill.copy.supplier.id, 'expectedSupplierRevision': expectedLedgerRevision,
+          'expectedPurchaseRevision': expectedPurchaseRevision, 'expectedPurchaseFingerprint': fingerprint,
+          'bill': bill.toJson(), 'confirmedUtcOffsetMinutes': confirmedAt.toLocal().timeZoneOffset.inMinutes,
+        });
+      if (!current()) return false;
+      final result = await _operateWorkspaceOriginalLedger(original, write: true);
+      return current() && result?.attempt?['status'] == 'saved';
+    } on Object {
+      return reject('Bill confirmation could not be confirmed. Keep the saved copy and check its original status.');
+    } finally {
+      _supplierWrites.remove(key); if (current()) notifyListeners();
+    }
+  }
+
+  /// Accept the exact reviewed bill through its original supplier account or
+  /// isolated QA checkpoint, without receipt, payment or Stock effects.
   Future<bool> confirmWorkspacePurchaseBill(
     WorkspacePurchaseSavedCopy copy, {
     required (String, String, bool) scope,
@@ -3419,7 +3482,11 @@ class WorkSession extends ChangeNotifier {
     required WorkspaceOpeningBillInclusion openingTreatment,
     required DateTime confirmedAt,
     WorkspaceSupplierBillOpeningReview? openingReview,
+    bool Function()? ownerCurrent,
   }) async {
+    if (_productionSession) return _confirmWorkspaceOriginalPurchaseBill(copy, scope: scope,
+      expectedPurchaseRevision: expectedPurchaseRevision, expectedLedgerRevision: expectedLedgerRevision,
+      openingTreatment: openingTreatment, confirmedAt: confirmedAt, openingReview: openingReview, ownerCurrent: ownerCurrent);
     final key = _supplierKey;
     final data = _storeData;
     if (key == null || key != scope ||
@@ -5537,14 +5604,23 @@ class WorkSession extends ChangeNotifier {
       invoice: copy.draft.id, order: 'shortage-copy:${copy.id}', kind: 'supplierShortage', ledgerRevision: copy.revision);
   }
   WorkspaceLedgerFormKey? supplierCreditFormKey(WorkspacePurchaseSavedCopy copy) {
-    if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded ||
+    if (!(workspaceOriginalSupplierCreditConfigured || workspaceSupplierOpeningConfirmationAvailable) || !workspaceSuppliersLoaded ||
         _ledgerFormStorage is! WorkSupplierCreditDraftGuard) { return null; }
     final ledger = workspaceSupplierLedger(copy.supplier.id), accepted = ledger?.purchaseBills[copy.draft.id];
     if (ledger == null || accepted == null || !ledger.valid || !ledger.historyComplete ||
         ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id ||
-        jsonEncode(accepted.copy.toJson()) != jsonEncode(copy.toJson())) { return null; }
+        workspaceLedgerCanonical(accepted.copy.toJson()) != workspaceLedgerCanonical(copy.toJson())) { return null; }
     return (account: ledger.accountScope, store: ledger.workspaceId, customer: ledger.supplierId,
       invoice: copy.draft.id, order: 'credit-copy:${copy.id}', kind: 'supplierCredit', ledgerRevision: copy.revision);
+  }
+  /// A scoped saved-input key, not permission to record a credit or rebase it.
+  WorkspaceLedgerFormKey? supplierCreditRecoveryFormKey(WorkspacePurchaseSavedCopy copy) {
+    if (!workspaceOriginalSupplierCreditConfigured) return supplierCreditFormKey(copy);
+    final scope = workspaceSupplierScope;
+    if (_disposed || scope == null || !copy.valid || _ledgerFormStorage is! WorkSupplierCreditDraftGuard) return null;
+    final key = (account: scope.$1, store: scope.$2, customer: copy.supplier.id,
+      invoice: copy.draft.id, order: 'credit-copy:${copy.id}', kind: 'supplierCredit', ledgerRevision: copy.revision);
+    return _ledgerFormScopeCurrent(key) ? key : null;
   }
   /// Stable source namespace also works before account cache/eligibility recovery.
   WorkspaceLedgerFormKey? supplierRefundRecoveryFormKey({required String supplierId,
@@ -5556,7 +5632,7 @@ class WorkSession extends ChangeNotifier {
           ? copyId == null || (copyRevision ?? 0) <= 0
           : copyId != null || copyRevision != null)) { return null; }
     final key = (account: scope.$1, store: scope.$2, customer: supplierId, invoice: sourceId,
-      order: 'supplier-refund:${!_productionSession ? 'qa' : 'live'}:${sourceKind.name}:${copyId ?? 'account'}',
+      order: 'supplier-refund:${scope.$3 ? 'qa' : 'live'}:${sourceKind.name}:${copyId ?? 'account'}',
       kind: 'supplierRefund', ledgerRevision: copyRevision ?? openingRevision);
     return _ledgerFormScopeCurrent(key) ? key : null;
   }
@@ -5591,21 +5667,63 @@ class WorkSession extends ChangeNotifier {
       invoice: receiptId, order: 'return-receipt:$receiptId', kind: 'supplierGoodsReturn', ledgerRevision: 1);
   }
   bool get workspaceSupplierMoneyInputAvailable =>
-      workspaceSupplierOpeningConfirmationAvailable &&
+      (workspaceOriginalSupplierMoneyConfigured || workspaceSupplierOpeningConfirmationAvailable) &&
       _ledgerFormStorage is WorkSupplierMoneyDraftGuard;
+  bool get workspaceOriginalSupplierMoneyConfigured => workspaceOriginalSupplierOpeningConfigured &&
+    _ledgerFormStorage is WorkSupplierMoneyDraftGuard && _ledgerFormStorage is WorkSupplierMoneyOriginalDraftGuard;
+  bool get workspaceOriginalSupplierAllocationConfigured => workspaceOriginalSupplierMoneyConfigured &&
+    _ledgerFormStorage is WorkSupplierAllocationDraftGuard && _ledgerFormStorage is WorkSupplierAllocationOriginalDraftGuard;
+  bool get workspaceOriginalSupplierRefundConfigured => workspaceOriginalSupplierMoneyConfigured &&
+    _ledgerFormStorage is WorkSupplierRefundDraftGuard && _ledgerFormStorage is WorkSupplierRefundOriginalDraftGuard;
+  bool get workspaceOriginalSupplierCreditConfigured => workspaceOriginalSupplierMoneyConfigured &&
+    _ledgerFormStorage is WorkSupplierCreditDraftGuard && _ledgerFormStorage is WorkSupplierCreditOriginalDraftGuard;
   bool get workspaceSupplierAllocationInputAvailable =>
-      workspaceSupplierMoneyInputAvailable && _ledgerFormStorage is WorkSupplierAllocationDraftGuard;
+      (workspaceOriginalSupplierAllocationConfigured || workspaceSupplierOpeningConfirmationAvailable) && workspaceSupplierMoneyInputAvailable &&
+      _ledgerFormStorage is WorkSupplierAllocationDraftGuard;
 
   WorkspaceLedgerFormKey? supplierAllocationFormKey(WorkspacePurchaseSavedCopy copy) {
     if (!workspaceSupplierAllocationInputAvailable || !workspaceSuppliersLoaded) return null;
     final ledger = workspaceSupplierLedger(copy.supplier.id);
     final accepted = ledger?.purchaseBills[copy.draft.id];
+    if (workspaceOriginalSupplierAllocationConfigured && ledger == null) {
+      final owned = _storeData.originalLedger;
+      final original = owned?.pending ?? owned?.controller.lastResolution?.original;
+      if (original?.operation == 'recordStoreSupplierMoneyAllocation' && original!.targetId == copy.supplier.id &&
+          original.scope == owned!.source.scope) {
+        try {
+          final intent = WorkspaceSupplierMoneyAllocationIntent.fromJson(original.input);
+          if (intent.billId == copy.draft.id && intent.copyId == copy.id && intent.copyRevision == copy.revision) {
+            return (account: intent.accountScope, store: intent.workspaceId, customer: intent.supplierId,
+              invoice: intent.billId, order: 'allocation-copy:${intent.copyId}', kind: 'supplierAllocation', ledgerRevision: intent.copyRevision);
+          }
+        } on Object {return null;}
+      }
+      // The saved-copy namespace can reopen an older encrypted form after a
+      // newer shared request, or a failed full-ledger refresh. This raw-input
+      // key grants no posting permission; preparation needs the live ledger.
+      if (owned != null && owned.source.scope.account == _contactAccountScope &&
+          owned.source.scope.store == activeWorkspace?.id) {
+        return (account: owned.source.scope.account, store: owned.source.scope.store, customer: copy.supplier.id,
+          invoice: copy.draft.id, order: 'allocation-copy:${copy.id}', kind: 'supplierAllocation', ledgerRevision: copy.revision);
+      }
+    }
     if (ledger == null || accepted == null || !ledger.valid || !ledger.historyComplete ||
         ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id ||
-        jsonEncode(accepted.copy.toJson()) != jsonEncode(copy.toJson())) {
+        workspaceLedgerCanonical(accepted.copy.toJson()) != workspaceLedgerCanonical(copy.toJson())) {
       return null;
     }
     return (account: ledger.accountScope, store: ledger.workspaceId, customer: ledger.supplierId,
+      invoice: copy.draft.id, order: 'allocation-copy:${copy.id}', kind: 'supplierAllocation', ledgerRevision: copy.revision);
+  }
+
+  /// Stable encrypted-input namespace only. Opening an older allocation must
+  /// not depend on a newer shared request or a full ledger refresh succeeding.
+  WorkspaceLedgerFormKey? supplierAllocationRecoveryFormKey(WorkspacePurchaseSavedCopy copy) {
+    if (!workspaceOriginalSupplierAllocationConfigured) return supplierAllocationFormKey(copy);
+    final owned = _storeData.originalLedger;
+    if (!workspaceSuppliersLoaded || owned == null || owned.source.scope.account != _contactAccountScope ||
+        owned.source.scope.store != activeWorkspace?.id || !hasVerifiedWorkspace) return null;
+    return (account: owned.source.scope.account, store: owned.source.scope.store, customer: copy.supplier.id,
       invoice: copy.draft.id, order: 'allocation-copy:${copy.id}', kind: 'supplierAllocation', ledgerRevision: copy.revision);
   }
 
@@ -5617,6 +5735,27 @@ class WorkSession extends ChangeNotifier {
       return null;
     }
     final ledger = workspaceSupplierLedger(supplierId);
+    if (workspaceOriginalSupplierMoneyConfigured && ledger == null) {
+      // Recovery can outlive a failed full-source refresh. This is only the
+      // retained request's raw-input key, never permission for a new payment.
+      final owned = _storeData.originalLedger;
+      final original = owned?.pending ?? owned?.controller.lastResolution?.original;
+      if (owned?.current == true && original?.scope == owned!.source.scope &&
+          original?.operation == 'recordStoreSupplierMoney' && original?.targetId == supplierId) {
+        final attempt = WorkspaceSupplierMoneyAttempt.fromJson({'entry': original!.input,
+          'expectedRevision': original.data['expectedSupplierRevision']});
+        if (attempt != null && (attempt.entry.kind == WorkspaceSupplierEntryKind.advance) == advance &&
+            (copy == null ? attempt.entry.origin == WorkspaceSupplierEntryOrigin.supplierAccount
+              : attempt.entry.origin == WorkspaceSupplierEntryOrigin.manualPurchase &&
+                attempt.entry.purchaseId == copy.id && attempt.entry.billId == copy.draft.id)) {
+          final review = attempt.entry.moneyReview!;
+          return (account: owned.source.scope.account, store: owned.source.scope.store, customer: supplierId,
+            invoice: copy?.draft.id ?? review.openingId,
+            order: copy == null ? 'account-${advance ? 'advance' : 'payment'}:${review.openingId}' : 'manual-copy:${copy.id}',
+            kind: 'supplierMoney', ledgerRevision: copy?.revision ?? review.openingRevision);
+        }
+      }
+    }
     final opening = ledger?.openingRecord;
     if (ledger == null || opening == null || !ledger.valid || !ledger.historyComplete ||
         ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id) {
@@ -5625,7 +5764,7 @@ class WorkSession extends ChangeNotifier {
     if (copy != null) {
       final bill = ledger.purchaseBills[copy.draft.id];
       if (copy.supplier.id != supplierId || bill == null ||
-          jsonEncode(bill.copy.toJson()) != jsonEncode(copy.toJson())) {
+          workspaceLedgerCanonical(bill.copy.toJson()) != workspaceLedgerCanonical(copy.toJson())) {
         return null;
       }
     }
@@ -5659,12 +5798,15 @@ class WorkSession extends ChangeNotifier {
           );
     }
     if (key.kind == 'supplierAllocation') {
+      if (workspaceOriginalSupplierAllocationConfigured) {
+        return WorkspaceLedgerFormDraft(key: key, revision: 1, fields: const {}).valid;
+      }
       final copy = workspaceSupplierLedger(key.customer)?.purchaseBills[key.invoice]?.copy;
       return copy != null && supplierAllocationFormKey(copy) == key;
     }
     if (key.kind == 'supplierRefund') {
       return WorkspaceLedgerFormDraft(key: key, revision: 1, fields: const {}).valid &&
-        key.order.startsWith('supplier-refund:${!_productionSession ? 'qa' : 'live'}:');
+        workspaceSupplierScope != null && key.order.startsWith('supplier-refund:${workspaceSupplierScope!.$3 ? 'qa' : 'live'}:');
     }
     if (key.kind == 'supplierCredit' || key.kind == 'supplierShortage') {
       // Stable accepted-copy namespace; native read/submit independently checks
@@ -7930,12 +8072,27 @@ class WorkSession extends ChangeNotifier {
         if (original.operation == 'confirmStoreSupplierOpening' && reason == 'stale_evidence') {
           _supplierNeedsReload.add(key);
         }
+        if (original.operation == 'confirmStoreSupplierBill' &&
+            const {'stale_evidence', 'bill_source_changed', 'bill_opening_evidence_changed'}.contains(reason)) {
+          _supplierNeedsReload.add(key);
+        }
         data.originalLedgerError = saved ? null : switch (reason) {
           'stale_evidence' => 'Supplier details changed. Reopen the supplier account and review the latest saved opening record.',
           'supplier_has_records' => 'This supplier already has account entries. A starting balance cannot replace them.',
           'opening_amount_unknown' => 'Check and save the opening amount before confirming the balance.',
           'opening_bill_inclusion_missing' => 'Check which supporting bills are included before confirming the balance.',
           'opening_confirmation_invalid' => 'Check the opening date and saved details before confirming again.',
+          'supplier_unavailable' => 'The original supplier account is unavailable. Saved input is kept.',
+          'stale_supplier' => 'Supplier account entries changed. Review the latest records before a new attempt.',
+          'opening_evidence_changed' => 'The starting-balance evidence differs. Check the original supplier account.',
+          'supplier_capacity_changed' => 'The amount no longer matches the supplier dues. Extra money needs a separately reviewed advance.',
+          'supplier_money_evidence_invalid' => 'Check the recorded payment date and opening-balance evidence before a new attempt.',
+          'allocation_source_changed' => 'The recorded payment or bill copy changed. Refresh the originals before reviewing this allocation.',
+          'allocation_capacity_changed' => 'The available money or bill due changed. Check this request before reviewing its amount.',
+          'allocation_confirmation_invalid' => 'Check the original allocation details and date before a new attempt.',
+          'bill_source_changed' => 'The saved supplier bill changed. Reopen its latest copy before confirming.',
+          'bill_opening_evidence_changed' => 'The bill’s starting-balance evidence changed. Review the original supplier account.',
+          'bill_confirmation_invalid' => 'Check the invoice date, total and starting-balance inclusion before confirming the bill.',
           _ => 'This attempt was not recorded. Refresh the original records and review before trying again.',
         };
         try {await owned.read();} on Object {
@@ -9307,6 +9464,478 @@ class WorkSession extends ChangeNotifier {
     return _operateWorkspaceOriginalLedger(original, write: true);
   }
 
+  /// Only typed original bill and money history supplies this capacity.
+  /// Valid attribution links are part of the existing typed ledger history.
+  /// Typed original refund proofs preserve the same source-consumption checks.
+  /// Credit-note evidence retains its separate receiver boundary.
+  bool canRecordWorkspaceOriginalSupplierMoney(String supplierId) {
+    final ledger = workspaceSupplierLedger(supplierId);
+    return const {WorkRemoteReviewStatus.approved, WorkRemoteReviewStatus.live}.contains(remoteReviewStatus) &&
+      workspaceOriginalSupplierMoneyConfigured && canRecordWorkspaceOriginalExpense &&
+      ledger != null && ledger.valid && ledger.historyComplete && ledger.openingRecord != null &&
+      ledger.entries.every((entry) => entry.kind == WorkspaceSupplierEntryKind.bill
+        ? entry.origin == WorkspaceSupplierEntryOrigin.manualPurchase
+        : entry.kind == WorkspaceSupplierEntryKind.creditNote
+        ? entry.origin == WorkspaceSupplierEntryOrigin.manualPurchase && ledger.creditNotes.containsKey(entry.operationId)
+        : entry.kind == WorkspaceSupplierEntryKind.refund
+        ? ledger.refunds[entry.operationId]?.entry.origin == entry.origin
+        : entry.origin != WorkspaceSupplierEntryOrigin.moolSocialOrder && entry.moneyReview != null &&
+          (entry.kind == WorkspaceSupplierEntryKind.payment || entry.kind == WorkspaceSupplierEntryKind.advance));
+  }
+
+  WorkspaceLedgerIntent? prepareWorkspaceOriginalSupplierMoney({required WorkspaceLedgerFormKey key,
+    required WorkspaceSupplierMoneyAttempt attempt}) {
+    final owned = _storeData.originalLedger, ledger = workspaceSupplierLedger(key.customer);
+    final advance = attempt.entry.kind == WorkspaceSupplierEntryKind.advance;
+    final copy = attempt.entry.origin == WorkspaceSupplierEntryOrigin.manualPurchase
+      ? ledger?.purchaseBills[attempt.entry.billId]?.copy : null;
+    if (!canRecordWorkspaceOriginalSupplierMoney(key.customer) || owned == null || ledger == null ||
+        (attempt.entry.origin == WorkspaceSupplierEntryOrigin.manualPurchase && copy?.id != attempt.entry.purchaseId) ||
+        key != supplierMoneyFormKey(key.customer, copy: copy, advance: advance) || !attempt.valid ||
+        attempt.expectedRevision != ledger.revision || attempt.entry.postedAt.isAfter(DateTime.now().toUtc()) ||
+        ledger.recordReviewedMoney(attempt.entry, expectedRevision: attempt.expectedRevision) == null) return null;
+    try {
+      return WorkspaceLedgerIntent.prepare(scope: owned.source.scope, operation: 'recordStoreSupplierMoney',
+        expectedRevision: owned.snapshot!.revision, idempotencyKey: _newCounterIdentity('supplier-money-request'),
+        fields: {'supplierId': key.customer, 'expectedSupplierRevision': attempt.expectedRevision,
+          'entry': attempt.entry.toJson(), 'confirmedUtcOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes});
+    } on FormatException { return null; }
+  }
+
+  bool _originalMoneySourceCurrent(_StoreOperationalData data, RemoteWorkOwnedLedgerStore owned, Object? publication) =>
+    !_disposed && hasVerifiedWorkspace &&
+    const {WorkRemoteReviewStatus.approved, WorkRemoteReviewStatus.live}.contains(remoteReviewStatus) &&
+    workspaceOriginalLedgerConfigured && identical(data, _storeData) &&
+    identical(data.originalLedger, owned) && owned.current && publicationPreferencesContext == publication;
+  bool _originalMoneyFormCurrent(WorkspaceLedgerFormKey key, _StoreOperationalData data,
+      RemoteWorkOwnedLedgerStore owned, Object? publication) =>
+    _originalMoneySourceCurrent(data, owned, publication) && workspaceOriginalSupplierMoneyConfigured &&
+    key.kind == 'supplierMoney' && key.account == owned.source.scope.account && key.store == owned.source.scope.store;
+
+  /// A null result means that no request identity has yet been retained for
+  /// this exact frozen form. Unreadable or retired identities throw instead.
+  Future<WorkspaceLedgerIntent?> readWorkspaceOriginalSupplierMoneyRequest(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAttempt attempt) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    if (owned == null || !_originalMoneyFormCurrent(key, data, owned, publication)) {
+      throw const WorkGatewayException('Reopen the original supplier payment form.');
+    }
+    final original = await (_ledgerFormStorage as WorkSupplierMoneyOriginalDraftGuard)
+      .readOriginalSupplierMoneyAttempt(key, attempt, scope: owned.source.scope, connectionId: owned.source.connectionId);
+    if (!_originalMoneyFormCurrent(key, data, owned, publication)) {
+      throw const WorkGatewayException('Return to the original Store before continuing.');
+    }
+    return original;
+  }
+
+  Future<WorkspaceLedgerReadback?> recordWorkspaceOriginalSupplierMoney(WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerFormKey key, required WorkspaceSupplierMoneyAttempt attempt}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    final supplierId = original.data['supplierId'];
+    // Keep the exact source pins across the durable local write as well as the
+    // eventual server transaction; a sidecar is identity, never Save success.
+    bool pinned() => owned != null && _originalMoneyFormCurrent(key, data, owned, publication) &&
+      supplierId is String && canRecordWorkspaceOriginalSupplierMoney(supplierId) && original.scope == owned.source.scope &&
+      original.targetId == key.customer && original.data['expectedRevision'] == workspaceOriginalLedgerSections?.revision &&
+      original.data['expectedSupplierRevision'] == workspaceSupplierLedger(supplierId)?.revision;
+    if (original.operation != 'recordStoreSupplierMoney' || !pinned()) return null;
+    try {
+      await (_ledgerFormStorage as WorkSupplierMoneyOriginalDraftGuard).retainOriginalSupplierMoneyAttempt(
+        key, attempt, original, scope: owned!.source.scope, connectionId: owned.source.connectionId);
+      if (!pinned()) return null;
+      return await _operateWorkspaceOriginalLedger(original, write: true);
+    } on Object {
+      if (_originalMoneySourceCurrent(data, owned!, publication)) {
+        data.originalLedgerError = 'The original payment request could not be retained. Keep its input and reopen it before continuing.';
+        notifyListeners();
+      }
+      return null;
+    }
+  }
+
+  Future<WorkspaceLedgerReadback?> checkWorkspaceOriginalSupplierMoneyRequest(String supplierId,
+      WorkspaceLedgerIntent original, {WorkspaceLedgerFormKey? key, WorkspaceSupplierMoneyAttempt? attempt,
+      bool explicitRetry = false}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    if (owned == null || original.operation != 'recordStoreSupplierMoney' || original.targetId != supplierId ||
+        original.scope != owned.source.scope || !_originalMoneySourceCurrent(data, owned, publication)) return null;
+    bool same(WorkspaceLedgerIntent? value) => value?.scope == original.scope &&
+      value?.idempotencyKey == original.idempotencyKey && value?.fingerprint == original.fingerprint;
+    if (same(owned.pending) || same(owned.controller.lastResolution?.original)) {
+      return checkWorkspaceOriginalLedgerAttempt(original, explicitRetry: explicitRetry);
+    }
+    if (key == null || attempt == null || !_originalMoneyFormCurrent(key, data, owned, publication)) return null;
+    try {
+      final retained = await readWorkspaceOriginalSupplierMoneyRequest(key, attempt);
+      if (!same(retained) || !_originalMoneyFormCurrent(key, data, owned, publication)) return null;
+      final status = await _operateWorkspaceOriginalLedger(original, write: false);
+      if (!explicitRetry || status == null || status.attempt != null || !_originalMoneySourceCurrent(data, owned, publication)) return status;
+      return _operateWorkspaceOriginalLedger(original, write: true);
+    } on Object {return null;}
+  }
+
+  Future<bool> resetRefusedWorkspaceSupplierMoneyDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    if (owned == null || !_originalMoneyFormCurrent(next.key, data, owned, publication)) return false;
+    try {
+      await (_ledgerFormStorage as WorkSupplierMoneyOriginalDraftGuard).resetRefusedSupplierMoneyDraft(next,
+        expectedRevision: expectedRevision, scope: owned.source.scope, connectionId: owned.source.connectionId,
+        verifyNotRecorded: (attempt, original) async {
+          // The raw form lock is held here. Never re-enter that lock to read
+          // the sidecar again; the guard has already verified the exact one.
+          if (!_originalMoneyFormCurrent(next.key, data, owned, publication)) return false;
+          final status = await _operateWorkspaceOriginalLedger(original, write: false);
+          if (status?.attempt?['status'] != 'not_saved' || workspaceOriginalLedgerPending != null ||
+              !_originalMoneyFormCurrent(next.key, data, owned, publication)) return false;
+          // A known refusal deliberately keeps the ordinary source getter
+          // unavailable. Use only the fresh original refresh performed by the
+          // status operation, never an older/local supplier balance.
+          final ledger = owned.snapshot?.suppliers[next.key.customer];
+          return ledger != null && !ledger.entries.any((entry) => entry.operationId == attempt.entry.operationId);
+        });
+      if (!_originalMoneyFormCurrent(next.key, data, owned, publication)) return false;
+      // Only the exact confirmed refusal and fresh original source above
+      // release editing. An unavailable/unknown status never reaches here.
+      data.originalLedgerError = null;
+      notifyListeners();
+      return true;
+    } on Object {
+      if (_originalMoneySourceCurrent(data, owned, publication)) {
+        data.originalLedgerError = 'Keep this request until its original status confirms that it was not recorded.';
+        notifyListeners();
+      }
+      return false;
+    }
+  }
+
+  bool _originalAllocationFormCurrent(WorkspaceLedgerFormKey key, _StoreOperationalData data,
+      RemoteWorkOwnedLedgerStore owned, Object? publication) =>
+    _originalMoneySourceCurrent(data, owned, publication) && workspaceOriginalSupplierAllocationConfigured &&
+    key.kind == 'supplierAllocation' && key.account == owned.source.scope.account && key.store == owned.source.scope.store;
+
+  WorkspaceLedgerIntent? prepareWorkspaceOriginalSupplierAllocation(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAllocationIntent intent) {
+    final owned = _storeData.originalLedger, ledger = workspaceSupplierLedger(key.customer);
+    final copy = ledger?.purchaseBills[intent.billId]?.copy;
+    if (!workspaceOriginalSupplierAllocationConfigured || !canRecordWorkspaceOriginalSupplierMoney(key.customer) ||
+        owned == null || ledger == null || copy == null || key != supplierAllocationFormKey(copy) || !intent.valid ||
+        intent.accountScope != key.account || intent.workspaceId != key.store || intent.supplierId != key.customer ||
+        intent.copyId != copy.id || intent.copyRevision != copy.revision || intent.requestedAt.isAfter(DateTime.now().toUtc())) return null;
+    final now = DateTime.now().toUtc();
+    if (now.isBefore(ledger.asOf) || ledger.allocateRecordedMoney(intent.commit(
+        revision: ledger.revision + 1, at: now,
+        sourceEntryCount: intent.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus ? ledger.entries.length : null),
+        expectedRevision: ledger.revision) == null) return null;
+    try {
+      return WorkspaceLedgerIntent.prepare(scope: owned.source.scope, operation: 'recordStoreSupplierMoneyAllocation',
+        expectedRevision: owned.snapshot!.revision, idempotencyKey: _newCounterIdentity('supplier-allocation-request'),
+        fields: {'supplierId': key.customer, 'expectedSupplierRevision': ledger.revision, 'intent': intent.intentToJson()});
+    } on FormatException {return null;}
+  }
+
+  Future<WorkspaceLedgerIntent?> readWorkspaceOriginalSupplierAllocationRequest(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAllocationIntent intent) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    if (owned == null || !_originalAllocationFormCurrent(key, data, owned, publication)) {
+      throw const WorkGatewayException('Reopen the original bill allocation form.');
+    }
+    final original = await (_ledgerFormStorage as WorkSupplierAllocationOriginalDraftGuard)
+      .readOriginalSupplierAllocationAttempt(key, intent, scope: owned.source.scope, connectionId: owned.source.connectionId);
+    if (!_originalAllocationFormCurrent(key, data, owned, publication)) {
+      throw const WorkGatewayException('Return to the original Store before continuing.');
+    }
+    return original;
+  }
+
+  Future<WorkspaceLedgerReadback?> recordWorkspaceOriginalSupplierAllocation(WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerFormKey key, required WorkspaceSupplierMoneyAllocationIntent intent,
+      bool Function()? ownerCurrent}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    bool pinned() => ownerCurrent?.call() != false && owned != null &&
+      _originalAllocationFormCurrent(key, data, owned, publication) &&
+      canRecordWorkspaceOriginalSupplierMoney(key.customer) && original.scope == owned.source.scope &&
+      original.targetId == key.customer && original.data['expectedRevision'] == workspaceOriginalLedgerSections?.revision &&
+      original.data['expectedSupplierRevision'] == workspaceSupplierLedger(key.customer)?.revision;
+    if (original.operation != 'recordStoreSupplierMoneyAllocation' || !pinned()) return null;
+    try {
+      await (_ledgerFormStorage as WorkSupplierAllocationOriginalDraftGuard).retainOriginalSupplierAllocationAttempt(
+        key, intent, original, scope: owned!.source.scope, connectionId: owned.source.connectionId);
+      if (!pinned()) return null;
+      return await _operateWorkspaceOriginalLedger(original, write: true);
+    } on Object {
+      if (_originalMoneySourceCurrent(data, owned!, publication)) {
+        data.originalLedgerError = 'The original allocation request could not be retained. Keep its input and reopen it.';
+        notifyListeners();
+      }
+      return null;
+    }
+  }
+
+  Future<WorkspaceLedgerReadback?> checkWorkspaceOriginalSupplierAllocationRequest(WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerFormKey key, required WorkspaceSupplierMoneyAllocationIntent intent,
+      bool explicitRetry = false, bool Function()? ownerCurrent}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    bool current() => ownerCurrent?.call() != false && owned != null &&
+      _originalAllocationFormCurrent(key, data, owned, publication);
+    if (!current() || original.operation != 'recordStoreSupplierMoneyAllocation' ||
+        original.targetId != key.customer || original.scope != owned!.source.scope) return null;
+    try {
+      final retained = await readWorkspaceOriginalSupplierAllocationRequest(key, intent);
+      if (!current() || retained?.fingerprint != original.fingerprint || retained?.idempotencyKey != original.idempotencyKey) return null;
+      final status = await _operateWorkspaceOriginalLedger(original, write: false);
+      if (!explicitRetry || status == null || status.attempt != null || !current()) return status;
+      return _operateWorkspaceOriginalLedger(original, write: true);
+    } on Object {return null;}
+  }
+
+  Future<bool> resetRefusedWorkspaceSupplierAllocationDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision, bool Function()? ownerCurrent}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    bool current() => ownerCurrent?.call() != false && owned != null &&
+      _originalAllocationFormCurrent(next.key, data, owned, publication);
+    if (!current()) return false;
+    try {
+      await (_ledgerFormStorage as WorkSupplierAllocationOriginalDraftGuard).resetRefusedSupplierAllocationDraft(next,
+        expectedRevision: expectedRevision, scope: owned!.source.scope, connectionId: owned.source.connectionId,
+        verifyNotRecorded: (intent, original) async {
+          if (!current()) return false;
+          // This callback holds the raw form lock; do not read its sidecar again.
+          final status = await _operateWorkspaceOriginalLedger(original, write: false);
+          if (status?.attempt?['status'] != 'not_saved' || workspaceOriginalLedgerPending != null || !current()) return false;
+          final ledger = owned.snapshot?.suppliers[next.key.customer];
+          return ledger != null && !ledger.billMoneyAllocations.containsKey(intent.operationId);
+        });
+      if (!current()) return false;
+      data.originalLedgerError = null; notifyListeners(); return true;
+    } on Object {return false;}
+  }
+
+  bool _originalCreditFormCurrent(WorkspaceLedgerFormKey key, _StoreOperationalData data,
+      RemoteWorkOwnedLedgerStore owned, Object? publication) =>
+    _originalMoneySourceCurrent(data, owned, publication) && workspaceOriginalSupplierCreditConfigured &&
+    key.kind == 'supplierCredit' && _ledgerFormScopeCurrent(key) &&
+    key.account == owned.source.scope.account && key.store == owned.source.scope.store;
+
+  Future<WorkspaceLedgerIntent?> prepareWorkspaceOriginalSupplierCredit(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierCreditIntent intent, {bool Function()? ownerCurrent}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    final purchase = _supplierStorage, supplierKey = _supplierKey;
+    bool current() => ownerCurrent?.call() != false && owned != null && _originalCreditFormCurrent(key, data, owned, publication);
+    if (!current() || !_supplierCreditIntentScope(key, intent) || intent.documentInput == null ||
+        !canRecordWorkspaceOriginalSupplierMoney(key.customer) || !workspaceSuppliersLoaded || workspaceSupplierSaving ||
+        supplierKey == null || supplierKey.$3 || _supplierLoads.containsKey(supplierKey) || workspaceSupplierRecoveryRequired ||
+        purchase is! RemoteWorkPurchaseEntryStore || !purchase.sourceCurrent || purchase.controller.source.scope != owned!.source.scope ||
+        purchase.controller.source.connectionId != owned.source.connectionId) return null;
+    final ledger = workspaceSupplierLedger(key.customer), now = DateTime.now().toUtc();
+    final ledgerRevision = ledger?.revision, sourceRevision = owned.snapshot?.revision;
+    if (ledger == null || sourceRevision == null || intent.requestedAt.isAfter(now) || now.isBefore(ledger.asOf) ||
+        intent.documentInput!.treatment.isEmpty || intent.documentInput!.reasonCode.isEmpty ||
+        !const {'return', 'shortage', 'damage'}.contains(intent.documentInput!.reasonCode) ||
+        intent.documentInput!.treatment == 'gst' && intent.documentInput!.printedTotalMinor != intent.amountMinor ||
+        ledger.recordSupplierCredit(intent.commit(revision: ledger.revision + 1, at: now), expectedRevision: ledger.revision) == null) return null;
+    final bill = ledger.purchaseBills[intent.billId];
+    if (bill == null || bill.copy.id != intent.copyId || bill.copy.revision != intent.copyRevision) return null;
+    try {
+      final proof = await purchase.controller.source.readBook();
+      if (!current() || _supplierKey != supplierKey || !purchase.sourceCurrent ||
+          owned.snapshot?.revision != sourceRevision || workspaceSupplierLedger(key.customer)?.revision != ledgerRevision) return null;
+      final book = proof.book, fingerprint = proof.bookFingerprint;
+      final copies = book?.latestReviewedCopies.where((copy) => copy.draft.id == intent.billId).toList();
+      if (book == null || fingerprint == null || copies?.length != 1 ||
+          workspaceLedgerCanonical(copies!.single.toJson()) != workspaceLedgerCanonical(bill.copy.toJson())) return null;
+      return WorkspaceLedgerIntent.prepare(scope: owned.source.scope, operation: 'recordStoreSupplierCreditNote',
+        expectedRevision: sourceRevision, idempotencyKey: _newCounterIdentity('supplier-credit-request'), fields: {
+          'supplierId': key.customer, 'expectedSupplierRevision': ledgerRevision,
+          'expectedPurchaseRevision': book.revision, 'expectedPurchaseFingerprint': fingerprint,
+          'intent': intent.toJson(), 'confirmedUtcOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
+        });
+    } on Object {return null;}
+  }
+
+  Future<WorkspaceLedgerIntent?> readWorkspaceOriginalSupplierCreditRequest(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierCreditIntent intent) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    if (owned == null || !_originalCreditFormCurrent(key, data, owned, publication)) {
+      throw const WorkGatewayException('Reopen the original supplier credit note.');
+    }
+    final original = await (_ledgerFormStorage as WorkSupplierCreditOriginalDraftGuard).readOriginalSupplierCreditAttempt(
+      key, intent, scope: owned.source.scope, connectionId: owned.source.connectionId);
+    if (!_originalCreditFormCurrent(key, data, owned, publication)) throw const WorkGatewayException('Return to the original Store before continuing.');
+    return original;
+  }
+
+  Future<WorkspaceLedgerReadback?> recordWorkspaceOriginalSupplierCredit(WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerFormKey key, required WorkspaceSupplierCreditIntent intent, bool Function()? ownerCurrent}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    bool current() => ownerCurrent?.call() != false && owned != null && _originalCreditFormCurrent(key, data, owned, publication) &&
+      canRecordWorkspaceOriginalSupplierMoney(key.customer) && _supplierCreditIntentScope(key, intent) &&
+      original.scope == owned.source.scope && original.targetId == key.customer && original.entryId == intent.operationId;
+    bool pinned() => current() &&
+      original.data['expectedRevision'] == workspaceOriginalLedgerSections?.revision &&
+      original.data['expectedSupplierRevision'] == workspaceSupplierLedger(key.customer)?.revision;
+    if (original.operation != 'recordStoreSupplierCreditNote' || !current()) return null;
+    try {
+      await (_ledgerFormStorage as WorkSupplierCreditOriginalDraftGuard).retainOriginalSupplierCreditAttempt(
+        key, intent, original, scope: owned!.source.scope, connectionId: owned.source.connectionId);
+      if (!pinned()) return null;
+      return await _operateWorkspaceOriginalLedger(original, write: true);
+    } on Object {
+      if (_originalMoneySourceCurrent(data, owned!, publication)) {
+        data.originalLedgerError = 'The original credit note request could not be retained. Keep its input and reopen it.';
+        notifyListeners();
+      }
+      return null;
+    }
+  }
+
+  Future<WorkspaceLedgerReadback?> checkWorkspaceOriginalSupplierCreditRequest(WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerFormKey key, required WorkspaceSupplierCreditIntent intent,
+      bool explicitRetry = false, bool Function()? ownerCurrent}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    bool current() => ownerCurrent?.call() != false && owned != null && _originalCreditFormCurrent(key, data, owned, publication);
+    if (!current() || original.operation != 'recordStoreSupplierCreditNote' || original.targetId != key.customer || original.scope != owned!.source.scope) return null;
+    try {
+      final retained = await readWorkspaceOriginalSupplierCreditRequest(key, intent);
+      if (!current() || retained?.fingerprint != original.fingerprint || retained?.idempotencyKey != original.idempotencyKey) return null;
+      final status = await _operateWorkspaceOriginalLedger(original, write: false);
+      if (!explicitRetry || status == null || status.attempt != null || !current()) return status;
+      return _operateWorkspaceOriginalLedger(original, write: true);
+    } on Object {return null;}
+  }
+
+  Future<bool> resetRefusedWorkspaceSupplierCreditDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision, bool Function()? ownerCurrent}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    bool current() => ownerCurrent?.call() != false && owned != null && _originalCreditFormCurrent(next.key, data, owned, publication);
+    if (!current()) return false;
+    try {
+      await (_ledgerFormStorage as WorkSupplierCreditOriginalDraftGuard).resetRefusedSupplierCreditDraft(next,
+        expectedRevision: expectedRevision, scope: owned!.source.scope, connectionId: owned.source.connectionId,
+        verifyNotRecorded: (intent, original) async {
+          if (!current()) return false;
+          final status = await _operateWorkspaceOriginalLedger(original, write: false);
+          if (status?.attempt?['status'] != 'not_saved' || workspaceOriginalLedgerPending != null || !current()) return false;
+          final ledger = WorkspaceSupplierLedger.fromJson(status?.current?.value);
+          return ledger != null && !ledger.creditNotes.containsKey(intent.operationId) &&
+            !ledger.entries.any((entry) => entry.operationId == intent.operationId);
+        });
+      if (!current()) return false;
+      data.originalLedgerError = null; notifyListeners(); return true;
+    } on Object {return false;}
+  }
+
+  bool _originalRefundFormCurrent(WorkspaceLedgerFormKey key, _StoreOperationalData data,
+      RemoteWorkOwnedLedgerStore owned, Object? publication) =>
+    _originalMoneySourceCurrent(data, owned, publication) && workspaceOriginalSupplierRefundConfigured &&
+    key.kind == 'supplierRefund' && _ledgerFormScopeCurrent(key) &&
+    key.account == owned.source.scope.account && key.store == owned.source.scope.store;
+
+  /// Existing encrypted originals supply selector identities only. A cleared
+  /// balance cache or newer shared request must not hide an older raw form.
+  Future<List<WorkSupplierRefundRecoverySource>> readWorkspaceOriginalSupplierRefundRecoverySources(String supplierId) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    if (!workspaceOriginalSupplierRefundConfigured || owned == null ||
+        !_originalMoneySourceCurrent(data, owned, publication)) throw const WorkGatewayException('Return to the original Store.');
+    final sources = await (_ledgerFormStorage as WorkSupplierRefundOriginalDraftGuard).readOriginalSupplierRefundSources(supplierId,
+      scope: owned.source.scope, connectionId: owned.source.connectionId);
+    if (!_originalMoneySourceCurrent(data, owned, publication)) throw const WorkGatewayException('The original Store changed.');
+    return sources;
+  }
+
+  WorkspaceLedgerIntent? prepareWorkspaceOriginalSupplierRefund(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierRefundIntent intent) {
+    final owned = _storeData.originalLedger, ledger = workspaceSupplierLedger(key.customer);
+    if (!workspaceOriginalSupplierRefundConfigured || !canRecordWorkspaceOriginalSupplierMoney(key.customer) ||
+        owned == null || ledger == null || !intent.valid || intent.formKey != key || !_ledgerFormScopeCurrent(key) ||
+        intent.qa != workspaceSupplierScope?.$3 || intent.requestedAt.isAfter(DateTime.now().toUtc())) return null;
+    final now = DateTime.now().toUtc();
+    if (intent.sourceKind == WorkspaceSupplierRefundSourceKind.manualBillSurplus &&
+        ledger.billMoneyAllocations.values.any((link) => link.billId == intent.sourceId &&
+          link.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus)) return null;
+    if (ledger.recordReviewedRefund(intent, expectedRevision: ledger.revision, recordedAt: now) == null) return null;
+    try {
+      return WorkspaceLedgerIntent.prepare(scope: owned.source.scope, operation: 'recordStoreSupplierRefund',
+        expectedRevision: owned.snapshot!.revision, idempotencyKey: _newCounterIdentity('supplier-refund-request'),
+        fields: {'supplierId': key.customer, 'expectedSupplierRevision': ledger.revision,
+          'intent': intent.toJson(), 'confirmedUtcOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes});
+    } on FormatException {return null;}
+  }
+
+  Future<WorkspaceLedgerIntent?> readWorkspaceOriginalSupplierRefundRequest(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierRefundIntent intent) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    if (owned == null || !_originalRefundFormCurrent(key, data, owned, publication)) {
+      throw const WorkGatewayException('Reopen the original supplier refund.');
+    }
+    final original = await (_ledgerFormStorage as WorkSupplierRefundOriginalDraftGuard)
+      .readOriginalSupplierRefundAttempt(key, intent, scope: owned.source.scope, connectionId: owned.source.connectionId);
+    if (!_originalRefundFormCurrent(key, data, owned, publication)) {
+      throw const WorkGatewayException('Return to the original Store before continuing.');
+    }
+    return original;
+  }
+
+  Future<WorkspaceLedgerReadback?> recordWorkspaceOriginalSupplierRefund(WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerFormKey key, required WorkspaceSupplierRefundIntent intent,
+      bool Function()? ownerCurrent}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    bool pinned() => ownerCurrent?.call() != false && owned != null &&
+      _originalRefundFormCurrent(key, data, owned, publication) && canRecordWorkspaceOriginalSupplierMoney(key.customer) &&
+      original.scope == owned.source.scope && original.targetId == key.customer &&
+      original.data['expectedRevision'] == workspaceOriginalLedgerSections?.revision &&
+      original.data['expectedSupplierRevision'] == workspaceSupplierLedger(key.customer)?.revision;
+    if (original.operation != 'recordStoreSupplierRefund' || !pinned()) return null;
+    try {
+      await (_ledgerFormStorage as WorkSupplierRefundOriginalDraftGuard).retainOriginalSupplierRefundAttempt(
+        key, intent, original, scope: owned!.source.scope, connectionId: owned.source.connectionId);
+      if (!pinned()) return null;
+      return await _operateWorkspaceOriginalLedger(original, write: true);
+    } on Object {
+      if (_originalMoneySourceCurrent(data, owned!, publication)) {
+        data.originalLedgerError = 'The original refund request could not be retained. Keep its input and reopen it.';
+        notifyListeners();
+      }
+      return null;
+    }
+  }
+
+  Future<WorkspaceLedgerReadback?> checkWorkspaceOriginalSupplierRefundRequest(WorkspaceLedgerIntent original,
+      {required WorkspaceLedgerFormKey key, required WorkspaceSupplierRefundIntent intent,
+      bool explicitRetry = false, bool Function()? ownerCurrent}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    bool current() => ownerCurrent?.call() != false && owned != null && _originalRefundFormCurrent(key, data, owned, publication);
+    if (!current() || original.operation != 'recordStoreSupplierRefund' || original.targetId != key.customer || original.scope != owned!.source.scope) return null;
+    try {
+      final retained = await readWorkspaceOriginalSupplierRefundRequest(key, intent);
+      if (!current() || retained?.fingerprint != original.fingerprint || retained?.idempotencyKey != original.idempotencyKey) return null;
+      final status = await _operateWorkspaceOriginalLedger(original, write: false);
+      if (!explicitRetry || status == null || status.attempt != null || !current()) return status;
+      return _operateWorkspaceOriginalLedger(original, write: true);
+    } on Object {return null;}
+  }
+
+  Future<bool> resetRefusedWorkspaceSupplierRefundDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision, bool Function()? ownerCurrent}) async {
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+    bool current() => ownerCurrent?.call() != false && owned != null && _originalRefundFormCurrent(next.key, data, owned, publication);
+    if (!current()) return false;
+    try {
+      await (_ledgerFormStorage as WorkSupplierRefundOriginalDraftGuard).resetRefusedSupplierRefundDraft(next,
+        expectedRevision: expectedRevision, scope: owned!.source.scope, connectionId: owned.source.connectionId,
+        verifyNotRecorded: (intent, original) async {
+          if (!current()) return false;
+          final status = await _operateWorkspaceOriginalLedger(original, write: false);
+          if (status?.attempt?['status'] != 'not_saved' || workspaceOriginalLedgerPending != null || !current()) return false;
+          final ledger = owned.snapshot?.suppliers[next.key.customer];
+          return ledger != null && !ledger.refunds.containsKey(intent.operationId) &&
+            !ledger.entries.any((entry) => entry.operationId == intent.operationId);
+        });
+      if (!current()) return false;
+      data.originalLedgerError = null; notifyListeners(); return true;
+    } on Object {return false;}
+  }
+
   Future<bool> recordStoreReviewExpense({
     required WorkspaceLedgerFormKey key,
     required int amountMinor,
@@ -9820,6 +10449,10 @@ class WorkSession extends ChangeNotifier {
   /// Read-only AI inspection of an already admitted native allocation basis.
   /// Never resets recovery, projects inventory, repairs a draft or sends intent.
   Future<bool> inspectWorkspaceSupplierAllocationCheckpoint(WorkspaceLedgerFormKey key) async {
+    if (workspaceOriginalSupplierAllocationConfigured) {
+      final ledger = workspaceSupplierLedger(key.customer), copy = workspaceSupplierLedger(key.customer)?.purchaseBills[key.invoice]?.copy;
+      return copy != null && ledger?.valid == true && ledger?.historyComplete == true && supplierAllocationFormKey(copy) == key;
+    }
     final data = _storeData;
     bool current() => _ledgerFormScopeCurrent(key) && identical(data, _storeData) && data.ledgerRecovered &&
       key.kind == 'supplierAllocation' && !workspaceSupplierSaving && !data.inventoryReceiptBusy &&
@@ -9836,6 +10469,12 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> recoverWorkspaceSupplierAllocationStatus(WorkspaceLedgerFormKey key) async {
+    if (workspaceOriginalSupplierAllocationConfigured) {
+      final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
+      if (owned == null || !_originalAllocationFormCurrent(key, data, owned, publication)) return false;
+      final loaded = await loadWorkspaceOriginalLedger(retry: true);
+      return loaded && _originalAllocationFormCurrent(key, data, owned, publication);
+    }
     try { return await _freshSupplierAllocationCheckpoint(key) != null; }
     on Object {
       showNotice('Saved bill allocation is unavailable. Its request is kept; retry recovery before editing.');
@@ -9983,6 +10622,17 @@ class WorkSession extends ChangeNotifier {
   Future<WorkspaceSupplierCreditNote?> readWorkspaceSupplierCreditStatus(
       WorkspaceLedgerFormKey key, WorkspaceSupplierCreditIntent intent) async {
     final data = _storeData;
+    if (workspaceOriginalSupplierCreditConfigured) {
+      final original = await readWorkspaceOriginalSupplierCreditRequest(key, intent);
+      if (original == null) throw const WorkGatewayException('The original credit request is unavailable. Keep its saved input.');
+      final status = await checkWorkspaceOriginalSupplierCreditRequest(original, key: key, intent: intent);
+      if (status == null || status.attempt == null) throw const WorkGatewayException('Credit note status is unverified. Check the original request.');
+      if (status.attempt?['status'] == 'not_saved') return null;
+      final ledger = WorkspaceSupplierLedger.fromJson(status.current?.value), note = ledger?.creditNotes[intent.operationId];
+      if (note == null || !intent.matches(note)) throw const WorkGatewayException('Keep the original credit note request and document.');
+      return note;
+    }
+    if (workspaceOriginalSupplierMoneyConfigured) throw const WorkGatewayException('Original credit note service is unavailable. Keep the saved input.');
     if (!_supplierCreditIntentScope(key, intent) || data.ledgerCheckpointStore == null) {
       throw const WorkGatewayException('Return to the original supplier bill.');
     }
@@ -10003,7 +10653,7 @@ class WorkSession extends ChangeNotifier {
       WorkspaceSupplierCreditIntent intent) async {
     final data = _storeData;
     bool current() => identical(data, _storeData) && _supplierCreditIntentScope(key, intent);
-    if (!current() || intent.requestedAt.isAfter(DateTime.now()) ||
+    if (workspaceOriginalSupplierMoneyConfigured || !current() || intent.requestedAt.isAfter(DateTime.now()) ||
         _ledgerFormStorage is! WorkSupplierCreditDraftGuard || data.ledgerCheckpointStore == null) { return false; }
     try {
       return await (_ledgerFormStorage as WorkSupplierCreditDraftGuard).withFrozenSupplierCredit(
@@ -10035,7 +10685,7 @@ class WorkSession extends ChangeNotifier {
       {required int expectedRevision}) async {
     final data = _storeData;
     if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierCreditDraftGuard ||
-        data.ledgerCheckpointStore == null) { return false; }
+        !workspaceOriginalSupplierCreditConfigured && data.ledgerCheckpointStore == null) { return false; }
     try {
       await (_ledgerFormStorage as WorkSupplierCreditDraftGuard).resetConfirmedSupplierCreditDraft(next,
         expectedRevision: expectedRevision, verifyCommitted: (intent) async {
@@ -10050,7 +10700,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool _supplierRefundIntentScope(WorkspaceLedgerFormKey key, WorkspaceSupplierRefundIntent intent) =>
-    _ledgerFormScopeCurrent(key) && intent.valid && key == intent.formKey && intent.qa == !_productionSession;
+    _ledgerFormScopeCurrent(key) && intent.valid && key == intent.formKey && intent.qa == workspaceSupplierScope?.$3;
 
   WorkspaceSupplierRefund? _matchingWorkspaceSupplierRefund(
       WorkspaceLedgerCheckpoint saved, WorkspaceSupplierRefundIntent intent) {
@@ -10097,7 +10747,7 @@ class WorkSession extends ChangeNotifier {
       WorkspaceSupplierRefundIntent intent) async {
     final data = _storeData;
     bool current() => identical(data, _storeData) && _supplierRefundIntentScope(key, intent);
-    if (!current() || intent.requestedAt.isAfter(DateTime.now()) ||
+    if (workspaceOriginalSupplierRefundConfigured || !current() || intent.requestedAt.isAfter(DateTime.now()) ||
         _ledgerFormStorage is! WorkSupplierRefundDraftGuard || data.ledgerCheckpointStore == null) { return false; }
     try {
       return await (_ledgerFormStorage as WorkSupplierRefundDraftGuard).withFrozenSupplierRefund(
@@ -10133,8 +10783,25 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> resetConfirmedWorkspaceSupplierRefundDraft(WorkspaceLedgerFormDraft next,
-      {required int expectedRevision}) async {
+      {required int expectedRevision, WorkspaceLedgerIntent? original, bool Function()? ownerCurrent}) async {
     final data = _storeData;
+    if (workspaceOriginalSupplierRefundConfigured) {
+      final owned = data.originalLedger, publication = publicationPreferencesContext;
+      bool current() => ownerCurrent?.call() != false && owned != null && _originalRefundFormCurrent(next.key, data, owned, publication);
+      if (!current() || original?.operation != 'recordStoreSupplierRefund' || original?.scope != owned!.source.scope ||
+          original?.targetId != next.key.customer) return false;
+      try {
+        await (_ledgerFormStorage as WorkSupplierRefundDraftGuard).resetConfirmedSupplierRefundDraft(next,
+          expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+            if (!current() || intent.formKey != next.key || workspaceLedgerFingerprint(intent.toJson()) != workspaceLedgerFingerprint(original!.input)) return false;
+            final status = await _operateWorkspaceOriginalLedger(original, write: false);
+            if (!current() || status?.attempt?['status'] != 'saved' || workspaceOriginalLedgerPending != null) return false;
+            final proof = owned.snapshot?.suppliers[next.key.customer]?.refunds[intent.operationId];
+            return proof != null && workspaceLedgerCanonical(proof.intent.toJson()) == workspaceLedgerCanonical(intent.toJson());
+          });
+        return current();
+      } on Object {return false;}
+    }
     if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierRefundDraftGuard ||
         data.ledgerCheckpointStore == null) { return false; }
     try {
@@ -10267,7 +10934,7 @@ class WorkSession extends ChangeNotifier {
 
   Future<bool> recordWorkspaceSupplierAllocationDraft(WorkspaceLedgerFormKey key,
       WorkspaceSupplierMoneyAllocationIntent intent) async {
-    if (!_ledgerFormScopeCurrent(key) || !intent.valid ||
+    if (workspaceOriginalSupplierAllocationConfigured || !_ledgerFormScopeCurrent(key) || !intent.valid ||
         intent.requestedAt.isAfter(DateTime.now()) || _ledgerFormStorage is! WorkSupplierAllocationDraftGuard) {
       return false;
     }
@@ -10297,11 +10964,25 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> resetConfirmedWorkspaceSupplierAllocationDraft(WorkspaceLedgerFormDraft next,
-      {required int expectedRevision}) async {
+      {required int expectedRevision, WorkspaceLedgerIntent? original, bool Function()? ownerCurrent}) async {
     if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierAllocationDraftGuard) return false;
+    final data = _storeData, owned = data.originalLedger, publication = publicationPreferencesContext;
     try {
       await (_ledgerFormStorage as WorkSupplierAllocationDraftGuard).resetConfirmedSupplierAllocationDraft(
         next, expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+          if (workspaceOriginalSupplierAllocationConfigured) {
+            if (owned == null || original == null || ownerCurrent?.call() == false ||
+                !_originalAllocationFormCurrent(next.key, data, owned, publication) ||
+                original.operation != 'recordStoreSupplierMoneyAllocation' || original.targetId != next.key.customer ||
+                workspaceLedgerFingerprint(original.input) != workspaceLedgerFingerprint(intent.intentToJson())) return false;
+            // The existing raw-form lock is held. Check the exact original
+            // receipt directly, without re-entering the encrypted sidecar.
+            final status = await _operateWorkspaceOriginalLedger(original, write: false);
+            if (status?.attempt?['status'] != 'saved' || ownerCurrent?.call() == false ||
+                !_originalAllocationFormCurrent(next.key, data, owned, publication)) return false;
+            final saved = owned.snapshot?.suppliers[next.key.customer]?.billMoneyAllocations[intent.operationId];
+            return saved != null && workspaceLedgerCanonical(saved.intentToJson()) == workspaceLedgerCanonical(intent.intentToJson());
+          }
           final saved = await _freshSupplierAllocationCheckpoint(next.key);
           return saved != null && _matchingSupplierAllocation(saved, intent) != null;
         });
@@ -10319,6 +11000,13 @@ class WorkSession extends ChangeNotifier {
     try {
       await (_ledgerFormStorage as WorkSupplierMoneyDraftGuard).resetConfirmedSupplierMoneyDraft(
         next, expectedRevision: expectedRevision, verifyCommitted: (entry) async {
+          if (workspaceOriginalSupplierMoneyConfigured) {
+            if (!await loadWorkspaceOriginalLedger(retry: true) || !_ledgerFormScopeCurrent(next.key) ||
+                !identical(data, _storeData) || workspaceOriginalLedgerPending != null) return false;
+            final actual = workspaceSupplierLedger(next.key.customer)?.entries
+              .where((item) => item.operationId == entry.operationId).toList();
+            return actual?.length == 1 && workspaceLedgerFingerprint(actual!.single.toJson()) == workspaceLedgerFingerprint(entry.toJson());
+          }
           if (!await recoverCustomerLedger() || !_ledgerFormScopeCurrent(next.key) ||
               !identical(data, _storeData)) {
             return false;
