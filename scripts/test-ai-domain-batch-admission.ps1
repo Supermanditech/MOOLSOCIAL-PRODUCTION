@@ -771,4 +771,28 @@ Check (!(Test-AiDomainPurchaseDataCheckpoint $bad)) 'reject changed qualified so
 $bad=($purchaseDataCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendContextPassed=0
 Check (!(Test-AiDomainPurchaseDataCheckpoint $bad)) 'reject changed purchase-data evidence'
 
+$originalLedgerCheckpoint=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate04OriginalLedgerCheckpoint
+Check (Test-AiDomainOriginalLedgerCheckpoint $originalLedgerCheckpoint) 'exact host-qualified original original-ledger source checkpoint'
+Check (!(Test-AiDomainOriginalLedgerCheckpoint $null)) 'reject absent original original-ledger checkpoint'
+Check (@(Get-AiDomainOriginalLedgerStageOwners 0 $originalLedgerCheckpoint).Count -eq 3) 'three exact existing original-ledger checkpoint metadata owners'
+Check (@(Get-AiDomainOriginalLedgerStageOwners 1 $originalLedgerCheckpoint).Count -eq 18) 'eighteen exact qualified source owners'
+Check (@(Get-AiDomainOriginalLedgerStageOwners 2 $originalLedgerCheckpoint).Count -eq 1) 'one sanitized evidence owner'
+Check (@(Get-AiDomainOriginalLedgerStageOwners 3 $originalLedgerCheckpoint).Count -eq 0) 'no extra checkpoint stage'
+foreach($property in @('sequence','baseline')) {
+ $bad=($originalLedgerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainOriginalLedgerCheckpoint $bad)) "reject changed original-ledger $property"
+}
+$bad=($originalLedgerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.productionAcceptance=$true
+Check (!(Test-AiDomainOriginalLedgerCheckpoint $bad)) 'host qualification is not production acceptance'
+foreach($property in @('wholeAggregateComplete','populatedStoreDeviceQualified','originalRuntimeAuthorityAvailable','legacyMigrationAvailable','standaloneRegisterCreation','syntheticFinanceSnapshot','cloudActivation','financialLivePosting','founderApprovalClaimed','productionAcceptance')) {
+ $bad=($originalLedgerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainOriginalLedgerCheckpoint $bad)) "reject invented original-ledger qualification $property"
+}
+$bad=($originalLedgerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('foreign')
+Check (!(Test-AiDomainOriginalLedgerCheckpoint $bad)) 'reject expanded original-ledger owners'
+$bad=($originalLedgerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.owners[0].sha256='foreign'
+Check (!(Test-AiDomainOriginalLedgerCheckpoint $bad)) 'reject changed qualified source hash'
+$bad=($originalLedgerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendContextPassed=0
+Check (!(Test-AiDomainOriginalLedgerCheckpoint $bad)) 'reject changed original-ledger evidence'
+
 Write-Output "AI domain batch admission checks passed: $n."
