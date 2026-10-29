@@ -702,6 +702,29 @@ foreach($property in @('legacyMigration','runtimeMembershipSourceAvailable','aut
  Check (!(Test-AiDomainAggregateThreeSourceAdmission $bad)) "reject invented purchase-book dependency $property"
 }
 
+$aggregateFourSourceAdmission=$approval.aggregate04SourceAdmission
+Check (Test-AiDomainAggregateFourSourceAdmission $aggregateFourSourceAdmission) 'exact original ledger source admission'
+Check (@($aggregateFourSourceAdmission.additionalOwners).Count -eq 5) 'only five necessary additional runtime/test owners'
+Check (@($aggregateFourSourceAdmission.metadataOwners).Count -eq 5) 'only five existing metadata admission owners'
+foreach($property in @('sequence','baseline','uiReferenceBaseline','scope','authority','admissionCommitSubject','sourceFeatureCommitsAuthorized','backendBranchPushAuthorized','newScope','productionAcceptance','deployment','paymentIntegration','admin','mediaActivation','apk','policyDevelopment')){
+ $bad=($aggregateFourSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'standingNarrowApproval'){$false}elseif($bad.$property -is [bool]){$true}else{'foreign'}
+ Check (!(Test-AiDomainAggregateFourSourceAdmission $bad)) "reject changed original ledger source admission $property"
+}
+foreach($property in @('additionalOwners','metadataOwners')){
+ $bad=($aggregateFourSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.$property+=@('backend/functions/src/foreign.ts')
+ Check (!(Test-AiDomainAggregateFourSourceAdmission $bad)) "reject expanded original ledger source $property"
+}
+foreach($property in @('sha256','text')){
+ $bad=($aggregateFourSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.contract.$property='foreign'
+ Check (!(Test-AiDomainAggregateFourSourceAdmission $bad)) "reject changed original interaction contract $property"
+}
+
+foreach($property in @('legacyMigration','runtimeMembershipSourceAvailable','standaloneRegisterCreation','syntheticFinanceSnapshot')) {
+ $bad=($aggregateFourSourceAdmission|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.$property=$true
+ Check (!(Test-AiDomainAggregateFourSourceAdmission $bad)) "reject invented ledger dependency $property"
+}
+
 $quoteRecurrence=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).quoteImplementationRecurrence20261029
 Check (Test-AiDomainQuoteRecurrenceAdmission $quoteRecurrence) 'exact registered quote implementation recurrence'
 Check (!(Test-AiDomainQuoteRecurrenceAdmission $null)) 'reject absent quote recurrence'

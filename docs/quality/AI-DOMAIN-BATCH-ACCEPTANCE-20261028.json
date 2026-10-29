@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 34,
+  "localMetadataCommits": 35,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -8426,5 +8426,47 @@
       ]
     },
     "sourceCommit": "76b94767b92fb48f1e3f2c4ea95d5cb9010c868e"
+  },
+  "aggregate04SourceAdmission": {
+    "sequence": "04-original-ledger-source-admission",
+    "baseline": "ba3ad6ad2f2c7dc7ca440f5d9724c5743ffe04ea",
+    "uiReferenceBaseline": "c9d03bb37b6115f7fe63f3f1dd819892dc037fc9",
+    "scope": "activated aggregate04 supplier opening/expense/register original source only",
+    "authority": "founder standing exact necessary admission/contract reconciliation within AI-DOMAIN-AGGREGATE-10",
+    "contract": {
+      "sha256": "30570AA7BA0A0DE6F8C34F83DA4ACAEB3F715E23211C18BCD78B89550280A559",
+      "text": "# AI-AGG-04 original ledger source contract — current bounded goal\r\n\r\nThis is reconciliation of the already activated AI-AGG-04 ticket, not another goal or a new financial feature. Starting source/evidence baseline ba3ad6ad2f2c7dc7ca440f5d9724c5743ffe04ea is clean and remote-exact. Accepted manual UI reference c9d03bb and latest approved amendments remain in force; no approved layout redesign. AGG03 supplier/purchase-data source is sealed, while its manual receiving dependency remains partial and OPPO is locked. Implement only this aggregate, then qualify and seal before another aggregate.\r\n\r\n## Source ownership and demonstrated gap\r\n\r\nWorkspaceLedgerCheckpoint currently stores supplierLedgers, expenses and moneyRegisters in one encrypted local checkpoint alongside mandatory customer-finance and inventory data. There is no original backend ledger source. WorkspaceFinanceSnapshot requires many payment/payout/customer totals: constructing zero values merely to fit that local storage envelope would be false. Expense save appends only an expense and preserves every other checkpoint section; it does not create a register entry or supplier payment. Money-register snapshots are read-only scoped projections with protected opening/history, not bank verification.\r\n\r\nImplement one original account/Store/realm-owned ledger source for exactly the existing supplier-ledger, expense and money-register sections. Do not add a second set of balances or a parallel local canonical writer. This source does not own customer payment/payout/finance or Stock totals: omit those unrelated sections, preserve their unknown state, and do not synthesize a WorkspaceLedgerCheckpoint or WorkspaceFinanceSnapshot. Native readback installs only explicitly owned sections. A server empty source proves only absence of saved source records, never a zero real-world balance or complete historical coverage.\r\n\r\nRemote adoption requires a genuinely pristine owned local ledger slot and no unresolved operations; preserve and block legacy records pending exact migration. Once bound, existing local whole-checkpoint save/restore/autosave/fallback cannot resume canonical writes. Keep account/Store/realm/endpoint binding and source retirement checks. QA fixtures remain separate and cannot be promoted. No phone data injection.\r\n\r\n## Original operations and exact native rules\r\n\r\n1. Read original owned sections and current revision/digest. No whole-book PUT, client totals, or client claims of complete history. Durable immutable size-bounded payload parts and atomic current head/attempt publication may reuse the accepted original-book pattern. Missing/corrupt/inconsistent original or authority is unavailable, never empty. Keep all unrelated records byte-equivalent.\r\n2. Save unposted supplier opening evidence through the existing purchase-entry original, not a new supplier master. Reuse WorkspaceSupplierOpeningRecord: id, basisId, account, store, qa=false, supplierId, revision, asOfDate, savedAt, currency=INR, nullable amountMinor, supplierCredit, sourceNote, and supporting bill links. Preserve unknown amount versus explicit zero and unknown/included/excluded bill choices. New evidence revision is current purchase-book revision+1; append immutable records, acknowledge exact same ID/content, reject conflicts/stale CAS. Native correction is a new unposted record; it cannot replace an already confirmed ledger opening. Freeze new remote captures in UTC; preserve legacy bytes without timezone inference. No financial effect at this step.\r\n3. Confirm the exact latest saved opening evidence using the existing explicit native confirmation. Bind current purchase-book head/digest, supplier identity, evidence fingerprint, expected ledger head and frozen confirmation/calendar context. In the atomic ledger publication transaction recheck that original purchase anchor and current membership. Require no existing supplier ledger/opening/posted bills/events; unknown source cannot count as absent. Preserve native latest-reviewed-bill matching: every latest supplier copy must have exactly one same copy/revision/draft link with non-unknown inclusion. Reject unknown amount and a starting date after the explicit confirmation calendar day. Copy WorkspaceSupplierLedger.confirmedOpening: supplier credit negates the nonnegative amount; historyComplete=true applies only to this explicitly confirmed starting balance. Freeze exact opening evidence in the ledger. This does not verify external tax/bank history, accept a purchase bill, receive goods or update Stock. Purchase evidence remains unchanged; only the ledger head and its receipt commit atomically, so do not claim two independent writes succeeded.\r\n4. Record expense using exact WorkspaceExpenseRecord fields account/store/operationId/positive amountMinor/category/method/reference/note/occurredAt. Preserve existing amount bounds and text/input validation; do not add tax classifications or payment-provider verification. Same operation ID/content acknowledges once; conflicting content rejects. Append only the expense; preserve supplier/register/customer/Stock sections. Existing native final Save remains the confirmation.\r\n5. Record an entry only in an existing original owned register. The accepted entry fields are id/reference/occurredAt/signed nonzero deltaMinor. Retain register ID/label/openingAt/openingMinor/historyComplete and earlier entry identities exactly. Preserve WorkspaceMoneyRegisterSnapshot.valid/canFollow: append-only prefix, chronological entries, opening/time bounds, monotonic revision/asOf, and complete-history interval checks. An entry cannot create a bank destination, change a register opening or make partial history complete. Never substitute zero for unknown opening. Do not create an initial register without an original source; unavailable register source remains a named dependency. Provide the smallest existing-style native entry form and AI-ACT-271 prefill/receiver for these accepted fields, using only original selectable registers. Existing historical entry details remain readable; a viewer alone is not completed new-entry automation.\r\n\r\n## Auth, attempts and native integration\r\n\r\nEvery private read/write/status checks the original transaction-bound B03 membership/ownership authority, actor/project/Store/realm and source currentness. The concrete runtime reader/issuer is still absent: default unavailable; no invented membership table or paid-plan requirement for manual free approved-Store use. AI preparation separately retains verified paid AI entitlement and current source/Store permissions.\r\n\r\nFreeze exact typed input, expected source revisions, operation identity and fingerprint before network dispatch. Persist the original attempt in existing encrypted storage. Standard AppCheck reads and limited-use mutation credentials remain distinct. Same nonce/same intent is exactly once; conflicting reuse, stale context and foreign ownership reject. After timeout/cancel/restart preserve unknown outcome and query the exact original status; never infer success from a changed balance. Read/status never resends. Explicit retry reuses the frozen original and cannot mint a new operation after resolution. Current readback is independent of historical receipt state. Preserve native final confirmations, dirty forms, record identity, account switching and source retirement. No generic silent local Save fallback.\r\n\r\n## Qualification and limits\r\n\r\nRun real local SDK repository/handler/native codec tests with labelled original source fixtures; use isolated host financial outcomes only. Cover unknown versus empty, actor/Store/realm isolation, revoked/stale membership, mutable input, CAS, duplicate/conflicting intent, acknowledgement loss, app/backend restart, immutable evidence/bill links, correction limits, unknown opening, register prefix/history, no cross-section effects, large payloads, interrupted staging and storage recovery. Exercise the actual native forms and test enlarged/narrow/keyboard/navigation cases where changed. Inspect current source on OPPO after unlock using the recorded launch contract and saved-data fingerprints; no injected authority/records and no fixture-based live acceptance.\r\n\r\nGoogle provisioning/deployment, payment integration, real charges/transfers/payouts, admin, live model/voice/OCR/private-media activation, APK, live posting/publication, new accounting/tax/pricing rules and governance/policy features remain excluded. Genuine missing original sources are named dependencies; complete independent local source work first. Scoped exact Git admissions/checkpoints use standing narrow authority and do not widen business scope. Self-assessment is not founder approval or production release readiness.\r\n"
+    },
+    "additionalOwners": [
+      "backend/functions/src/workspace/workspace_ledger_service.ts",
+      "backend/functions/src/workspace/workspace_ledger_repository.ts",
+      "backend/functions/src/workspace/workspace_ledger_service.test.ts",
+      "apps/mobile/lib/features/work/work_ledger_gateway.dart",
+      "apps/mobile/test/work_ledger_gateway_test.dart"
+    ],
+    "metadataOwners": [
+      "docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json",
+      "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "config/codex-subagent-coordination-policy.json",
+      "scripts/ai-domain-batch-admission.ps1",
+      "scripts/test-ai-domain-batch-admission.ps1"
+    ],
+    "admissionCommitSubject": "coordination(ai-domain-batch-20261028): admit exact original ledger source owners",
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "newScope": false,
+    "productionAcceptance": false,
+    "deployment": false,
+    "paymentIntegration": false,
+    "liveFinancialActions": false,
+    "admin": false,
+    "mediaActivation": false,
+    "apk": false,
+    "policyDevelopment": false,
+    "legacyMigration": false,
+    "runtimeMembershipSourceAvailable": false,
+    "standaloneRegisterCreation": false,
+    "syntheticFinanceSnapshot": false,
+    "financialOutcomeFixtures": "isolated labelled host only"
   }
 }
