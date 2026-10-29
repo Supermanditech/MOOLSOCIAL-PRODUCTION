@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 32,
+  "localMetadataCommits": 33,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -8213,5 +8213,46 @@
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
     "sourceCommit": "ad76b1b899b381e477110c27e2e3ab83ad85d000"
+  },
+  "aggregate03SourceAdmission": {
+    "baseline": "d4ed39bb5a5a162ca6b57d9fc1b930a1cf6d4689",
+    "branch": "work/codex-backend/ai-domain-batch-20261028",
+    "goal": "AI-DOMAIN-AGGREGATE-10",
+    "ticket": "AI-AGG-03",
+    "standingNarrowApproval": true,
+    "acceptedUiCommit": "c9d03bb37b6115f7fe63f3f1dd819892dc037fc9",
+    "contract": {
+      "path": "AGG03-CONTRACT-v1.md",
+      "sha256": "7C2E0012E197346D4C163FED0A3246D66C5286319124A2F18C32A0DEC8F57188",
+      "source": "# AI-AGG-03 original private purchase-book connection\n\nGoal: AI-DOMAIN-AGGREGATE-10, already activated with standing narrow implementation/admission/test/Git authority. Accepted manual UI baseline c9d03bb37b6115f7fe63f3f1dd819892dc037fc9; current clean, remote-exact source d4ed39bb5a5a162ca6b57d9fc1b930a1cf6d4689. This is the existing supplier/bill/receiving scope, not new business functionality. Preserve all approved layouts, forms, IDs, original data, task numbers and final confirmations.\n\n## Reconciled sources and demonstrated gaps\n\nThe native WorkPurchaseEntryStore is the original account/Store/QA-scoped private book. It contains supplier profiles, the current invoice draft, immutable saved copies, opening-record evidence, receiving drafts/cancellations, bill/goods reviews and retained Restock attempts. Its encrypted local implementation has CAS/serialization and explicit separate financial/Stock guards. It is not a backend supplier master or ledger. Backend AI235/236 only prepare supplied text/query;237 cannot read an original directory. Native252 and selected bills/receipts cannot use marketplace order projections as arbitrary invoice authority.\n\nRetain this one logical owner. Add a remote WorkPurchaseEntryStore adapter and operation-specific command interface. Do not create a parallel supplier master, bulk-upload a local book, infer arbitrary edits from a candidate-book diff, or claim local records are server originals. A separately confirmed remote book is required before any canonical AI selection.\n\n## Original scope and representation\n\nBind every request and response to verified actor account, default auth namespace/project, exact Store and evaluation/production realm. Client actor echoes never establish authority. Preserve the exact existing private supplier ID; it is scoped to this book, not a verified global supplier ID. Preserve profile fields name, optional phone/address/GSTIN and existing createdAt/updatedAt capture dates. Native validation remains the source contract: name <=120, optional phone +/7-15 digits, address <=500, optional 15 uppercase alphanumeric GSTIN, unchanged creation time and nondecreasing update time. GSTIN shape is not registration verification. No inferred full address from area.\n\nUse the existing version1 book JSON. Records keep their original IDs/references and original native decoders. Server authority revisions are book revisions, not physical quantity, GST, invoice acceptance, payment or Stock proof. Never silently discard unknown/malformed source sections or interpret missing amounts as zero. Account/Store/realm or content mismatches are unavailable/stale, with originals kept.\n\n## First operation slice: supplier Save/read/status\n\nAdd readStorePurchaseEntryBook, saveStoreSupplierProfile and readStorePurchaseEntryAttempt. All use a strict closed version1 envelope with Store, realm and actor pin. Read is read-only: it cannot retry a Save or adopt/upload legacy data. A confirmed absent remote book is distinguishable from failure. Save is an explicit native-confirmed operation with expected book revision (null only for a genuinely absent head), original profile fields, caller-retained idempotency key and canonical command fingerprint. It may create/update one supplier profile and advance the original book revision once. Every unrelated draft, copy, opening/receipt/review/attempt field stays unchanged. Reject duplicate other-profile phone/GSTIN according to the existing native rule, changed creation date, backward update time, stale CAS, foreign scope and unknown fields.\n\nPersist receipts durably. Same operation key and same command recover exactly once; changed content under that key conflicts. Status returns the original receipt and independently current book, never installs a historical receipt as current state or retries financial/Stock effects. Recheck original access even for receipts. Unknown transport outcomes preserve the original pending request/key; cancellation or account switching cannot erase it or turn it into another Save. Backend/process and app restart recovery are required.\n\nNative integration adds explicit typed command calls at the actual supplier Save owner. Generic save(book) on the remote adapter must reject unsupported intent; no transition inference. The configured original source must be qualified before unchanged-contact early return. Once a canonical read confirms an unchanged contact, Save is a no-op. Review/search/capture never register a supplier. Unsupported financial/Stock guard interfaces remain unavailable rather than emulated with a client lock.\n\n## Source adoption and preservation\n\nDo not automatically configure this as an authoritative phone source without original access and a genuinely pristine local book. Existing local records, unexplained divergence or QA/realm mismatch block remote adoption pending exact migration qualification. Retain the existing secure data and journals. After remote adoption, never silently fall back to a second local canonical writer. Dependency-injected original adapters may be tested on the host; they must not be injected into OPPO. Runtime composition stays explicitly unavailable when original access/source/adoption conditions are absent.\n\n## Repository and authority\n\nUse durable original repository transactions, not in-memory runtime maps or synthetic providers. Authorization must consume the original transaction-bound Store membership/ownership source. Its runtime reader/issuer is currently absent: default unavailable, including reads; do not invent a membership table, infer membership from approved/live application status, or require a paid plan for agreed free manual Store use. Original paid entitlement remains required for AI preparation separately. Local labelled authority fixtures test the service, not live authorization.\n\nThe book can exceed a Firestore document. Do not place its existing 10MiB storage allowance into one document or lower it silently. A durable repository may stage server-created immutable size-bounded payload parts, verify the exact manifest/digest, then atomically publish a head/receipt pointer under expected revision and original transaction authority. Interrupted unpublished staging is not an active book or successful Save. Never expose incomplete/foreign parts. Active reads verify the immutable payload and current head before returning it. No client supplies a whole replacement book or blob path. Do not add cleanup/governance features.\n\n## Remaining03 joins\n\nContinue with exact native purchase/receipt draft and owned saved-original field/attempt contracts after their existing decoders and guards are reconciled. No blanket generic write or invoice-posting proof is admitted. Immutable saved originals remain separate from posted ledger/Stock outcomes. Existing243 original-marketplace receiving stays intact.\n\nAutomatic supplier registration requires a trusted final-placement original and compatible provenance. Current profile v1 only admits source manual; do not label automatic Restock import manual. No trusted upstream final-placement producer is configured; carry this exact dependency into07. Existing supplier name/area/current optional GSTIN cannot be invented as historical billing/contact facts. No phone event injection or live purchase. Do not reopen already qualified235/236/243/253/269 portions.\n\n## Qualification and closeout\n\nTest exact original native Save and read/status across account/Store/realm isolation, actor spoofing, duplicate/conflicting requests, stale CAS, unknown outcome/restart, changed/retired source, source absence, unchanged contact, duplicate phone/GSTIN and preservation of all unrelated book sections. Test actual local durable SDK repository where available with explicitly labelled isolated data. Inspect current-source reachable OPPO, preserve all108 protected fingerprints and record populated/authenticated boundaries honestly. Use scoped atomic source/evidence commits, clean worktree, named normal branch push and independent exact remote readback. Partial source work is not whole-aggregate or live acceptance.\n\nNo payment integration, Google provisioning/deployment, admin, live model/OCR/media, new tax/pricing/credit rules, APK, live posting/publication, policy/governance feature or unrelated scope.\n"
+    },
+    "additionalOwners": [
+      "backend/functions/src/workspace/workspace_purchase_entry_service.ts",
+      "backend/functions/src/workspace/workspace_purchase_entry_repository.ts",
+      "backend/functions/src/workspace/workspace_purchase_entry_service.test.ts",
+      "apps/mobile/lib/features/work/work_purchase_entry_gateway.dart",
+      "apps/mobile/test/work_purchase_entry_gateway_test.dart"
+    ],
+    "metadataOwners": [
+      "docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json",
+      "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "config/codex-subagent-coordination-policy.json",
+      "scripts/ai-domain-batch-admission.ps1",
+      "scripts/test-ai-domain-batch-admission.ps1"
+    ],
+    "admissionCommitSubject": "coordination(ai-domain-batch-20261028): admit exact original purchase-book command owners",
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "newScope": false,
+    "productionAcceptance": false,
+    "deployment": false,
+    "paymentIntegration": false,
+    "admin": false,
+    "mediaActivation": false,
+    "apk": false,
+    "policyDevelopment": false,
+    "legacyMigration": false,
+    "runtimeMembershipSourceAvailable": false,
+    "automaticRestockRuntimeRegistration": false
   }
 }

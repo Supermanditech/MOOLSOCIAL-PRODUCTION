@@ -207,7 +207,12 @@
       "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
       "apps/mobile/test/work_catalogue_gateway_test.dart",
       "apps/mobile/test/store_add_product_sheet_test.dart",
-      "apps/mobile/test/work_saved_product_draft_test.dart"
+      "apps/mobile/test/work_saved_product_draft_test.dart",
+      "backend/functions/src/workspace/workspace_purchase_entry_service.ts",
+      "backend/functions/src/workspace/workspace_purchase_entry_repository.ts",
+      "backend/functions/src/workspace/workspace_purchase_entry_service.test.ts",
+      "apps/mobile/lib/features/work/work_purchase_entry_gateway.dart",
+      "apps/mobile/test/work_purchase_entry_gateway_test.dart"
     ],
     "acceptedUiCommit": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
     "contractSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382",

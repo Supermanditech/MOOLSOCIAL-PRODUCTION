@@ -679,6 +679,29 @@ foreach($property in @('sha256','source')){
  Check (!(Test-AiDomainAggregateTwoSourceAdmission $bad)) "reject changed original interaction contract $property"
 }
 
+$aggregateThreeSourceAdmission=$approval.aggregate03SourceAdmission
+Check (Test-AiDomainAggregateThreeSourceAdmission $aggregateThreeSourceAdmission) 'exact original private purchase-book source admission'
+Check (@($aggregateThreeSourceAdmission.additionalOwners).Count -eq 5) 'only five necessary additional runtime/test owners'
+Check (@($aggregateThreeSourceAdmission.metadataOwners).Count -eq 5) 'only five existing metadata admission owners'
+foreach($property in @('baseline','branch','goal','ticket','standingNarrowApproval','sourceFeatureCommitsAuthorized','backendBranchPushAuthorized','newScope','productionAcceptance','deployment','paymentIntegration','admin','mediaActivation','apk','policyDevelopment')){
+ $bad=($aggregateThreeSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'standingNarrowApproval'){$false}elseif($bad.$property -is [bool]){$true}else{'foreign'}
+ Check (!(Test-AiDomainAggregateThreeSourceAdmission $bad)) "reject changed original purchase-book source admission $property"
+}
+foreach($property in @('additionalOwners','metadataOwners')){
+ $bad=($aggregateThreeSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.$property+=@('backend/functions/src/foreign.ts')
+ Check (!(Test-AiDomainAggregateThreeSourceAdmission $bad)) "reject expanded original purchase-book source $property"
+}
+foreach($property in @('sha256','source')){
+ $bad=($aggregateThreeSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.contract.$property='foreign'
+ Check (!(Test-AiDomainAggregateThreeSourceAdmission $bad)) "reject changed original interaction contract $property"
+}
+
+foreach($property in @('legacyMigration','runtimeMembershipSourceAvailable','automaticRestockRuntimeRegistration')) {
+ $bad=($aggregateThreeSourceAdmission|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.$property=$true
+ Check (!(Test-AiDomainAggregateThreeSourceAdmission $bad)) "reject invented purchase-book dependency $property"
+}
+
 $quoteRecurrence=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).quoteImplementationRecurrence20261029
 Check (Test-AiDomainQuoteRecurrenceAdmission $quoteRecurrence) 'exact registered quote implementation recurrence'
 Check (!(Test-AiDomainQuoteRecurrenceAdmission $null)) 'reject absent quote recurrence'
