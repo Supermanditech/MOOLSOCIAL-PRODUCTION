@@ -25,7 +25,7 @@ import {handleAssistantModelRequest} from "./assistant/model_http.js";
 import {AssistantHistoryService} from "./assistant/history_service.js";
 import {DataConnectHistoryRepository} from "./assistant/history_dataconnect_store.js";
 import {handleAssistantHistoryRequest} from "./assistant/history_http.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreProductPreparationContext, OriginalStoreOrderPreparationContext, OriginalStoreOperationalPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext, OriginalStoreCouponPreparationContext} from "./assistant/domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreProductPreparationContext, OriginalStoreOrderPreparationContext, OriginalStoreOperationalPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext, OriginalStoreCouponPreparationContext, OriginalStoreLedgerPreparationContext} from "./assistant/domain_context.js";
 import {handleAssistantCanonicalContextRequest} from "./assistant/domain_context_http.js";
 
 import {
@@ -168,8 +168,10 @@ import {
 import {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, WorkspaceBulkQuoteService,
   bulkSupplierQuoteOperation, requireDefaultPurchaseTenant}
   from "./workspace/workspace_purchase_projection_service.js";
-import {WorkspacePurchaseEntryService, purchaseEntryOperation} from './workspace/workspace_purchase_entry_service.js';
+import {WorkspacePurchaseEntryService, purchaseEntryOperation, workspaceOriginalRequestBodyLimit} from './workspace/workspace_purchase_entry_service.js';
 import {FirestorePurchaseEntryRepository} from './workspace/workspace_purchase_entry_repository.js';
+import {WorkspaceLedgerService, workspaceLedgerOperation} from './workspace/workspace_ledger_service.js';
+import {FirestoreWorkspaceLedgerRepository} from './workspace/workspace_ledger_repository.js';
 
 const youtubeServerApiKey = defineSecret("YOUTUBE_SERVER_API_KEY");
 const youtubeOauthClientId = defineSecret("YOUTUBE_OAUTH_CLIENT_ID");
@@ -2640,6 +2642,10 @@ function assistantOriginalContextSource(projectId: string) {
     ...(original ? {original} : {}),
     ...(original && (purchaseEntryRealm === 'evaluation' || purchaseEntryRealm === 'production') ? {
       supplierOriginal: {realm: purchaseEntryRealm, source: {read: (actor, body) => workspacePurchaseEntryService().read(actor, body)}}} : {}),
+    ...(original && (purchaseEntryRealm === 'evaluation' || purchaseEntryRealm === 'production') ? {
+      storeLedger: new OriginalStoreLedgerPreparationContext({realm: purchaseEntryRealm, authority: original,
+        ledger: {handle: (actor, operation, body) => workspaceLedgerService().handle(actor, operation, body)},
+        purchase: {read: (actor, body) => workspacePurchaseEntryService().read(actor, body)}})} : {}),
     ...(original&&catalogue&&(couponRealm==='evaluation'||couponRealm==='production')&&
       process.env.MOOLSOCIAL_PURCHASE_REALM===couponRealm&&process.env.MOOLSOCIAL_BULK_SUPPLIER_QUOTES_V1==='true'?{
       retainedQuotes:{realm:couponRealm,source:{read:(userId,body)=>workspaceBulkQuoteService().read(userId,body)}}}:{}),
@@ -3157,7 +3163,9 @@ export const moolSocialWorkspace = onRequest(
           405,
         );
       }
-      if (request.rawBody.byteLength > 64 * 1024) {
+      const payloadOperation = request.body !== null && typeof request.body === 'object' && !Array.isArray(request.body) &&
+        typeof request.body.operation === 'string' ? request.body.operation.trim() : '';
+      if (request.rawBody.byteLength > workspaceOriginalRequestBodyLimit(payloadOperation)) {
         throw new WorkspaceProfileError(
           "payload_too_large",
           "The Workspace request is too large.",
@@ -3188,6 +3196,7 @@ export const moolSocialWorkspace = onRequest(
       const bulkQuoteOperation = bulkQuoteAction !== undefined;
       const storeProcurementRead = operation === 'readStoreProcurementCatalogue';
       const purchaseEntryAction = purchaseEntryOperation(operation);
+      const ledgerAction = workspaceLedgerOperation(operation);
       if (storeProcurementRead && process.env.MOOLSOCIAL_STORE_PROCUREMENT_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Store purchasing is not connected.', 503);
       }
@@ -3240,7 +3249,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "finishRetailerSetup" ||
         operation === "setRetailerAvailability" ||
         operation === "saveRetailerProduct" ||
-        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation || purchaseEntryAction === 'saveSupplier' || purchaseEntryAction === 'savePurchaseDraft' ||
+        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation || purchaseEntryAction === 'saveSupplier' || purchaseEntryAction === 'savePurchaseDraft' || purchaseEntryAction === 'saveOpeningEvidence' || ledgerAction === 'mutation' ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || privateProductDraftOperation === 'save' || stockOperation === "save" || stockVisibilityOperation === "save" || stockVisibilityOperation === "close" || catalogueProductionAction !== undefined ||
         ['request', 'offer', 'accept', 'withdraw'].includes(bulkQuoteAction ?? '') ||
@@ -3281,7 +3290,7 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation) || purchaseEntryAction !== undefined || purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
+            if (["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation) || purchaseEntryAction !== undefined || ledgerAction !== undefined || purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;
@@ -3313,7 +3322,9 @@ export const moolSocialWorkspace = onRequest(
         });
         return;
       }
-      const result = purchaseEntryAction !== undefined
+      const result = ledgerAction !== undefined
+        ? await workspaceLedgerService().handle({uid: ownerUserId, projectId: publicAuthProjectId()}, operation, {operation, ...catalogueBody})
+        : purchaseEntryAction !== undefined
         ? await workspacePurchaseEntryService().handle({uid: ownerUserId, projectId: publicAuthProjectId()}, operation, catalogueBody)
         : catalogueProductionAction !== undefined
         ? await workspaceCatalogueService().handleCatalogueProduction(ownerUserId, operation, catalogueBody)
@@ -3528,6 +3539,18 @@ function workspacePurchaseEntryService(): WorkspacePurchaseEntryService {
   // repository deliberately refuses private IO without it; approved application
   // status, paid entitlement and caller echoes cannot substitute for membership.
   return new WorkspacePurchaseEntryService(new FirestorePurchaseEntryRepository(getFirestore(), realm, publicAuthProjectId()));
+}
+
+function workspaceLedgerService(): WorkspaceLedgerService {
+  const realm = process.env.MOOLSOCIAL_PURCHASE_REALM;
+  if (realm !== 'evaluation' && realm !== 'production') return new WorkspaceLedgerService(null);
+  const db = getFirestore(), projectId = publicAuthProjectId();
+  const purchase = new FirestorePurchaseEntryRepository(db, realm, projectId);
+  // Same missing original transaction-bound B03 authority as purchase entry.
+  // Keep private reads/writes unavailable; never substitute a subscription,
+  // application-status echo or a labelled host fixture for current membership.
+  return new WorkspaceLedgerService(new FirestoreWorkspaceLedgerRepository(db, realm, projectId,
+    undefined, purchase.ledgerAnchor()));
 }
 
 function workspacePromotionService(): WorkspacePromotionService {

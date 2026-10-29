@@ -1,15 +1,16 @@
 import {createHash} from 'node:crypto';
 import type {DocumentReference, Firestore, Transaction} from 'firebase-admin/firestore';
 import {WorkspaceProfileError} from './workspace_profile_service.js';
+import type {LedgerPurchaseAnchor} from './workspace_ledger_repository.js';
 import {
   checkedPurchaseEntryBook, checkedPurchaseEntryReceipt, checkedPurchaseEntryScope,
-  planPurchaseEntrySupplier, planPurchaseEntryDraft, purchaseEntryCanonical, purchaseEntryClone,
+  planPurchaseEntrySupplier, planPurchaseEntryDraft, planPurchaseEntryOpening, purchaseEntryCanonical, purchaseEntryClone,
   purchaseEntrySaveFingerprint, purchaseEntrySaveOperation, purchaseEntryDraftReceiptFields, purchaseEntryTerminalReasons,
   purchaseEntryError, purchaseEntryExact,
   purchaseEntryFingerprint, purchaseEntryHash, purchaseEntryId, purchaseEntryRevision,
   type PurchaseEntryActor, type PurchaseEntryBook, type PurchaseEntryReceipt,
   type PurchaseEntryRealm, type PurchaseEntryRepository, type PurchaseEntryResult,
-  type PurchaseEntryScope, type PurchaseEntrySupplierCommand, type PurchaseEntryDraftCommand, type PurchaseEntrySaveCommand,
+  type PurchaseEntryScope, type PurchaseEntrySupplierCommand, type PurchaseEntryDraftCommand, type PurchaseEntryOpeningCommand, type PurchaseEntrySaveCommand,
 } from './workspace_purchase_entry_service.js';
 
 /** Only an original server-owned Store authority reader may implement this.
@@ -32,6 +33,24 @@ export class FirestorePurchaseEntryRepository implements PurchaseEntryRepository
   constructor(private readonly db: Firestore, readonly realm: PurchaseEntryRealm,
     readonly projectId: string, private readonly authority?: PurchaseEntryTransactionAuthority,
     private readonly now: () => Date = () => new Date()) {}
+  /** Read-only original anchor for an explicitly confirmed supplier opening.
+   * The ledger publication transaction locks this original head and authority;
+   * no purchase write, cached client proof or second supplier master is used. */
+  ledgerAnchor(): LedgerPurchaseAnchor {
+    return {
+      capture: (actor, scope) => this.read(actor, scope),
+      assertCurrent: async (transaction, actor, raw, captured) => {
+        const scope = this.scope(actor, raw), book = checkedPurchaseEntryBook(captured, scope);
+        await this.authority!.assertCurrent(transaction, actor, scope);
+        const head = await this.head(transaction, scope);
+        if (!head || head.original.revision !== book.revision || head.original.fingerprint !== purchaseEntryHash(book)) {
+          purchaseEntryError('stale_evidence', 409);
+        }
+        const manifest = await transaction.get(this.root(scope).collection('originals').doc(head.original.id));
+        if (!manifest.exists || !equal(manifest.data(), this.manifest(scope, head.original))) purchaseEntryError('service_unavailable', 503);
+      },
+    };
+  }
   private scope(actor: PurchaseEntryActor, raw: PurchaseEntryScope): PurchaseEntryScope {
     const scope = checkedPurchaseEntryScope(raw);
     if (!actor || actor.uid !== scope.account || actor.projectId !== this.projectId || actor.tenantId !== undefined ||
@@ -184,10 +203,13 @@ export class FirestorePurchaseEntryRepository implements PurchaseEntryRepository
     return this.status(actor, scope, command.idempotencyKey, command.fingerprint);
   }
   async saveSupplier(actor: PurchaseEntryActor, input: PurchaseEntrySupplierCommand): Promise<PurchaseEntryResult> {
-    if ('draft' in input) purchaseEntryError();
+    if ('draft' in input || 'opening' in input) purchaseEntryError();
     return this.save(actor, input);
   }
   async savePurchaseDraft(actor: PurchaseEntryActor, input: PurchaseEntryDraftCommand): Promise<PurchaseEntryResult> {
+    return this.save(actor, input);
+  }
+  async saveOpeningEvidence(actor: PurchaseEntryActor, input: PurchaseEntryOpeningCommand): Promise<PurchaseEntryResult> {
     return this.save(actor, input);
   }
   private async save(actor: PurchaseEntryActor, input: PurchaseEntrySaveCommand): Promise<PurchaseEntryResult> {
@@ -202,8 +224,9 @@ export class FirestorePurchaseEntryRepository implements PurchaseEntryRepository
       return this.status(actor, scope, command.idempotencyKey, command.fingerprint);
     }
     let plan: ReturnType<typeof planPurchaseEntrySupplier>;
-    try {plan = 'draft' in command ? planPurchaseEntryDraft(command, current) : planPurchaseEntrySupplier(command, current);} catch (error) {
-      if (error instanceof WorkspaceProfileError && purchaseEntryTerminalReasons('draft' in command).includes(error.code)) {
+    try {plan = 'draft' in command ? planPurchaseEntryDraft(command, current) : 'opening' in command
+      ? planPurchaseEntryOpening(command, current) : planPurchaseEntrySupplier(command, current);} catch (error) {
+      if (error instanceof WorkspaceProfileError && purchaseEntryTerminalReasons('draft' in command, 'opening' in command).includes(error.code)) {
         return this.rejectSave(actor, command, current, error.code);
       }
       throw error;

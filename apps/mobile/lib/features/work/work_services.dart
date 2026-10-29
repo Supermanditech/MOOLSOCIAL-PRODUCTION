@@ -24,6 +24,7 @@ import '../buy/buy_v2_session.dart';
 import '../buy/buy_v2_saved_products_store.dart';
 import 'work_models.dart';
 import 'work_purchase_entry_gateway.dart';
+import 'work_ledger_gateway.dart';
 import 'work_document_preview.dart';
 import 'work_customer_feedback.dart';
 import 'work_catalogue_gateway.dart';
@@ -2174,6 +2175,14 @@ abstract interface class WorkPurchaseDraftCommandStore implements WorkPurchaseEn
     {required String account, required String store, required bool qa, required int? expectedRevision,
     WorkspacePurchaseSavedCopy? reviewedCopy, String? replaceReviewedDraftId});
 }
+abstract interface class WorkPurchaseOpeningCommandStore implements WorkPurchaseEntryCommandStore {
+  bool get openingEvidenceSaveAvailable;
+  WorkspaceSupplierOpeningSaveIntent? get pendingOpeningInput;
+  Future<WorkSupplierOpeningSaveOutcome> saveOpeningEvidence(WorkspaceSupplierProfile profile, WorkspaceSupplierOpeningRecord opening,
+    {required String account, required String store, required bool qa, required int? expectedRevision});
+  Future<WorkSupplierOpeningSaveOutcome?> readOpeningAttempt(WorkspaceSupplierOpeningSaveIntent original);
+  Future<WorkSupplierOpeningSaveOutcome> retryOpeningAttempt(WorkspaceSupplierOpeningSaveIntent original);
+}
 
 /// Local routing adoption only, never server permission or financial authority.
 /// The bind callback performs local metadata IO; no HTTP belongs in this lock.
@@ -2199,10 +2208,15 @@ class WorkPurchaseDraftSaveOutcome extends WorkSupplierProfileSaveOutcome {
     required super.reason, required super.resultRevision}) : super(originalProfile: original.profile, operationKey: original.idempotencyKey);
   final WorkspacePurchaseDraftSaveIntent original;
 }
+class WorkSupplierOpeningSaveOutcome extends WorkSupplierProfileSaveOutcome {
+  WorkSupplierOpeningSaveOutcome({required this.original, required super.currentBook, required super.status,
+    required super.reason, required super.resultRevision}) : super(originalProfile: original.profile, operationKey: original.idempotencyKey);
+  final WorkspaceSupplierOpeningSaveIntent original;
+}
 
 /// The single original private-book adapter. It never writes the retained
 /// local book, infers a whole-book transition or implements financial guards.
-class RemoteWorkPurchaseEntryStore implements WorkPurchaseDraftCommandStore {
+class RemoteWorkPurchaseEntryStore implements WorkPurchaseDraftCommandStore, WorkPurchaseOpeningCommandStore {
   RemoteWorkPurchaseEntryStore._(this.controller);
   final WorkspaceSupplierSaveController controller;
   static Future<RemoteWorkPurchaseEntryStore> openOriginal({
@@ -2239,6 +2253,10 @@ class RemoteWorkPurchaseEntryStore implements WorkPurchaseDraftCommandStore {
   @override WorkspaceSupplierProfile? get lastRejectedSupplierProfile => controller.lastResolution?.saved == false &&
     controller.lastResolution?.original is WorkspaceSupplierSaveIntent ? controller.lastResolution?.original.profile : null;
   @override bool get purchaseDraftSaveAvailable => sourceCurrent && controller.source.purchaseDraftSupported;
+  @override bool get openingEvidenceSaveAvailable => sourceCurrent && controller.source.openingEvidenceSupported;
+  @override WorkspaceSupplierOpeningSaveIntent? get pendingOpeningInput => switch (controller.pending) {
+    final WorkspaceSupplierOpeningSaveIntent original => original, _ => null,
+  };
   @override bool get hasUnresolvedPurchaseSave => controller.pending != null;
   @override WorkspacePurchaseDraftSaveIntent? get pendingPurchaseInput => switch (controller.pending) {
     final WorkspacePurchaseDraftSaveIntent original => original, _ => null,
@@ -2309,6 +2327,31 @@ class RemoteWorkPurchaseEntryStore implements WorkPurchaseDraftCommandStore {
     final result = await controller.savePurchaseDraft(profile, draft, expectedRevision: expectedRevision,
       reviewedCopy: reviewedCopy, replaceReviewedDraftId: replaceReviewedDraftId);
     _check(account, store, qa); return _purchaseConfirmation(result);
+  }
+  WorkSupplierOpeningSaveOutcome _openingConfirmation(WorkspacePurchaseEntryReadback result) {
+    final receipt = result.receipt, book = result.book;
+    if (receipt == null || receipt.original is! WorkspaceSupplierOpeningSaveIntent || receipt.saved && book == null || !sourceCurrent) {
+      throw const WorkGatewayException('Check the original opening record Save. Your entries are kept.');
+    }
+    return WorkSupplierOpeningSaveOutcome(original: receipt.original as WorkspaceSupplierOpeningSaveIntent,
+      currentBook: book, status: receipt.status, reason: receipt.reason, resultRevision: receipt.resultRevision);
+  }
+  @override Future<WorkSupplierOpeningSaveOutcome> saveOpeningEvidence(WorkspaceSupplierProfile profile, WorkspaceSupplierOpeningRecord opening,
+    {required String account, required String store, required bool qa, required int? expectedRevision}) async {
+    _check(account, store, qa);
+    final result = await controller.saveOpeningEvidence(profile, opening, expectedRevision: expectedRevision);
+    _check(account, store, qa); return _openingConfirmation(result);
+  }
+  @override Future<WorkSupplierOpeningSaveOutcome?> readOpeningAttempt(WorkspaceSupplierOpeningSaveIntent original) async {
+    _check(original.scope.account, original.scope.store, false);
+    final result = await controller.readRetainedAttempt(original);
+    _check(original.scope.account, original.scope.store, false);
+    return result.receipt == null ? null : _openingConfirmation(result);
+  }
+  @override Future<WorkSupplierOpeningSaveOutcome> retryOpeningAttempt(WorkspaceSupplierOpeningSaveIntent original) async {
+    _check(original.scope.account, original.scope.store, false);
+    final result = await controller.retryOpeningEvidence(original);
+    _check(original.scope.account, original.scope.store, false); return _openingConfirmation(result);
   }
 }
 
@@ -7006,10 +7049,82 @@ abstract interface class WorkLedgerCheckpointStore {
     required int? expectedRevision,
   });
 }
+/// Local routing protection only. The bind callback may perform local encrypted
+/// metadata IO; authenticated source reads must happen outside this queue.
+abstract interface class WorkLedgerOriginalAdoptionGuard {
+  Future<void> checkPristineOriginalBinding(String account, String store, {required String connectionId, required String realm});
+  Future<void> withPristineOriginalBinding(String account, String store, {
+    required String connectionId, required String realm, required Future<void> Function() bind,
+  });
+}
+/// The original-owned sections adapter deliberately does not implement the old
+/// whole-checkpoint writer. Customer finance/Stock cannot be filled with zeroes
+/// or silently routed back into local persistence when this source is absent.
+class RemoteWorkOwnedLedgerStore {
+  RemoteWorkOwnedLedgerStore._(this.source, this.controller, this._snapshot);
+  final WorkspaceLedgerRemoteSource source;
+  final WorkspaceLedgerSaveController controller;
+  WorkspaceOwnedLedgerSections? _snapshot;
+  bool get current => source.current;
+  WorkspaceOwnedLedgerSections? get snapshot => current ? _snapshot : null;
+  WorkspaceLedgerIntent? get pending => current ? controller.pending : null;
+  static Future<RemoteWorkOwnedLedgerStore> openOriginal({
+    required WorkspaceLedgerRemoteSource source, required WorkLedgerCheckpointStore retainedLocal,
+    required bool qa, required Future<void> Function() assertNoPendingLocalOperations,
+    FlutterSecureStorage? storage,
+  }) async {
+    if (qa || !source.current || retainedLocal is! WorkLedgerOriginalAdoptionGuard) {
+      throw const WorkGatewayException('Use the original non-review Store records. Saved data is kept.');
+    }
+    final guard = retainedLocal as WorkLedgerOriginalAdoptionGuard;
+    final journal = SecureWorkspaceLedgerJournal(scope: source.scope, connectionId: source.connectionId,
+      current: () => source.current, storage: storage);
+    await journal.validateRetainedConnection();
+    await assertNoPendingLocalOperations();
+    await guard.checkPristineOriginalBinding(source.scope.account, source.scope.store, connectionId: source.connectionId, realm: source.scope.realm);
+    // Network reads stay outside the local writer lock. No marker exists on a
+    // fresh device until original readback and the second pristine check pass.
+    final initial = await source.readOwnedSections();
+    if (!source.current) throw const WorkGatewayException('The original Store connection changed.');
+    await guard.withPristineOriginalBinding(source.scope.account, source.scope.store, connectionId: source.connectionId, realm: source.scope.realm, bind: () async {
+      // This callback must inspect only existing local pending operations; it
+      // must not acquire server authority or make HTTP calls under this queue.
+      await assertNoPendingLocalOperations();
+      if (!source.current) throw const WorkGatewayException('The original Store connection changed.');
+      await journal.adoptConfirmedOriginal();
+      if (!source.current) throw const WorkGatewayException('The original Store connection changed.');
+    });
+    final controller = WorkspaceLedgerSaveController(source: source, journal: journal);
+    await controller.restoreState();
+    return RemoteWorkOwnedLedgerStore._(source, controller, initial);
+  }
+  Future<WorkspaceOwnedLedgerSections> read() async {
+    if (!current || controller.busy) throw const WorkGatewayException('Wait for the original saved status before continuing.');
+    // A failed/revoked refresh must not leave the earlier source presented as
+    // current. The encrypted attempt journal is independent and stays intact.
+    _snapshot = null;
+    final result = await source.readOwnedSections();
+    if (!current) throw const WorkGatewayException('Return to the original Store connection.');
+    _snapshot = result; return result;
+  }
+  Future<WorkspaceLedgerReadback> save(WorkspaceLedgerIntent original) async {
+    if (!current) throw const WorkGatewayException('Return to the original Store connection.');
+    _snapshot = null;
+    return controller.save(original);
+  }
+  Future<WorkspaceLedgerReadback> readAttempt(WorkspaceLedgerIntent original) async {
+    if (!current) throw const WorkGatewayException('Return to the original Store connection.');
+    // A receipt/status check cannot qualify all source collections, and a
+    // denied check must not leave the earlier ledger marked current.
+    _snapshot = null;
+    return controller.readRetainedAttempt(original);
+  }
+  void retire() {source.retire(); _snapshot = null;}
+}
 
 /// Uses the existing encrypted device-storage mechanism, scoped to one Store.
 /// Serializes native writes; a timeout cannot release an unfinished write.
-class SecureWorkLedgerCheckpointStore implements WorkLedgerCheckpointStore {
+class SecureWorkLedgerCheckpointStore implements WorkLedgerCheckpointStore, WorkLedgerOriginalAdoptionGuard {
   SecureWorkLedgerCheckpointStore({
     required this.accountScope,
     FlutterSecureStorage? storage,
@@ -7019,6 +7134,41 @@ class SecureWorkLedgerCheckpointStore implements WorkLedgerCheckpointStore {
   static final _tails = <String, Future<void>>{};
   String _key(String account, String store) =>
       'moolsocial.workspace.ledger.v1.${Uri.encodeComponent(account)}/${Uri.encodeComponent(store)}';
+  String _originalKey(String account, String store) => '${_key(account, store)}.original-binding';
+  Future<void> _requireLocal(String account, String store) async {
+    _check(account, store);
+    final marker = await _storage.read(key: _originalKey(account, store));
+    _check(account, store);
+    if (marker != null) throw const WorkGatewayException('Use the connected original Store records. Local ledger fallback is unavailable.');
+  }
+  Future<({String expected, String? marker})> _pristineOriginal(String account, String store, String connectionId, String realm) async {
+    _check(account, store);
+    if (connectionId.trim().isEmpty || !const {'evaluation', 'production'}.contains(realm)) throw const WorkGatewayException('The original Store connection is unavailable.');
+    final old = await _storage.read(key: _key(account, store)); _check(account, store);
+    if (old != null) throw const WorkGatewayException('Existing local ledger records need migration. They have been kept unchanged.');
+    final expected = jsonEncode({'schemaVersion': 1, 'account': account, 'store': store, 'realm': realm, 'connectionId': connectionId});
+    final marker = await _storage.read(key: _originalKey(account, store)); _check(account, store);
+    if (marker != null && marker != expected) throw const WorkGatewayException('Return to the original Store connection. Saved records are kept.');
+    return (expected: expected, marker: marker);
+  }
+  @override Future<void> checkPristineOriginalBinding(String account, String store, {required String connectionId, required String realm}) =>
+    _serial(_key(account, store), () async {await _pristineOriginal(account, store, connectionId, realm);});
+  @override Future<void> withPristineOriginalBinding(String account, String store, {
+    required String connectionId, required String realm, required Future<void> Function() bind,
+  }) => _serial(_key(account, store), () async {
+    final original = await _pristineOriginal(account, store, connectionId, realm), expected = original.expected, marker = original.marker;
+    await bind(); _check(account, store);
+    if (marker == expected) return;
+    try {await _storage.write(key: _originalKey(account, store), value: expected);} on Object {
+      _check(account, store);
+      if (await _storage.read(key: _originalKey(account, store)) != expected) rethrow;
+    }
+    _check(account, store);
+    if (await _storage.read(key: _originalKey(account, store)) != expected) {
+      throw const WorkGatewayException('The original connection could not be retained. Saved records are kept.');
+    }
+    _check(account, store);
+  });
   void _check(String account, String store) {
     if (account.trim().isEmpty ||
         store.trim().isEmpty ||
@@ -7046,6 +7196,7 @@ class SecureWorkLedgerCheckpointStore implements WorkLedgerCheckpointStore {
 
   Future<WorkspaceLedgerCheckpoint?> _read(String account, String store) async {
     _check(account, store);
+    await _requireLocal(account, store);
     final raw = await _storage.read(key: _key(account, store));
     _check(account, store);
     if (raw == null) return null;

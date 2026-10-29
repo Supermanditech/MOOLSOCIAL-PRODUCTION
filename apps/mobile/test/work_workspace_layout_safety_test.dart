@@ -58,7 +58,8 @@ import 'work_catalogue_gateway_test.dart' as catalogue_fixture;
 import 'work_order_identity_gateway_test.dart' as purchase_fixture;
 import 'ui_v2/buy/buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
-import 'package:moolsocial/features/work/work_purchase_entry_gateway.dart' show WorkspacePurchaseDraftSaveIntent;
+import 'package:moolsocial/features/work/work_purchase_entry_gateway.dart' show WorkspacePurchaseDraftSaveIntent, WorkspaceSupplierOpeningSaveIntent;
+import 'package:moolsocial/features/work/work_ledger_gateway.dart' show WorkspaceLedgerIntent, SecureWorkspaceLedgerJournal, WorkspaceLedgerSaveController, workspaceLedgerCanonical, workspaceLedgerFingerprint;
 import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
 import 'package:moolsocial/features/work/widgets/workspace_purchase_originals.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart' show SocialContentResponse;
@@ -2601,10 +2602,310 @@ class _OriginalPurchaseCommandFixture extends _OriginalSupplierCommandFixture im
   }
 }
 
+class _OriginalOpeningCommandFixture extends _OriginalPurchaseCommandFixture implements WorkPurchaseOpeningCommandStore {
+  @override bool openingEvidenceSaveAvailable = true;
+  @override WorkspaceSupplierOpeningSaveIntent? pendingOpeningInput;
+  int openingCalls = 0, openingStatusCalls = 0, openingRetryCalls = 0;
+  bool loseOpeningAcknowledgement = false, openingStatusAvailable = true;
+  WorkSupplierOpeningSaveOutcome? openingTerminal;
+  @override bool get hasUnresolvedPurchaseSave => pendingOpeningInput != null || super.hasUnresolvedPurchaseSave;
+  @override Future<WorkSupplierOpeningSaveOutcome> saveOpeningEvidence(WorkspaceSupplierProfile profile, WorkspaceSupplierOpeningRecord opening,
+    {required String account, required String store, required bool qa, required int? expectedRevision}) async {
+    expect((account, store, qa), originalScope); openingCalls++;
+    final original = WorkspaceSupplierOpeningSaveIntent(scope: (account: account, store: store, realm: 'evaluation'),
+      expectedRevision: expectedRevision, idempotencyKey: 'HOST-native-opening-$openingCalls', profile: profile, opening: opening);
+    value = WorkspacePurchaseEntryBook.fromJson({...value!.toJson(), 'revision': value!.revision + 1,
+      'openingRecords': [...value!.openingRecords.map((record) => record.toJson()), opening.toJson()]});
+    openingTerminal = WorkSupplierOpeningSaveOutcome(original: original, currentBook: value, status: 'saved', reason: null, resultRevision: value!.revision);
+    if (loseOpeningAcknowledgement) {
+      loseOpeningAcknowledgement = false; pendingOpeningInput = original;
+      throw const WorkGatewayException('HOST original opening acknowledgement lost');
+    }
+    return openingTerminal!;
+  }
+  @override Future<WorkSupplierOpeningSaveOutcome?> readOpeningAttempt(WorkspaceSupplierOpeningSaveIntent original) async {
+    openingStatusCalls++;
+    if (!openingStatusAvailable || openingTerminal?.original.fingerprint != original.fingerprint) return null;
+    pendingOpeningInput = null; return openingTerminal;
+  }
+  @override Future<WorkSupplierOpeningSaveOutcome> retryOpeningAttempt(WorkspaceSupplierOpeningSaveIntent original) async {
+    openingRetryCalls++;
+    final recovered = await readOpeningAttempt(original);
+    if (recovered == null) throw const WorkGatewayException('HOST original status remains unknown');
+    return recovered;
+  }
+}
+
+// Isolated original-ledger readback only. These labelled records are never
+// installed in OPPO and grant no runtime approval, posting or finance totals.
+class _OwnedLedgerNativeTransport extends catalogue_fixture.Transport {
+  _OwnedLedgerNativeTransport() : super({});
+  bool unavailable = false;
+  int reads = 0;
+  Completer<void>? release;
+  final started = Completer<void>();
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {
+    required Map<String, String> headers, required Map<String, Object?> body,
+  }) async {
+    reads++; sent = body; if (!started.isCompleted) started.complete();
+    if (release != null) await release!.future;
+    if (unavailable) throw const SocketException('HOST original ledger unavailable');
+    expect(body['operation'], 'readStoreLedgerSource');
+    final scope = Map<String, Object?>.from(body['scope']! as Map), kind = body['kind'];
+    final expense = {'account': scope['account'], 'store': scope['store'], 'operationId': 'HOST-owned-expense',
+      'amountMinor': 1250, 'category': 'Other', 'method': 'Cash', 'reference': 'HOST original receipt',
+      'note': 'HOST recorded evidence only', 'occurredAt': '2026-10-29T01:00:00.000Z'};
+    final rows = kind == 'expense' ? [{'kind': kind, 'id': 'HOST-owned-expense', 'parentId': null,
+      'revision': 1, 'json': workspaceLedgerCanonical(expense), 'fingerprint': workspaceLedgerFingerprint(expense), 'ordinal': null}] : [];
+    return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+      'schemaVersion': 1, 'ledgerVersion': 1, 'actorAccountId': scope['account'], 'storeId': scope['store'], 'realm': scope['realm'],
+      'observedAt': DateTime.now().toUtc().toIso8601String(), 'state': 'ready', 'sourceRevision': 1,
+      'kind': kind, 'parentId': body['parentId'], 'totalCount': rows.length, 'startsSource': true, 'rows': rows, 'nextCursor': null,
+    }}));
+  }
+}
+
+// Labelled HOST wire states for the actual native form and real original
+// gateway/journals. Backend atomicity is qualified separately by SDK tests.
+class _OriginalOpeningLedgerWire extends catalogue_fixture.Transport {
+  _OriginalOpeningLedgerWire(this.account, {this.unknownAmount = false, this.futureDate = false, this.credit = false, this.zero = false}) : super({}) {
+    final now = DateTime.now().toUtc(), day = DateTime.now().add(Duration(days: futureDate ? 1 : 0));
+    supplier = WorkspaceSupplierProfile(id: 'HOST-opening-supplier', name: 'HOST original opening supplier',
+      createdAt: now.subtract(const Duration(hours: 1)), updatedAt: now.subtract(const Duration(hours: 1)));
+    opening = WorkspaceSupplierOpeningRecord(id: 'HOST-opening-evidence', basisId: 'HOST-opening-basis',
+      account: account, store: store, qa: false, supplierId: supplier.id, revision: 2,
+      asOfDate: day.toIso8601String().substring(0, 10), savedAt: now.subtract(const Duration(minutes: 1)),
+      amountMinor: unknownAmount ? null : zero ? 0 : 1250, supplierCredit: credit, sourceNote: 'HOST original unposted evidence');
+    book = WorkspacePurchaseEntryBook(account: account, store: store, qa: false, revision: 2,
+      profiles: [supplier], openingRecords: [opening]);
+  }
+  final String account;
+  static const store = 'WK-510001'; // Existing isolated native seed's Store.
+  final bool unknownAmount, futureDate, credit, zero;
+  late WorkspaceSupplierProfile supplier;
+  late WorkspaceSupplierOpeningRecord opening;
+  late WorkspacePurchaseEntryBook book;
+  bool connected = true, loseAcknowledgement = false, dropBeforeWrite = false, statusUnavailable = false;
+  bool refuseStaleEvidence = false;
+  int confirmations = 0, effects = 0, statusReads = 0, purchaseReads = 0;
+  WorkspaceLedgerIntent? lastOriginal;
+  WorkspaceSupplierLedger? ledger;
+  Map<String, Object?>? receipt;
+  String get rawBook => const JsonEncoder.withIndent('  ').convert(book.toJson());
+  String get bookDigest => crypto.sha256.convert(utf8.encode(rawBook)).toString();
+  Map<String, Object?> get sourceScope => {'account': account, 'store': store, 'realm': 'evaluation'};
+  Map<String, Object?> get frame => {'schemaVersion': 1, 'ledgerVersion': 1, 'actorAccountId': account,
+    'storeId': store, 'realm': 'evaluation', 'observedAt': DateTime.now().toUtc().toIso8601String(),
+    'state': ledger == null ? 'empty' : 'ready', 'sourceRevision': ledger?.revision};
+  Map<String, Object?>? get ledgerRow => ledger == null ? null : {'kind': 'supplierLedger', 'id': supplier.id,
+    'parentId': null, 'revision': ledger!.revision, 'json': workspaceLedgerCanonical(ledger!.toJson()),
+    'fingerprint': workspaceLedgerFingerprint(ledger!.toJson()), 'ordinal': null};
+  SocialContentResponse response(Object value) => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': value}));
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {
+    required Map<String, String> headers, required Map<String, Object?> body,
+  }) async {
+    sent = body; expect(connected, true);
+    expect(headers['authorization'], 'Bearer isolated-host-token');
+    expect(headers['x-firebase-appcheck'], 'isolated-host-appcheck');
+    if (body['operation'] == 'readStorePurchaseEntryBook') {
+      purchaseReads++; expect(body['actorAccountId'], account); expect(body['storeId'], store); expect(body['realm'], 'evaluation');
+      return response({'schemaVersion': 1, 'purchaseEntryVersion': 1, 'actorAccountId': account, 'storeId': store,
+        'realm': 'evaluation', 'observedAt': DateTime.now().toUtc().toIso8601String(), 'state': 'ready',
+        'bookJson': rawBook, 'bookFingerprint': bookDigest, 'attempt': null});
+    }
+    expect(body['scope'], sourceScope);
+    if (body['operation'] == 'readStoreLedgerSource') {
+      final rows = body['kind'] == 'supplierLedger' && ledger != null ? [ledgerRow!] : [];
+      return response({...frame, 'kind': body['kind'], 'parentId': body['parentId'], 'totalCount': rows.length,
+        'startsSource': true, 'rows': rows, 'nextCursor': null});
+    }
+    if (body['operation'] == 'confirmStoreSupplierOpening') {
+      confirmations++;
+      final data = Map<String, Object?>.from(body)..remove('schemaVersion')..remove('ledgerVersion');
+      final command = WorkspaceLedgerIntent.fromJson(data, (account: account, store: store, realm: 'evaluation'));
+      if (lastOriginal != null) expect(command.fingerprint, lastOriginal!.fingerprint);
+      lastOriginal = command;
+      expect(command.data['expectedPurchaseFingerprint'], bookDigest);
+      expect(command.data['expectedPurchaseRevision'], book.revision);
+      expect(command.input, opening.toJson());
+      if (dropBeforeWrite) {dropBeforeWrite = false; throw TimeoutException('HOST dispatch without known write');}
+      if (refuseStaleEvidence) {
+        refuseStaleEvidence = false;
+        book = WorkspacePurchaseEntryBook.fromJson({...book.toJson(), 'revision': 3});
+        receipt = {'schemaVersion': 1, 'scope': sourceScope, 'operation': command.operation,
+          'idempotencyKey': command.idempotencyKey, 'fingerprint': command.fingerprint,
+          'inputFingerprint': workspaceLedgerFingerprint(command.input), 'status': 'not_saved', 'reason': 'stale_evidence',
+          'changed': false, 'resultRevision': null, 'targetKind': 'supplierLedger', 'targetId': supplier.id, 'entryId': null,
+          'recordedAt': DateTime.now().toUtc().toIso8601String()};
+        return response({...frame, 'attempt': receipt, 'current': null});
+      }
+      if (receipt == null) {
+        effects++;
+        ledger = WorkspaceSupplierLedger.confirmedOpening(opening, accountScope: account, workspaceId: store,
+          supplierId: supplier.id, supplierName: supplier.name, qa: false,
+          confirmedAt: DateTime.parse(command.data['confirmedAt']! as String));
+        expect(ledger, isNotNull);
+        receipt = {'schemaVersion': 1, 'scope': sourceScope, 'operation': command.operation,
+          'idempotencyKey': command.idempotencyKey, 'fingerprint': command.fingerprint,
+          'inputFingerprint': workspaceLedgerFingerprint(command.input), 'status': 'saved', 'reason': null,
+          'changed': true, 'resultRevision': 1, 'targetKind': 'supplierLedger', 'targetId': supplier.id, 'entryId': null,
+          'recordedAt': DateTime.now().toUtc().toIso8601String()};
+      }
+      if (loseAcknowledgement) {loseAcknowledgement = false; throw TimeoutException('HOST lost original confirmation reply');}
+      return response({...frame, 'attempt': receipt, 'current': ledgerRow});
+    }
+    if (body['operation'] == 'readStoreLedgerAttempt') {
+      statusReads++; expect(body['idempotencyKey'], lastOriginal!.idempotencyKey); expect(body['fingerprint'], lastOriginal!.fingerprint);
+      if (statusUnavailable) throw const SocketException('HOST original status unavailable');
+      return response({...frame, 'attempt': receipt, 'current': ledgerRow});
+    }
+    throw StateError('HOST unexpected original-ledger operation');
+  }
+}
+
+// HOST-only original wire for native expense confirmation/recovery. No runtime
+// provider is installed and real repository atomicity has separate SDK tests.
+class _OriginalExpenseLedgerWire extends _OriginalOpeningLedgerWire {
+  _OriginalExpenseLedgerWire(super.account);
+  int saves = 0, expenseEffects = 0, expenseStatusReads = 0;
+  int? head;
+  WorkspaceExpenseRecord? recordedExpense;
+  Map<String, Object?>? expenseReceipt;
+  WorkspaceLedgerIntent? expenseOriginal;
+  bool refuseExpense = false, refuseRefreshAfterSave = false;
+  Map<String, Object?> get expenseFrame => {...frame, 'state': head == null ? 'empty' : 'ready', 'sourceRevision': head};
+  Map<String, Object?>? get expenseRow => recordedExpense == null ? null : {
+    'kind': 'expense', 'id': recordedExpense!.operationId, 'parentId': null, 'revision': 1,
+    'json': workspaceLedgerCanonical(recordedExpense!.toJson()),
+    'fingerprint': workspaceLedgerFingerprint(recordedExpense!.toJson()), 'ordinal': null};
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {
+    required Map<String, String> headers, required Map<String, Object?> body,
+  }) async {
+    if (!const {'readStoreLedgerSource', 'recordStoreExpense', 'readStoreLedgerAttempt'}.contains(body['operation'])) {
+      return super.postJson(endpoint, headers: headers, body: body);
+    }
+    expect(connected, true); expect(body['scope'], sourceScope);
+    expect(headers['authorization'], 'Bearer isolated-host-token');
+    expect(headers['x-firebase-appcheck'], 'isolated-host-appcheck');
+    if (body['operation'] == 'readStoreLedgerSource') {
+      if (refuseRefreshAfterSave && expenseReceipt != null) throw const SocketException('HOST original expense refresh unavailable');
+      final rows = body['kind'] == 'expense' && expenseRow != null ? [expenseRow!] : [];
+      return response({...expenseFrame, 'kind': body['kind'], 'parentId': body['parentId'],
+        'totalCount': rows.length, 'startsSource': true, 'rows': rows, 'nextCursor': null});
+    }
+    if (body['operation'] == 'recordStoreExpense') {
+      saves++;
+      final raw = Map<String, Object?>.from(body)..remove('schemaVersion')..remove('ledgerVersion');
+      final command = WorkspaceLedgerIntent.fromJson(raw, (account: account, store: _OriginalOpeningLedgerWire.store, realm: 'evaluation'));
+      if (expenseOriginal != null) expect(command.toJson(), expenseOriginal!.toJson());
+      expenseOriginal = command;
+      if (dropBeforeWrite) {dropBeforeWrite = false; throw TimeoutException('HOST expense dispatch unknown');}
+      if (expenseReceipt == null) {
+        if (!refuseExpense) {
+          expenseEffects++; head = 1;
+          recordedExpense = WorkspaceExpenseRecord.fromJson(command.input)!;
+        }
+        expenseReceipt = {'schemaVersion': 1, 'scope': sourceScope, 'operation': command.operation,
+          'idempotencyKey': command.idempotencyKey, 'fingerprint': command.fingerprint,
+          'inputFingerprint': workspaceLedgerFingerprint(command.input), 'status': refuseExpense ? 'not_saved' : 'saved',
+          'reason': refuseExpense ? 'stale_ledger' : null, 'changed': !refuseExpense,
+          'resultRevision': refuseExpense ? null : 1, 'targetKind': 'expense', 'targetId': command.targetId, 'entryId': null,
+          'recordedAt': DateTime.now().toUtc().toIso8601String()};
+      }
+      if (loseAcknowledgement) {loseAcknowledgement = false; throw TimeoutException('HOST lost expense reply');}
+      return response({...expenseFrame, 'attempt': expenseReceipt, 'current': expenseRow});
+    }
+    expenseStatusReads++;
+    expect(body['idempotencyKey'], expenseOriginal!.idempotencyKey);
+    expect(body['fingerprint'], expenseOriginal!.fingerprint);
+    if (statusUnavailable) throw const SocketException('HOST expense status unavailable');
+    return response({...expenseFrame, 'attempt': expenseReceipt, 'current': expenseRow});
+  }
+}
+
+class _OriginalRegisterLedgerWire extends _OriginalOpeningLedgerWire {
+  _OriginalRegisterLedgerWire(super.account, {this.unknownOpening = false, this.absent = false}) {
+    final now = DateTime.now().toUtc();
+    register = WorkspaceMoneyRegisterSnapshot(accountScope: account, workspaceId: _OriginalOpeningLedgerWire.store,
+      registerId: 'HOST-original-cash-book', label: 'HOST original cash book', revision: 1,
+      openingAt: now.subtract(const Duration(days: 1)), asOf: now.subtract(const Duration(minutes: 1)),
+      historyComplete: !unknownOpening, openingMinor: unknownOpening ? null : 5000, entries: const []);
+  }
+  final bool unknownOpening, absent;
+  late WorkspaceMoneyRegisterSnapshot register;
+  int head = 1, saves = 0, entryEffects = 0, entryStatusReads = 0;
+  WorkspaceLedgerIntent? entryOriginal;
+  Map<String, Object?>? entryReceipt;
+  bool refuseEntry = false;
+  Map<String, Object?> get header {
+    final value = Map<String, Object?>.from(register.toJson())..remove('entries');
+    return {...value, 'entryCount': register.entries.length, 'lastEntryAt': register.entries.lastOrNull?.occurredAt.toUtc().toIso8601String(),
+      'sequenceValidationMinor': (register.openingMinor ?? 0) + register.entries.fold<int>(0, (sum, e) => sum + e.deltaMinor)};
+  }
+  Map<String, Object?> get headerRow => {'kind': 'moneyRegister', 'id': register.registerId, 'parentId': null,
+    'revision': register.revision, 'json': workspaceLedgerCanonical(header), 'fingerprint': workspaceLedgerFingerprint(header), 'ordinal': null};
+  Map<String, Object?> get entryFrame => {...frame, 'state': 'ready', 'sourceRevision': head};
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {
+    required Map<String, String> headers, required Map<String, Object?> body,
+  }) async {
+    if (!const {'readStoreLedgerSource', 'recordStoreMoneyRegisterEntry', 'readStoreLedgerAttempt'}.contains(body['operation'])) {
+      return super.postJson(endpoint, headers: headers, body: body);
+    }
+    expect(connected, true); expect(body['scope'], sourceScope);
+    if (body['operation'] == 'readStoreLedgerSource') {
+      final rows = <Map<String, Object?>>[];
+      if (!absent && body['kind'] == 'moneyRegister') rows.add(headerRow);
+      if (!absent && body['kind'] == 'moneyEntry') {
+        expect(body['parentId'], register.registerId);
+        for (final (index, entry) in register.entries.indexed) {
+          rows.add({'kind': 'moneyEntry', 'id': entry.id, 'parentId': register.registerId, 'revision': 1,
+            'json': workspaceLedgerCanonical(entry.toJson()), 'fingerprint': workspaceLedgerFingerprint(entry.toJson()), 'ordinal': index + 1});
+        }
+      }
+      return response({...entryFrame, 'kind': body['kind'], 'parentId': body['parentId'],
+        'totalCount': rows.length, 'startsSource': true, 'rows': rows, 'nextCursor': null});
+    }
+    if (body['operation'] == 'recordStoreMoneyRegisterEntry') {
+      saves++;
+      final raw = Map<String, Object?>.from(body)..remove('schemaVersion')..remove('ledgerVersion');
+      final command = WorkspaceLedgerIntent.fromJson(raw, (account: account, store: _OriginalOpeningLedgerWire.store, realm: 'evaluation'));
+      if (entryOriginal != null) expect(command.toJson(), entryOriginal!.toJson());
+      entryOriginal = command;
+      if (dropBeforeWrite) {dropBeforeWrite = false; throw TimeoutException('HOST register dispatch unknown');}
+      if (entryReceipt == null) {
+        if (!refuseEntry) {
+          final value = Map<String, Object?>.from(command.input! as Map);
+          final entry = WorkspaceMoneyRegisterEntry(id: value['id']! as String, reference: value['reference']! as String,
+            occurredAt: DateTime.parse(value['occurredAt']! as String), deltaMinor: value['deltaMinor']! as int);
+          expect(entry.occurredAt.isBefore(DateTime.parse(command.data['capturedAt']! as String)), true);
+          final next = WorkspaceMoneyRegisterSnapshot(accountScope: register.accountScope, workspaceId: register.workspaceId,
+            registerId: register.registerId, label: register.label, revision: register.revision + 1,
+            openingAt: register.openingAt, asOf: DateTime.parse(command.data['capturedAt']! as String),
+            openingMinor: register.openingMinor, historyComplete: register.historyComplete, entries: [...register.entries, entry]);
+          expect(next.canFollow(register), true);
+          register = next; head++; entryEffects++;
+        }
+        entryReceipt = {'schemaVersion': 1, 'scope': sourceScope, 'operation': command.operation,
+          'idempotencyKey': command.idempotencyKey, 'fingerprint': command.fingerprint,
+          'inputFingerprint': workspaceLedgerFingerprint(command.input), 'status': refuseEntry ? 'not_saved' : 'saved',
+          'reason': refuseEntry ? 'stale_register' : null, 'changed': !refuseEntry,
+          'resultRevision': refuseEntry ? null : head, 'targetKind': 'moneyRegister', 'targetId': register.registerId,
+          'entryId': command.entryId, 'recordedAt': DateTime.now().toUtc().toIso8601String()};
+      }
+      if (loseAcknowledgement) {loseAcknowledgement = false; throw TimeoutException('HOST register reply lost');}
+      return response({...entryFrame, 'attempt': entryReceipt, 'current': headerRow});
+    }
+    entryStatusReads++;
+    expect(body['idempotencyKey'], entryOriginal!.idempotencyKey); expect(body['fingerprint'], entryOriginal!.fingerprint);
+    if (statusUnavailable) throw const SocketException('HOST original entry status unavailable');
+    return response({...entryFrame, 'attempt': entryReceipt, 'current': entryReceipt == null ? null : headerRow});
+  }
+}
+
 class _AuthenticatedNativeScopeFixture {
   _AuthenticatedNativeScopeFixture({this.makeWork, this.reportStorage, _NativeScopeInventoryStore? inventory, bool connectedPrincipal = false})
     : inventory = inventory ?? _NativeScopeInventoryStore(), principal = _NativeScopePrincipalFixture(connected: connectedPrincipal);
-  final WorkSession Function(_NativeScopeProofStore contact, _NativeScopePurchaseStore purchase,
+  final FutureOr<WorkSession> Function(_NativeScopeProofStore contact, _NativeScopePurchaseStore purchase,
     _NativeScopeInventoryStore inventory, _NativeScopeProofStore trading)? makeWork;
   final _NativeScopePrincipalFixture principal;
   final mode = ValueNotifier<String>('store');
@@ -2637,13 +2938,13 @@ class _AuthenticatedNativeScopeFixture {
     if (account == null) throw StateError('HOST principal acceptance was not established');
     contact = _NativeScopeProofStore(account.userId);
     trading = _NativeScopeProofStore(account.userId);
-    work = makeWork?.call(contact, purchase, inventory, trading) ?? WorkSession(
+    work = await (makeWork?.call(contact, purchase, inventory, trading) ?? WorkSession(
       contactDraftStore: contact,
       purchaseEntryStore: purchase,
       inventoryStore: inventory,
       tradingPreferencesStoreFactory: (_) => trading,
       catalogueReference: workspaceMasterCatalogue,
-    );
+    ));
     // Real account recovery first, then existing isolated reviewed-Store seed.
     expect(await work.recoverWorkspaceAccount(accountReady: true), isTrue);
     work
@@ -29848,9 +30149,622 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
     source.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: false, revision: 1,
       profiles: [supplier], draft: WorkspacePurchaseEntryDraft(id: 'HOST-native-draft', supplierId: supplier.id,
         invoiceReference: 'HOST-ORIGINAL-1', invoiceDate: '29/10/2026', createdAt: at, updatedAt: at,
-        goods: const [{'name': 'HOST printed item', 'pack': '1 kg', 'quantity': '2', 'cost': ''}]));
+        goods: const [{'productId': '', 'name': 'HOST printed item', 'pack': '1 kg', 'quantity': '2', 'cost': ''}]));
+    expect(() => WorkspacePurchaseEntryBook.fromJson(source.value!.toJson()), returnsNormally);
     expect(await host.work.loadWorkspaceSuppliers(retry: true), isTrue);
     return host;
+  }
+  Future<(_AuthenticatedNativeScopeFixture, _OriginalOpeningLedgerWire)> originalOpeningLedgerHost(String variant) async {
+    late _OriginalOpeningLedgerWire wire;
+    final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) async {
+      wire = _OriginalOpeningLedgerWire(contact.accountScope, unknownAmount: variant == 'unknown amount',
+        futureDate: variant == 'future date', credit: variant == 'supplier credit', zero: variant == 'zero balance');
+      final gateway = AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation',
+        purchaseEntrySupported: true, purchaseOpeningEvidenceSupported: true, ledgerSourceSupported: true);
+      final original = await RemoteWorkPurchaseEntryStore.openOriginal(
+        source: gateway.originalPurchaseEntrySource(accountId: contact.accountScope,
+          storeId: _OriginalOpeningLedgerWire.store, current: () => wire.connected)!,
+        retainedLocal: SecureWorkPurchaseEntryStore(accountScope: () => contact.accountScope), qa: false);
+      return WorkSession.production(gateway: ReviewWorkGateway(), contactDraftStore: contact, purchaseEntryStore: original,
+        inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading, catalogueGateway: gateway);
+    });
+    await host.ready();
+    expect(await host.work.loadWorkspaceSuppliers(), true);
+    return (host, wire);
+  }
+  Future<void> revealOriginalOpening(WidgetTester tester, Finder target, {bool towardTop = false}) async {
+    final scroll = find.descendant(of: find.byKey(const Key('work-opening-dues-form')), matching: find.byType(Scrollable)).first;
+    for (var i = 0; target.evaluate().isEmpty && i < 30; i++) {
+      await tester.drag(scroll, Offset(0, towardTop ? 240 : -240)); await tester.pumpAndSettle();
+    }
+    expect(target, findsOneWidget);
+    await Scrollable.of(tester.element(target)).position.ensureVisible(tester.renderObject(target), alignment: 0.5);
+    await tester.pumpAndSettle();
+  }
+  Future<void> openOriginalOpening(WidgetTester tester, _AuthenticatedNativeScopeFixture host, _OriginalOpeningLedgerWire wire) async {
+    await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+    for (final key in ['work-store-stock', 'work-incoming-purchases']) {
+      final target = find.byKey(Key(key)); await tester.ensureVisible(target); await tester.tap(target); await tester.pumpAndSettle();
+    }
+    final action = await purchaseRegisterAction(tester, 'work-purchase-opening', owner: host.work);
+    await tester.ensureVisible(action); await tester.tap(action); await tester.pumpAndSettle();
+    final picker = find.byKey(const Key('work-opening-supplier-picker'));
+    await revealOriginalOpening(tester, picker); await tester.tap(picker); await tester.pumpAndSettle();
+    await tester.tap(find.text(wire.supplier.name).last); await tester.pumpAndSettle();
+    expect(host.work.workspaceOriginalSupplierOpeningConfigured, true);
+    expect(host.work.workspaceSupplierOpeningConfirmationAvailable, false,
+      reason: 'Original opening access must never unlock QA receiving/Stock writers.');
+  }
+  for (final variant in ['saved', 'AI review', 'supplier credit', 'zero balance', 'lost reply', 'lost reply enlarged',
+      'dispatch without write', 'stale book', 'refused stale source', 'unknown amount', 'future date']) {
+    testWidgets('AGG04 original opening native confirmation and recovery: $variant', (tester) async {
+      tester.view.physicalSize = Size(variant.endsWith('enlarged') ? 320 : 360, 780);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = variant.endsWith('enlarged') ? 2 : 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final (host, wire) = await originalOpeningLedgerHost(variant);
+      try {
+        if (variant == 'AI review') {
+          await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+          expect(await host.work.loadWorkspaceOriginalLedger(), true);
+          final adapter = host.adapters(tester).where((value) => value.actionId == 'AI-ACT-258').single;
+          final snapshot = await adapter.snapshot(host.readContext(), wire.supplier.id); expect(snapshot, isNotNull);
+          unawaited(adapter.openReview(scope_contract.MoolAssistantProposal(id: 'HOST-original-opening-review', actionId: 'AI-ACT-258',
+            binding: host.readContext().binding, requestRevision: 0, entitlementRevision: 'HOST-fixture-only',
+            sourceRevision: snapshot!.sourceRevision, validUntil: DateTime.now().add(const Duration(minutes: 5)),
+            entityId: wire.supplier.id, title: 'HOST review original opening', summary: 'HOST native confirmation remains required', fields: const {}), () => true));
+          await tester.pumpAndSettle(); expect(wire.confirmations, 0); expect(wire.effects, 0);
+        } else {await openOriginalOpening(tester, host, wire);}
+        final work = host.work, scope = host.work.workspaceSupplierScope!, bookBefore = wire.rawBook,
+          financeBefore = host.work.workspaceFinance,
+          stockBefore = jsonEncode(host.work.workspaceCatalogueItems.map((p) => [p.id, p.stock]).toList());
+        expect(work.workspaceSupplierOpeningAccountLoaded, true, reason: work.workspaceOriginalLedgerError);
+        final confirm = find.byKey(const Key('work-opening-confirm'));
+        await revealOriginalOpening(tester, confirm);
+        if (variant == 'unknown amount') {
+          expect(tester.widget<FilledButton>(confirm).onPressed, null);
+          expect(await work.confirmWorkspaceSupplierOpeningRecord(wire.opening, scope: scope,
+            expectedRevision: 2, confirmedAt: DateTime.now()), false);
+          expect(wire.confirmations, 0); expect(wire.effects, 0);
+        } else {
+          if (variant == 'saved') {
+            await tester.tap(confirm); await tester.pumpAndSettle();
+            await tester.tap(find.text('Cancel').last); await tester.pumpAndSettle();
+            expect(wire.confirmations, 0); expect(work.workspaceOriginalLedgerPending, null);
+          }
+          if (variant.startsWith('lost reply')) {wire.loseAcknowledgement = true; wire.statusUnavailable = true;}
+          if (variant == 'dispatch without write') wire.dropBeforeWrite = true;
+          if (variant == 'refused stale source') wire.refuseStaleEvidence = true;
+          if (variant == 'stale book') wire.book = WorkspacePurchaseEntryBook.fromJson({...wire.book.toJson(), 'revision': 3});
+          await tester.tap(confirm); await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-opening-confirm-accept'))); await tester.pumpAndSettle();
+          if (variant == 'stale book' || variant == 'future date') {
+            expect(wire.confirmations, 0); expect(wire.effects, 0); expect(work.workspaceOriginalLedgerPending, null);
+            expect(work.workspaceSupplierError, isNotNull);
+          } else if (variant == 'refused stale source') {
+            expect(wire.confirmations, 1); expect(wire.effects, 0); expect(work.workspaceOriginalLedgerPending, null);
+            expect(work.workspaceOriginalLedgerResolution!.status, 'not_saved');
+            expect(work.workspaceSupplierRecoveryRequired, true);
+            final reopen = find.byKey(const Key('work-opening-recover'));
+            await revealOriginalOpening(tester, reopen); await tester.tap(reopen); await tester.pumpAndSettle();
+            expect(work.workspaceSupplierRecoveryRequired, false); expect(work.workspacePurchaseEntryRevision, 3);
+            expect(work.workspaceSupplierOpeningAccountLoaded, true); expect(wire.effects, 0); expect(wire.confirmations, 1);
+            expect(tester.widget<FilledButton>(confirm).onPressed, isNotNull);
+          } else if (variant.startsWith('lost reply') || variant == 'dispatch without write') {
+            expect(wire.confirmations, 1); expect(work.workspaceOriginalLedgerPending, isNotNull,
+              reason: work.workspaceOriginalLedgerError ?? work.workspaceSupplierError);
+            final pending = work.workspaceOriginalLedgerPending!;
+            final originalFingerprint = pending.fingerprint;
+            // Current book/ledger content is deliberately independent of a receipt.
+            expect(await work.loadWorkspaceOriginalLedger(retry: true), true);
+            expect(work.workspaceOriginalLedgerPending!.fingerprint, originalFingerprint);
+            await revealOriginalOpening(tester, find.byKey(const Key('work-opening-close')), towardTop: true);
+            await tester.tap(find.byKey(const Key('work-opening-close'))); await tester.pumpAndSettle();
+            expect(find.text('Discard changes'), findsNothing);
+            final action = await purchaseRegisterAction(tester, 'work-purchase-opening', owner: work);
+            await tester.ensureVisible(action); await tester.tap(action); await tester.pumpAndSettle();
+            final amount = find.byKey(const Key('work-opening-amount'));
+            await revealOriginalOpening(tester, amount);
+            expect(tester.widget<TextField>(amount).readOnly, true);
+            expect(tester.widget<TextField>(amount).controller!.text, '12.50');
+            expect(work.workspaceOriginalLedgerPending!.fingerprint, originalFingerprint);
+            expect(find.byKey(const Key('work-opening-confirm')), findsNothing);
+            final status = find.byKey(const Key('work-opening-check-status'));
+            await revealOriginalOpening(tester, status); await tester.tap(status); await tester.pumpAndSettle();
+            expect(wire.statusReads, 1); expect(wire.confirmations, 1);
+            expect(work.workspaceOriginalLedgerPending!.fingerprint, originalFingerprint);
+            if (variant == 'dispatch without write') {
+              expect(wire.effects, 0);
+              final retry = find.byKey(const Key('work-opening-retry-original'));
+              await revealOriginalOpening(tester, retry); await tester.tap(retry); await tester.pumpAndSettle();
+              expect(wire.confirmations, 2); expect(wire.effects, 1);
+              expect(wire.lastOriginal!.fingerprint, originalFingerprint);
+            } else {
+              wire.statusUnavailable = false;
+              await revealOriginalOpening(tester, status); await tester.tap(status); await tester.pumpAndSettle();
+              expect(wire.statusReads, 2); expect(wire.confirmations, 1); expect(wire.effects, 1);
+            }
+            expect(work.workspaceOriginalLedgerPending, null);
+          } else {
+            expect(wire.confirmations, 1, reason: work.workspaceOriginalLedgerError ?? work.workspaceSupplierError);
+            expect(wire.effects, 1); expect(work.workspaceOriginalLedgerPending, null);
+          }
+        }
+        if (wire.effects == 1) {
+          expect(work.workspaceSupplierLedger(wire.supplier.id)!.openingBalanceMinor,
+            variant == 'zero balance' ? 0 : variant == 'supplier credit' ? -1250 : 1250);
+          expect(wire.lastOriginal!.data['expectedPurchaseFingerprint'], wire.bookDigest);
+          expect(wire.bookDigest, isNot(crypto.sha256.convert(utf8.encode(jsonEncode(wire.book.toJson()))).toString()),
+            reason: 'Proof must preserve original bytes rather than rehash a native serialisation.');
+          await revealOriginalOpening(tester, find.byKey(const Key('work-opening-posting-status')), towardTop: true);
+          expect(tester.widget<Text>(find.byKey(const Key('work-opening-posting-status'))).data, 'Confirmed in supplier account');
+          if (variant == 'saved') {
+            final again = await work.checkWorkspaceOriginalLedgerAttempt(wire.lastOriginal!, explicitRetry: true);
+            expect(again?.attempt?['status'], 'saved'); expect(wire.confirmations, 1); expect(wire.effects, 1);
+          }
+        }
+        if (variant != 'stale book' && variant != 'refused stale source') expect(wire.rawBook, bookBefore);
+        expect(work.workspaceFinance, same(financeBefore)); expect(work.workspaceInvoiceHistoryLoaded, false);
+        expect(jsonEncode(work.workspaceCatalogueItems.map((p) => [p.id, p.stock]).toList()), stockBefore);
+        expect(work.workspaceSupplierOpeningConfirmationAvailable, false);
+        expect(tester.takeException(), null);
+      } finally {wire.connected = false; await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+    });
+  }
+  for (final bridge in ['direct journal', 'native session']) {
+  testWidgets('AGG04 original expense journal native bridge: $bridge', (tester) async {
+    late _OriginalExpenseLedgerWire wire;
+    final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) {
+      wire = _OriginalExpenseLedgerWire(contact.accountScope);
+      return WorkSession.production(gateway: ReviewWorkGateway(), contactDraftStore: contact,
+        purchaseEntryStore: purchase, inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading,
+        catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation', ledgerSourceSupported: true));
+    });
+    await host.ready();
+    try {
+      final work = host.work;
+      expect(await work.loadWorkspaceOriginalLedger(), true);
+      final original = work.prepareWorkspaceOriginalExpense(key: work.expenseFormKey()!, amountMinor: 1250,
+        category: 'Other', method: 'Cash', reference: 'HOST receipt', note: 'HOST local only')!;
+      final scope = work.workspaceSupplierScope!;
+      final source = (work.catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).originalLedgerSource(
+        accountId: scope.$1, storeId: scope.$2, current: () => wire.connected)!;
+      final journal = SecureWorkspaceLedgerJournal(scope: source.scope, connectionId: source.connectionId, current: () => wire.connected);
+      final controller = WorkspaceLedgerSaveController(source: source, journal: journal);
+      final result = bridge == 'direct journal' ? await controller.save(original)
+        : await work.recordWorkspaceOriginalExpense(original);
+      expect(result?.attempt?['status'], 'saved', reason: work.workspaceOriginalLedgerError); expect(wire.expenseEffects, 1);
+    } finally {wire.connected = false; await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+  });
+  }
+  for (final variant in ['saved', 'AI review', 'cancel reopen', 'refresh unavailable', 'lost reply', 'lost reply enlarged',
+      'dispatch without write', 'stale source', 'invalid amount', 'approval revoked', 'principal revoked']) {
+    testWidgets('AGG04 original expense native Save and recovery: $variant', (tester) async {
+      tester.view.physicalSize = Size(variant.endsWith('enlarged') ? 320 : 360, 780);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = variant.endsWith('enlarged') ? 2 : 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      late _OriginalExpenseLedgerWire wire;
+      final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) {
+        wire = _OriginalExpenseLedgerWire(contact.accountScope);
+        return WorkSession.production(gateway: ReviewWorkGateway(), contactDraftStore: contact,
+          purchaseEntryStore: purchase, inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading,
+          catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(
+            endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+            credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation', ledgerSourceSupported: true));
+      });
+      await host.ready();
+      Future<void> show(Finder target) async {
+        expect(target, findsOneWidget);
+        await tester.ensureVisible(target); await tester.pumpAndSettle();
+      }
+      try {
+        final work = host.work;
+        await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+        expect(await work.loadWorkspaceOriginalLedger(), true);
+        final financeBefore = work.workspaceFinance,
+          stockBefore = jsonEncode(work.workspaceCatalogueItems.map((p) => [p.id, p.stock]).toList());
+        await openStoreTools(tester);
+        for (final key in ['work-business-statement', 'work-statement-expenses']) {
+          final action = find.byKey(Key(key)); await reveal(tester, action);
+          await tester.tap(action); await tester.pumpAndSettle();
+        }
+        final open = find.byKey(const Key('store-expense-open'));
+        await show(open);
+        final originalKey = work.expenseFormKey()!;
+        if (variant == 'AI review') {
+          final adapter = host.adapters(tester).where((a) => a.actionId == 'AI-ACT-270').single;
+          final snapshot = await adapter.snapshot(host.readContext(), null); expect(snapshot, isNotNull);
+          unawaited(adapter.openReview(scope_contract.MoolAssistantProposal(id: 'HOST-original-expense-review',
+            actionId: 'AI-ACT-270', binding: host.readContext().binding, requestRevision: 0,
+            entitlementRevision: 'HOST-fixture-only', sourceRevision: snapshot!.sourceRevision,
+            validUntil: DateTime.now().add(const Duration(minutes: 5)), entityId: null,
+            title: 'HOST review original expense', summary: 'HOST native Save remains required',
+            fields: const {'amount': '12.50', 'reference': 'HOST expense receipt', 'channel': 'Cash', 'category': 'Other', 'note': 'HOST original expense'}), () => true));
+          await tester.pumpAndSettle();
+          expect(await work.readLedgerForm(originalKey), null, reason: 'AI Review must not persist raw or canonical records.');
+          expect(wire.saves, 0);
+        } else {await tester.tap(open); await tester.pumpAndSettle();}
+        final amount = find.byKey(const Key('store-expense-amount')),
+          reference = find.byKey(const Key('store-expense-reference'));
+        await show(amount); await tester.enterText(amount, variant == 'invalid amount' ? '0' : '12.50');
+        await show(reference); await tester.enterText(reference, 'HOST expense receipt'); await tester.pumpAndSettle();
+        expect(wire.saves, 0); expect(work.workspaceExpenses, isEmpty);
+        if (variant == 'cancel reopen') {
+          await tester.tap(find.byKey(const Key('supplier-money-close'))); await tester.pumpAndSettle();
+          expect(wire.saves, 0); expect(work.workspaceOriginalLedgerPending, null);
+          await show(open); await tester.tap(open); await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(amount).controller!.text, '12.50');
+          expect(tester.widget<TextField>(reference).controller!.text, 'HOST expense receipt');
+        }
+        final save = find.byKey(const Key('store-expense-submit')); await show(save);
+        final oldSave = tester.widget<FilledButton>(save).onPressed!;
+        if (variant.endsWith('revoked')) {
+          if (variant == 'approval revoked') {work.remoteReviewStatus = WorkRemoteReviewStatus.pending; work.notifyListeners();}
+          else {host.principal.identity = null; host.principal.changes.add(null);}
+          await tester.pumpAndSettle(); await (oldSave as dynamic)(); await tester.pumpAndSettle();
+          expect(amount, findsNothing); expect(wire.saves, 0); expect(wire.expenseEffects, 0);
+        } else {
+          if (variant.startsWith('lost reply')) {wire.loseAcknowledgement = true; wire.statusUnavailable = true;}
+          if (variant == 'dispatch without write') wire.dropBeforeWrite = true;
+          if (variant == 'stale source') wire.refuseExpense = true;
+          if (variant == 'refresh unavailable') wire.refuseRefreshAfterSave = true;
+          final firstTap = (oldSave as dynamic)(), secondTap = (oldSave as dynamic)();
+          await firstTap; await secondTap; await tester.pumpAndSettle();
+          if (variant == 'invalid amount') {
+            expect(wire.saves, 0); expect(work.workspaceOriginalLedgerPending, null);
+          } else if (variant == 'stale source') {
+            expect(wire.saves, 1); expect(wire.expenseEffects, 0);
+            expect(work.workspaceOriginalLedgerResolution!.status, 'not_saved');
+            expect(find.byKey(const Key('store-expense-retry-original')), findsNothing);
+            await (oldSave as dynamic)(); await tester.pumpAndSettle(); expect(wire.saves, 1);
+          } else if (variant.startsWith('lost reply') || variant == 'dispatch without write') {
+            final original = work.workspaceOriginalLedgerPending!;
+            expect(wire.saves, 1); expect(tester.widget<TextField>(amount).enabled, false);
+            await (oldSave as dynamic)(); await tester.pumpAndSettle();
+            expect(wire.saves, 1, reason: 'An old Save callback must check status, never retry a financial effect.');
+            await show(find.byKey(const Key('supplier-money-close')));
+            await tester.tap(find.byKey(const Key('supplier-money-close'))); await tester.pumpAndSettle();
+            await show(open); await tester.tap(open); await tester.pumpAndSettle();
+            expect(tester.widget<TextField>(amount).controller!.text, '12.50');
+            expect(tester.widget<TextField>(amount).enabled, false);
+            expect(work.workspaceOriginalLedgerPending!.toJson(), original.toJson());
+            if (variant == 'dispatch without write') {
+              final retry = find.byKey(const Key('store-expense-retry-original'));
+              await show(retry); await tester.tap(retry); await tester.pumpAndSettle();
+              expect(wire.saves, 2); expect(wire.expenseEffects, 1);
+            } else {
+              wire.statusUnavailable = false;
+              final status = find.byKey(const Key('store-expense-check-status'));
+              await show(status); await tester.tap(status); await tester.pumpAndSettle();
+              expect(wire.saves, 1); expect(wire.expenseEffects, 1);
+            }
+            expect(work.workspaceOriginalLedgerPending, null);
+            expect(wire.expenseOriginal!.toJson(), original.toJson());
+          } else {
+            expect(wire.saves, 1, reason: work.workspaceOriginalLedgerError);
+            expect(wire.expenseEffects, 1); expect(amount, findsNothing);
+            if (variant == 'refresh unavailable') {
+              expect(work.workspaceOriginalLedgerResolution!.status, 'saved');
+              expect(work.workspaceOriginalLedgerSections, null);
+              expect(find.byKey(const Key('work-expense-period-total')), findsNothing,
+                reason: 'A failed source refresh cannot become an empty/zero expense total.');
+              expect(work.canRecordWorkspaceOriginalExpense, false);
+              wire.refuseRefreshAfterSave = false;
+              expect(await work.loadWorkspaceOriginalLedger(retry: true), true);
+            }
+            expect(work.workspaceExpenses.single.amountMinor, 1250);
+            expect(work.expenseFormKey(), isNot(originalKey));
+          }
+        }
+        expect(work.workspaceFinance, same(financeBefore)); expect(work.workspaceInvoiceHistoryLoaded, false);
+        expect(jsonEncode(work.workspaceCatalogueItems.map((p) => [p.id, p.stock]).toList()), stockBefore);
+        expect(tester.takeException(), null);
+      } finally {wire.connected = false; await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+    });
+  }
+  for (final variant in ['money in', 'money out', 'AI review', 'lost reply', 'lost reply enlarged',
+      'dispatch without write', 'stale register', 'unknown opening', 'missing register', 'keep editing',
+      'approval revoked', 'principal revoked']) {
+    testWidgets('AGG04 original register native entry and recovery: $variant', (tester) async {
+      tester.view.physicalSize = Size(variant.endsWith('enlarged') ? 320 : 360, 780);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = variant.endsWith('enlarged') ? 2 : 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      late _OriginalRegisterLedgerWire wire;
+      final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) {
+        wire = _OriginalRegisterLedgerWire(contact.accountScope,
+          unknownOpening: variant == 'unknown opening', absent: variant == 'missing register');
+        return WorkSession.production(gateway: ReviewWorkGateway(), contactDraftStore: contact,
+          purchaseEntryStore: purchase, inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading,
+          catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(
+            endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+            credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation', ledgerSourceSupported: true));
+      });
+      await host.ready();
+      Future<void> show(Finder target) async {
+        expect(target, findsOneWidget); await tester.ensureVisible(target); await tester.pumpAndSettle();
+      }
+      try {
+        final work = host.work;
+        await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+        expect(await work.loadWorkspaceOriginalLedger(), true);
+        final before = wire.register.toJson(), financeBefore = work.workspaceFinance,
+          stockBefore = jsonEncode(work.workspaceCatalogueItems.map((p) => [p.id, p.stock]).toList());
+        await openStoreTools(tester);
+        for (final key in ['work-business-statement', 'work-statement-money']) {
+          final action = find.byKey(Key(key)); await reveal(tester, action);
+          await tester.tap(action); await tester.pumpAndSettle();
+        }
+        final open = find.byKey(const Key('work-money-register-record'));
+        if (variant == 'missing register') {
+          expect(open, findsNothing); expect(work.workspaceMoneyRegisters, isEmpty);
+          expect(find.text('Combined money movements are unavailable.'), findsOneWidget);
+          expect(find.text('0.00'), findsNothing, reason: 'Unknown combined totals cannot appear as zero.');
+          expect(work.prepareWorkspaceOriginalRegisterEntry(registerId: wire.register.registerId,
+            deltaMinor: 1250, reference: 'HOST absent original', occurredAt: DateTime.now().toUtc()), null);
+          expect(wire.saves, 0); expect(wire.entryEffects, 0); expect(tester.takeException(), null); return;
+        }
+        await show(open);
+        if (variant == 'AI review') {
+          final adapter = host.adapters(tester).where((a) => a.actionId == 'AI-ACT-271').single;
+          final entity = 'ledger-register:${crypto.sha256.convert(utf8.encode(jsonEncode(wire.register.registerId)))}';
+          final snapshot = await adapter.snapshot(host.readContext(), entity); expect(snapshot, isNotNull);
+          unawaited(adapter.openReview(scope_contract.MoolAssistantProposal(id: 'HOST-register-review', actionId: 'AI-ACT-271',
+            binding: host.readContext().binding, requestRevision: 0, entitlementRevision: 'HOST-fixture-only',
+            sourceRevision: snapshot!.sourceRevision, validUntil: DateTime.now().add(const Duration(minutes: 5)),
+            entityId: entity, title: 'HOST prepare original money entry', summary: 'HOST native Save is required',
+            fields: {'amount': '12.50', 'direction': 'in', 'reference': 'HOST original movement',
+              'occurredAt': DateTime.now().toUtc().toIso8601String()}), () => true));
+          await tester.pumpAndSettle(); expect(wire.saves, 0); expect(wire.entryEffects, 0);
+        } else {await tester.tap(open); await tester.pumpAndSettle();}
+        final amount = find.byKey(const Key('work-money-entry-amount')),
+          reference = find.byKey(const Key('work-money-entry-reference'));
+        await show(amount); await tester.enterText(amount, '12.50');
+        await show(reference); await tester.enterText(reference, 'HOST original movement'); await tester.pumpAndSettle();
+        if (variant == 'money out') {
+          final movement = find.byKey(const ValueKey('work-money-entry-direction-in'));
+          await show(movement); await tester.tap(movement); await tester.pumpAndSettle();
+          await tester.tap(find.text('Money out').last); await tester.pumpAndSettle();
+        }
+        if (variant == 'keep editing') {
+          await tester.tap(find.byKey(const Key('work-money-entry-form-close'))); await tester.pumpAndSettle();
+          expect(find.text('Discard unsaved entry?'), findsOneWidget);
+          await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(amount).controller!.text, '12.50'); expect(wire.saves, 0);
+        }
+        final submit = find.byKey(const Key('work-money-entry-submit')); await show(submit);
+        final oldSave = tester.widget<FilledButton>(submit).onPressed!;
+        if (variant.endsWith('revoked')) {
+          if (variant == 'approval revoked') {work.remoteReviewStatus = WorkRemoteReviewStatus.pending; work.notifyListeners();}
+          else {host.principal.identity = null; host.principal.changes.add(null);}
+          await tester.pumpAndSettle(); await (oldSave as dynamic)(); await tester.pumpAndSettle();
+          expect(amount, findsNothing); expect(wire.saves, 0); expect(wire.entryEffects, 0);
+        } else {
+          if (variant.startsWith('lost reply')) {wire.loseAcknowledgement = true; wire.statusUnavailable = true;}
+          if (variant == 'dispatch without write') wire.dropBeforeWrite = true;
+          if (variant == 'stale register') wire.refuseEntry = true;
+          final first = (oldSave as dynamic)(), second = (oldSave as dynamic)();
+          await first; await second; await tester.pumpAndSettle();
+          expect(wire.saves, 1, reason: work.workspaceOriginalLedgerError);
+          if (variant == 'stale register') {
+            expect(wire.entryEffects, 0); expect(work.workspaceOriginalLedgerResolution!.status, 'not_saved');
+            expect(find.byKey(const Key('work-money-entry-retry-original')), findsNothing);
+            await (oldSave as dynamic)(); await tester.pumpAndSettle(); expect(wire.saves, 1);
+          } else if (variant.startsWith('lost reply') || variant == 'dispatch without write') {
+            final original = work.workspaceOriginalLedgerPending!;
+            await (oldSave as dynamic)(); await tester.pumpAndSettle(); expect(wire.saves, 1);
+            await tester.tap(find.byKey(const Key('work-money-entry-form-close'))); await tester.pumpAndSettle();
+            await show(open); await tester.tap(open); await tester.pumpAndSettle();
+            expect(tester.widget<TextField>(amount).controller!.text, '12.50');
+            expect(tester.widget<TextField>(amount).enabled, false);
+            expect(work.workspaceOriginalLedgerPending!.toJson(), original.toJson());
+            if (variant == 'dispatch without write') {
+              final retry = find.byKey(const Key('work-money-entry-retry-original'));
+              await show(retry); await tester.tap(retry); await tester.pumpAndSettle();
+              expect(wire.saves, 2);
+            } else {
+              wire.statusUnavailable = false;
+              final status = find.byKey(const Key('work-money-entry-check-status'));
+              await show(status); await tester.tap(status); await tester.pumpAndSettle(); expect(wire.saves, 1);
+            }
+            expect(wire.entryEffects, 1); expect(work.workspaceOriginalLedgerPending, null);
+            expect(wire.entryOriginal!.toJson(), original.toJson());
+          } else {expect(wire.entryEffects, 1); expect(amount, findsNothing);}
+          if (wire.entryEffects == 1) {
+            final saved = work.workspaceMoneyRegisters.single;
+            expect(saved.entries.single.deltaMinor, variant == 'money out' ? -1250 : 1250);
+            expect(saved.openingMinor, variant == 'unknown opening' ? null : 5000);
+            expect(saved.historyComplete, variant != 'unknown opening'); expect(saved.canFollow(WorkspaceMoneyRegisterSnapshot.fromJson(before)!), true);
+            expect(saved.registerId, wire.register.registerId);
+            final entity = jsonEncode(['register', saved.registerId, saved.entries.single.id]);
+            final view = showStoreMoneyEntryDetails(tester.element(find.byKey(const Key('work-money-book-selector'))), work, entity);
+            unawaited(view); await tester.pumpAndSettle();
+            expect(find.byKey(const Key('work-money-entry-details')), findsOneWidget,
+              reason: 'Original register details must not depend on unrelated customer-finance records.');
+            await tester.tap(find.byKey(const Key('work-money-entry-close'))); await tester.pumpAndSettle();
+          }
+        }
+        expect(work.workspaceFinance, same(financeBefore)); expect(work.workspaceInvoiceHistoryLoaded, false);
+        expect(jsonEncode(work.workspaceCatalogueItems.map((p) => [p.id, p.stock]).toList()), stockBefore);
+        expect(tester.takeException(), null);
+      } finally {wire.connected = false; await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+    });
+  }
+  testWidgets('AGG04 original ledger AI snapshot reads cold original once and never opens local finance', (tester) async {
+    late _OriginalRegisterLedgerWire wire;
+    final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) {
+      wire = _OriginalRegisterLedgerWire(contact.accountScope);
+      return WorkSession.production(gateway: ReviewWorkGateway(), contactDraftStore: contact,
+        purchaseEntryStore: purchase, inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading,
+        catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation', ledgerSourceSupported: true));
+    });
+    await host.ready();
+    try {
+      await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+      final work = host.work;
+      expect(work.workspaceOriginalLedgerBound, false); expect(work.workspaceOriginalLedgerSections, null);
+      final adapter = host.adapters(tester).where((a) => a.actionId == 'AI-ACT-271').single;
+      final entity = 'ledger-register:${crypto.sha256.convert(utf8.encode(jsonEncode(wire.register.registerId)))}', context = host.readContext();
+      final snapshots = await Future.wait([adapter.snapshot(context, entity), adapter.snapshot(context, entity)]);
+      expect(snapshots.first, isNotNull); expect(snapshots.last!.sourceRevision, snapshots.first!.sourceRevision);
+      expect(snapshots.first!.sourceRevision, startsWith('store-original-ledger-v1:'));
+      expect(work.workspaceOriginalLedgerBound, true); expect(work.workspaceMoneyRegisters.single.registerId, wire.register.registerId);
+      expect(work.workspaceFinance, null); expect(work.workspaceInvoiceHistoryLoaded, false);
+      expect(wire.saves, 0); expect(wire.entryEffects, 0); expect(work.workspaceOriginalLedgerPending, null);
+      work.remoteReviewStatus = WorkRemoteReviewStatus.pending; work.notifyListeners(); await tester.pumpAndSettle();
+      expect(await adapter.snapshot(context, entity), null);
+      expect(wire.saves, 0); expect(tester.takeException(), null);
+    } finally {wire.connected = false; await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+  });
+  for (final variant in ['pristine', 'legacy local records', 'scope changed']) {
+    testWidgets('AGG04 session original ledger installs only owned records: $variant', (tester) async {
+      final wire = _OwnedLedgerNativeTransport();
+      final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) => WorkSession.production(
+        gateway: ReviewWorkGateway(), contactDraftStore: contact, purchaseEntryStore: purchase,
+        inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading,
+        catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(
+          endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+          credentials: catalogue_fixture.Credentials(), transport: wire, realm: 'evaluation', ledgerSourceSupported: true)));
+      await host.ready();
+      try {
+        final work = host.work, scope = host.work.workspaceSupplierScope!;
+        final financeBefore = work.workspaceFinance;
+        final storageKey = 'moolsocial.workspace.ledger.v1.${Uri.encodeComponent(scope.$1)}/${Uri.encodeComponent(scope.$2)}';
+        if (variant == 'legacy local records') {
+          await const FlutterSecureStorage().write(key: storageKey, value: 'HOST immutable retained ledger bytes');
+          expect(await work.loadWorkspaceOriginalLedger(), false); expect(wire.reads, 0);
+          expect(work.workspaceOriginalLedgerBound, false); expect(work.workspaceOriginalLedgerSections, null);
+          expect(await const FlutterSecureStorage().read(key: storageKey), 'HOST immutable retained ledger bytes');
+          expect(await const FlutterSecureStorage().read(key: '$storageKey.original-binding'), null);
+          expect(work.workspaceOriginalLedgerError, isNotNull);
+        } else if (variant == 'scope changed') {
+          wire.release = Completer<void>();
+          final loading = work.loadWorkspaceOriginalLedger();
+          await wire.started.future;
+          work.activeWorkspace = null; wire.release!.complete();
+          expect(await loading, false); expect(work.workspaceOriginalLedgerBound, false);
+          expect(work.workspaceOriginalLedgerSections, null);
+          expect(await const FlutterSecureStorage().read(key: '$storageKey.original-binding'), null);
+        } else {
+          final first = work.loadWorkspaceOriginalLedger();
+          expect(identical(first, work.loadWorkspaceOriginalLedger()), true);
+          expect(await first, true); expect(wire.reads, 3);
+          expect(work.workspaceOriginalLedgerBound, true); expect(work.workspaceOriginalLedgerBusy, false);
+          expect(work.workspaceOriginalLedgerSections!.expenses.values.single.amountMinor, 1250);
+          expect(work.workspaceExpenses.single.operationId, 'HOST-owned-expense');
+          expect(work.workspaceMoneyRegisters, isEmpty); expect(work.workspaceSupplierLedger('HOST-absent-supplier'), null);
+          expect(work.workspaceFinance, same(financeBefore)); expect(work.workspaceInvoiceHistoryLoaded, false);
+          expect(work.workspaceMoneyStatement, null, reason: 'A section read cannot qualify unrelated complete finance totals.');
+          expect(await work.recoverCustomerLedger(), false, reason: 'Owned source cannot recover unrelated finance/Stock.');
+          expect(await work.saveWorkspaceExpenseRecord(work.workspaceExpenses.single), false,
+            reason: 'The old whole-checkpoint writer cannot write the new original source.');
+          wire.unavailable = true;
+          expect(await work.loadWorkspaceOriginalLedger(retry: true), false);
+          expect(work.workspaceOriginalLedgerSections, null); expect(work.workspaceOriginalLedgerError, isNotNull);
+          expect(work.workspaceOriginalLedgerBound, true); expect(work.workspaceOriginalLedgerBusy, false);
+          wire.unavailable = false; expect(await work.loadWorkspaceOriginalLedger(retry: true), true);
+          expect(work.workspaceExpenses.single.amountMinor, 1250); expect(work.workspaceFinance, same(financeBefore));
+          expect(await const FlutterSecureStorage().read(key: storageKey), null);
+        }
+        expect(tester.takeException(), null);
+      } finally {await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+    });
+  }
+  for (final display in [(width: 360.0, scale: 1.0), (width: 320.0, scale: 2.0)]) {
+  testWidgets('AGG04 native opening unknown Save locks frozen fields and status recovery never writes again ${display.width}/${display.scale}', (tester) async {
+    tester.view.physicalSize = Size(display.width, 780); tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = display.scale;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final source = _OriginalOpeningCommandFixture()..loseOpeningAcknowledgement = true..openingStatusAvailable = false;
+    final host = await originalPurchaseHost(source);
+    try {
+      await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+      final supplier = source.value!.profiles.single, draftBefore = jsonEncode(source.value!.draft!.toJson());
+      final adapter = host.adapters(tester).where((value) => value.actionId == 'AI-ACT-257').single;
+      final snap = await adapter.snapshot(host.readContext(), supplier.id); expect(snap, isNotNull);
+      final fields = <String, Object?>{'supplierId': supplier.id, 'openingId': null, 'openingRevision': null,
+        'directoryRevision': source.value!.revision, 'asOfDate': DateTime.now().toUtc().toIso8601String().substring(0, 10),
+        'amount': '12.50', 'amountKnown': true, 'supplierCredit': false, 'sourceNote': 'HOST original opening evidence',
+        'billInclusions': <String, Object?>{}};
+      unawaited(adapter.openReview(scope_contract.MoolAssistantProposal(id: 'HOST-opening-unknown', actionId: 'AI-ACT-257',
+        binding: host.readContext().binding, requestRevision: 0, entitlementRevision: 'HOST-fixture-only', sourceRevision: snap!.sourceRevision,
+        validUntil: DateTime.now().add(const Duration(minutes: 5)), entityId: supplier.id,
+        title: 'HOST review opening', summary: 'HOST exact unposted evidence', fields: fields), () => true));
+      await tester.pumpAndSettle();
+      // Scroll only the native form: ancestor scrolling can move the sheet's
+      // header beneath its modal barrier and does not simulate a user drag.
+      Future<void> revealOpeningControl(Finder target, {bool towardTop = false}) async {
+        final scroll = find.descendant(of: find.byKey(const Key('work-opening-dues-form')),
+          matching: find.byType(Scrollable)).first;
+        for (var attempt = 0; target.evaluate().isEmpty && attempt < 30; attempt++) {
+          await tester.drag(scroll, Offset(0, towardTop ? 240 : -240));
+          await tester.pumpAndSettle();
+        }
+        expect(target, findsOneWidget);
+        await Scrollable.of(tester.element(target)).position.ensureVisible(
+          tester.renderObject(target), alignment: 0.5);
+        await tester.pumpAndSettle();
+      }
+      final save = find.byKey(const Key('work-opening-save')); await revealOpeningControl(save);
+      final lateSave = tester.widget<FilledButton>(save).onPressed!;
+      await tester.tap(save); await tester.pumpAndSettle();
+      expect(source.openingCalls, 1, reason: jsonEncode({'sessionError': host.work.workspaceSupplierError,
+        'revision': host.work.workspacePurchaseEntryRevision,
+        'formError': tester.widgetList<Text>(find.descendant(of: find.byKey(const Key('work-opening-error')), matching: find.byType(Text))).map((value) => value.data).toList()}));
+      expect(source.pendingOpeningInput, isNotNull);
+      expect(source.pendingOpeningInput!.opening.savedAt.isUtc, isTrue);
+      final frozen = source.pendingOpeningInput!.fingerprint;
+      lateSave(); await tester.pumpAndSettle();
+      expect(source.openingRetryCalls, 0, reason: 'An old Save callback may only check status; Retry needs the visible explicit control.');
+      expect(source.openingStatusCalls, 1); expect(source.openingCalls, 1);
+      final amount = find.byKey(const Key('work-opening-amount')); expect(tester.widget<TextField>(amount).readOnly, isTrue);
+      expect(tester.widget<TextField>(amount).controller!.text, '12.50');
+      expect(find.byKey(const Key('work-opening-save')), findsNothing);
+      final check = find.byKey(const Key('work-opening-check-status')); await revealOpeningControl(check);
+      await tester.tap(check); await tester.pumpAndSettle();
+      expect(source.openingStatusCalls, 2); expect(source.openingCalls, 1); expect(source.pendingOpeningInput!.fingerprint, frozen);
+      expect(await host.work.loadWorkspaceSuppliers(retry: true), isTrue);
+      final pending = source.pendingOpeningInput!;
+      expect(host.work.workspaceSupplierOpeningRecord(supplier.id)!.id, pending.opening.id);
+      expect(await host.work.saveWorkspaceSupplierOpeningRecord(pending.opening,
+        scope: host.work.workspaceSupplierScope!, expectedRevision: pending.expectedRevision), isFalse,
+        reason: 'A matching book record cannot resolve an unknown original receipt.');
+      expect(source.pendingOpeningInput!.fingerprint, frozen); expect(source.openingCalls, 1);
+      final close = find.byKey(const Key('work-opening-close')); await revealOpeningControl(close, towardTop: true); await tester.tap(close); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-opening-dues-form')), findsNothing); expect(find.text('Discard changes'), findsNothing);
+      expect(source.pendingOpeningInput!.fingerprint, frozen);
+      final correction = host.adapters(tester).where((value) => value.actionId == 'AI-ACT-381').single;
+      expect(await correction.snapshot(host.readContext(), supplier.id), isNull,
+        reason: 'AI cannot replace an unresolved original save with another correction.');
+      for (final key in ['work-store-stock', 'work-incoming-purchases']) {
+        final target = find.byKey(Key(key)); await tester.ensureVisible(target);
+        await tester.tap(target); await tester.pumpAndSettle();
+      }
+      final reopening = await purchaseRegisterAction(tester, 'work-purchase-opening', owner: host.work);
+      await tester.ensureVisible(reopening); await tester.tap(reopening); await tester.pumpAndSettle();
+      await revealOpeningControl(amount);
+      expect(tester.widget<TextField>(amount).controller!.text, '12.50'); expect(tester.widget<TextField>(amount).readOnly, true);
+      expect(source.openingCalls, 1); expect(source.pendingOpeningInput!.fingerprint, frozen);
+      source.openingStatusAvailable = true;
+      await revealOpeningControl(check); await tester.tap(check); await tester.pumpAndSettle();
+      expect(source.openingStatusCalls, 3); expect(source.openingCalls, 1); expect(source.pendingOpeningInput, isNull);
+      expect(source.wholeBookWrites, 0); expect(jsonEncode(source.value!.draft!.toJson()), draftBefore);
+      expect(host.work.workspaceSupplierOpeningRecord(supplier.id)!.amountMinor, 1250);
+      expect(host.work.workspaceSupplierLedger(supplier.id), isNull);
+      expect(tester.takeException(), isNull);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+  });
   }
   testWidgets('AGG03 original purchase copy freezes UTC through the actual native Save and avoids whole-book writes', (tester) async {
     tester.view.physicalSize = const Size(420, 900); tester.view.devicePixelRatio = 1;

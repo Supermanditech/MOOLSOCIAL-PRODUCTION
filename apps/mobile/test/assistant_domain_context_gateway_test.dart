@@ -44,6 +44,51 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
+  const ledgerExport = String.fromEnvironment('AI_DOMAIN_LEDGER_CONTEXT_EXPORT_PATH');
+  test('Actual SDK original ledger preparation metadata decodes through the mobile gateway', () async {
+    final export = jsonDecode(File(ledgerExport).readAsStringSync()) as Map<String, dynamic>;
+    expect(export['label'], 'ISOLATED ACTUAL SDK AI CONTEXT; NO RUNTIME AUTHORITY');
+    final actor = export['actor'] as Map<String, dynamic>, scope = export['scope'] as Map<String, dynamic>;
+    final owner = (environment: 'firebase-service', projectId: actor['projectId'] as String,
+      tenantId: null, userId: actor['uid'] as String);
+    final context = MoolAssistantContext(accountScope: owner, authenticationRevision: 1).withWorkspace(
+      MoolAssistantWorkspace(id: scope['storeId'] as String, name: 'HOST SDK Store', profile: 'retailer-grocery',
+        revision: 1, isStore: true, approved: true, approvalAccountScope: owner));
+    final credentials = _Credentials();
+    final gateway = AssistantDomainContextGateway(owner: owner, isCurrent: () => true,
+      credentials: credentials, transport: _CapacityWire(export['metadata'] as Map<String, dynamic>),
+      clock: () => DateTime.parse(export['now'] as String), compactStoreSelection: true);
+    final result = await gateway.read(context, () => true);
+    for (final raw in export['nativeTargets'] as List) {
+      final target = raw as Map;
+      expect(result.revisions[(target['actionId'] as String, target['entityId'] as String?)], target['sourceRevision']);
+    }
+    expect(result.revisions.length, (export['nativeTargets'] as List).length);
+    expect(credentials.modes, [SocialAppCheckTokenMode.standard]);
+    expect(jsonEncode(export['metadata']), isNot(contains('sourceNote')));
+    expect(jsonEncode(export['metadata']), isNot(contains('openingMinor')));
+  }, skip: ledgerExport.isEmpty ? 'Requires explicit isolated actual SDK ledger-context export' : false);
+  for (final action in assistantStoreLedgerContextActions) {
+    test('Original ledger metadata $action requires approved Store and exact original proof', () async {
+      const storeId = 'store-one';
+      final context = _context.withWorkspace(const MoolAssistantWorkspace(id: storeId, name: 'HOST Store',
+        profile: 'retailer-grocery', revision: 1, isStore: true, approved: true, approvalAccountScope: _owner));
+      final entity = action == 'AI-ACT-270' ? null : action == 'AI-ACT-271' ? 'ledger-register:${'b' * 64}' : 'HOST-original-supplier';
+      final row = {'actionId': action, 'entityId': entity, 'sourceRevision': 'store-original-ledger-v1:${'a' * 64}'};
+      final data = {..._data(), 'ownerKey': sha256.convert(utf8.encode(jsonEncode([
+        _owner.projectId, _owner.userId, 'workspace', storeId]))).toString(),
+        'scope': {'audience': 'workspace', 'storeId': storeId}, 'revisions': [row]};
+      expect((await _source(_Wire(() => _ok(data))).read(context, () => true)).revisions[(action, entity)], row['sourceRevision']);
+      for (final fault in ['personal', 'proof', 'entity', 'foreign owner']) {
+        final changed = jsonDecode(jsonEncode(data)) as Map<String, dynamic>, changedRow = (jsonDecode(jsonEncode(row)) as Map<String, dynamic>);
+        if (fault == 'proof') changedRow['sourceRevision'] = 'unqualified-source';
+        if (fault == 'entity') changedRow['entityId'] = action == 'AI-ACT-270' ? 'HOST-foreign' : null;
+        if (fault == 'foreign owner') changed['ownerKey'] = 'b' * 64;
+        changed['revisions'] = [changedRow];
+        await expectLater(_source(_Wire(() => _ok(changed))).read(fault == 'personal' ? _context : context, () => true), throwsA(anything));
+      }
+    });
+  }
   const priceExport = String.fromEnvironment('AI_DOMAIN_PRICE_REFRESH_EXPORT_PATH');
   test('Actual expired-price catalogue HTTP metadata decodes through the original mobile gateway', () async {
     final data = jsonDecode(File(priceExport).readAsStringSync()) as Map<String, dynamic>;

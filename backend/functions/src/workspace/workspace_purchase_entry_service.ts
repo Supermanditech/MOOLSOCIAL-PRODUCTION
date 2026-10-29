@@ -40,12 +40,22 @@ export interface PurchaseEntryCopy extends Readonly<Record<string, unknown>> {
 export interface PurchaseEntryDraftCommand extends PurchaseEntrySupplierCommand {
   draft: PurchaseEntryDraft; reviewedCopy: PurchaseEntryCopy | null; replaceReviewedDraftId: string | null;
 }
-export type PurchaseEntrySaveCommand = PurchaseEntrySupplierCommand | PurchaseEntryDraftCommand;
+export interface PurchaseEntryOpeningBill {
+  copyId: string; copyRevision: number; draftId: string; inclusion: 'unknown' | 'included' | 'excluded';
+}
+export interface PurchaseEntryOpeningRecord {
+  id: string; basisId: string; account: string; store: string; qa: false; supplierId: string;
+  revision: number; asOfDate: string; savedAt: string; currency: 'INR'; amountMinor: number | null;
+  supplierCredit: boolean; sourceNote: string; bills: readonly PurchaseEntryOpeningBill[];
+}
+export interface PurchaseEntryOpeningCommand extends PurchaseEntrySupplierCommand {opening: PurchaseEntryOpeningRecord}
+export type PurchaseEntrySaveCommand = PurchaseEntrySupplierCommand | PurchaseEntryDraftCommand | PurchaseEntryOpeningCommand;
 export interface PurchaseEntryReceipt {
-  schemaVersion: 1; scope: PurchaseEntryScope; operation: 'saveSupplierProfile' | 'savePurchaseDraft';
+  schemaVersion: 1; scope: PurchaseEntryScope; operation: 'saveSupplierProfile' | 'savePurchaseDraft' | 'saveSupplierOpeningEvidence';
   idempotencyKey: string; fingerprint: string; status: 'saved' | 'not_saved'; reason: string | null; changed: boolean;
   resultRevision: number | null; profile: PurchaseEntrySupplier; recordedAt: string;
   draftId?: string; draftFingerprint?: string; copyId?: string | null; copyFingerprint?: string | null;
+  openingId?: string; openingFingerprint?: string;
 }
 export interface PurchaseEntryResult {receipt: PurchaseEntryReceipt | null; currentBook: PurchaseEntryBook | null}
 /** Implementations must authorize the original Store source even for receipts.
@@ -55,6 +65,7 @@ export interface PurchaseEntryRepository {
   read(actor: PurchaseEntryActor, scope: PurchaseEntryScope): Promise<PurchaseEntryBook | null>;
   saveSupplier(actor: PurchaseEntryActor, command: PurchaseEntrySupplierCommand): Promise<PurchaseEntryResult>;
   savePurchaseDraft?(actor: PurchaseEntryActor, command: PurchaseEntryDraftCommand): Promise<PurchaseEntryResult>;
+  saveOpeningEvidence?(actor: PurchaseEntryActor, command: PurchaseEntryOpeningCommand): Promise<PurchaseEntryResult>;
   status(actor: PurchaseEntryActor, scope: PurchaseEntryScope, key: string, fingerprint: string): Promise<PurchaseEntryResult>;
 }
 export function purchaseEntryError(code = 'invalid_input', status = 400): never {
@@ -244,17 +255,99 @@ export function purchaseEntryInvoiceFinancialYear(raw: string): number | null {
 export function purchaseEntryDraftCommandFingerprint(input: Omit<PurchaseEntryDraftCommand, 'fingerprint'>): string {
   return purchaseEntryHash({schemaVersion: 1, operation: 'savePurchaseDraft', ...input});
 }
-export function purchaseEntrySaveOperation(command: PurchaseEntrySaveCommand): 'saveSupplierProfile' | 'savePurchaseDraft' {
-  return 'draft' in command ? 'savePurchaseDraft' : 'saveSupplierProfile';
+export function purchaseEntryOpeningCommandFingerprint(input: Omit<PurchaseEntryOpeningCommand, 'fingerprint'>): string {
+  return purchaseEntryHash({schemaVersion: 1, operation: 'saveSupplierOpeningEvidence', ...input});
+}
+/** The original unposted evidence schema is shared with ledger confirmation. */
+export function checkedPurchaseEntryOpening(raw: unknown, scope: PurchaseEntryScope): PurchaseEntryOpeningRecord {
+  const v = purchaseEntryExact(raw, ['id', 'basisId', 'account', 'store', 'qa', 'supplierId', 'revision', 'asOfDate',
+    'savedAt', 'currency', 'amountMinor', 'supplierCredit', 'sourceNote', 'bills']);
+  const text = (value: unknown, maximum?: number): string => {
+    if (typeof value !== 'string' || !value.trim() || maximum !== undefined && value.length > maximum ||
+        /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value) || Buffer.from(value, 'utf8').toString('utf8') !== value) purchaseEntryError();
+    return value;
+  };
+  for (const key of ['id', 'basisId', 'account', 'store', 'supplierId']) text(v[key], 240);
+  purchaseEntryRevision(v.revision); purchaseEntryMicros(v.savedAt); text(v.sourceNote, 4000);
+  if (typeof v.asOfDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v.asOfDate)) purchaseEntryError();
+  const day = new Date(v.asOfDate + 'T00:00:00.000Z');
+  if (!Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== v.asOfDate ||
+      v.account !== scope.account || v.store !== scope.store || v.qa !== false || v.currency !== 'INR' ||
+      typeof v.supplierCredit !== 'boolean' || v.amountMinor !== null &&
+      (!Number.isSafeInteger(v.amountMinor) || (v.amountMinor as number) < 0 || (v.amountMinor as number) > 999999999999) ||
+      !Array.isArray(v.bills) || v.bills.length > 1000) purchaseEntryError();
+  const ids = new Set<string>();
+  for (const rawBill of v.bills) {
+    const bill = purchaseEntryExact(rawBill, ['copyId', 'copyRevision', 'draftId', 'inclusion']);
+    const id = text(bill.copyId); text(bill.draftId); purchaseEntryRevision(bill.copyRevision);
+    if (ids.has(id) || !['unknown', 'included', 'excluded'].includes(bill.inclusion as string)) purchaseEntryError();
+    ids.add(id);
+  }
+  return purchaseEntryClone(v) as unknown as PurchaseEntryOpeningRecord;
+}
+export function purchaseEntrySaveOperation(command: PurchaseEntrySaveCommand): PurchaseEntryReceipt['operation'] {
+  return 'draft' in command ? 'savePurchaseDraft' : 'opening' in command ? 'saveSupplierOpeningEvidence' : 'saveSupplierProfile';
 }
 export function purchaseEntrySaveFingerprint(command: PurchaseEntrySaveCommand): string {
   const {fingerprint: _, ...input} = command;
-  return 'draft' in input ? purchaseEntryDraftCommandFingerprint(input as Omit<PurchaseEntryDraftCommand, 'fingerprint'>) : purchaseEntryCommandFingerprint(input);
+  return 'draft' in input ? purchaseEntryDraftCommandFingerprint(input as Omit<PurchaseEntryDraftCommand, 'fingerprint'>)
+    : 'opening' in input ? purchaseEntryOpeningCommandFingerprint(input as Omit<PurchaseEntryOpeningCommand, 'fingerprint'>) : purchaseEntryCommandFingerprint(input);
 }
-export function purchaseEntryDraftReceiptFields(command: PurchaseEntrySaveCommand): Pick<PurchaseEntryReceipt, 'draftId' | 'draftFingerprint' | 'copyId' | 'copyFingerprint'> {
+export function purchaseEntryDraftReceiptFields(command: PurchaseEntrySaveCommand): Pick<PurchaseEntryReceipt, 'draftId' | 'draftFingerprint' | 'copyId' | 'copyFingerprint' | 'openingId' | 'openingFingerprint'> {
+  if ('opening' in command) return {openingId: command.opening.id, openingFingerprint: purchaseEntryHash(command.opening)};
   if (!('draft' in command)) return {};
   return {draftId: command.draft.id, draftFingerprint: purchaseEntryHash(command.draft), copyId: command.reviewedCopy?.id ?? null,
     copyFingerprint: command.reviewedCopy === null ? null : purchaseEntryHash(command.reviewedCopy)};
+}
+/** Evidence only: preserve every supplier, purchase copy, receipt and ledger.
+ * The separately confirmed opening operation owns any financial effect. */
+export function planPurchaseEntryOpening(command: PurchaseEntryOpeningCommand, original: PurchaseEntryBook | null):
+  {book: PurchaseEntryBook; profile: PurchaseEntrySupplier; changed: boolean} {
+  const scope = checkedPurchaseEntryScope(command.scope), profile = checkedPurchaseEntrySupplier(command.profile),
+    opening = checkedPurchaseEntryOpening(command.opening, scope), current = original === null ? null : checkedPurchaseEntryBook(original, scope);
+  if (opening.supplierId !== profile.id) purchaseEntryError();
+  if (!current) purchaseEntryError('supplier_unavailable', 409);
+  const supplier = current.profiles.find(value => value.id === profile.id);
+  if (!supplier || !sameNativeSupplier(supplier, profile)) purchaseEntryError('supplier_unavailable', 409);
+  const records = current.openingRecords ?? [];
+  // Validate the original evidence before treating a missing ID as absence.
+  const ids = new Set<string>(), bases = new Map<string, string>(), owners = new Map<string, string>(),
+    suppliers = new Set(current.profiles.map(value => value.id)), copies = new Map<string, PurchaseEntryCopy>();
+  for (const rawCopy of current.copies ?? []) {
+    let copy: PurchaseEntryCopy;
+    try {copy = checkedPurchaseEntryCopy(rawCopy, false);} catch {purchaseEntryError('service_unavailable', 503);}
+    const id = copy.id;
+    if (copies.has(id)) purchaseEntryError('service_unavailable', 503);
+    copies.set(id, copy);
+  }
+  const linksValid = (record: PurchaseEntryOpeningRecord): boolean => record.bills.every(link => {
+    const copy = copies.get(link.copyId), draft = copy?.draft as Record<string, unknown> | undefined;
+    return copy !== undefined && copy.revision === link.copyRevision && link.copyRevision < record.revision &&
+      draft !== undefined && draft.id === link.draftId && draft.supplierId === record.supplierId;
+  });
+  let previousRevision = 0;
+  for (const value of records) {
+    const record = checkedPurchaseEntryOpening(value, scope);
+    if (ids.has(record.id) || !suppliers.has(record.supplierId) || record.revision <= previousRevision || record.revision > current.revision ||
+        bases.has(record.supplierId) && bases.get(record.supplierId) !== record.basisId ||
+        owners.has(record.basisId) && owners.get(record.basisId) !== record.supplierId || !linksValid(record)) purchaseEntryError('service_unavailable', 503);
+    ids.add(record.id); bases.set(record.supplierId, record.basisId); owners.set(record.basisId, record.supplierId);
+    previousRevision = record.revision;
+  }
+  const existing = records.find(value => (value as Record<string, unknown>).id === opening.id);
+  if (existing) {
+    if (purchaseEntryCanonical(existing) !== purchaseEntryCanonical(opening)) purchaseEntryError('immutable_opening_conflict', 409);
+    return {book: current, profile, changed: false};
+  }
+  if (command.expectedRevision !== current.revision) purchaseEntryError('stale_book', 409);
+  if (opening.revision !== current.revision + 1) purchaseEntryError('stale_opening', 409);
+  if (bases.has(opening.supplierId) && bases.get(opening.supplierId) !== opening.basisId ||
+      owners.has(opening.basisId) && owners.get(opening.basisId) !== opening.supplierId) purchaseEntryError('immutable_opening_conflict', 409);
+  if (!linksValid(opening)) purchaseEntryError('stale_opening', 409);
+  if (records.length >= 1000) purchaseEntryError('capacity_exceeded', 409);
+  const candidate = {...current, revision: current.revision + 1, openingRecords: [...records, opening]};
+  if (Buffer.byteLength(purchaseEntryCanonical(candidate), 'utf8') > 10 * 1024 * 1024) purchaseEntryError('capacity_exceeded', 409);
+  return {book: checkedPurchaseEntryBook(candidate, scope), profile, changed: true};
 }
 export function planPurchaseEntryDraft(command: PurchaseEntryDraftCommand, original: PurchaseEntryBook | null):
   {book: PurchaseEntryBook; profile: PurchaseEntrySupplier; changed: boolean} {
@@ -332,8 +425,9 @@ export function checkedPurchaseEntryReceipt(raw: unknown, scope: PurchaseEntrySc
   const operation = purchaseEntryObject(raw).operation;
   const r = purchaseEntryExact(raw, ['schemaVersion', 'scope', 'operation', 'idempotencyKey', 'fingerprint',
     'status', 'reason', 'changed', 'resultRevision', 'profile', 'recordedAt',
-    ...(operation === 'savePurchaseDraft' ? ['draftId', 'draftFingerprint', 'copyId', 'copyFingerprint'] : [])]);
-  if (r.schemaVersion !== 1 || !['saveSupplierProfile', 'savePurchaseDraft'].includes(r.operation as string) || r.idempotencyKey !== key ||
+    ...(operation === 'savePurchaseDraft' ? ['draftId', 'draftFingerprint', 'copyId', 'copyFingerprint']
+      : operation === 'saveSupplierOpeningEvidence' ? ['openingId', 'openingFingerprint'] : [])]);
+  if (r.schemaVersion !== 1 || !['saveSupplierProfile', 'savePurchaseDraft', 'saveSupplierOpeningEvidence'].includes(r.operation as string) || r.idempotencyKey !== key ||
       r.fingerprint !== fingerprint || purchaseEntryCanonical(checkedPurchaseEntryScope(r.scope)) !== purchaseEntryCanonical(scope) ||
       typeof r.changed !== 'boolean') purchaseEntryError('service_unavailable', 503);
   if (r.status === 'saved') {
@@ -341,7 +435,7 @@ export function checkedPurchaseEntryReceipt(raw: unknown, scope: PurchaseEntrySc
     purchaseEntryRevision(r.resultRevision);
   } else if (r.status === 'not_saved') {
     if (r.changed !== false || typeof r.reason !== 'string' ||
-        !purchaseEntryTerminalReasons(operation === 'savePurchaseDraft').includes(r.reason)) purchaseEntryError('service_unavailable', 503);
+        !purchaseEntryTerminalReasons(operation === 'savePurchaseDraft', operation === 'saveSupplierOpeningEvidence').includes(r.reason)) purchaseEntryError('service_unavailable', 503);
     if (r.resultRevision !== null) purchaseEntryRevision(r.resultRevision);
   } else purchaseEntryError('service_unavailable', 503);
   purchaseEntryMicros(r.recordedAt);
@@ -351,17 +445,27 @@ export function checkedPurchaseEntryReceipt(raw: unknown, scope: PurchaseEntrySc
       if (r.copyFingerprint !== null) purchaseEntryError('service_unavailable', 503);
     } else {purchaseEntryId(r.copyId); purchaseEntryFingerprint(r.copyFingerprint);}
   }
+  if (operation === 'saveSupplierOpeningEvidence') {purchaseEntryId(r.openingId); purchaseEntryFingerprint(r.openingFingerprint);}
   return {...r, profile: checkedPurchaseEntrySupplier(r.profile)} as unknown as PurchaseEntryReceipt;
 }
-export function purchaseEntryTerminalReasons(draft: boolean): readonly string[] {
+export function purchaseEntryTerminalReasons(draft: boolean, opening = false): readonly string[] {
   return ['stale_book', 'duplicate_supplier', 'capacity_exceeded', ...(draft ?
-    ['stale_draft', 'immutable_copy_conflict', 'incomplete_reviewed_copy', 'duplicate_invoice', 'private_original_unavailable'] : [])];
+    ['stale_draft', 'immutable_copy_conflict', 'incomplete_reviewed_copy', 'duplicate_invoice', 'private_original_unavailable'] : []),
+    ...(opening ? ['supplier_unavailable', 'immutable_opening_conflict', 'stale_opening'] : [])];
 }
 const common = ['schemaVersion', 'purchaseEntryVersion', 'actorAccountId', 'realm', 'storeId'];
-export function purchaseEntryOperation(operation: string): 'read' | 'saveSupplier' | 'savePurchaseDraft' | 'status' | undefined {
+/** HTTP infrastructure bound only, not authority or a larger book allowance.
+ * A draft and its reviewed data copy can both appear in one command. The
+ * original persisted purchase book remains bounded at10MiB by its owner. */
+export function workspaceOriginalRequestBodyLimit(operation: string): number {
+  return ['saveStorePurchaseDraft', 'saveStoreSupplierOpeningEvidence', 'confirmStoreSupplierOpening'].includes(operation)
+    ? 24 * 1024 * 1024 : 64 * 1024;
+}
+export function purchaseEntryOperation(operation: string): 'read' | 'saveSupplier' | 'savePurchaseDraft' | 'saveOpeningEvidence' | 'status' | undefined {
   if (operation === 'readStorePurchaseEntryBook') return 'read';
   if (operation === 'saveStoreSupplierProfile') return 'saveSupplier';
   if (operation === 'saveStorePurchaseDraft') return 'savePurchaseDraft';
+  if (operation === 'saveStoreSupplierOpeningEvidence') return 'saveOpeningEvidence';
   if (operation === 'readStorePurchaseEntryAttempt') return 'status';
   return undefined;
 }
@@ -422,6 +526,20 @@ export class WorkspacePurchaseEntryService {
       ids = purchaseEntryDraftReceiptFields(command);
     if (!receipt || receipt.operation !== 'savePurchaseDraft' || purchaseEntryCanonical(receipt.profile) !== purchaseEntryCanonical(profile) ||
         Object.entries(ids).some(([key, value]) => receipt[key as keyof PurchaseEntryReceipt] !== value)) purchaseEntryError('service_unavailable', 503);
+    return this.response(scope, result, idempotencyKey, fingerprint);
+  }
+  async saveOpeningEvidence(actor: PurchaseEntryActor, body: Readonly<Record<string, unknown>>): Promise<object> {
+    purchaseEntryExact(body, [...common, 'expectedRevision', 'idempotencyKey', 'fingerprint', 'profile', 'opening']);
+    const scope = this.scope(actor, body);
+    if (!this.repository!.saveOpeningEvidence) purchaseEntryError('service_unavailable', 503);
+    const profile = checkedPurchaseEntrySupplier(body.profile), opening = checkedPurchaseEntryOpening(body.opening, scope),
+      expectedRevision = body.expectedRevision === null ? null : purchaseEntryRevision(body.expectedRevision),
+      idempotencyKey = purchaseEntryId(body.idempotencyKey), fingerprint = purchaseEntryFingerprint(body.fingerprint);
+    const command = {scope, profile, opening, expectedRevision, idempotencyKey, fingerprint};
+    if (fingerprint !== purchaseEntryOpeningCommandFingerprint({scope, profile, opening, expectedRevision, idempotencyKey})) purchaseEntryError();
+    const result = await this.repository!.saveOpeningEvidence(actor, command), receipt = result.receipt;
+    if (!receipt || receipt.operation !== 'saveSupplierOpeningEvidence' || receipt.openingId !== opening.id ||
+        receipt.openingFingerprint !== purchaseEntryHash(opening) || purchaseEntryCanonical(receipt.profile) !== purchaseEntryCanonical(profile)) purchaseEntryError('service_unavailable', 503);
     return this.response(scope, result, idempotencyKey, fingerprint);
   }
   async status(actor: PurchaseEntryActor, body: Readonly<Record<string, unknown>>): Promise<object> {

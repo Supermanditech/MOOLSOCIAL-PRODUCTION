@@ -59,7 +59,8 @@ import 'work_invoice_pdf_screen.dart';
 import 'store_add_product_sheet.dart';
 import '../work_services.dart';
 import '../work_catalogue_gateway.dart';
-import '../work_purchase_entry_gateway.dart' show WorkspacePurchaseDraftSaveIntent;
+import '../work_purchase_entry_gateway.dart' show WorkspacePurchaseDraftSaveIntent, WorkspaceSupplierOpeningSaveIntent;
+import '../work_ledger_gateway.dart' show WorkspaceLedgerIntent, WorkspaceLedgerReadback;
 import '../work_session.dart';
 
 class _StoreRestockNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
@@ -1760,6 +1761,47 @@ class StoreExpenseInitialData {
   }
 }
 
+@immutable
+class StoreRegisterEntryInitialData {
+  const StoreRegisterEntryInitialData._(this.fields);
+  final Map<String, String> fields;
+  static const allowedFields = {'amount', 'direction', 'reference', 'occurredAt'};
+  factory StoreRegisterEntryInitialData.fromFields(Map<String, Object?> raw) {
+    if (!const {'amount', 'direction', 'reference'}.every(raw.containsKey) || !raw.keys.every(allowedFields.contains) ||
+        !raw.values.every((value) => value is String) || !const {'in', 'out'}.contains(raw['direction'])) {
+      throw const FormatException('Use the existing money-entry fields.');
+    }
+    final fields = raw.map((key, value) => MapEntry(key, value! as String));
+    final at = fields['occurredAt'] == null ? null : DateTime.tryParse(fields['occurredAt']!);
+    if (fields.containsKey('occurredAt') && (at == null || !at.isUtc || at.toIso8601String() != fields['occurredAt'])) {
+      throw const FormatException('Use the original entry date and time.');
+    }
+    return StoreRegisterEntryInitialData._(Map.unmodifiable(fields));
+  }
+}
+
+String _storeRegisterEntryEntity(String id) => 'ledger-register:' +
+  assistant_hash.sha256.convert(utf8.encode(jsonEncode(id))).toString();
+
+String? _storeRegisterEntryId(WorkSession session, String? entity) => session.workspaceOriginalLedgerSections?.registers.keys
+  .where((id) => _storeRegisterEntryEntity(id) == entity).singleOrNull;
+
+String? _storeRegisterEntrySignature(WorkSession session, String? entity) {
+  final id = _storeRegisterEntryId(session, entity), sections = session.workspaceOriginalLedgerSections;
+  if (id == null || sections == null || !session.canRecordWorkspaceOriginalRegisterEntry(id)) return null;
+  return _storeOriginalLedgerSignature(session, 'AI-ACT-271', entity);
+}
+
+String? _storeOriginalLedgerSignature(WorkSession session, String action, String? entity, {bool purchase = false}) {
+  final sections = session.workspaceOriginalLedgerSections;
+  if (sections == null || purchase && (!session.workspaceOriginalSupplierOpeningConfigured ||
+      !session.workspaceSuppliersLoaded || session.workspaceSupplierRecoveryRequired)) return null;
+  return 'store-original-ledger-v1:' + assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    sections.scope.account, sections.scope.store, sections.scope.realm, sections.revision,
+    purchase ? session.workspacePurchaseEntryRevision : null, action, entity,
+  ]))).toString();
+}
+
 final _openSupplierOpeningForms = Expando<Set<Object>>('native-opening-forms');
 bool _supplierOpeningFormOpen(WorkSession session) => _openSupplierOpeningForms[session]?.isNotEmpty == true;
 
@@ -1767,7 +1809,9 @@ typedef _StoreMoneyEntryView=({String entity,Map<String,String> fields,String si
 _StoreMoneyEntryView? _storeMoneyEntryView(WorkSession session,String? entity) {
   if(entity==null)return null;
   final scope=session.workspaceSupplierScope,finance=session.workspaceFinance;
-  if(scope==null||finance==null||!finance.valid||session.workspaceFinanceStale||
+  if(scope==null)return null;
+  final original = session.workspaceOriginalLedgerConfigured;
+  if (original ? session.workspaceOriginalLedgerSections == null : finance==null||!finance.valid||session.workspaceFinanceStale||
     finance.accountScope!=scope.$1||finance.workspaceId!=scope.$2)return null;
   final fields=<String,String>{};Object? facts;
   Object? decoded;try{decoded=jsonDecode(entity);}on FormatException{decoded=null;}
@@ -1786,6 +1830,7 @@ _StoreMoneyEntryView? _storeMoneyEntryView(WorkSession session,String? entity) {
     facts=[register.registerId,register.revision,register.openingAt.toUtc().toIso8601String(),
       register.asOf.toUtc().toIso8601String(),register.openingMinor,register.historyComplete,entry.toJson()];
   } else {
+    if (finance == null || original) return null;
     final entry=session.workspaceMoneyStatement?.entries.where((e)=>e.id==entity).singleOrNull;
     if(entry==null)return null;
     fields.addAll({'Date':_registerDate(entry.occurredAt),'Particulars':entry.party,'Entry type':entry.label,
@@ -1795,8 +1840,10 @@ _StoreMoneyEntryView? _storeMoneyEntryView(WorkSession session,String? entity) {
       entry.occurredAt.toUtc().toIso8601String(),entry.amountMinor,entry.incoming,entry.posted,entry.transfer];
   }
   fields.removeWhere((_,value)=>value.trim().isEmpty);
-  final signature=assistant_hash.sha256.convert(utf8.encode(jsonEncode([
-    [scope.$1,scope.$2,scope.$3],finance.revision,finance.asOf.toUtc().toIso8601String(),session.workspaceMoneyPeriod,facts,
+  final signature=original ? _storeOriginalLedgerSignature(session, 'AI-ACT-271', entity)!
+    : assistant_hash.sha256.convert(utf8.encode(jsonEncode([
+    [scope.$1,scope.$2,scope.$3],original ? session.workspaceOriginalLedgerSections!.revision : finance!.revision,
+    original ? null : finance!.asOf.toUtc().toIso8601String(),session.workspaceMoneyPeriod,facts,
   ]))).toString();
   return(entity:entity,fields:Map.unmodifiable(fields),signature:signature);
 }
@@ -1862,29 +1909,43 @@ Future<MoolAssistantReviewResult> showStoreMoneyEntryDetails(BuildContext contex
 }
 
 String? _supplierAccountAssistantSignature(WorkSession session, String actionId, String? entityId) {
-  if(actionId=='AI-ACT-271')return _storeMoneyEntryView(session,entityId)?.signature;
+  if(actionId=='AI-ACT-271')return _storeRegisterEntryId(session, entityId) != null
+    ? _storeRegisterEntrySignature(session, entityId) : _storeMoneyEntryView(session,entityId)?.signature;
   if (actionId == 'AI-ACT-270') {
     final key = session.expenseFormKey();
-    if (entityId != null || key == null || !session.canRecordStoreReviewExpense) return null;
+    if (entityId != null || key == null || !(session.canRecordStoreReviewExpense || session.canRecordWorkspaceOriginalExpense)) return null;
+    if (session.workspaceOriginalLedgerConfigured) return _storeOriginalLedgerSignature(session, actionId, entityId);
     return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
       [key.account, key.store, key.customer, key.invoice, key.order, key.kind, key.ledgerRevision],
       session.workspaceExpenses.map((e) => e.toJson()).toList(),
     ]))).toString();
   }
+  if (actionId == 'AI-ACT-268' && session.workspaceOriginalLedgerConfigured) {
+    return session.workspaceSupplierLedger(entityId ?? '') == null ? null
+      : _storeOriginalLedgerSignature(session, actionId, entityId);
+  }
   if (!_assistantFinancialBookAdmitted(session)) return null;
   final supplier = session.workspaceSuppliers.where((s) => s.id == entityId).singleOrNull;
   if (supplier == null || session.workspaceSupplierRecoveryRequired) return null;
   final opening = session.workspaceSupplierOpeningRecord(supplier.id);
-  final ledger = session.workspaceInvoiceHistoryLoaded ? session.workspaceSupplierLedger(supplier.id) : null;
+  final openingAction = const ['AI-ACT-257', 'AI-ACT-258', 'AI-ACT-381'].contains(actionId);
+  final ledger = (openingAction ? session.workspaceSupplierOpeningAccountLoaded : session.workspaceInvoiceHistoryLoaded)
+    ? session.workspaceSupplierLedger(supplier.id) : null;
   if (actionId == 'AI-ACT-257' && opening != null) return null;
-  if (actionId == 'AI-ACT-258' && (opening == null || !session.workspaceSupplierOpeningConfirmationAvailable ||
-      !session.workspaceInvoiceHistoryLoaded)) return null;
+  if (actionId == 'AI-ACT-258' && (opening == null ||
+      !(session.workspaceSupplierOpeningConfirmationAvailable || session.workspaceOriginalSupplierOpeningConfirmationAvailable) ||
+      !session.workspaceSupplierOpeningAccountLoaded)) return null;
 
+  if (actionId == 'AI-ACT-381' && session.workspaceOriginalSupplierOpeningConfigured && !session.workspaceSupplierOpeningAccountLoaded) return null;
   if (actionId == 'AI-ACT-381' && (opening == null ||
       (ledger?.openingRecord != null && jsonEncode(ledger!.openingRecord!.toJson()) == jsonEncode(opening.toJson())))) return null;
+  if (session.workspaceOriginalSupplierOpeningConfigured) {
+    return _storeOriginalLedgerSignature(session, actionId, entityId, purchase: true);
+  }
   return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
     actionId, session.workspacePurchaseEntryRevision, supplier.toJson(), opening?.toJson(),
-    if (actionId == 'AI-ACT-258' || actionId == 'AI-ACT-268') [session.workspaceInvoiceHistoryLoaded, ledger?.toJson()],
+    if (actionId == 'AI-ACT-258') [session.workspaceSupplierOpeningAccountLoaded, ledger?.toJson()],
+    if (actionId == 'AI-ACT-268') [session.workspaceInvoiceHistoryLoaded, ledger?.toJson()],
     session.workspaceLatestPurchaseCopies.where((c) => c.supplier.id == supplier.id).map((c) => c.toJson()).toList(),
   ]))).toString();
 }
@@ -1902,20 +1963,31 @@ Future<MoolAssistantReviewResult> showStoreSupplierAccountReview(BuildContext co
   if (!owner() || !isCurrent() || _supplierOpeningFormOpen(session) || _supplierMoneyFormOpen(session)) {
     return MoolAssistantReviewResult.stale;
   }
-  if (actionId != 'AI-ACT-270' && !_assistantFinancialBookAdmitted(session) || !owner() || !isCurrent() || !sourceCurrent()) {
+  final originalRegister = actionId == 'AI-ACT-271' && _storeRegisterEntryId(session, entityId) != null;
+  final originalMoney = const {'AI-ACT-268', 'AI-ACT-271'}.contains(actionId) && session.workspaceOriginalLedgerSections != null;
+  if (actionId != 'AI-ACT-270' && !originalMoney && !_assistantFinancialBookAdmitted(session) || !owner() || !isCurrent() || !sourceCurrent()) {
     return MoolAssistantReviewResult.stale;
   }
   if(actionId=='AI-ACT-271') {
+    if (originalRegister) {
+      final initial = fields.isEmpty ? null : StoreRegisterEntryInitialData.fromFields(fields);
+      await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
+        builder: (sheet) => _supplierCapturedOwnerSheet(context, sheet, session, owner,
+          _StoreRegisterEntrySheet(session: session, registerId: _storeRegisterEntryId(session, entityId)!,
+            initialData: initial, ownerCurrent: owner, prefillCurrent: () => sourceCurrent() && isCurrent()), ownerChanges: ownerChanges));
+      return owner() ? MoolAssistantReviewResult.opened : MoolAssistantReviewResult.stale;
+    }
     if(entityId==null||fields.isNotEmpty)return MoolAssistantReviewResult.unavailable;
     return showStoreMoneyEntryDetails(context,session,entityId,expectedSignature:expectedSignature,
       ownerCurrent:owner,reviewCurrent:isCurrent,ownerChanges:ownerChanges,validUntil:validUntil);
   }
   if (actionId == 'AI-ACT-268') {
     if (fields.isNotEmpty) return MoolAssistantReviewResult.unavailable;
-    final ledger = session.workspaceInvoiceHistoryLoaded ? session.workspaceSupplierLedger(entityId!) : null;
+    final ledger = session.workspaceOriginalLedgerSections != null || session.workspaceInvoiceHistoryLoaded
+      ? session.workspaceSupplierLedger(entityId!) : null;
     if (ledger != null) {
       await _showSupplierStatement(context, session, ledger,
-        ownerCurrent: () => owner() && session.workspaceInvoiceHistoryLoaded, ownerChanges: ownerChanges);
+        ownerCurrent: () => owner() && (session.workspaceOriginalLedgerSections != null || session.workspaceInvoiceHistoryLoaded), ownerChanges: ownerChanges);
     } else {
       // Existing native unavailable balance view; no invented statement/data.
       await showModalBottomSheet<void>(context: context, useSafeArea: true,
@@ -2006,8 +2078,12 @@ class _StoreMoneyEntryAssistantAdapter implements MoolAssistantOwnerAwareNativeA
   final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext,String?) readSnapshot;
   final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal,bool Function(),Listenable?) open;
   @override String get actionId=>'AI-ACT-271';
-  @override Set<String> get allowedFields=>const {};
-  @override String? validateFields(Map<String,Object?> fields)=>fields.isEmpty?null:'Choose a recorded money entry.';
+  @override Set<String> get allowedFields=>StoreRegisterEntryInitialData.allowedFields;
+  @override String? validateFields(Map<String,Object?> fields) {
+    if (fields.isEmpty) return null;
+    try {StoreRegisterEntryInitialData.fromFields(fields); return null;}
+    on FormatException catch (error) {return error.message.toString();}
+  }
   @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx,String? entity)=>readSnapshot(ctx,entity);
   Future<MoolAssistantReviewResult> _open(MoolAssistantProposal p,bool Function() current,Listenable? changes) async {
     if(p.actionId!=actionId||!current()||readContext()?.binding!=p.binding||validateFields(p.fields)!=null)
@@ -8329,8 +8405,17 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       !_financeSheetOpen && !_couponsSheetOpen && !_supplierOpeningFormOpen(source) &&
       !_supplierMoneyFormOpen(source) && !source.workspaceSupplierSaving;
     if (!current() || (actionId == 'AI-ACT-270' ? entityId != null : entityId == null)) return null;
+    if (source.workspaceOriginalLedgerConfigured) {
+      if (source.workspaceOriginalLedgerSections == null && !await source.loadWorkspaceOriginalLedger()) return null;
+      if (!current()) return null;
+      if (const {'AI-ACT-257', 'AI-ACT-258', 'AI-ACT-381'}.contains(actionId)) {
+        if (!source.workspaceOriginalSupplierOpeningConfigured || !await source.loadWorkspaceSuppliers()) return null;
+        if (!current()) return null;
+      }
+    }
     final scope = source.workspaceSupplierScope;
-    if (actionId != 'AI-ACT-270' && !_assistantFinancialBookAdmitted(source) || !current() || source.workspaceSupplierScope != scope) return null;
+    final originalMoney = const {'AI-ACT-268', 'AI-ACT-271'}.contains(actionId) && source.workspaceOriginalLedgerSections != null;
+    if (actionId != 'AI-ACT-270' && !originalMoney && !_assistantFinancialBookAdmitted(source) || !current() || source.workspaceSupplierScope != scope) return null;
     final signature = _supplierAccountAssistantSignature(source, actionId, entityId);
     if (signature == null) return null;
     return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: signature,
@@ -24660,6 +24745,14 @@ class _StoreSupplierOpeningSurface extends StatefulWidget {
 }
 
 class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
+  WorkspaceLedgerIntent? get _pendingConfirmation {
+    final pending = session.workspaceOriginalLedgerPending;
+    return pending?.operation == 'confirmStoreSupplierOpening' ? pending : null;
+  }
+  bool get _pendingSave => session.workspacePendingOpeningInput != null || _pendingConfirmation != null;
+  bool get _confirmationConfigured => session.workspaceSupplierOpeningConfirmationAvailable || session.workspaceOriginalSupplierOpeningConfigured;
+  bool get _confirmationAvailable => session.workspaceSupplierOpeningConfirmationAvailable || session.workspaceOriginalSupplierOpeningConfirmationAvailable;
+  bool get _accountLoading => session.workspaceOriginalSupplierOpeningConfigured && session.workspaceOriginalLedgerBusy;
   final _date = TextEditingController(),
       _amount = TextEditingController(),
       _note = TextEditingController();
@@ -24690,7 +24783,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     _credit,
     _relations.map((k, v) => MapEntry(k, v.name)),
   ]);
-  bool get _dirty => _editing && _input != _baseline;
+  bool get _dirty => _editing && !_pendingSave && _input != _baseline;
   @override
   void initState() {
     super.initState();
@@ -24715,30 +24808,98 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
         _relations.addAll(initial.relations);
       }
     }
-    if (session.workspaceSupplierOpeningConfirmationAvailable) {
+    final pending = session.workspacePendingOpeningInput;
+    if (pending != null) _restoreOpening(pending);
+    if (_pendingConfirmation case final original?) _restoreConfirmation(original);
+    if (_confirmationConfigured && pending == null) {
       unawaited(_recoverPosting(readOnlyOpen: widget.readOnlyOpen));
     }
   }
 
+  void _restoreOpening(WorkspaceSupplierOpeningSaveIntent original) {
+    final record = original.opening;
+    _supplierId = record.supplierId; _basisId = record.basisId; _revision = original.expectedRevision;
+    _attempt = record; _viewed = null; _editing = true;
+    _date.text = record.asOfDate; _amount.text = record.amountMinor == null ? '' : (record.amountMinor! / 100).toStringAsFixed(2);
+    _note.text = record.sourceNote; _known = record.amountMinor != null; _credit = record.supplierCredit;
+    _relations..clear()..addAll({for (final bill in record.bills) bill.copyId: bill.inclusion});
+    _baseline = _input;
+    _error = 'Check the saved status before changing these entries.';
+  }
+  void _restoreConfirmation(WorkspaceLedgerIntent original) {
+    final record = WorkspaceSupplierOpeningRecord.fromJson(original.input);
+    _show(record.supplierId, version: record);
+    _revision = original.data['expectedPurchaseRevision']! as int;
+    _error = 'Check the confirmation status before changing this starting balance.';
+  }
+  Future<void> _recoverConfirmation(WorkspaceLedgerIntent original, {bool explicitRetry = false}) async {
+    if (!_current || _busy || session.workspaceOriginalLedgerBusy) return;
+    FocusScope.of(context).unfocus(); setState(() {_busy = true; _error = null;});
+    final result = await session.checkWorkspaceOriginalLedgerAttempt(original, explicitRetry: explicitRetry);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (!_current) return;
+      _postingRecovered = session.workspaceSupplierOpeningAccountLoaded;
+      if (result?.attempt?['status'] == 'saved') {
+        _assistantCommitted = true;
+        final record = WorkspaceSupplierOpeningRecord.fromJson(original.input);
+        _show(record.supplierId, version: record);
+      }
+      _error = session.workspaceOriginalLedgerError ??
+        (result?.attempt == null ? 'Confirmation status is not known yet. Keep this attempt and check again.' : null);
+    });
+  }
+  Future<void> _recoverOpening({bool explicitRetry = false}) async {
+    if (_pendingConfirmation case final pending?) {
+      await _recoverConfirmation(pending, explicitRetry: explicitRetry); return;
+    }
+    final original = session.workspacePendingOpeningInput;
+    if (original == null || !_current || _busy || session.workspaceSupplierSaving) return;
+    FocusScope.of(context).unfocus(); setState(() {_busy = true; _error = null;});
+    final result = await session.checkWorkspaceOpeningAttempt(original, explicitRetry: explicitRetry);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (!_current) {_error = 'Return to the Store where you started. The original entries are kept.'; return;}
+      if (result == null) {_error = session.workspaceSupplierError ?? 'Saved status is not confirmed yet.'; return;}
+      if (result.recorded) {_assistantCommitted = true; _show(original.opening.supplierId);
+        if (session.workspaceOriginalSupplierOpeningConfigured) unawaited(_recoverPosting());}
+      else {
+        _attempt = null; _revision = session.workspacePurchaseEntryRevision;
+        _basisId = session.workspaceSupplierOpeningRecord(original.opening.supplierId)?.basisId ?? original.opening.basisId;
+        _error = session.workspaceSupplierError ?? 'The opening record was not saved. Review these entries before saving again.';
+      }
+    });
+  }
   Future<void> _recoverPosting({bool readOnlyOpen = false}) async {
-    final recovered = readOnlyOpen ? session.workspaceInvoiceHistoryLoaded : await session.recoverCustomerLedger();
+    final original = session.workspaceOriginalSupplierOpeningConfigured;
+    final bookReady = !original || !session.workspaceSupplierRecoveryRequired || await session.loadWorkspaceSuppliers(retry: true);
+    if (!mounted || !_current) return;
+    final recovered = bookReady && (original
+      ? await session.loadWorkspaceOriginalLedger(retry: true)
+      : readOnlyOpen ? session.workspaceInvoiceHistoryLoaded : await session.recoverCustomerLedger());
     if (!mounted || !_current) {
       return;
     }
     setState(() {
       _postingRecovered = recovered;
+      if (_pendingConfirmation case final original?) {
+        _restoreConfirmation(original); return;
+      }
       if (recovered && !_editing) {
+        if (original && _supplierId != null) _show(_supplierId!);
         _error = null;
       }
       if (!recovered) {
-        _error = session.customerLedgerRecoveryError ??
+        _error = session.workspaceSupplierError ?? session.workspaceOriginalLedgerError ?? session.customerLedgerRecoveryError ??
             'Supplier account could not be opened. Saved records are kept; try again.';
       }
     });
   }
 
-  bool get _accountReady => _current && _postingRecovered && (!widget.readOnlyOpen || session.workspaceInvoiceHistoryLoaded) &&
-      !session.workspaceSupplierRecoveryRequired;
+  bool get _accountReady => _current && _postingRecovered && (!widget.readOnlyOpen || session.workspaceSupplierOpeningAccountLoaded) &&
+      session.workspaceOriginalLedgerPending == null && !session.workspaceSupplierRecoveryRequired;
   bool get _posted {
     final proof = _supplierId == null ? null :
         session.workspaceSupplierLedger(_supplierId!)?.openingRecord;
@@ -24749,7 +24910,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
   Future<void> _confirmOpening() async {
     final record = _viewed;
     if (_busy || _editing || !_accountReady || !_assistantSourceCurrent || record == null || _revision == null ||
-        !session.workspaceSupplierOpeningConfirmationAvailable) {
+        !_confirmationAvailable) {
       return;
     }
     FocusScope.of(context).unfocus();
@@ -24778,9 +24939,9 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
         return;
       }
       setState(() {
-        _postingRecovered = session.workspaceInvoiceHistoryLoaded;
-        _error = saved ? null : session.workspaceSupplierError ??
-          'Balance confirmation was not completed. Reopen the saved supplier account before trying again.';
+        _postingRecovered = session.workspaceSupplierOpeningAccountLoaded;
+        _error = session.workspaceOriginalLedgerError ?? (saved ? null : session.workspaceSupplierError ??
+          'Balance confirmation was not completed. Reopen the saved supplier account before trying again.');
       });
     } finally {
       if (mounted) {
@@ -24827,7 +24988,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
   }
 
   Future<void> _pickSupplier() async {
-    if (!mounted || !_current || _busy || _leaving ||
+    if (!mounted || !_current || _busy || _leaving || _pendingSave || _accountLoading ||
         session.workspaceSupplierSaving) {
       return;
     }
@@ -24846,7 +25007,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-    bool readySelection() => validReturn() && session.workspaceSuppliersLoaded &&
+    bool readySelection() => validReturn() && !_pendingSave && session.workspaceSuppliersLoaded &&
         !session.workspaceSupplierSaving && !session.workspaceSupplierRecoveryRequired &&
         session.workspaceSuppliers.any((p) => p.id == selected);
     if (selected == null || selected == original || !readySelection()) {
@@ -24886,6 +25047,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
   }
 
   void _changed({bool clearBills = true}) {
+    if (_pendingSave) return;
     setState(() {
       if (clearBills) _relations.clear();
       _attempt = null;
@@ -24894,7 +25056,8 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
   }
 
   Future<void> _save() async {
-    if (_busy || !_editing || !_current || !_assistantSourceCurrent || _supplierId == null) return;
+    if (_pendingSave) {await _recoverOpening(); return;}
+    if (_busy || _accountLoading || !_editing || !_current || !_assistantSourceCurrent || _supplierId == null) return;
     final amount = _known
         ? WorkspacePurchaseEntryDraft.printedPaise(_amount.text)
         : null;
@@ -24961,6 +25124,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
       if (saved && _current) {
         _assistantCommitted = true;
         _show(_supplierId!);
+        if (session.workspaceOriginalSupplierOpeningConfigured) unawaited(_recoverPosting());
       } else {
         _error =
             session.workspaceSupplierError ??
@@ -24978,7 +25142,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
   }) => TextField(
     key: Key(key),
     controller: controller,
-    readOnly: !_editing || _busy || !_current,
+    readOnly: !_editing || _busy || _accountLoading || !_current || _pendingSave,
     maxLines: lines,
     maxLength: lines > 1 ? 4000 : 40,
     keyboardType: money
@@ -25020,9 +25184,9 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     }
     final usable =
         _current &&
-        !_busy &&
+        !_busy && !_accountLoading &&
         session.workspaceSuppliersLoaded &&
-        !session.workspaceSupplierSaving;
+        !session.workspaceSupplierSaving && !_pendingSave;
     final history = session.workspaceSupplierOpeningRecords
         .where((r) => r.supplierId == _supplierId)
         .toList();
@@ -25115,11 +25279,11 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
         const SizedBox(height: 16),
         InkWell(
           key: const Key('work-opening-supplier-picker'),
-          onTap: _current && !_busy && !session.workspaceSupplierSaving ? _pickSupplier : null,
+          onTap: _current && !_busy && !_accountLoading && !_pendingSave && !session.workspaceSupplierSaving ? _pickSupplier : null,
           child: InputDecorator(
             key: ValueKey(('work-opening-supplier', _supplierId, _selectionEpoch)),
             decoration: InputDecoration(labelText: 'Supplier', filled: false,
-              enabled: _current && !_busy && !session.workspaceSupplierSaving,
+              enabled: _current && !_busy && !_accountLoading && !_pendingSave && !session.workspaceSupplierSaving,
               suffixIcon: const Icon(Icons.search)),
             isEmpty: _supplierId == null,
             child: Text(session.workspaceSuppliers
@@ -25314,7 +25478,14 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
           Wrap(
             spacing: 8,
             children: [
-              if (_editing)
+              if (_pendingSave) ...[
+                OutlinedButton(key: const Key('work-opening-check-status'),
+                  onPressed: _current && !_busy && !session.workspaceSupplierSaving ? () => _recoverOpening() : null,
+                  child: const Text('Check saved status')),
+                FilledButton(key: const Key('work-opening-retry-original'),
+                  onPressed: _current && !_busy && !session.workspaceSupplierSaving ? () => _recoverOpening(explicitRetry: true) : null,
+                  child: Text(_pendingConfirmation != null ? 'Retry confirmation' : 'Retry save')),
+              ] else if (_editing)
                 FilledButton(
                   key: const Key('work-opening-save'),
                   style: FilledButton.styleFrom(
@@ -25352,23 +25523,23 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                 ),
               if (_accountReady && !_editing && !_posted && _viewed != null &&
                   _viewed == session.workspaceSupplierOpeningRecord(_supplierId!) &&
-                  session.workspaceSupplierOpeningConfirmationAvailable)
+                  _confirmationConfigured)
                 FilledButton(
                   key: const Key('work-opening-confirm'),
-                  onPressed: usable && _postingRecovered && _known &&
+                  onPressed: usable && _confirmationAvailable && _postingRecovered && _known &&
                       _viewed == session.workspaceSupplierOpeningRecord(_supplierId!) &&
                       _viewed!.bills.every((b) => b.inclusion != WorkspaceOpeningBillInclusion.unknown)
                       ? _confirmOpening : null,
                   child: Text(_busy ? 'Confirming…' : 'Confirm opening balance'),
                 ),
-              if (!_accountReady && session.workspaceSupplierOpeningConfirmationAvailable)
+              if (!_accountReady && _confirmationConfigured)
                 TextButton(key: const Key('work-opening-recover'),
                   onPressed: usable ? _recoverPosting : null,
                   child: const Text('Reopen supplier account')),
             ],
           ),
           if (!_editing && !_posted && _viewed != null &&
-              session.workspaceSupplierOpeningConfirmationAvailable &&
+              _confirmationConfigured &&
               (!_known || _viewed!.bills.any((b) => b.inclusion == WorkspaceOpeningBillInclusion.unknown)))
             const Text('Choose Correct record to check the amount and which bills are included before confirming.',
               style: TextStyle(fontSize: 12, color: MoolColors.ink)),
@@ -45846,11 +46017,47 @@ class _StoreExpensesSurface extends StatefulWidget {
 
 class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
   bool loading = true, recovered = false;
+  bool _ledgerSheetOpen = false;
   String? _registerId;
+
+  Future<void> _openExpense() => _openLedgerSheet((owner) =>
+    _StoreMoneyEntrySheet(session: widget.session, ownerCurrent: owner));
+
+  Future<void> _openRegisterEntry(String id) => _openLedgerSheet((owner) =>
+    _StoreRegisterEntrySheet(session: widget.session, registerId: id, ownerCurrent: owner));
+
+  Future<void> _openLedgerSheet(Widget Function(bool Function()) content) async {
+    if (_ledgerSheetOpen || _supplierMoneyFormOpen(widget.session)) return;
+    final session = widget.session, host = context.getInheritedWidgetOfExactType<MoolAssistantHost>();
+    final captured = host?.readContext(), scope = session.workspaceSupplierScope;
+    final original = session.workspaceOriginalLedgerConfigured;
+    bool owner() {
+      if (!mounted || session.workspaceSupplierScope != scope) return false;
+      if (!original) return true;
+      final current = host?.readContext(), account = current?.accountScope;
+      return current?.binding == captured?.binding && account is
+          ({String environment, String projectId, String? tenantId, String userId}) &&
+        session.workspaceApprovalMatchesAccount(account);
+    }
+    if (!owner()) return;
+    _ledgerSheetOpen = true;
+    try {
+      await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
+        builder: (sheetContext) => _supplierCapturedOwnerSheet(context, sheetContext, session, owner, content(owner)));
+    } finally {_ledgerSheetOpen = false;}
+  }
+
+  Widget _originalExpenseAction() => TextButton.icon(key: const Key('store-expense-open'),
+    onPressed: _openExpense, icon: const Icon(Icons.add, size: 18),
+    label: Text(widget.session.workspaceOriginalLedgerPending?.operation == 'recordStoreExpense'
+      ? 'Check expense status' : 'Record expense'));
 
   Widget _moneyBook(BuildContext context) {
     final session = widget.session;
-    if (loading || !recovered) {
+    final original = session.workspaceOriginalLedgerConfigured;
+    final pending = session.workspaceOriginalLedgerPending;
+    final pendingRegister = pending?.operation == 'recordStoreMoneyRegisterEntry' ? pending!.targetId : null;
+    if (loading || !recovered || original && session.workspaceOriginalLedgerSections == null) {
       return ListView(
         children: [
           Text(
@@ -45863,6 +46070,9 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
               onPressed: recover,
               child: const Text('Retry opening records'),
             ),
+          if (!loading && pendingRegister != null)
+            TextButton(key: const Key('work-money-register-record'), onPressed: () => _openRegisterEntry(pendingRegister),
+              child: const Text('Check money-entry status')),
         ],
       );
     }
@@ -45895,7 +46105,7 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
       final now = DateTime.now();
       final end = selected.asOf.isBefore(now) ? selected.asOf : now;
       final start = session.workspaceMoneyPeriodStart ?? selected.openingAt;
-      final balances = session.workspaceFinanceStale
+      final balances = !original && session.workspaceFinanceStale
           ? null
           : selected.balances(start, end);
       int? running = balances?.openingMinor;
@@ -45987,6 +46197,11 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
             ),
           ),
         ),
+        if (original && (pendingRegister != null || selected != null &&
+            session.canRecordWorkspaceOriginalRegisterEntry(selected.registerId)))
+          Align(alignment: Alignment.centerLeft, child: TextButton.icon(key: const Key('work-money-register-record'),
+            onPressed: () => _openRegisterEntry(pendingRegister ?? selected!.registerId),
+            icon: const Icon(Icons.add, size: 18), label: Text(pendingRegister == null ? 'Record money entry' : 'Check money-entry status'))),
         if (unavailable)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -46043,14 +46258,15 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
               'Recorded total',
               '',
               '',
-              _formatStoreMinorAmount(debit),
-              _formatStoreMinorAmount(credit),
+              original && selected == null ? 'Unavailable' : _formatStoreMinorAmount(debit),
+              original && selected == null ? 'Unavailable' : _formatStoreMinorAmount(credit),
               selected == null ? '' : balanceText(closing),
             ],
             notice: selected == null
-                ? 'Posted movements only in totals; pending entries and transfers excluded.'
+                ? original ? 'Combined movements require their original source. Select an available cash/bank register.'
+                  : 'Posted movements only in totals; pending entries and transfers excluded.'
                 : 'Book balance, not a verified bank balance. Movement type is supplied without an inferred voucher classification.',
-            empty: 'No records in this period.',
+            empty: original && selected == null ? 'Combined money movements are unavailable.' : 'No records in this period.',
           ),
         ),
       ],
@@ -46064,7 +46280,9 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
   }
 
   Future<void> recover() async {
-    final result = await widget.session.recoverCustomerLedger();
+    final result = widget.session.workspaceOriginalLedgerConfigured
+      ? await widget.session.loadWorkspaceOriginalLedger(retry: true)
+      : await widget.session.recoverCustomerLedger();
     if (mounted) {
       setState(() {
         loading = false;
@@ -46076,14 +46294,16 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
   @override
   Widget build(BuildContext context) {
     if (widget.statement) return _moneyBook(context);
+    final original = widget.session.workspaceOriginalLedgerConfigured;
+    final sourceReady = recovered && (!original || widget.session.workspaceOriginalLedgerSections != null);
     final start = widget.session.workspaceMoneyPeriodStart;
     final expenses = widget.session.workspaceExpenses
         .where(
           (expense) => start == null || !expense.occurredAt.isBefore(start),
         )
         .toList();
-    if (recovered && widget.register) {
-      return _StoreVoucherRegister(
+    if (sourceReady && widget.register) {
+      final register = _StoreVoucherRegister(
         identity: (
           'expenses',
           widget.session.workspaceStockHistoryScope()?.key,
@@ -46117,6 +46337,12 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
         notice: 'Recorded expenses · not a cash or bank balance',
         empty: 'No expense entries recorded for this period.',
       );
+      return original ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (widget.session.canRecordWorkspaceOriginalExpense ||
+            widget.session.workspaceOriginalLedgerPending?.operation == 'recordStoreExpense')
+          Align(alignment: Alignment.centerLeft, child: _originalExpenseAction()),
+        Expanded(child: register),
+      ]) : register;
     }
     return ListView(
       key: const Key('work-finance-expenses'),
@@ -46128,28 +46354,29 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
         ),
         if (loading)
           const Text('Opening saved expenses…')
-        else if (!recovered) ...[
+        else if (!sourceReady) ...[
           const Text('Saved expenses could not be opened.'),
           TextButton(
             onPressed: recover,
             child: const Text('Retry opening expenses'),
           ),
+          if (original && widget.session.workspaceOriginalLedgerPending?.operation == 'recordStoreExpense')
+            TextButton(key: const Key('store-expense-open'), onPressed: _openExpense, child: const Text('Check expense status')),
         ] else ...[
           Text(
             'Recorded expenses ${_purchaseAmount(expenses.fold<int>(0, (sum, expense) => sum + expense.amountMinor))}',
             key: const Key('work-expense-period-total'),
           ),
-          if (widget.session.canRecordStoreReviewExpense)
+          if (widget.session.canRecordStoreReviewExpense || widget.session.canRecordWorkspaceOriginalExpense ||
+              widget.session.workspaceOriginalLedgerPending?.operation == 'recordStoreExpense')
             TextButton.icon(
               key: const Key('store-expense-open'),
               icon: const Icon(Icons.add),
-              label: const Text('Record test expense'),
-              onPressed: () => showModalBottomSheet<void>(
-                context: context,
-                isScrollControlled: true,
-                useSafeArea: true,
-                builder: (_) => _StoreMoneyEntrySheet(session: widget.session),
-              ),
+              label: Text(widget.session.workspaceOriginalLedgerConfigured
+                ? widget.session.workspaceOriginalLedgerPending?.operation == 'recordStoreExpense'
+                  ? 'Check expense status' : 'Record expense'
+                : 'Record test expense'),
+              onPressed: _openExpense,
             ),
           const Text(
             'Recorded entries for this Store and period. Purchases and settlements stay in their own records.',
@@ -48677,6 +48904,173 @@ class _SupplierPaymentDraftCopiesState extends State<_SupplierPaymentDraftCopies
     ])]);
 }
 
+class _StoreRegisterEntrySheet extends StatefulWidget {
+  const _StoreRegisterEntrySheet({required this.session, required this.registerId,
+    required this.ownerCurrent, this.initialData, this.prefillCurrent});
+  final WorkSession session;
+  final String registerId;
+  final bool Function() ownerCurrent;
+  final StoreRegisterEntryInitialData? initialData;
+  final bool Function()? prefillCurrent;
+  @override State<_StoreRegisterEntrySheet> createState() => _StoreRegisterEntrySheetState();
+}
+
+class _StoreRegisterEntrySheetState extends State<_StoreRegisterEntrySheet> {
+  final amount = TextEditingController(), reference = TextEditingController();
+  final _token = Object();
+  late final Object? _scope, _context;
+  DateTime occurredAt = DateTime.now().toUtc();
+  String direction = 'in';
+  bool ready = false, busy = false, dirty = false, _initialAttempted = false;
+  int? _reviewedHead, _reviewedRegister;
+  WorkspaceLedgerIntent? original;
+  String? status, error;
+  WorkspaceMoneyRegisterSnapshot? get register => widget.session.workspaceOriginalLedgerSections?.registers[widget.registerId];
+  bool get current => mounted && widget.ownerCurrent() && widget.session.hasVerifiedWorkspace &&
+    widget.session.workspaceSupplierScope == _scope && widget.session.publicationPreferencesContext == _context;
+  bool get editable => ready && current && !busy && original == null &&
+    widget.session.canRecordWorkspaceOriginalRegisterEntry(widget.registerId);
+  @override void initState() {
+    super.initState();
+    _scope = widget.session.workspaceSupplierScope; _context = widget.session.publicationPreferencesContext;
+    (_openSupplierMoneyForms[widget.session] ??= <Object>{}).add(_token);
+    widget.session.addListener(refresh);
+    unawaited(load());
+  }
+  void refresh() {if (mounted) setState(() {});}
+  Future<void> load() async {
+    if (busy || !current) return;
+    setState(() {busy = true; error = null;});
+    try {
+      final opened = await widget.session.loadWorkspaceOriginalLedger(retry: true);
+      if (!current) return;
+      final retained = widget.session.workspaceOriginalLedgerPending;
+      if (retained?.operation == 'recordStoreMoneyRegisterEntry' && retained!.targetId == widget.registerId) {
+        original = retained;
+        final entry = Map<String, Object?>.from(retained.input! as Map), delta = entry['deltaMinor']! as int;
+        amount.text = '${delta.abs() ~/ 100}.${(delta.abs() % 100).toString().padLeft(2, '0')}';
+        direction = delta > 0 ? 'in' : 'out'; reference.text = entry['reference']! as String;
+        occurredAt = DateTime.parse(entry['occurredAt']! as String); ready = true; return;
+      }
+      if (!opened || register == null || !widget.session.canRecordWorkspaceOriginalRegisterEntry(widget.registerId)) {
+        error = 'This original account is unavailable. No entry has been recorded.'; return;
+      }
+      _reviewedHead = widget.session.workspaceOriginalLedgerSections!.revision;
+      _reviewedRegister = register!.revision;
+      if (!_initialAttempted && widget.initialData != null) {
+        _initialAttempted = true;
+        if (dirty || widget.prefillCurrent?.call() == false) {
+          error = 'Suggestion was not applied. Your existing entry is kept.';
+        } else {
+          final fields = widget.initialData!.fields;
+          amount.text = fields['amount']!; direction = fields['direction']!;
+          reference.text = fields['reference']!;
+          if (fields['occurredAt'] != null) occurredAt = DateTime.parse(fields['occurredAt']!);
+        }
+      }
+      ready = true;
+    } finally {if (mounted) setState(() => busy = false);}
+  }
+  Future<void> save() async {
+    if (busy || !current) return;
+    if (original != null) {await check(); return;}
+    if (!editable) return;
+    final minor = WorkspacePurchaseEntryDraft.printedPaise(amount.text.trim());
+    if (minor == null || minor <= 0 || reference.text.trim().isEmpty) {
+      setState(() => error = 'Enter the amount and movement reference.'); return;
+    }
+    if (_reviewedHead != widget.session.workspaceOriginalLedgerSections?.revision ||
+        _reviewedRegister != register?.revision || widget.prefillCurrent?.call() == false) {
+      setState(() => error = 'The account changed. Refresh records and review your entry.'); return;
+    }
+    final next = widget.session.prepareWorkspaceOriginalRegisterEntry(registerId: widget.registerId,
+      deltaMinor: direction == 'in' ? minor : -minor, reference: reference.text.trim(), occurredAt: occurredAt);
+    if (next == null) {setState(() => error = 'Check the entry date, time and original account.'); return;}
+    setState(() {original = next; busy = true; error = null;});
+    try {await finish(await widget.session.recordWorkspaceOriginalRegisterEntry(next));}
+    finally {if (mounted) setState(() => busy = false);}
+  }
+  Future<void> finish(WorkspaceLedgerReadback? result) async {
+    if (!current) return;
+    status = result?.attempt?['status'] as String?;
+    if (status == 'saved') {Navigator.pop(context); return;}
+    error = widget.session.workspaceOriginalLedgerError ?? 'Saved status is unconfirmed. Keep this original request.';
+  }
+  Future<void> check({bool explicitRetry = false}) async {
+    if (busy || !current || original == null) return;
+    setState(() {busy = true; error = null;});
+    try {await finish(await widget.session.checkWorkspaceOriginalLedgerAttempt(original!, explicitRetry: explicitRetry));}
+    finally {if (mounted) setState(() => busy = false);}
+  }
+  Future<void> chooseTime() async {
+    if (!editable || register == null) return;
+    final now = DateTime.now(), first = register!.openingAt.toLocal();
+    if (first.isAfter(now)) {setState(() => error = 'The original account dates need checking.'); return;}
+    final local = occurredAt.toLocal();
+    final date = await showDatePicker(context: context,
+      initialDate: local.isBefore(first) || local.isAfter(now) ? now : local,
+      firstDate: DateTime(first.year, first.month, first.day), lastDate: now);
+    if (!editable || date == null) return;
+    final time = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(local));
+    if (!editable || time == null) return;
+    setState(() {occurredAt = DateTime(date.year, date.month, date.day, time.hour, time.minute).toUtc(); dirty = true;});
+  }
+  Future<bool> confirmLeave() async {
+    if (busy) return false;
+    if (!current || !dirty || original != null) return true;
+    return await showDialog<bool>(context: context, builder: (dialog) => AlertDialog(
+      title: const Text('Discard unsaved entry?'), content: const Text('This money entry has not been recorded.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Keep editing')),
+        TextButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Discard changes'))])) == true;
+  }
+  @override void dispose() {
+    widget.session.removeListener(refresh); _openSupplierMoneyForms[widget.session]?.remove(_token);
+    amount.dispose(); reference.dispose(); super.dispose();
+  }
+  @override Widget build(BuildContext context) => PopScope(canPop: !busy && (!dirty || original != null || !current),
+    onPopInvokedWithResult: (didPop, _) async {if (!didPop && await confirmLeave() && context.mounted) Navigator.pop(context);},
+    child: SafeArea(top: false, child: Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Padding(padding: const EdgeInsets.only(left: 16, right: 8), child: Row(children: [
+          const Expanded(child: Text('Record money entry', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+          TextButton(key: const Key('work-money-entry-form-close'), onPressed: busy ? null : () async {
+            if (await confirmLeave() && context.mounted) Navigator.pop(context);
+          }, child: const Text('Close'))])),
+        Flexible(child: SingleChildScrollView(key: const Key('work-money-entry-form'), padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (!current) const Text('Return to the Store where you started. Your entry is kept.')
+            else ...[
+              Text(register?.label ?? 'Saved money entry', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const Text('Record a movement already made in this account. No money is transferred.', style: TextStyle(fontSize: 12)),
+              const SizedBox(height: 8),
+              TextField(key: const Key('work-money-entry-amount'), controller: amount, enabled: editable,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Amount (₹)', isDense: true), onChanged: (_) {if (editable) setState(() => dirty = true);}),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(key: ValueKey('work-money-entry-direction-$direction'), initialValue: direction,
+                decoration: const InputDecoration(labelText: 'Movement', isDense: true),
+                items: const [DropdownMenuItem(value: 'in', child: Text('Money in')), DropdownMenuItem(value: 'out', child: Text('Money out'))],
+                onChanged: !editable ? null : (value) {if (editable && value != null) setState(() {direction = value; dirty = true;});}),
+              const SizedBox(height: 8),
+              TextField(key: const Key('work-money-entry-reference'), controller: reference, enabled: editable, maxLength: 512,
+                decoration: const InputDecoration(labelText: 'Movement reference', isDense: true), onChanged: (_) {if (editable) setState(() => dirty = true);}),
+              TextButton.icon(key: const Key('work-money-entry-date'), onPressed: editable ? chooseTime : null,
+                icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                label: Text('Entry date & time · ${_registerDate(occurredAt.toLocal())} ${occurredAt.toLocal().hour.toString().padLeft(2, '0')}:${occurredAt.toLocal().minute.toString().padLeft(2, '0')}')),
+              if (error != null) Text(error!),
+              if (original != null) ...[
+                Text(status == 'not_saved' ? 'This entry was not recorded. Close and reopen to review it.' : 'The original request is kept until its status is confirmed.'),
+                TextButton(key: const Key('work-money-entry-check-status'), onPressed: busy ? null : check, child: const Text('Check saved status')),
+                if (status == null) TextButton(key: const Key('work-money-entry-retry-original'), onPressed: busy ? null : () => check(explicitRetry: true), child: const Text('Retry same entry')),
+              ] else ...[
+                if (!ready || error != null) TextButton(onPressed: busy ? null : load, child: const Text('Refresh records')),
+                FilledButton(key: const Key('work-money-entry-submit'), onPressed: editable ? save : null, child: Text(busy ? 'Saving…' : 'Save entry')),
+              ],
+            ],
+          ]))),
+      ]))));
+}
+
 class _StoreMoneyEntrySheet extends StatefulWidget {
   const _StoreMoneyEntrySheet({required this.session, this.purchase, this.supplierMoney,
     this.initialData, this.expenseInitialData, this.prefillKey, this.prefillSignature, this.prefillCurrent, this.ownerCurrent, this.readOnlyOpen = false, this.selectedDocument})
@@ -48699,7 +49093,17 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   final Object _nativeMoneyToken = Object();
   late final WorkSession _nativeMoneyOwner;
   bool _initialAttempted = false;
-  bool get _inputOwnerCurrent => widget.ownerCurrent?.call() != false;
+  late final bool _originalExpense;
+  late final Object? _expenseOwnerScope, _expenseOwnerContext;
+  WorkspaceLedgerIntent? _expenseIntent;
+  String? _expenseStatus;
+  bool get _inputOwnerCurrent => widget.ownerCurrent?.call() != false &&
+    (!_originalExpense || widget.session.hasVerifiedWorkspace &&
+      widget.session.workspaceSupplierScope == _expenseOwnerScope &&
+      widget.session.publicationPreferencesContext == _expenseOwnerContext);
+  bool get _compactMoney => manualMoney || _originalExpense;
+  bool get _editableExpense => !_originalExpense || _expenseIntent == null && _inputOwnerCurrent &&
+    widget.session.canRecordWorkspaceOriginalExpense;
   bool get expense => widget.purchase == null && widget.supplierMoney == null;
   bool get manualMoney => widget.supplierMoney != null;
   WorkspaceSupplierLedger? get moneyLedger => widget.session.workspaceSupplierLedger(widget.supplierMoney?.supplierId ?? '');
@@ -48712,7 +49116,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     draft.revision == null && draft.pending == null && amount.text.isEmpty && reference.text.isEmpty;
   String get title => _settledBillInput ? 'Bill payment details' : manualMoney ? widget.supplierMoney!.advance
       ? 'Record supplier advance' : 'Record supplier payment'
-      : expense ? 'Record test expense' : 'Record test payment';
+      : expense ? _originalExpense ? 'Record expense' : 'Record test expense' : 'Record test payment';
   int? get billBalance {
     if (manualMoney) {
       final copy = widget.supplierMoney!.copy;
@@ -48758,7 +49162,11 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   @override
   void initState() {
     super.initState();
+    _originalExpense = expense && widget.session.workspaceOriginalLedgerConfigured;
+    _expenseOwnerScope = widget.session.workspaceSupplierScope;
+    _expenseOwnerContext = widget.session.publicationPreferencesContext;
     _nativeMoneyOwner = widget.session;
+    if (_originalExpense) widget.session.addListener(refresh);
     (_openSupplierMoneyForms[_nativeMoneyOwner] ??= <Object>{}).add(_nativeMoneyToken);
     draft = _LedgerFormAutosave(
       widget.session,
@@ -48767,7 +49175,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
       : expense
           ? widget.session.expenseFormKey()
           : widget.session.supplierPaymentFormKey(widget.purchase!),
-      inputOwnerCurrent: widget.ownerCurrent,
+      inputOwnerCurrent: () => _inputOwnerCurrent && (!_originalExpense || _expenseIntent == null),
     );
     draft.addListener(refresh);
     amountFocus.addListener(refresh);
@@ -48793,6 +49201,21 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
 
   Future<void> _loadMoneyInputLocked({bool readOnlyOpen = false}) async {
     if (!_inputOwnerCurrent) return;
+    if (_originalExpense) {
+      final ready = await widget.session.loadWorkspaceOriginalLedger();
+      if (!mounted || !_inputOwnerCurrent) return;
+      final original = widget.session.workspaceOriginalLedgerPending;
+      if (original?.operation == 'recordStoreExpense') {
+        final expense = WorkspaceExpenseRecord.fromJson(original!.input);
+        if (expense == null) { error = 'Saved expense request could not be opened. Its data is kept.'; return; }
+        _expenseIntent = original;
+        amount.text = '${expense.amountMinor ~/ 100}.${(expense.amountMinor % 100).toString().padLeft(2, '0')}';
+        reference.text = expense.reference; category = expense.category;
+        method = expense.method; note.text = expense.note;
+        return;
+      }
+      if (!ready) {error = widget.session.workspaceOriginalLedgerError ?? 'Original expense records are unavailable.'; return;}
+    }
     final pristineAtStart = amount.text.isEmpty && reference.text.isEmpty &&
       draft.revision == null && draft.pending == null && !draft.busy && draft.error == null &&
       frozen == null && supportingCopies == null && resetAttempt == null && !confirmed && !conflict;
@@ -49008,6 +49431,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
 
   Future<void> submit() async {
     if (manualMoney) { await submitManualMoney(); return; }
+    if (_originalExpense) {await _submitOriginalExpense(); return;}
     if (saving || !_inputOwnerCurrent ||
         (widget.expenseInitialData != null && widget.prefillSignature !=
           _supplierAccountAssistantSignature(widget.session, 'AI-ACT-270', null)) ||
@@ -49071,8 +49495,49 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     });
   }
 
+  Future<void> _submitOriginalExpense() async {
+    if (saving || !_inputOwnerCurrent) return;
+    // An earlier Save callback is status-only once an attempt exists.
+    if (_expenseIntent != null) {await _checkOriginalExpense(); return;}
+    setState(() {_saving = true; error = null;});
+    try {
+      if (!await draft.flush() || !mounted || !_inputOwnerCurrent) return;
+      if (widget.expenseInitialData != null && widget.prefillSignature !=
+          _supplierAccountAssistantSignature(widget.session, 'AI-ACT-270', null)) {
+        error = 'Expense records changed. Reopen and review your saved input.'; return;
+      }
+      final minor = WorkspacePurchaseEntryDraft.printedPaise(amount.text.trim());
+      if (minor == null || minor <= 0 || reference.text.trim().isEmpty) {
+        error = 'Enter the expense amount and its receipt or payment reference.'; return;
+      }
+      final key = draft.key;
+      final original = key == null ? null : widget.session.prepareWorkspaceOriginalExpense(
+        key: key, amountMinor: minor, category: category, method: method,
+        reference: reference.text.trim(), note: note.text.trim());
+      if (original == null) {error = 'Expense records changed. Reopen and review your saved input.'; return;}
+      _expenseIntent = original;
+      await _checkOriginalExpense(firstSave: true);
+    } finally {if (mounted) setState(() => _saving = false);}
+  }
+
+  Future<void> _checkOriginalExpense({bool firstSave = false, bool explicitRetry = false}) async {
+    final original = _expenseIntent;
+    if (original == null || !_inputOwnerCurrent || !firstSave && saving) return;
+    setState(() {_saving = true; error = null;});
+    try {
+      final result = firstSave
+        ? await widget.session.recordWorkspaceOriginalExpense(original)
+        : await widget.session.checkWorkspaceOriginalLedgerAttempt(original, explicitRetry: explicitRetry);
+      if (!mounted || !_inputOwnerCurrent) return;
+      _expenseStatus = result?.attempt?['status'] as String?;
+      if (_expenseStatus == 'saved') {Navigator.pop(context); return;}
+      error = widget.session.workspaceOriginalLedgerError ?? 'Expense status is unconfirmed. Keep this request and check again.';
+    } finally {if (mounted) setState(() => _saving = false);}
+  }
+
   @override
   void dispose() {
+    if (_originalExpense) widget.session.removeListener(refresh);
     _openSupplierMoneyForms[_nativeMoneyOwner]?.remove(_nativeMoneyToken);
     draft.removeListener(refresh);
     draft.dispose();
@@ -49099,9 +49564,10 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     controller: amount,
     focusNode: manualMoney ? amountFocus : null,
     style: manualMoney ? const TextStyle(fontSize: 13) : null,
-    enabled: draft.ready && !saving && !_settledBillInput && (!manualMoney || (frozen == null && !conflict)),
+    enabled: draft.ready && !saving && _editableExpense && !_settledBillInput && (!manualMoney || (frozen == null && !conflict)),
     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-    decoration: manualMoney ? _moneyDecoration('Amount paid (₹)') : const InputDecoration(labelText: 'Paid (₹)'),
+    decoration: _originalExpense ? _moneyDecoration('Expense amount (₹)')
+      : manualMoney ? _moneyDecoration('Amount paid (₹)') : const InputDecoration(labelText: 'Paid (₹)'),
     onChanged: (_) => draft.save(fields));
 
   Widget _paymentMethodField() => DropdownButtonFormField<String>(
@@ -49112,7 +49578,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     decoration: manualMoney ? _moneyDecoration('Payment method') : const InputDecoration(labelText: 'Method used'),
     items: [for (final value in {'UPI', 'Cheque', 'Bank transfer', 'NEFT', 'RTGS', 'Cash', method})
       DropdownMenuItem(value: value, child: Text(value))],
-    onChanged: !draft.ready || saving || _settledBillInput || (manualMoney && (frozen != null || conflict))
+    onChanged: !draft.ready || saving || !_editableExpense || _settledBillInput || (manualMoney && (frozen != null || conflict))
       ? null : (value) {
         if (value != null) {
           setState(() => method = value);
@@ -49130,7 +49596,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   });
 
   Widget _moneyViewport(BuildContext context, Widget fields) {
-    if (!manualMoney) return fields;
+    if (!_compactMoney) return fields;
     return LayoutBuilder(builder: (context, constraints) => ConstrainedBox(
       constraints: BoxConstraints(maxHeight: constraints.maxHeight),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -49146,7 +49612,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
             TextButton(key: const Key('supplier-money-close'),
               style: TextButton.styleFrom(textStyle: const TextStyle(fontSize: 13)),
               onPressed: saving ? null : () async {
-                if (await draft.flush() && context.mounted) Navigator.pop(context);
+                if ((_expenseIntent != null || !_inputOwnerCurrent || await draft.flush()) && context.mounted) Navigator.pop(context);
               }, child: const Text('Close')),
           ])),
         Flexible(child: NotificationListener<ScrollNotification>(
@@ -49169,8 +49635,12 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   }
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: !saving && !draft.busy && draft.error == null,
+  Widget build(BuildContext context) => _originalExpense && !_inputOwnerCurrent
+    ? Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
+      const Text('Return to the Store where you started. Expense input is kept.'),
+      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]))
+    : PopScope(
+    canPop: !saving && (_expenseIntent != null || !draft.busy && draft.error == null),
     onPopInvokedWithResult: (didPop, result) async {
       if (!didPop && !saving && await draft.flush() && context.mounted) {
         Navigator.pop(context);
@@ -49179,20 +49649,20 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     child: SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.only(bottom: manualMoney ? MediaQuery.viewInsetsOf(context).bottom : 0),
+        padding: EdgeInsets.only(bottom: _compactMoney ? MediaQuery.viewInsetsOf(context).bottom : 0),
       child: _moneyViewport(context, SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
           16,
           16,
           16,
-          16 + (manualMoney ? 0 : MediaQuery.viewInsetsOf(context).bottom),
+          16 + (_compactMoney ? 0 : MediaQuery.viewInsetsOf(context).bottom),
         ),
         child: Column(
           key: _compactSettled ? const Key('supplier-money-compact-settled') : null,
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (!manualMoney) Text(title, style: Theme.of(context).textTheme.titleLarge),
+            if (!_compactMoney) Text(title, style: Theme.of(context).textTheme.titleLarge),
             if (manualMoney) ...[
               Text(moneyLedger?.supplierName ?? 'Supplier', key: const Key('supplier-money-supplier'),
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -49215,6 +49685,8 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
               : 'Record money already paid without linking it to a bill.',
               key: const Key('supplier-money-purpose-guide'),
               style: const TextStyle(fontSize: 12, color: MoolColors.muted))
+            else if (_originalExpense) const Text('Record a business expense already paid. No money is transferred.',
+              style: TextStyle(fontSize: 12, color: MoolColors.muted))
             else const Text('Test record only. No money is transferred.'),
             if (_settledBillInput) const Text(
               'No amount is due on this bill. To record extra money already paid to the supplier, close and choose Record advance paid.',
@@ -49242,8 +49714,9 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
               controller: reference,
               focusNode: manualMoney ? referenceFocus : null,
               style: manualMoney ? const TextStyle(fontSize: 13) : null,
-              enabled: draft.ready && !saving && !_settledBillInput && (!manualMoney || (frozen == null && !conflict)),
-              decoration: manualMoney ? _moneyDecoration('Payment reference', hint: 'UPI/bank reference or cash note')
+              enabled: draft.ready && !saving && _editableExpense && !_settledBillInput && (!manualMoney || (frozen == null && !conflict)),
+              decoration: _originalExpense ? _moneyDecoration('Receipt / payment reference')
+                : manualMoney ? _moneyDecoration('Payment reference', hint: 'UPI/bank reference or cash note')
                 : const InputDecoration(labelText: 'Payment reference'),
               onChanged: (_) => draft.save(fields),
             ),
@@ -49286,7 +49759,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                   })
                     DropdownMenuItem(value: value, child: Text(value)),
                 ],
-                onChanged: !draft.ready || saving
+                onChanged: !draft.ready || saving || !_editableExpense
                     ? null
                     : (value) {
                         if (value != null) {
@@ -49299,7 +49772,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                 key: const Key('store-expense-note'),
                 controller: note,
                 maxLength: 512,
-                enabled: draft.ready && !saving,
+                enabled: draft.ready && !saving && _editableExpense,
                 decoration: const InputDecoration(labelText: 'Expense note'),
                 onChanged: (_) => draft.save(fields),
               ),
@@ -49334,21 +49807,29 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
               }),
             if (error != null || draft.error != null)
               Text(error ?? draft.error!),
-            if (!draft.ready)
+            if (_originalExpense && _expenseIntent != null) ...[
+              Text(_expenseStatus == 'not_saved' ? 'This expense was not recorded. Close and reopen to review the saved input.'
+                : 'Keep this expense request until its saved status is confirmed.', key: const Key('store-expense-attempt-status')),
+              TextButton(key: const Key('store-expense-check-status'),
+                onPressed: saving ? null : _checkOriginalExpense, child: const Text('Check saved status')),
+              if (_expenseStatus == null) TextButton(key: const Key('store-expense-retry-original'),
+                onPressed: saving ? null : () => _checkOriginalExpense(explicitRetry: true), child: const Text('Retry same expense')),
+            ],
+            if (!draft.ready && _expenseIntent == null)
               TextButton(
                 onPressed: load,
                 child: const Text('Retry opening saved input'),
               ),
-            if (draft.error != null && draft.ready)
+            if (draft.error != null && draft.ready && _expenseIntent == null)
               TextButton(
                 onPressed: saving || (manualMoney && conflict) ? null : () => draft.save(fields),
                 child: const Text('Retry saving input'),
               ),
-            if (!_compactSettled) FilledButton(
-              key: manualMoney ? const Key('supplier-money-submit') : null,
+            if (!_compactSettled && _expenseIntent == null) FilledButton(
+              key: manualMoney ? const Key('supplier-money-submit') : _originalExpense ? const Key('store-expense-submit') : null,
               onPressed:
                   draft.ready && !saving && !draft.busy && draft.error == null &&
-                    !_settledBillInput && (!manualMoney || (moneyRecovered && !conflict))
+                    _editableExpense && !_settledBillInput && (!manualMoney || (moneyRecovered && !conflict))
                   ? manualMoney && confirmed ? recordAnother : submit
                   : null,
               child: Text(
@@ -49358,7 +49839,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                     : manualMoney ? confirmed ? widget.supplierMoney!.advance ? 'Record another advance' : 'Record another payment'
                         : frozen != null ? 'Retry same payment' : widget.supplierMoney!.advance ? 'Record advance paid' : 'Record payment'
                     : expense
-                    ? 'Record test expense'
+                    ? _originalExpense ? 'Save expense' : 'Record test expense'
                     : 'Record test payment',
               ),
             ),

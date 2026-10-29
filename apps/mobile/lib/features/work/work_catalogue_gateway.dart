@@ -12,6 +12,7 @@ import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_publication_data.dart';
 import 'work_purchase_entry_gateway.dart';
+import 'work_ledger_gateway.dart';
 import 'work_models.dart' show WorkspaceVariantFamily, WorkspaceVariantMembership, WorkspaceCatalogueItem,
   WorkspaceProductCompliance,
   WorkspaceSavedInventory, WorkspaceStockMode,
@@ -5628,6 +5629,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     required this.endpoint,
     required this.credentials,
     required this.transport,
+    SocialContentTransport? privateOriginalTransport,
     this.realm = 'production',
     this.ownerAccountId,
     this.policyReadbackRequired = false,
@@ -5641,6 +5643,8 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.productPreviewSupported = false,
     this.purchaseEntrySupported = false,
     this.purchaseDraftSupported = false,
+    this.purchaseOpeningEvidenceSupported = false,
+    this.ledgerSourceSupported = false,
     this.productMediaSupported = false,
     WorkspaceProductMediaUploadTransport? productMediaTransport,
     this.reviewedProductSubmissionSupported = false,
@@ -5664,7 +5668,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.publicRestockSupplierTypes,
     this.trustedReadClockSupported = false,
     DateTime Function()? now,
-  }) : _publicRestockCatalogue = publicRestockCatalogue,
+  }) : _privateOriginalTransportOverride = privateOriginalTransport, _publicRestockCatalogue = publicRestockCatalogue,
        _reviewedVariantsOverride = reviewedVariants, _productMediaTransportOverride = productMediaTransport, _deviceNow = now ?? DateTime.now {
     if (!_validEndpoint(endpoint) || _localWorkspaceEndpoint(endpoint) && realm != 'evaluation' ||
         publicRestockCatalogue && procurementContext?.purpose != BuyV2ProcurementPurpose.restock ||
@@ -5677,6 +5681,23 @@ class AuthenticatedWorkspaceCatalogueGateway
   final Uri endpoint;
   final SocialContentCredentials credentials;
   final SocialContentTransport transport;
+  final SocialContentTransport? _privateOriginalTransportOverride;
+  static final _originalIoTransports = Expando<SocialContentTransport>('workspace-private-originals');
+  static const _privateOriginalOperations = {'readStorePurchaseEntryBook', 'readStorePurchaseEntryAttempt',
+    'saveStoreSupplierProfile', 'saveStorePurchaseDraft', 'saveStoreSupplierOpeningEvidence',
+    'readStoreLedgerSource', 'readStoreLedgerAttempt', 'recordStoreExpense',
+    'confirmStoreSupplierOpening', 'recordStoreMoneyRegisterEntry'};
+  SocialContentTransport get _privateOriginalTransport {
+    if (_privateOriginalTransportOverride case final configured?) return configured;
+    final base = transport;
+    if (base is! IoSocialContentTransport) return base;
+    // A bookJson response can escape an original of up to 10 MiB again. Keep
+    // the ordinary 2 MiB public budget; only private original RPCs need this
+    // bounded envelope allowance. Custom network clients can inject their
+    // corresponding original transport explicitly.
+    return _originalIoTransports[base] ??= IoSocialContentTransport(timeout: base.timeout,
+      maximumResponseBytes: 24 * 1024 * 1024, followRedirects: false);
+  }
   @override
   final String realm;
   final String? ownerAccountId;
@@ -5728,6 +5749,9 @@ class AuthenticatedWorkspaceCatalogueGateway
   /// Explicit original private-book contract, not a Store/membership grant.
   final bool purchaseEntrySupported;
   final bool purchaseDraftSupported;
+  final bool purchaseOpeningEvidenceSupported;
+  /// Negotiated original owned-section contract; never a membership grant.
+  final bool ledgerSourceSupported;
   @override
   final bool productMediaSupported;
   final WorkspaceProductMediaUploadTransport? _productMediaTransportOverride;
@@ -5811,6 +5835,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       endpoint: endpoint,
       credentials: credentials,
       transport: transport,
+      privateOriginalTransport: _privateOriginalTransportOverride,
       realm: realm,
       ownerAccountId: accountId,
       trustedReadClockSupported: trustedReadClockSupported,
@@ -5825,6 +5850,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       productPreviewSupported: productPreviewSupported,
       purchaseEntrySupported: purchaseEntrySupported,
       purchaseDraftSupported: purchaseDraftSupported,
+      purchaseOpeningEvidenceSupported: purchaseOpeningEvidenceSupported,
+      ledgerSourceSupported: ledgerSourceSupported,
       productMediaSupported: productMediaSupported,
       productMediaTransport: _productMediaTransportOverride,
       reviewedProductSubmissionSupported: reviewedProductSubmissionSupported,
@@ -5957,7 +5984,22 @@ class AuthenticatedWorkspaceCatalogueGateway
       owner._procurementScopeCurrent;
     return WorkspacePurchaseEntryRemoteSource(scope: (account: accountId, store: storeId, realm: realm),
       connectionId: _bulkHash([endpoint.toString(), realm, accountId, storeId]),
-      request: owner._ownerRequest, current: active, purchaseDraftSupported: owner.purchaseDraftSupported, now: owner.now);
+      request: owner._ownerRequest, current: active, purchaseDraftSupported: owner.purchaseDraftSupported,
+      openingEvidenceSupported: owner.purchaseOpeningEvidenceSupported, now: owner.now);
+  }
+
+  WorkspaceLedgerRemoteSource? originalLedgerSource({
+    required String accountId, required String storeId, required bool Function() current,
+  }) {
+    _id(accountId); _id(storeId);
+    // Buying/public catalogue connections cannot become private Store ledgers.
+    if (!ledgerSourceSupported || procurementContext != null || _publicRestockCatalogue || !current()) return null;
+    final owner = forOwnerAccount(accountId);
+    bool active() => current() && owner.ledgerSourceSupported && owner.ownerAccountId == accountId &&
+      owner._procurementScopeCurrent;
+    return WorkspaceLedgerRemoteSource(scope: (account: accountId, store: storeId, realm: realm),
+      connectionId: _bulkHash([endpoint.toString(), realm, accountId, storeId]),
+      request: owner._ownerRequest, current: active, now: owner.now);
   }
 
   bool _productPreviewOwner(WorkspaceMasterCatalogueScope scope, bool Function() current) => current() &&
@@ -6836,7 +6878,8 @@ class AuthenticatedWorkspaceCatalogueGateway
     if (!active()) return null;
     onDispatch?.call();
     final requestStartedMicros = _readClock.elapsedMicroseconds;
-    final response = await transport
+    final requestTransport = _privateOriginalOperations.contains(body['operation']) ? _privateOriginalTransport : transport;
+    final response = await requestTransport
         .postJson(
           endpoint,
           headers: {

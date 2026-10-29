@@ -11,7 +11,8 @@ import '../buy/buy_v2_models.dart' show BuyV2Product, BuyV2OfferClass, buyV2Whol
 import 'work_models.dart';
 import 'work_publication.dart';
 import 'work_services.dart';
-import 'work_purchase_entry_gateway.dart' show WorkspaceSupplierSaveIntent, WorkspacePurchaseDraftSaveIntent;
+import 'work_ledger_gateway.dart';
+import 'work_purchase_entry_gateway.dart' show WorkspaceSupplierSaveIntent, WorkspacePurchaseDraftSaveIntent, WorkspaceSupplierOpeningSaveIntent;
 import 'work_customer_feedback.dart';
 import 'work_catalogue_gateway.dart';
 import 'work_supplier_policy.dart';
@@ -349,6 +350,11 @@ class _StoreOperationalData {
   bool returnIntentSaved = false;
   bool customerCollectionBusy = false;
   WorkLedgerCheckpointStore? ledgerCheckpointStore;
+  RemoteWorkOwnedLedgerStore? originalLedger;
+  Future<bool>? originalLedgerLoad;
+  String? originalLedgerError;
+  bool originalLedgerSelected = false;
+  bool originalLedgerCommandBusy = false;
   int? ledgerCheckpointRevision;
   WorkspaceInventoryLedger? ledgerInventory;
   Map<String, WorkspaceOrderRecord> ledgerBilledOrders = const {};
@@ -3232,8 +3238,83 @@ class WorkSession extends ChangeNotifier {
       _storeData.ledgerCheckpointStore != null &&
       _storeData.customerCollectionGateway is StoreReviewCustomerCollectionGateway;
 
-  /// Confirm saved opening evidence in the existing financial checkpoint.
-  /// Review-only until an authoritative production supplier adapter is connected.
+  /// Separate from QA receiving/Stock access: this only connects original
+  /// opening evidence to its supplier account, after native confirmation.
+  bool get workspaceOriginalSupplierOpeningConfigured {
+    final source = _supplierStorage, key = _supplierKey;
+    return workspaceOriginalLedgerConfigured && key != null && !key.$3 &&
+      source is RemoteWorkPurchaseEntryStore && source.sourceCurrent && source.originalScope == key;
+  }
+  bool get workspaceSupplierOpeningAccountLoaded => workspaceOriginalSupplierOpeningConfigured
+    ? workspaceOriginalLedgerSections != null : !_productionSession && workspaceInvoiceHistoryLoaded;
+  bool get workspaceOriginalSupplierOpeningConfirmationAvailable => workspaceOriginalSupplierOpeningConfigured &&
+    workspaceSupplierOpeningAccountLoaded && !workspaceOriginalLedgerBusy && workspaceOriginalLedgerPending == null;
+
+  Future<bool> _confirmWorkspaceOriginalSupplierOpening(WorkspaceSupplierOpeningRecord record, {
+    required (String, String, bool) scope, required int expectedRevision, required DateTime confirmedAt,
+  }) async {
+    final key = _supplierKey, data = _storeData, purchase = _supplierStorage, owned = _storeData.originalLedger,
+      context = publicationPreferencesContext;
+    if (key == null || key != scope || key.$3 || !workspaceOriginalSupplierOpeningConfirmationAvailable ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving || _supplierLoads.containsKey(key) ||
+        workspaceSupplierRecoveryRequired || workspacePendingOpeningInput != null ||
+        purchase is! RemoteWorkPurchaseEntryStore || owned == null || !owned.current ||
+        purchase.controller.source.scope != owned.source.scope ||
+        purchase.controller.source.connectionId != owned.source.connectionId ||
+        record.account != key.$1 || record.store != key.$2 || record.qa || !record.valid ||
+        expectedRevision != workspacePurchaseEntryRevision ||
+        owned.snapshot?.suppliers.containsKey(record.supplierId) != false) return false;
+    bool current() => !_disposed && hasVerifiedWorkspace && _supplierKey == key && identical(data, _storeData) &&
+      identical(data.originalLedger, owned) && owned.current && purchase.sourceCurrent && publicationPreferencesContext == context;
+    bool reject(String message) {
+      if (current()) {_supplierValidationErrors[key] = message; notifyListeners();}
+      return false;
+    }
+    _supplierWrites.add(key); _supplierValidationErrors.remove(key); notifyListeners();
+    try {
+      // Verify the original bytes' digest, not a normalised book.toJson() hash.
+      final proof = await purchase.controller.source.readBook();
+      if (!current()) return false;
+      final book = proof.book, fingerprint = proof.bookFingerprint;
+      final saved = book?.openingRecordFor(record.supplierId),
+        supplier = book?.profiles.where((p) => p.id == record.supplierId).singleOrNull;
+      if (book == null || fingerprint == null || book.revision != expectedRevision || supplier == null ||
+          saved == null || jsonEncode(saved.toJson()) != jsonEncode(record.toJson())) {
+        _supplierNeedsReload.add(key);
+        return reject('Opening details changed. Reopen the supplier and review the latest saved balance.');
+      }
+      final localConfirmation = confirmedAt.toLocal();
+      final confirmationDay = DateTime(localConfirmation.year, localConfirmation.month, localConfirmation.day);
+      if (DateTime.parse(record.asOfDate).isAfter(confirmationDay)) {
+        return reject('Starting date cannot be after the date you confirm the balance.');
+      }
+      final copies = book.latestReviewedCopies.where((c) => c.supplier.id == record.supplierId).toList();
+      if (copies.length != record.bills.length || copies.any((copy) => record.bills.where((bill) =>
+          bill.copyId == copy.id && bill.copyRevision == copy.revision && bill.draftId == copy.draft.id &&
+          bill.inclusion != WorkspaceOpeningBillInclusion.unknown).length != 1) ||
+          // Reuse input validation only; never install this computed projection.
+          WorkspaceSupplierLedger.confirmedOpening(record, accountScope: key.$1, workspaceId: key.$2,
+            supplierId: supplier.id, supplierName: supplier.name, qa: false, confirmedAt: confirmedAt) == null) {
+        return reject('Check the saved amount, starting date and each supporting bill before confirming.');
+      }
+      final original = WorkspaceLedgerIntent.prepare(scope: owned.source.scope,
+        operation: 'confirmStoreSupplierOpening', expectedRevision: owned.snapshot!.revision,
+        idempotencyKey: _newCounterIdentity('supplier-opening-confirm'), fields: {
+          'opening': record.toJson(), 'expectedPurchaseRevision': expectedRevision,
+          'expectedPurchaseFingerprint': fingerprint, 'confirmedAt': confirmedAt.toUtc().toIso8601String(),
+          'confirmedUtcOffsetMinutes': confirmedAt.toLocal().timeZoneOffset.inMinutes,
+        });
+      final result = await _operateWorkspaceOriginalLedger(original, write: true);
+      return current() && result?.attempt?['status'] == 'saved';
+    } on Object {
+      return reject('Balance confirmation could not be confirmed. Saved evidence is kept; check its original status.');
+    } finally {
+      _supplierWrites.remove(key); if (current()) notifyListeners();
+    }
+  }
+
+  /// Confirm saved opening evidence through its original owned source, or the
+  /// existing isolated QA checkpoint. These capabilities stay independent.
   /// Saving the evidence alone never posts it or changes Stock.
   Future<bool> confirmWorkspaceSupplierOpeningRecord(
     WorkspaceSupplierOpeningRecord record, {
@@ -3243,6 +3324,8 @@ class WorkSession extends ChangeNotifier {
   }) async {
     final key = _supplierKey;
     final data = _storeData;
+    if (_productionSession) return _confirmWorkspaceOriginalSupplierOpening(record,
+      scope: scope, expectedRevision: expectedRevision, confirmedAt: confirmedAt);
     if (key == null || key != scope || !key.$3 || _productionSession ||
         !workspaceSuppliersLoaded || workspaceSupplierSaving ||
         _supplierLoads.containsKey(key) || _supplierNeedsReload.contains(key) ||
@@ -4442,6 +4525,12 @@ class WorkSession extends ChangeNotifier {
         record.qa != key.$3) {
       return false;
     }
+    final commandSource = _supplierStorage;
+    if (commandSource is WorkPurchaseOpeningCommandStore &&
+        (!commandSource.sourceCurrent || commandSource.originalScope != key || commandSource.pendingOpeningInput != null)) {
+      _supplierValidationErrors[key] = 'Check the original saved status before changing these opening entries.';
+      notifyListeners(); return false;
+    }
     final old = _supplierDirectories[key];
     final previous = old?.openingRecords
         .where((r) => r.id == record.id)
@@ -4491,6 +4580,29 @@ class WorkSession extends ChangeNotifier {
     _supplierValidationErrors.remove(key);
     notifyListeners();
     try {
+      final original = _supplierStorage;
+      if (original is WorkPurchaseOpeningCommandStore) {
+        final supplier = old.profiles.where((profile) => profile.id == record.supplierId).singleOrNull;
+        if (!original.openingEvidenceSaveAvailable || supplier == null || key.$3) {
+          throw const WorkGatewayException('Opening record saving is not connected. Your entries are kept.');
+        }
+        // Fresh remote evidence has a frozen UTC capture; never rewrite dates
+        // inside an older saved original or infer its timezone.
+        final frozen = WorkspaceSupplierOpeningRecord.fromJson({...record.toJson(),
+          'savedAt': record.savedAt.toUtc().toIso8601String()});
+        final result = await original.saveOpeningEvidence(supplier, frozen, account: key.$1, store: key.$2,
+          qa: false, expectedRevision: old.revision);
+        if (_disposed || _supplierKey != key || !original.sourceCurrent) {
+          _supplierNeedsReload.add(key); return false;
+        }
+        final current = result.currentBook;
+        if (current != null) _supplierDirectories[key] = current;
+        if (!result.recorded) {
+          _supplierValidationErrors[key] = 'Opening records changed or could not be saved. Review the current supplier details. Your entries are kept.';
+          return false;
+        }
+        return true;
+      }
       await _supplierStorage.save(next, expectedRevision: old.revision);
       if (_supplierKey != key) {
         _supplierNeedsReload.add(key);
@@ -4509,6 +4621,36 @@ class WorkSession extends ChangeNotifier {
       _supplierWrites.remove(key);
       if (_supplierKey == key) notifyListeners();
     }
+  }
+
+  WorkspaceSupplierOpeningSaveIntent? get workspacePendingOpeningInput {
+    final original = _supplierStorage;
+    if (original is! WorkPurchaseOpeningCommandStore || !original.sourceCurrent ||
+        original.originalScope != _supplierKey) return null;
+    return original.pendingOpeningInput;
+  }
+  Future<WorkSupplierOpeningSaveOutcome?> checkWorkspaceOpeningAttempt(WorkspaceSupplierOpeningSaveIntent original,
+    {bool explicitRetry = false}) async {
+    final key = _supplierKey, source = _supplierStorage;
+    if (_disposed || key == null || key.$3 || source is! WorkPurchaseOpeningCommandStore ||
+        !source.sourceCurrent || source.originalScope != key || workspaceSupplierSaving || _supplierLoads.containsKey(key) ||
+        original.scope.account != key.$1 || original.scope.store != key.$2) return null;
+    _supplierWrites.add(key); _supplierErrors.remove(key); _supplierValidationErrors.remove(key); notifyListeners();
+    try {
+      final result = explicitRetry ? await source.retryOpeningAttempt(original) : await source.readOpeningAttempt(original);
+      if (_disposed || _supplierKey != key || !source.sourceCurrent) {_supplierNeedsReload.add(key); return null;}
+      if (result == null) {
+        _supplierErrors[key] = 'Saved status is not confirmed yet. Check again or retry the same Save.';
+        return null;
+      }
+      if (result.currentBook != null) {_supplierDirectories[key] = result.currentBook!; _supplierNeedsReload.remove(key);}
+      if (!result.recorded) _supplierValidationErrors[key] = 'The opening record was not saved. Review the current details before saving again.';
+      return result;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (_supplierKey == key) _supplierErrors[key] = 'Saved status could not be checked. The original entries are kept.';
+      return null;
+    } finally {_supplierWrites.remove(key); if (!_disposed && _supplierKey == key) notifyListeners();}
   }
 
   int? get workspacePurchaseEntryRevision => _supplierDirectories[_supplierKey]?.revision;
@@ -7747,6 +7889,134 @@ class WorkSession extends ChangeNotifier {
       if (!_disposed && identical(data, _storeData)) notifyListeners();
     }
   }
+  bool get workspaceOriginalLedgerConfigured => _productionSession && hasVerifiedWorkspace &&
+    catalogueGateway is AuthenticatedWorkspaceCatalogueGateway &&
+    (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).ledgerSourceSupported;
+  bool get workspaceOriginalLedgerBound => _storeData.originalLedgerSelected;
+  bool get workspaceOriginalLedgerBusy => _storeData.originalLedgerLoad != null ||
+    _storeData.originalLedgerCommandBusy || _storeData.originalLedger?.controller.busy == true;
+  String? get workspaceOriginalLedgerError => _storeData.originalLedgerError;
+  WorkspaceOwnedLedgerSections? get workspaceOriginalLedgerSections => !_disposed && hasVerifiedWorkspace &&
+    _storeData.originalLedgerLoad == null && _storeData.originalLedgerError == null
+      ? _storeData.originalLedger?.snapshot : null;
+  WorkspaceLedgerIntent? get workspaceOriginalLedgerPending => _storeData.originalLedger?.pending;
+  WorkspaceLedgerResolution? get workspaceOriginalLedgerResolution => _storeData.originalLedger?.controller.lastResolution;
+
+  /// Status never writes. Explicit retry must use the retained original identity.
+  Future<WorkspaceLedgerReadback?> checkWorkspaceOriginalLedgerAttempt(WorkspaceLedgerIntent original, {bool explicitRetry = false}) {
+    final owned = _storeData.originalLedger;
+    bool same(WorkspaceLedgerIntent? retained) => retained?.scope == original.scope &&
+      retained?.idempotencyKey == original.idempotencyKey && retained?.fingerprint == original.fingerprint;
+    if (owned == null || !same(owned.pending) && !same(owned.controller.lastResolution?.original)) return Future.value(null);
+    return _operateWorkspaceOriginalLedger(original, write: explicitRetry);
+  }
+
+  Future<WorkspaceLedgerReadback?> _operateWorkspaceOriginalLedger(WorkspaceLedgerIntent original, {required bool write}) async {
+    final data = _storeData, owned = _storeData.originalLedger, key = _supplierKey, context = publicationPreferencesContext;
+    bool current() => !_disposed && hasVerifiedWorkspace && identical(data, _storeData) &&
+      _supplierKey == key && identical(data.originalLedger, owned) && owned?.current == true &&
+      publicationPreferencesContext == context;
+    if (owned == null || key == null || key.$3 || !current() || original.scope != owned.source.scope ||
+        data.originalLedgerLoad != null || data.originalLedgerCommandBusy || owned.controller.busy) return null;
+    data.originalLedgerCommandBusy = true; data.originalLedgerError = null; notifyListeners();
+    try {
+      final result = write ? await owned.save(original) : await owned.readAttempt(original);
+      if (!current()) return null;
+      if (result.attempt == null) {
+        data.originalLedgerError = 'The original saved status is not confirmed yet. Keep this attempt and check again.';
+      } else {
+        final saved = result.attempt!['status'] == 'saved';
+        final reason = result.attempt!['reason'];
+        if (original.operation == 'confirmStoreSupplierOpening' && reason == 'stale_evidence') {
+          _supplierNeedsReload.add(key);
+        }
+        data.originalLedgerError = saved ? null : switch (reason) {
+          'stale_evidence' => 'Supplier details changed. Reopen the supplier account and review the latest saved opening record.',
+          'supplier_has_records' => 'This supplier already has account entries. A starting balance cannot replace them.',
+          'opening_amount_unknown' => 'Check and save the opening amount before confirming the balance.',
+          'opening_bill_inclusion_missing' => 'Check which supporting bills are included before confirming the balance.',
+          'opening_confirmation_invalid' => 'Check the opening date and saved details before confirming again.',
+          _ => 'This attempt was not recorded. Refresh the original records and review before trying again.',
+        };
+        try {await owned.read();} on Object {
+          if (current()) data.originalLedgerError = saved
+            ? 'The saved result is confirmed. Original account details need refreshing.'
+            : 'This attempt was not recorded. Original account details need refreshing.';
+        }
+      }
+      return current() ? result : null;
+    } on Object {
+      if (current()) data.originalLedgerError = 'The original saved status could not be confirmed. Keep this attempt and check again.';
+      return null;
+    } finally {
+      data.originalLedgerCommandBusy = false; if (current()) notifyListeners();
+    }
+  }
+
+  /// Bind only the three original-owned sections. This never marks customer
+  /// finance, invoice history or Stock recovered and never imports local rows.
+  Future<bool> loadWorkspaceOriginalLedger({bool retry = false}) {
+    final data = _storeData, key = _supplierKey, connection = catalogueGateway,
+      context = publicationPreferencesContext;
+    if (!workspaceOriginalLedgerConfigured || key == null || key.$3 ||
+        connection is! AuthenticatedWorkspaceCatalogueGateway) return Future.value(false);
+    if (data.originalLedgerCommandBusy || _supplierWrites.contains(key)) return Future.value(false);
+    if (data.originalLedgerLoad case final loading?) return loading;
+    if (!retry && data.originalLedger?.current == true && data.originalLedgerError == null &&
+        data.originalLedger?.snapshot != null) return Future.value(true);
+    bool current() => !_disposed && hasVerifiedWorkspace && identical(data, _storeData) &&
+      _supplierKey == key && identical(catalogueGateway, connection) && publicationPreferencesContext == context;
+    void localOperationsSettled() {
+      if (!current() || _supplierWrites.isNotEmpty || workspaceSupplierRecoveryRequired ||
+          workspacePendingOpeningInput != null || data.customerCollectionBusy ||
+          data.pendingCustomerCollection != null || data.pendingCustomerReturn != null || data.pendingCustomerRefund != null ||
+          data.collectionMayHaveSubmitted || data.returnMayHaveSubmitted || data.refundMayHaveSubmitted ||
+          data.returnIntentSaved || data.refundIntentSaved || data.inventoryReceiptBusy ||
+          data.inventoryReceiptRecoveryPending || data.inventoryRestockRecoveryPending ||
+          data.ledgerRecovery != null || data.ledgerRecovered || data.ledgerCheckpointRevision != null ||
+          data.ledgerInventory != null || data.ledgerBilledOrders.isNotEmpty || data.ledgerBilledInvoices.isNotEmpty ||
+          data.ledgerPurchaseReceipts.isNotEmpty || data.supplierLedgers.isNotEmpty ||
+          data.expenses.isNotEmpty || data.moneyRegisters.isNotEmpty) {
+        throw const WorkGatewayException('Recover or migrate the saved Store records before connecting originals. Saved data is kept.');
+      }
+    }
+    final operation = Future<bool>.microtask(() async {
+      try {
+        // This loader can be started by a native form's initState. Publish the
+        // loading state after that build, never dirty an ancestor mid-build.
+        if (current()) notifyListeners();
+        var original = data.originalLedger;
+        if (original?.current == true) {
+          await original!.read();
+        } else {
+          original?.retire();
+          final source = connection.originalLedgerSource(accountId: key.$1, storeId: key.$2, current: current);
+          if (source == null) throw const WorkGatewayException('The original Store records are not connected.');
+          original = await RemoteWorkOwnedLedgerStore.openOriginal(source: source, qa: false,
+            retainedLocal: data.ledgerCheckpointStore ?? SecureWorkLedgerCheckpointStore(
+              accountScope: () => _disposed ? null : _contactAccountScope),
+            assertNoPendingLocalOperations: () async {localOperationsSettled();});
+        }
+        if (!current()) {original.retire(); return false;}
+        data.originalLedger = original; data.originalLedgerSelected = true;
+        // Retire the old whole-checkpoint route. Its encrypted disk marker also
+        // prevents a new local writer from taking over after app restart.
+        data.ledgerCheckpointStore = null;
+        data.originalLedgerError = null;
+        return true;
+      } on Object {
+        if (current()) data.originalLedgerError =
+          'Original Store records could not be confirmed. Saved records and pending actions are kept.';
+        return false;
+      } finally {
+        data.originalLedgerLoad = null;
+        if (current()) notifyListeners();
+      }
+    });
+    data.originalLedgerLoad = operation;
+    return operation;
+  }
+
   bool get workspaceInvoiceHistoryLoaded => _storeData.ledgerRecovered;
   // Read-only original native ownership; never a model-supplied financial source.
   Object get workspaceCustomerActionSource {
@@ -7781,6 +8051,7 @@ class WorkSession extends ChangeNotifier {
     if (_disposed ||
         accountScope != _contactAccountScope ||
         storeId != activeWorkspace?.id ||
+        _storeData.originalLedgerSelected || _storeData.originalLedgerLoad != null ||
         _storeData.customerCollectionBusy ||
         _storeData.pendingCustomerCollection != null ||
         _storeData.pendingCustomerReturn != null ||
@@ -8947,6 +9218,12 @@ class WorkSession extends ChangeNotifier {
 
   /// Supplier money updates are independent of shipment/receipt projections.
   WorkspaceLedgerFormKey? expenseFormKey() {
+    if (workspaceOriginalLedgerConfigured) {
+      if (workspaceOriginalLedgerSections == null) return null;
+      return (account: _contactAccountScope!, store: activeWorkspace!.id,
+        customer: 'store-expenses', invoice: 'manual-expenses', order: 'manual-expenses',
+        kind: 'expense', ledgerRevision: workspaceExpenses.length + 1);
+    }
     final finance = workspaceFinance;
     if (finance == null || workspaceFinanceStale) {
       return null;
@@ -8968,6 +9245,66 @@ class WorkSession extends ChangeNotifier {
         adapter is StoreReviewOrderGateway &&
         adapter.seed.accountScope == _contactAccountScope &&
         adapter.seed.storeId == activeWorkspace?.id;
+  }
+
+  bool get canRecordWorkspaceOriginalExpense => workspaceOriginalLedgerConfigured &&
+    workspaceOriginalLedgerSections != null && !workspaceOriginalLedgerBusy &&
+    workspaceOriginalLedgerPending == null;
+
+  /// Native Save freezes the reviewed fields. This prepares no business effect.
+  WorkspaceLedgerIntent? prepareWorkspaceOriginalExpense({
+    required WorkspaceLedgerFormKey key, required int amountMinor,
+    required String category, required String method, required String reference,
+    required String note,
+  }) {
+    final owned = _storeData.originalLedger;
+    if (!canRecordWorkspaceOriginalExpense || owned == null || key != expenseFormKey()) return null;
+    final record = WorkspaceExpenseRecord(accountScope: key.account, workspaceId: key.store,
+      operationId: _newCounterIdentity('expense'), amountMinor: amountMinor,
+      category: category, method: method, reference: reference, note: note,
+      occurredAt: DateTime.now().toUtc());
+    if (!record.valid) return null;
+    try {
+      return WorkspaceLedgerIntent.prepare(scope: owned.source.scope, operation: 'recordStoreExpense',
+        expectedRevision: owned.snapshot!.revision, idempotencyKey: _newCounterIdentity('expense-request'),
+        fields: {'expense': record.toJson()});
+    } on FormatException { return null; }
+  }
+
+  Future<WorkspaceLedgerReadback?> recordWorkspaceOriginalExpense(WorkspaceLedgerIntent original) {
+    if (original.operation != 'recordStoreExpense' || !canRecordWorkspaceOriginalExpense ||
+        original.scope != _storeData.originalLedger?.source.scope ||
+        original.data['expectedRevision'] != workspaceOriginalLedgerSections?.revision) return Future.value(null);
+    return _operateWorkspaceOriginalLedger(original, write: true);
+  }
+
+  bool canRecordWorkspaceOriginalRegisterEntry(String registerId) => canRecordWorkspaceOriginalExpense &&
+    workspaceOriginalLedgerSections?.registers[registerId]?.valid == true;
+
+  WorkspaceLedgerIntent? prepareWorkspaceOriginalRegisterEntry({required String registerId,
+    required int deltaMinor, required String reference, required DateTime occurredAt}) {
+    final owned = _storeData.originalLedger, register = workspaceOriginalLedgerSections?.registers[registerId];
+    if (!canRecordWorkspaceOriginalRegisterEntry(registerId) || owned == null || register == null) return null;
+    final captured = DateTime.now().toUtc();
+    final entry = WorkspaceMoneyRegisterEntry(id: _newCounterIdentity('money-entry'), reference: reference,
+      occurredAt: occurredAt.toUtc(), deltaMinor: deltaMinor);
+    if (!entry.valid || !entry.occurredAt.isBefore(captured)) return null;
+    try {
+      return WorkspaceLedgerIntent.prepare(scope: owned.source.scope, operation: 'recordStoreMoneyRegisterEntry',
+        expectedRevision: owned.snapshot!.revision, idempotencyKey: _newCounterIdentity('money-entry-request'),
+        fields: {'registerId': registerId, 'expectedRegisterRevision': register.revision,
+          'entry': entry.toJson(), 'capturedAt': captured.toIso8601String()});
+    } on FormatException { return null; }
+  }
+
+  Future<WorkspaceLedgerReadback?> recordWorkspaceOriginalRegisterEntry(WorkspaceLedgerIntent original) {
+    final registerId = original.data['registerId'];
+    if (original.operation != 'recordStoreMoneyRegisterEntry' || registerId is! String ||
+        !canRecordWorkspaceOriginalRegisterEntry(registerId) ||
+        original.scope != _storeData.originalLedger?.source.scope ||
+        original.data['expectedRevision'] != workspaceOriginalLedgerSections?.revision ||
+        original.data['expectedRegisterRevision'] != workspaceOriginalLedgerSections?.registers[registerId]?.revision) return Future.value(null);
+    return _operateWorkspaceOriginalLedger(original, write: true);
   }
 
   Future<bool> recordStoreReviewExpense({
@@ -9024,7 +9361,9 @@ class WorkSession extends ChangeNotifier {
   }
 
   List<WorkspaceExpenseRecord> get workspaceExpenses => List.unmodifiable(
-    _storeData.expenses.values
+    (_storeData.originalLedgerSelected
+      ? workspaceOriginalLedgerSections?.expenses.values ?? const <WorkspaceExpenseRecord>[]
+      : _storeData.expenses.values)
         .where(
           (expense) =>
               expense.accountScope == _contactAccountScope &&
@@ -9035,6 +9374,9 @@ class WorkSession extends ChangeNotifier {
   );
 
   WorkspaceMoneyStatement? get workspaceMoneyStatement {
+    // The owned-section source does not qualify the separate customer-finance
+    // totals. Do not compose a complete statement from a partial source join.
+    if (_storeData.originalLedgerSelected) return null;
     final finance = workspaceFinance;
     if (finance == null ||
         workspaceFinanceStale ||
@@ -9134,7 +9476,9 @@ class WorkSession extends ChangeNotifier {
 
   List<WorkspaceMoneyRegisterSnapshot> get workspaceMoneyRegisters =>
       List.unmodifiable(
-        _storeData.moneyRegisters.values.where(
+        (_storeData.originalLedgerSelected
+          ? workspaceOriginalLedgerSections?.registers.values ?? const <WorkspaceMoneyRegisterSnapshot>[]
+          : _storeData.moneyRegisters.values).where(
           (register) =>
               register.accountScope == _contactAccountScope &&
               register.workspaceId == activeWorkspace?.id,
@@ -9254,7 +9598,7 @@ class WorkSession extends ChangeNotifier {
     final data = ledger.workspaceId == activeWorkspace?.id
         ? _storeData
         : _storeDataById[ledger.workspaceId];
-    if (data == null) {
+    if (data == null || data.originalLedgerSelected || data.originalLedgerLoad != null) {
       return false;
     }
     final key = (ledger.accountScope, ledger.supplierId);
@@ -10044,6 +10388,7 @@ class WorkSession extends ChangeNotifier {
     if (account == null || _disposed) {
       return null;
     }
+    if (_storeData.originalLedgerSelected) return workspaceOriginalLedgerSections?.suppliers[supplierId];
     final key = (account, supplierId);
     return _storeData.staleSupplierLedgers.contains(key)
         ? null
@@ -15591,6 +15936,7 @@ class WorkSession extends ChangeNotifier {
     _workspaceApplications.clear();
     _clearCollection();
     for (final data in {..._storeDataById.values, _storeData}) {
+      data.originalLedger?.retire();
       final operations = data.orderOperations;
       if (operations != null && !operations.isDisposed) operations.dispose();
     }

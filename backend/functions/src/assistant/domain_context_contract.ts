@@ -26,12 +26,13 @@ export const storeOperationalActions=new Set(['AI-ACT-275','AI-ACT-280','AI-ACT-
 export const storeOrderBoardActions=new Set(['AI-ACT-273']);
 export const storeSupplierDraftActions=new Set(['AI-ACT-235','AI-ACT-236']);
 export const storeSupplierOriginalActions=new Set(['AI-ACT-237']);
+export const storeLedgerOriginalActions=new Set(['AI-ACT-257','AI-ACT-258','AI-ACT-268','AI-ACT-270','AI-ACT-271','AI-ACT-381']);
 export const storePurchaseRootActions=new Set(['AI-ACT-253','AI-ACT-269']);
 export const storeReceivingOriginalActions=new Set(['AI-ACT-243']);
 export const storeCouponActions=new Set(['AI-ACT-308','AI-ACT-309','AI-ACT-310']);
 export const storeReportOwnerActions=new Set(['AI-ACT-312','AI-ACT-313','AI-ACT-314','AI-ACT-411']);
 export const storePublicDetailsActions=new Set(['AI-ACT-320','AI-ACT-321']);
-export const storeNativeMaskActions = new Set([...storeProductActions, ...storeProductOwnerActions,...storeStockOwnerActions,...storeRestockOwnerActions,...storeOrderOriginalActions,...storeOperationalActions,...storeOrderBoardActions,...storeSupplierDraftActions,...storeSupplierOriginalActions,...storePurchaseRootActions,...storeReceivingOriginalActions,...storeCouponActions,...storeReportOwnerActions,...storePublicDetailsActions]);
+export const storeNativeMaskActions = new Set([...storeProductActions, ...storeProductOwnerActions,...storeStockOwnerActions,...storeRestockOwnerActions,...storeOrderOriginalActions,...storeOperationalActions,...storeOrderBoardActions,...storeSupplierDraftActions,...storeSupplierOriginalActions,...storeLedgerOriginalActions,...storePurchaseRootActions,...storeReceivingOriginalActions,...storeCouponActions,...storeReportOwnerActions,...storePublicDetailsActions]);
 export const cataloguePriceRefreshActions = new Set(["AI-ACT-060", "AI-ACT-352"]);
 export const catalogueSearchActions = new Set(["AI-ACT-001", "AI-ACT-002", "AI-ACT-003", "AI-ACT-004", "AI-ACT-005", ...catalogueProductActions, ...cataloguePriceRefreshActions]);
 export function canonicalContextRequest(value: unknown): {scope: PlansScope; catalogueListingIds?: readonly string[]; retainedSupplierQuoteIds?: readonly string[]; nativeSelectionVersion?: 1; nativeProductPreviewVersion?: 1} {

@@ -6,7 +6,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../shared/social_content_gateway.dart';
-import 'work_models.dart' show WorkspacePurchaseEntryBook, WorkspaceSupplierProfile, WorkspacePurchaseEntryDraft, WorkspacePurchaseSavedCopy;
+import 'work_models.dart' show WorkspacePurchaseEntryBook, WorkspaceSupplierProfile, WorkspacePurchaseEntryDraft, WorkspacePurchaseSavedCopy, WorkspaceSupplierOpeningRecord;
 
 typedef WorkspacePurchaseEntryScope = ({String account, String store, String realm});
 typedef WorkspacePurchaseEntryRequest = Future<SocialContentResponse?> Function(
@@ -81,6 +81,7 @@ abstract class WorkspacePurchaseEntrySaveIntent {
   WorkspacePurchaseEntrySaveIntent withKey(String key);
   static WorkspacePurchaseEntrySaveIntent fromJson(Object? raw, WorkspacePurchaseEntryScope scope) =>
     _object(raw)['operation'] == 'savePurchaseDraft' ? WorkspacePurchaseDraftSaveIntent.fromJson(raw, scope)
+      : _object(raw)['operation'] == 'saveSupplierOpeningEvidence' ? WorkspaceSupplierOpeningSaveIntent.fromJson(raw, scope)
       : WorkspaceSupplierSaveIntent.fromJson(raw, scope);
 }
 
@@ -196,10 +197,48 @@ class WorkspacePurchaseDraftSaveIntent extends WorkspacePurchaseEntrySaveIntent 
     return result;
   }
 }
+class WorkspaceSupplierOpeningSaveIntent extends WorkspacePurchaseEntrySaveIntent {
+  WorkspaceSupplierOpeningSaveIntent({required super.scope, required super.expectedRevision,
+    required super.idempotencyKey, required super.profile, required WorkspaceSupplierOpeningRecord opening})
+      : _openingJson = jsonEncode(WorkspaceSupplierOpeningRecord.fromJson(opening.toJson()).toJson()) {
+    final value = this.opening;
+    if (!value.valid || value.qa || value.account != scope.account || value.store != scope.store ||
+        value.supplierId != profile.id || !value.savedAt.isUtc ||
+        !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value.asOfDate) ||
+        DateTime.parse('${value.asOfDate}T00:00:00.000Z').toIso8601String().substring(0, 10) != value.asOfDate) throw const FormatException();
+    _revision(value.revision); _time(value.savedAt.toIso8601String());
+    for (final text in [value.id, value.basisId, value.account, value.store, value.supplierId, value.sourceNote,
+      for (final bill in value.bills) ...[bill.copyId, bill.draftId]]) {
+      if (RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]').hasMatch(text) || utf8.decode(utf8.encode(text)) != text) throw const FormatException();
+    }
+    for (final bill in value.bills) {_revision(bill.copyRevision);}
+  }
+  final String _openingJson;
+  WorkspaceSupplierOpeningRecord get opening => WorkspaceSupplierOpeningRecord.fromJson(jsonDecode(_openingJson));
+  late final String openingFingerprint = _hash(jsonDecode(_openingJson));
+  @override String get operation => 'saveSupplierOpeningEvidence';
+  @override Map<String, Object?> get data => {...super.data, 'opening': jsonDecode(_openingJson)};
+  @override Map<String, Object?> get receiptFields => {'openingId': opening.id, 'openingFingerprint': openingFingerprint};
+  @override WorkspaceSupplierOpeningSaveIntent withKey(String key) => WorkspaceSupplierOpeningSaveIntent(
+    scope: scope, expectedRevision: expectedRevision, idempotencyKey: key, profile: profile, opening: opening);
+  static WorkspaceSupplierOpeningSaveIntent fromJson(Object? raw, WorkspacePurchaseEntryScope expected) {
+    final value = _object(raw); _keys(value, {'schemaVersion', 'operation', 'scope', 'expectedRevision',
+      'idempotencyKey', 'profile', 'opening', 'fingerprint'});
+    if (value['schemaVersion'] != 1 || value['operation'] != 'saveSupplierOpeningEvidence' ||
+        jsonEncode(_sorted(value['scope'])) != jsonEncode(_sorted(_scopeJson(expected)))) throw const FormatException();
+    final result = WorkspaceSupplierOpeningSaveIntent(scope: expected,
+      expectedRevision: value['expectedRevision'] == null ? null : _revision(value['expectedRevision']),
+      idempotencyKey: _id(value['idempotencyKey']), profile: WorkspaceSupplierProfile.fromJson(value['profile']),
+      opening: WorkspaceSupplierOpeningRecord.fromJson(value['opening']));
+    if (_fingerprint(value['fingerprint']) != result.fingerprint) throw const FormatException();
+    return result;
+  }
+}
 Set<String> _terminalReasons(WorkspacePurchaseEntrySaveIntent original) => {
   'stale_book', 'duplicate_supplier', 'capacity_exceeded',
   if (original is WorkspacePurchaseDraftSaveIntent) ...{
     'stale_draft', 'immutable_copy_conflict', 'incomplete_reviewed_copy', 'duplicate_invoice', 'private_original_unavailable'},
+  if (original is WorkspaceSupplierOpeningSaveIntent) ...{'supplier_unavailable', 'immutable_opening_conflict', 'stale_opening'},
 };
 
 class WorkspaceSupplierSaveReceipt {
@@ -282,12 +321,13 @@ class WorkspacePurchaseEntryRequestFailure implements Exception {
 class WorkspacePurchaseEntryRemoteSource {
   WorkspacePurchaseEntryRemoteSource({required this.scope, required this.connectionId,
     required WorkspacePurchaseEntryRequest request, required bool Function() current,
-    this.purchaseDraftSupported = false, DateTime Function()? now}) : _request = request, _current = current, _now = now ?? DateTime.now {
+    this.purchaseDraftSupported = false, this.openingEvidenceSupported = false, DateTime Function()? now}) : _request = request, _current = current, _now = now ?? DateTime.now {
     _scope(scope); _id(connectionId);
   }
   final WorkspacePurchaseEntryScope scope;
   final String connectionId;
   final bool purchaseDraftSupported;
+  final bool openingEvidenceSupported;
   final WorkspacePurchaseEntryRequest _request;
   final bool Function() _current;
   final DateTime Function() _now;
@@ -323,6 +363,11 @@ class WorkspacePurchaseEntryRemoteSource {
   Future<WorkspacePurchaseEntryReadback> savePurchaseDraft(WorkspacePurchaseDraftSaveIntent original) {
     if (original.scope != scope || !purchaseDraftSupported) throw const WorkspacePurchaseEntryRequestFailure(mayHaveCommitted: false);
     return _call('saveStorePurchaseDraft', {'expectedRevision': original.expectedRevision,
+      'idempotencyKey': original.idempotencyKey, 'fingerprint': original.fingerprint, ...original.data}, mutation: true, original: original);
+  }
+  Future<WorkspacePurchaseEntryReadback> saveOpeningEvidence(WorkspaceSupplierOpeningSaveIntent original) {
+    if (original.scope != scope || !openingEvidenceSupported) throw const WorkspacePurchaseEntryRequestFailure(mayHaveCommitted: false);
+    return _call('saveStoreSupplierOpeningEvidence', {'expectedRevision': original.expectedRevision,
       'idempotencyKey': original.idempotencyKey, 'fingerprint': original.fingerprint, ...original.data}, mutation: true, original: original);
   }
   Future<WorkspacePurchaseEntryReadback> readAttempt(WorkspacePurchaseEntrySaveIntent original) {
@@ -535,6 +580,10 @@ class WorkspaceSupplierSaveController {
       idempotencyKey: 'request-shape', profile: profile, draft: draft, reviewedCopy: reviewedCopy, replaceReviewedDraftId: replaceReviewedDraftId));
   Future<WorkspacePurchaseEntryReadback> retryPurchaseDraft(WorkspacePurchaseDraftSaveIntent original) =>
     _save(original, retained: original);
+  Future<WorkspacePurchaseEntryReadback> saveOpeningEvidence(WorkspaceSupplierProfile profile, WorkspaceSupplierOpeningRecord opening,
+    {required int? expectedRevision}) => _save(WorkspaceSupplierOpeningSaveIntent(scope: source.scope,
+      expectedRevision: expectedRevision, idempotencyKey: 'request-shape', profile: profile, opening: opening));
+  Future<WorkspacePurchaseEntryReadback> retryOpeningEvidence(WorkspaceSupplierOpeningSaveIntent original) => _save(original, retained: original);
   Future<WorkspacePurchaseEntryReadback> _save(WorkspacePurchaseEntrySaveIntent requested, {WorkspacePurchaseEntrySaveIntent? retained}) {
     final signature = _hash([requested.dataFingerprint, requested.expectedRevision, retained?.idempotencyKey]);
     if (_saving != null) {
@@ -572,11 +621,15 @@ class WorkspaceSupplierSaveController {
       if (requested is WorkspacePurchaseDraftSaveIntent && !source.purchaseDraftSupported) {
         throw const WorkspacePurchaseEntryRequestFailure(mayHaveCommitted: false);
       }
+      if (requested is WorkspaceSupplierOpeningSaveIntent && !source.openingEvidenceSupported) {
+        throw const WorkspacePurchaseEntryRequestFailure(mayHaveCommitted: false);
+      }
       if (original == null) {
         original = requested.withKey(_newKey());
         await journal.retain(original); _check(); _pending = original;
       }
       final result = original is WorkspacePurchaseDraftSaveIntent ? await source.savePurchaseDraft(original)
+        : original is WorkspaceSupplierOpeningSaveIntent ? await source.saveOpeningEvidence(original)
         : await source.saveSupplier(original as WorkspaceSupplierSaveIntent);
       _check(); await _resolve(result.receipt!);
       return result;
