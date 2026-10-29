@@ -469,7 +469,7 @@ export interface StoreMasterCatalogueRequest {
   storeId: string; query: StoreMasterCatalogueQuery; pageSize: number; cursor: string | null;
 }
 export interface StoreMasterCataloguePage {
-  schemaVersion: 1; masterCatalogueVersion: 1; realm: StoreProductDraftRecord['realm']; storeId: string;
+  schemaVersion: 1; masterCatalogueVersion: 1; realm: StoreProductDraftRecord['realm']; storeId: string; actorAccountId: string;
   observedAt: string; state: 'ready'; query: StoreMasterCatalogueQuery; snapshotId: string;
   items: StoreMasterCatalogueItem[]; nextCursor: string | null; scannedCount: number;
   verifiedPackCount: number; missingSourceCount: number;
@@ -583,6 +583,42 @@ function productPresentationQuery(raw: unknown): ProductPresentationQuery {
   return {storeId: id(value.storeId), start, end, skuIds, ...(sources ? {discoverySourcesVersion: 1 as const} : {})};
 }
 
+/** These are separate immutable originals, never interchangeable revisions. */
+export type StoreProductPreviewKind = 'catalogue-sku' | 'submitted-original' | 'saved-draft';
+export function productPreviewOperation(operation: string): 'list' | 'read' | undefined {
+  return operation === 'listStoreProductPreviewSources' ? 'list'
+    : operation === 'readStoreProductPreviewOriginal' ? 'read' : undefined;
+}
+export interface StoreProductPreviewReference {
+  kind: StoreProductPreviewKind; skuId: string; revision: number; fingerprint: string;
+  title: string; brand: string; variant: string; pack: string;
+  channels: string[]; publicListingRequested: boolean | null;
+}
+function productPreviewKind(raw: unknown): StoreProductPreviewKind {
+  if (raw !== 'catalogue-sku' && raw !== 'submitted-original' && raw !== 'saved-draft') invalid();
+  return raw;
+}
+function productPreviewReference(kind: StoreProductPreviewKind,
+    record: StoreSkuRecord | StoreProductSubmissionRecord | StoreProductDraftRecord): StoreProductPreviewReference {
+  const payload = kind === 'catalogue-sku' ? record as StoreSkuRecord
+    : kind === 'submitted-original' ? (record as StoreProductSubmissionRecord).product : (record as StoreProductDraftRecord).draft;
+  return {kind, skuId: record.skuId, revision: record.revision,
+    fingerprint: kind === 'catalogue-sku' ? cataloguePayloadHash(record) : (record as StoreProductSubmissionRecord | StoreProductDraftRecord).fingerprint,
+    title: payload.content.title, brand: payload.content.brand, variant: payload.content.variant, pack: payload.pack.label,
+    channels: payload.channels.map(channel => channel.kind),
+    publicListingRequested: kind === 'catalogue-sku' ? (record as StoreSkuRecord).publicListing : null};
+}
+
+export function checkedStoreProductPreviewOriginal(kind: StoreProductPreviewKind, raw: unknown,
+    realm: StoreProductDraftRecord['realm'], storeId: string, skuId: string) {
+  storeId = id(storeId); skuId = id(skuId);
+  const record = kind === 'catalogue-sku' ? normalizeRecord(raw, storeId)
+    : kind === 'submitted-original' ? checkedProductSubmission(raw, realm, storeId, skuId)
+      : checkedProductDraft(raw, realm, storeId, skuId);
+  if (record.skuId !== skuId) invalid();
+  return {record, reference: productPreviewReference(kind, record)};
+}
+
 export interface WorkspaceCatalogueRepository {
   readonly realm: "evaluation" | "production";
   commodityPrice?(owner: string, action: 'confirm' | 'read' | 'reconcile', raw: Readonly<Record<string, unknown>>,
@@ -619,6 +655,7 @@ export interface WorkspaceCatalogueRepository {
   reconcileProductDraft?(command: StoreProductDraftCommand): Promise<StoreProductDraftRecord | undefined>;
   readProductDraft?(storeId: string, skuId: string, ownerUserId: string): Promise<StoreProductDraftRecord | undefined>;
   listProductDrafts?(storeId: string, ownerUserId: string, limit: number, after?: string): Promise<StoreProductDraftRecord[]>;
+  listProductSubmissions?(storeId: string, ownerUserId: string, limit: number, after?: string): Promise<StoreProductSubmissionRecord[]>;
   masterCataloguePage?(ownerUserId: string, identity: CatalogueIdentity, request: StoreMasterCatalogueRequest): Promise<StoreMasterCataloguePage>;
   productMedia?(ownerUserId: string, action: "prepare" | "confirm" | "read", request: StoreProductMediaRequest): Promise<object>;
   readReviewedProductSubmission?(storeId: string, skuId: string, ownerUserId: string,
@@ -1431,9 +1468,77 @@ export class WorkspaceCatalogueService {
     return this.repository.productMedia(id(ownerUserId), action, request);
   }
 
+  async handleProductPreview(ownerUserId: string, operation: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
+    const action = productPreviewOperation(operation), body = structuredClone(raw);
+    if (!action || body.productPreviewVersion !== 1 || body.realm !== this.repository.realm) invalid();
+    const owner = id(ownerUserId);
+    if (body.actorAccountId !== owner) throw new WorkspaceProfileError('account_scope_mismatch', 'Your account changed. Open this Store again.', 403);
+    const storeId = id(body.storeId), kind = productPreviewKind(body.kind);
+    const observedAt = this.now().toISOString(), realm = this.repository.realm;
+    const unavailable = () => new WorkspaceProfileError('service_unavailable', 'Original product details are not connected.', 503, true);
+    if (action === 'list') {
+      exact(body, ['productPreviewVersion', 'actorAccountId', 'realm', 'storeId', 'kind', 'limit', 'cursor']);
+      const limit = integer(body.limit, 1, 50), anchor = cataloguePayloadHash({owner, storeId, realm, kind});
+      let after: string | undefined;
+      if (body.cursor !== null) {
+        if (typeof body.cursor !== 'string' || body.cursor.length > 2048 || !/^[A-Za-z0-9_-]+$/u.test(body.cursor)) invalid();
+        let cursor: Record<string, unknown>;
+        try {cursor = JSON.parse(Buffer.from(body.cursor, 'base64url').toString('utf8')) as Record<string, unknown>;} catch {invalid();}
+        if (!cursor! || typeof cursor! !== 'object' || Array.isArray(cursor!)) invalid();
+        exact(cursor!, ['version', 'scope', 'after']);
+        if (cursor!.version !== 1 || cursor!.scope !== anchor || Buffer.from(JSON.stringify(cursor!)).toString('base64url') !== body.cursor) invalid();
+        after = id(cursor!.after);
+      }
+      const profile = requireStore(await this.repository.store(storeId), storeId, owner);
+      let records: Array<StoreSkuRecord | StoreProductSubmissionRecord | StoreProductDraftRecord>;
+      if (kind === 'catalogue-sku') records = (await this.repository.page(profile, owner, after, limit)).map(row => normalizeRecord(row, storeId));
+      else if (kind === 'submitted-original') {
+        if (!this.repository.listProductSubmissions) throw unavailable();
+        records = (await this.repository.listProductSubmissions(storeId, owner, limit, after))
+          .map(row => checkedProductSubmission(row, realm, storeId, row.skuId));
+      } else {
+        if (!this.repository.listProductDrafts) throw unavailable();
+        records = (await this.repository.listProductDrafts(storeId, owner, limit, after))
+          .map(row => checkedProductDraft(row, realm, storeId, row.skuId));
+      }
+      if (records.length > limit || new Set(records.map(row => row.skuId)).size !== records.length ||
+          records.some((row, index) => (index ? records[index - 1]!.skuId : after ?? '') >= row.skuId)) invalid();
+      const last = records.at(-1)?.skuId;
+      return {schemaVersion: 1, productPreviewVersion: 1, actorAccountId: owner, realm, storeId, kind, observedAt,
+        items: records.map(row => productPreviewReference(kind, row)),
+        nextCursor: records.length === limit && last ? Buffer.from(JSON.stringify({version: 1, scope: anchor, after: last})).toString('base64url') : null};
+    }
+    exact(body, ['productPreviewVersion', 'actorAccountId', 'realm', 'storeId', 'kind', 'skuId', 'expectedRevision', 'expectedFingerprint']);
+    const skuId = id(body.skuId);
+    if (body.expectedRevision === null ? body.expectedFingerprint !== null
+        : !Number.isSafeInteger(body.expectedRevision) || (body.expectedRevision as number) < 1 ||
+          typeof body.expectedFingerprint !== 'string' || !/^[A-F0-9]{64}$/u.test(body.expectedFingerprint)) invalid();
+    const profile = requireStore(await this.repository.store(storeId), storeId, owner);
+    let record: StoreSkuRecord | StoreProductSubmissionRecord | StoreProductDraftRecord | undefined;
+    if (kind === 'catalogue-sku') {
+      const rows = await this.repository.page(profile, owner, undefined, 1, skuId);
+      if (rows.length > 1 || rows.some(row => row.skuId !== skuId)) invalid();
+      record = rows[0] ? normalizeRecord(rows[0], storeId) : undefined;
+    } else if (kind === 'submitted-original') {
+      if (!this.repository.readProductSubmission) throw unavailable();
+      const row = await this.repository.readProductSubmission(storeId, skuId, owner);
+      record = row ? checkedProductSubmission(row, realm, storeId, skuId) : undefined;
+    } else {
+      if (!this.repository.readProductDraft) throw unavailable();
+      const row = await this.repository.readProductDraft(storeId, skuId, owner);
+      record = row ? checkedProductDraft(row, realm, storeId, skuId) : undefined;
+    }
+    const reference = record ? productPreviewReference(kind, record) : null;
+    if (body.expectedRevision !== null && (!reference || reference.revision !== body.expectedRevision || reference.fingerprint !== body.expectedFingerprint))
+      throw new WorkspaceProfileError('revision_conflict', 'This product version changed. Choose its latest saved copy.', 409);
+    return {schemaVersion: 1, productPreviewVersion: 1, actorAccountId: owner, realm, storeId, kind, skuId, observedAt,
+      state: record ? 'found' : 'none', reference, record: record ?? null};
+  }
   async readMasterCatalogue(ownerUserId: string, body: Readonly<Record<string, unknown>>): Promise<StoreMasterCataloguePage> {
     if (body.realm !== this.repository.realm) invalid('The catalogue environment changed. Reopen this Store.');
-    const {realm: _, ...raw} = structuredClone(body);
+    const owner = id(ownerUserId);
+    if (body.actorAccountId !== owner) throw new WorkspaceProfileError('account_scope_mismatch', 'Your account changed. Open this Store again.', 403);
+    const {realm: _, actorAccountId: _actor, ...raw} = structuredClone(body);
     const request = masterLookupRequest(raw);
     if (!this.identity || !this.repository.masterCataloguePage) {
       throw new WorkspaceProfileError('service_unavailable', 'The master catalogue is not connected.', 503, true);
@@ -1445,7 +1550,8 @@ export class WorkspaceCatalogueService {
   async handleProductDraft(ownerUserId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const action = productDraftOperation(operation), owner = id(ownerUserId);
     if (!action || body.productDraftVersion !== 1 || body.realm !== this.repository.realm) invalid();
-    const {productDraftVersion: _, realm: _realm, ...request} = structuredClone(body);
+    if (body.actorAccountId !== owner) throw new WorkspaceProfileError('account_scope_mismatch', 'Your account changed. Open this Store again.', 403);
+    const {productDraftVersion: _, realm: _realm, actorAccountId: _actor, ...request} = structuredClone(body);
     if (action === 'list') {
       exact(request, ['storeId'], ['limit', 'after']);
       const storeId = id(request.storeId), limit = request.limit === undefined ? 30 : integer(request.limit, 1, 50);
@@ -1456,7 +1562,7 @@ export class WorkspaceCatalogueService {
       const items = rows.map(row => checkedProductDraft(row, this.repository.realm, storeId, row.skuId));
       if (items.some((row, index) => Date.parse(row.savedAt) > this.now().getTime() ||
           (index === 0 ? after !== undefined && row.skuId <= after : row.skuId <= items[index - 1]!.skuId))) invalid('Saved product page changed.');
-      return {schemaVersion: 1, productDraftVersion: 1, realm: this.repository.realm, storeId,
+      return {schemaVersion: 1, productDraftVersion: 1, actorAccountId: owner, realm: this.repository.realm, storeId,
         observedAt: this.now().toISOString(), state: 'ready', items, nextCursor: items.length === limit ? items.at(-1)!.skuId : null};
     }
     let storeId: string, skuId: string, record: StoreProductDraftRecord | undefined;
@@ -1476,7 +1582,7 @@ export class WorkspaceCatalogueService {
       record = checkedProductDraft(record, this.repository.realm, storeId, skuId);
       if (Date.parse(record.savedAt) > this.now().getTime()) invalid('Saved product time changed.');
     }
-    return {schemaVersion: 1, productDraftVersion: 1, realm: this.repository.realm, storeId, skuId,
+    return {schemaVersion: 1, productDraftVersion: 1, actorAccountId: owner, realm: this.repository.realm, storeId, skuId,
       observedAt: this.now().toISOString(), state: record ? 'saved' : 'not_found', record: record ?? null};
   }
 
@@ -3964,7 +4070,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
         if (search && !searchable.includes(search)) continue;
         items.push(item);
       }
-      return {schemaVersion: 1, masterCatalogueVersion: 1, realm: this.realm, storeId: request.storeId,
+      return {schemaVersion: 1, masterCatalogueVersion: 1, actorAccountId: ownerUserId, realm: this.realm, storeId: request.storeId,
         observedAt: this.now().toISOString(), state: 'ready', query: request.query, snapshotId: scan.snapshotId,
         items, nextCursor: scan.nextCursor, scannedCount: scan.batch.length, verifiedPackCount: scan.verifiedPackCount, missingSourceCount};
     });
@@ -4072,6 +4178,17 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       const profile = await this.productSubmissionOwner(transaction, command.storeId, command.ownerUserId);
       const receipt = await transaction.get(receiptRef);
       return receipt.exists ? planStoreProductSubmission(command, profile, undefined, receipt.data() as StoreProductSubmissionReceipt) : undefined;
+    });
+  }
+  async listProductSubmissions(storeId: string, ownerUserId: string, limit: number, after?: string): Promise<StoreProductSubmissionRecord[]> {
+    storeId = id(storeId); ownerUserId = id(ownerUserId); limit = integer(limit, 1, 50);
+    if (after !== undefined) after = id(after);
+    let query = this.root(storeId).collection('productSubmissions').orderBy(FieldPath.documentId()).limit(limit);
+    if (after !== undefined) query = query.startAfter(after);
+    return this.firestore.runTransaction(async transaction => {
+      await this.productSubmissionOwner(transaction, storeId, ownerUserId);
+      const page = await transaction.get(query);
+      return page.docs.map(doc => checkedProductSubmission(doc.data(), this.realm, storeId, id(doc.id)));
     });
   }
   async readProductSubmission(storeId: string, skuId: string, ownerUserId: string): Promise<StoreProductSubmissionRecord | undefined> {

@@ -95,6 +95,20 @@ SocialContentResponse modelResponse(Map<String, Object?> data) =>
       body: jsonEncode({'ok': true, 'data': data}),
     );
 void main() {
+  test('AGG02 preview version survives request copies without altering legacy requests', () {
+    final input=AssistantModelInput(scope:(audience:'workspace',storeId:'store-one'),requestId:'host-preview',
+      requestRevision:1,message:'Preview saved copy',language:'English',expectedEntitlementRevision:'host-paid');
+    expect(input.toJson().containsKey('nativeProductPreviewVersion'),isFalse);
+    final modern=input.withProductPreviewVersion(1).withCatalogueListingIds(null).withNativeTargets(null)
+      .withNativeTargetMask(null).withNativeOriginalCaptures(null);
+    expect(modern.toJson()['nativeProductPreviewVersion'],1);
+    expect(modern.withProductPreviewVersion(null).toJson(),input.toJson());
+    expect(()=>input.withProductPreviewVersion(2),throwsA(isA<AssistantModelFailure>()));
+    expect(()=>modelInput.withProductPreviewVersion(1),throwsA(isA<AssistantModelFailure>()));
+    const invalid=AssistantModelInput(scope:(audience:'workspace',storeId:'store-one'),requestId:'host-invalid',
+      requestRevision:1,message:'Invalid version',language:'English',expectedEntitlementRevision:'host-paid',nativeProductPreviewVersion:2);
+    expect(invalid.toJson,throwsA(isA<AssistantModelFailure>()));
+  });
   test('Frozen original captures survive every input copy and remain closed workspace-only hints', () {
     final captures=[(actionId:'AI-ACT-374',digest:'b'*64),(actionId:'AI-ACT-225',digest:'a'*64)];
     final input=AssistantModelInput(scope:(audience:'workspace',storeId:'store-one'),requestId:'host-original',

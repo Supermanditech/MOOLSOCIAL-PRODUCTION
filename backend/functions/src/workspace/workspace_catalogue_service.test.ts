@@ -2280,25 +2280,34 @@ test('AGG02 draft handler never dispatches a write for Preview reads or reconcil
   });
   const service = subject(repository);
   const read = await service.handleProductDraft('owner-one', 'readStoreProductDraft', {
-    productDraftVersion: 1, realm: 'evaluation', storeId: 'store-one', skuId: saved.skuId}) as {state: string; record: StoreProductDraftRecord};
+    productDraftVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one', skuId: saved.skuId}) as {state: string; record: StoreProductDraftRecord};
   assert.equal(read.state, 'saved'); assert.deepEqual(read.record, saved);
-  await service.handleProductDraft('owner-one', 'listStoreProductDrafts', {productDraftVersion: 1, realm: 'evaluation', storeId: 'store-one'});
+  await service.handleProductDraft('owner-one', 'listStoreProductDrafts', {productDraftVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one'});
   const command = privateDraftCommand();
-  await service.handleProductDraft('owner-one', 'reconcileStoreProductDraft', {productDraftVersion: 1, realm: 'evaluation', storeId: command.storeId,
+  await service.handleProductDraft('owner-one', 'reconcileStoreProductDraft', {productDraftVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: command.storeId,
     expectedRevision: command.expectedRevision, idempotencyKey: command.idempotencyKey, draft: command.draft, catalogueOrigin: null});
   assert.deepEqual(calls, ['read', 'list', 'reconcile']);
   await assert.rejects(service.handleProductDraft('owner-one', 'readStoreProductDraft', {
-    productDraftVersion: 1, realm: 'evaluation', storeId: 'store-one', skuId: saved.skuId, retry: true}));
+    productDraftVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one', skuId: saved.skuId, retry: true}));
   await assert.rejects(service.handleProductDraft('owner-one', 'readStoreProductDraft', {
     productDraftVersion: 2, storeId: 'store-one', skuId: saved.skuId}));
   for (const realm of [undefined, 'production', 'unexpected']) {
     await assert.rejects(service.handleProductDraft('owner-one', 'saveStoreProductDraft', {
-      productDraftVersion: 1, realm, storeId: command.storeId, expectedRevision: command.expectedRevision,
+      productDraftVersion: 1, actorAccountId: 'owner-one', realm, storeId: command.storeId, expectedRevision: command.expectedRevision,
       idempotencyKey: command.idempotencyKey, draft: command.draft, catalogueOrigin: null}));
     await assert.rejects(service.readMasterCatalogue('owner-one', {
-      masterCatalogueVersion: 1, realm, storeId: 'store-one', query: {search: '', code: null}, pageSize: 30, cursor: null}));
+      masterCatalogueVersion: 1, actorAccountId: 'owner-one', realm, storeId: 'store-one', query: {search: '', code: null}, pageSize: 30, cursor: null}));
   }
-  assert.deepEqual(calls, ['read', 'list', 'reconcile'], 'Realm validation must precede repository access.');
+  for (const actorAccountId of [undefined, 'other-owner']) {
+    await assert.rejects(service.handleProductDraft('owner-one', 'saveStoreProductDraft', {
+      productDraftVersion: 1, actorAccountId, realm: 'evaluation', storeId: command.storeId,
+      expectedRevision: command.expectedRevision, idempotencyKey: command.idempotencyKey,
+      draft: command.draft, catalogueOrigin: null}), {code: 'account_scope_mismatch'});
+    await assert.rejects(service.readMasterCatalogue('owner-one', {
+      masterCatalogueVersion: 1, actorAccountId, realm: 'evaluation', storeId: 'store-one',
+      query: {search: '', code: null}, pageSize: 30, cursor: null}), {code: 'account_scope_mismatch'});
+  }
+  assert.deepEqual(calls, ['read', 'list', 'reconcile'], 'Account/realm validation must precede repository access.');
 });
 for (const basis of ['included', 'additional']) for (const amountMinor of [0, 7]) {
   test(`LF-TAX channel tax survives submission and reviewed selling terms ${basis}/${amountMinor}`, () => {
@@ -2829,6 +2838,127 @@ function agg02MasterOriginals() {
   }
   return {aggregate: aggregate!, product: originals.get('propose_product')!, pack: originals.get('propose_pack')!};
 }
+test('AGG02 typed original preview never substitutes same-SKU sources or replays a command', async () => {
+  const calls: string[] = [], repository = new Memory();
+  const sku = {...input(), publicListing: false, schemaVersion: 1 as const, storeId: 'store-one', revision: 1, observedAt: at};
+  repository.records.set('store-one/sku-one', sku);
+  const product = submittedProduct(); product.content.title = 'HOST submitted version';
+  const submission = planStoreProductSubmission(productCommand({product}), profile);
+  const draftInput = submittedProduct(); draftInput.content.title = 'HOST private saved version';
+  let draft = planStoreProductDraft(privateDraftCommand({draft: draftInput}), profile);
+  const originalStore = repository.store.bind(repository);
+  repository.store = async store => {calls.push('owner'); return originalStore(store);};
+  Object.assign(repository, {
+    async listProductSubmissions() {calls.push('list-submitted'); return [submission];},
+    async readProductSubmission() {calls.push('read-submitted'); return submission;},
+    async listProductDrafts() {calls.push('list-draft'); return [draft];},
+    async readProductDraft() {calls.push('read-draft'); return draft;},
+    async save() {throw new Error('Preview must never save a SKU.');},
+    async saveProductDraft() {throw new Error('Preview must never save a draft.');},
+    async submitProduct() {throw new Error('Preview must never submit a product.');},
+    async reconcileProductDraft() {throw new Error('Preview must never replay recovery.');},
+  });
+  const service = subject(repository), references: Record<string, any> = {};
+  for (const kind of ['catalogue-sku', 'submitted-original', 'saved-draft']) {
+    const page = await service.handleProductPreview('owner-one', 'listStoreProductPreviewSources', {
+      productPreviewVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one', kind, limit: 1, cursor: null}) as any;
+    assert.equal(page.items.length, 1); assert.equal(page.items[0].kind, kind);
+    assert.equal(page.items[0].skuId, 'sku-one'); assert.equal(page.items[0].revision, 1);
+    references[kind] = page.items[0];
+    const read = await service.handleProductPreview('owner-one', 'readStoreProductPreviewOriginal', {
+      productPreviewVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one', kind, skuId: 'sku-one',
+      expectedRevision: 1, expectedFingerprint: page.items[0].fingerprint}) as any;
+    assert.equal(read.kind, kind); assert.equal(read.state, 'found'); assert.deepEqual(read.reference, page.items[0]);
+    assert.deepEqual(read.record, kind === 'catalogue-sku' ? sku : kind === 'submitted-original' ? submission : draft);
+    assert.equal(Object.hasOwn(read.record, 'draft'), kind === 'saved-draft');
+    assert.equal(Object.hasOwn(read.record, 'product'), kind === 'submitted-original');
+    await assert.rejects(service.handleProductPreview('owner-one', 'listStoreProductPreviewSources', {
+      productPreviewVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one', kind: kind === 'saved-draft' ? 'submitted-original' : 'saved-draft',
+      limit: 1, cursor: page.nextCursor}));
+  }
+  assert.equal(new Set(Object.values(references).map(value => value.fingerprint)).size, 3);
+  const read = {productPreviewVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one', kind: 'saved-draft', skuId: 'sku-one',
+    expectedRevision: 1, expectedFingerprint: references['submitted-original'].fingerprint};
+  await assert.rejects(service.handleProductPreview('owner-one', 'readStoreProductPreviewOriginal', read), {code: 'revision_conflict'});
+  const next = submittedProduct(); next.content.title = 'HOST second private saved version';
+  draft = planStoreProductDraft(privateDraftCommand({draft: next, expectedRevision: 1, idempotencyKey: 'HOST-next-private'}), profile, draft);
+  await assert.rejects(service.handleProductPreview('owner-one', 'readStoreProductPreviewOriginal',
+    {...read, expectedFingerprint: references['saved-draft'].fingerprint}), {code: 'revision_conflict'});
+  const before = calls.length;
+  for (const realm of [undefined, 'production']) await assert.rejects(service.handleProductPreview('owner-one', 'readStoreProductPreviewOriginal', {...read, realm}));
+  for (const actorAccountId of [undefined, 'other-owner'])
+    await assert.rejects(service.handleProductPreview('owner-one', 'readStoreProductPreviewOriginal',
+      {...read, actorAccountId}), {code: 'account_scope_mismatch'});
+  assert.equal(calls.length, before, 'Wrong account/realm is rejected before original reads.');
+  await assert.rejects(service.handleProductPreview('other-owner', 'readStoreProductPreviewOriginal', {...read, actorAccountId: 'other-owner'}), {code: 'not_found'});
+  assert.equal(repository.records.size, 1); assert.equal(repository.receipts.size, 0);
+});
+
+test('AGG02 emulator typed preview reads three actual originals without publication or write recovery', {
+  skip: process.env.FIRESTORE_EMULATOR_HOST === undefined,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: `demo-agg02-preview-${randomUUID().slice(0, 8)}`}, `preview-${randomUUID()}`);
+  const db = getFirestore(app), root = db.collection('workspaceCatalogues').doc('evaluation');
+  const repo = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
+  const service = () => new WorkspaceCatalogueService(repo(), catalogueIdentity, () => new Date(at));
+  try {
+    await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+    await root.collection('participants').doc('store-one').set(producerParticipant());
+    await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+    await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+    const sku = input(); sku.publicListing = false;
+    for (const command of productionCommands(sku)) await repo().produceCatalogue(
+      ['create', 'review_product', 'review_pack'].includes(String(command.type)) ? 'reviewer-one' : 'owner-one', catalogueIdentity, command);
+    const bound = await service().bindReviewedSku('owner-one', {storeId: 'store-one', sku, expectedRevision: 0, idempotencyKey: 'HOST-unlisted-preview'});
+    const submitted = await repo().submitProduct(productCommand());
+    const draftInput = submittedProduct(); draftInput.content.title = 'HOST private draft चावल';
+    const draftBody = {productDraftVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one', expectedRevision: 0,
+      idempotencyKey: 'HOST-preview-draft', draft: draftInput, catalogueOrigin: null};
+    await service().handleProductDraft('owner-one', 'saveStoreProductDraft', draftBody);
+    const capture: Record<string, unknown> = {testData: 'isolated volatile local original repository; never phone data', bound, submitted};
+    const bindingsBefore = await root.collection('publicListingBindings').get();
+    const before = await root.collection('stores').doc('store-one').collection('productDrafts').doc('sku-one').collection('receipts').get();
+    assert.equal(before.size, 1, 'Count the actual original Save receipt namespace.');
+    for (const kind of ['catalogue-sku', 'submitted-original', 'saved-draft']) {
+      const request = {productPreviewVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one', kind, limit: 1, cursor: null};
+      const page = await service().handleProductPreview('owner-one', 'listStoreProductPreviewSources', request) as any;
+      assert.equal(page.items.length, 1); assert.equal(page.items[0].skuId, 'sku-one'); assert.equal(page.items[0].revision, 1);
+      const original = await service().handleProductPreview('owner-one', 'readStoreProductPreviewOriginal', {
+        productPreviewVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one', kind, skuId: 'sku-one',
+        expectedRevision: 1, expectedFingerprint: page.items[0].fingerprint}) as any;
+      assert.equal(original.state, 'found'); assert.equal(original.kind, kind); assert.equal(original.reference.kind, kind);
+      if (kind === 'catalogue-sku') assert.equal(original.record.publicListing, false);
+      if (kind === 'saved-draft') assert.equal(original.record.draft.content.title, draftInput.content.title);
+      if (kind === 'submitted-original') assert.deepEqual(original.record, submitted);
+      const end = await service().handleProductPreview('owner-one', 'listStoreProductPreviewSources', {...request, cursor: page.nextCursor}) as any;
+      assert.equal(end.items.length, 0); assert.equal(end.nextCursor, null);
+      capture[kind] = {page, original};
+      await assert.rejects(service().handleProductPreview('other-owner', 'readStoreProductPreviewOriginal', {
+        productPreviewVersion: 1, actorAccountId: 'other-owner', realm: 'evaluation', storeId: 'store-one', kind, skuId: 'sku-one',
+        expectedRevision: null, expectedFingerprint: null}), {code: 'not_found'});
+    }
+    const after = await root.collection('stores').doc('store-one').collection('productDrafts').doc('sku-one').collection('receipts').get();
+    assert.equal(after.size, before.size);
+    const bindingsAfter = await root.collection('publicListingBindings').get();
+    assert.deepEqual(bindingsAfter.docs.map(doc => doc.data()), bindingsBefore.docs.map(doc => doc.data()));
+    assert.deepEqual((await service().publicCatalogue({storeId: 'store-one'}) as any).items, [],
+      'A stable listing identity is not publication; the original public reader must exclude the unlisted SKU.');
+    assert.equal((await root.collection('stores').doc('store-one').collection('productSubmissions').get()).size, 1);
+    const ref = (capture['saved-draft'] as any).page.items[0];
+    const revised = {...draftInput, content: {...draftInput.content, title: 'HOST newer private copy'}};
+    await service().handleProductDraft('owner-one', 'saveStoreProductDraft', {...draftBody,
+      expectedRevision: 1, idempotencyKey: 'HOST-preview-draft-next', draft: revised});
+    await assert.rejects(service().handleProductPreview('owner-one', 'readStoreProductPreviewOriginal', {
+      productPreviewVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one', kind: 'saved-draft', skuId: 'sku-one',
+      expectedRevision: ref.revision, expectedFingerprint: ref.fingerprint}), {code: 'revision_conflict'});
+    await db.collection('workspaceProfiles').doc(profile.caseId).update({ownerUserId: 'changed-owner'});
+    await assert.rejects(service().handleProductPreview('owner-one', 'listStoreProductPreviewSources', {
+      productPreviewVersion: 1, actorAccountId: 'owner-one', realm: 'evaluation', storeId: 'store-one', kind: 'saved-draft', limit: 30, cursor: null}), {code: 'not_found'});
+    if (process.env.AGG02_PREVIEW_CAPTURE_PATH) writeFileSync(process.env.AGG02_PREVIEW_CAPTURE_PATH, JSON.stringify(capture, null, 2));
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
 test('AGG02 master selection reconstructs reviewed facts from both immutable originals without supplier prices', () => {
   const source = agg02MasterOriginals();
   const item = resolveStoreMasterCatalogueItem('evaluation', catalogueIdentity, source.aggregate, 'pack-one', source.product, source.pack);
@@ -2892,14 +3022,14 @@ test('AGG02 emulator original catalogue paging, owned import and durable private
     await repository().produceCatalogue('reviewer-one', catalogueIdentity,
       {type: 'review_pack', commandId: 'agg02-second-review', expectedVersion: 6, packId: 'pack-two',
         decision: 'verify', reasonCode: 'host-only', expectedDescriptorSha256: cataloguePayloadHash(saved.product.pack)});
-    const request = {masterCatalogueVersion: 1, realm: 'evaluation', storeId: 'store-two', query: {search: '', code: null}, pageSize: 1, cursor: null};
+    const request = {masterCatalogueVersion: 1, actorAccountId: 'owner-two', realm: 'evaluation', storeId: 'store-two', query: {search: '', code: null}, pageSize: 1, cursor: null};
     const page = await service().readMasterCatalogue('owner-two', request);
     assert.equal(page.items.length, 1); assert.equal(page.missingSourceCount, 0); assert.ok(page.nextCursor);
     assert.equal(page.verifiedPackCount, 2);
     const next = await service().readMasterCatalogue('owner-two', {...request, cursor: page.nextCursor});
     assert.equal(next.items.length, 1); assert.equal(next.nextCursor, null);
     assert.notEqual(next.items[0]!.verifiedPackId, page.items[0]!.verifiedPackId);
-    await assert.rejects(service().readMasterCatalogue('owner-one', request), {code: 'not_found'});
+    await assert.rejects(service().readMasterCatalogue('owner-one', {...request, actorAccountId: 'owner-one'}), {code: 'not_found'});
     await assert.rejects(service().readMasterCatalogue('owner-two', {...request, cursor: page.nextCursor,
       query: {search: 'oil', code: null}}), {code: 'conflict'});
     const exactCode = await service().readMasterCatalogue('owner-two', {...request, query: {search: '', code: 'PACK-002'}});
@@ -2913,12 +3043,12 @@ test('AGG02 emulator original catalogue paging, owned import and durable private
     assert.deepEqual(unknownCode.items, []); assert.equal(unknownCode.scannedCount, 0);
     const origin = storeMasterCatalogueOrigin(page.items[0]!);
     const draft = {...submittedProduct('local-sku'), channels: [], catalogueProductHint: origin.canonicalProductId};
-    const body = {productDraftVersion: 1, realm: 'evaluation', storeId: 'store-two', expectedRevision: 0,
+    const body = {productDraftVersion: 1, actorAccountId: 'owner-two', realm: 'evaluation', storeId: 'store-two', expectedRevision: 0,
       idempotencyKey: 'agg02-import-save', draft, catalogueOrigin: origin};
     const first = await service().handleProductDraft('owner-two', 'saveStoreProductDraft', body) as {record: StoreProductDraftRecord};
     assert.equal(first.record.revision, 1); assert.deepEqual(first.record.catalogueOrigin, origin);
     const presentations: object[] = [];
-    for (const type of ['wholesale', 'bulk', 'unknown-pack', 'high-price'] as const) {
+    for (const type of ['wholesale', 'bulk', 'unknown-pack', 'unknown-wholesale', 'high-price'] as const) {
       const skuId = `host-preview-${type}`, product = submittedProduct(skuId);
       product.sku = skuId.toUpperCase();
       if (type === 'unknown-pack') {
@@ -2936,14 +3066,14 @@ test('AGG02 emulator original catalogue paging, owned import and durable private
         ? [{kind: 'retail', priceMinor: type === 'high-price' ? 900000000 : 33000,
           mrpMinor: type === 'high-price' ? 1000000000 : 40000, minimumOrder: 1, quantityStep: 1, tiers: []}]
         : [{kind: 'retail', priceMinor: 33000, mrpMinor: 40000, minimumOrder: 1, quantityStep: 1, tiers: []},
-          {kind: type, priceMinor: 30000, mrpMinor: 40000, minimumOrder: 10, quantityStep: 5,
+          {kind: type === 'unknown-wholesale' ? 'wholesale' : type, priceMinor: 30000, mrpMinor: 40000, minimumOrder: 10, quantityStep: 5,
             tiers: [{minimumQuantity: 10, unitPriceMinor: 30000}, {minimumQuantity: 25, unitPriceMinor: 28000}]}],
-        ...(type === 'unknown-pack' ? {pack: {label: 'Host unmeasured carton', quantityMilli: null, unit: null, unitsPerCase: null}} : {})};
-      const previewBody = {productDraftVersion: 1, realm: 'evaluation', storeId: 'store-two', expectedRevision: 0,
+        ...(type === 'unknown-pack' || type === 'unknown-wholesale' ? {pack: {label: 'Host unmeasured carton', quantityMilli: null, unit: null, unitsPerCase: null}} : {})};
+      const previewBody = {productDraftVersion: 1, actorAccountId: 'owner-two', realm: 'evaluation', storeId: 'store-two', expectedRevision: 0,
         idempotencyKey: `host-preview-save-${type}`, draft, catalogueOrigin: null};
       await service().handleProductDraft('owner-two', 'saveStoreProductDraft', previewBody);
       const response = await service().handleProductDraft('owner-two', 'readStoreProductDraft',
-        {productDraftVersion: 1, realm: 'evaluation', storeId: 'store-two', skuId}) as {record: StoreProductDraftRecord};
+        {productDraftVersion: 1, actorAccountId: 'owner-two', realm: 'evaluation', storeId: 'store-two', skuId}) as {record: StoreProductDraftRecord};
       assert.equal(response.record.draft.channels[0]!.priceMinor, type === 'high-price' ? 900000000 : 33000);
       presentations.push({type, body: previewBody, response});
     }
@@ -2955,7 +3085,7 @@ test('AGG02 emulator original catalogue paging, owned import and durable private
     const recovered = await service().handleProductDraft('owner-two', 'reconcileStoreProductDraft', body) as {record: StoreProductDraftRecord};
     assert.deepEqual(recovered.record, first.record);
     const read = await service().handleProductDraft('owner-two', 'readStoreProductDraft',
-      {productDraftVersion: 1, realm: 'evaluation', storeId: 'store-two', skuId: 'local-sku'}) as {record: StoreProductDraftRecord};
+      {productDraftVersion: 1, actorAccountId: 'owner-two', realm: 'evaluation', storeId: 'store-two', skuId: 'local-sku'}) as {record: StoreProductDraftRecord};
     assert.equal(read.record.revision, 2);
     await assert.rejects(service().handleProductDraft('owner-two', 'saveStoreProductDraft', {...body, idempotencyKey: 'agg02-stale'}), {code: 'conflict'});
     const producerReceipt = root.collection('canonicalCatalogues').doc(catalogueIdentity.catalogueId)
@@ -4328,6 +4458,89 @@ async function assistantOwnedOriginalFixture(count = 1, channel: 'retail' | 'who
   return {repository, provider, context, authority, plans, actor, request, calls, personalReads: () => personalReads,
     onRead: (hook: () => void) => {onRead = hook;}, revokeMember: () => {member = false;}, revokePaid: () => {paid = false;}};
 }
+
+test('AGG02 AI preview negotiates typed originals without changing legacy previews or replaying writes', async () => {
+  const f = await assistantOwnedOriginalFixture(2);
+  const draft = planStoreProductDraft(privateDraftCommand({draft: submittedProduct('owned-sku-0001')}), profile);
+  const submitted = planStoreProductSubmission(productCommand({product: submittedProduct('owned-sku-0001')}), profile);
+  Object.assign(f.repository, {
+    async listProductSubmissions() {return [submitted];}, async readProductSubmission() {return submitted;},
+    async listProductDrafts() {return [draft];}, async readProductDraft() {return draft;},
+  });
+  const base = {...f.request, actionId: 'AI-ACT-230'};
+  const before = cataloguePayloadHash({rows: [...f.repository.records], receipts: [...f.repository.receipts]});
+  let previewReads = 0;
+  const originalRead = f.provider.handleProductPreview.bind(f.provider);
+  f.provider.handleProductPreview = async (...args) => {previewReads++; return originalRead(...args);};
+  const legacy = await f.context.read(f.actor, base);
+  assert.equal(previewReads, 0, 'An older client never receives the new source kind.');
+  assert.equal(Object.hasOwn(legacy.modelContext as object, 'previewOriginals'), false);
+  const modern = await f.context.read(f.actor, {...base, nativeProductPreviewVersion: 1});
+  assert.equal(previewReads, 6);
+  const tool = modern.tools.find(row => row.actionId === 'AI-ACT-230')!;
+  assert.equal(tool.name, 'store_preview_owned_original');
+  const seen = new Set<string>();
+  for (const kind of ['catalogue-sku', 'submitted-original', 'saved-draft']) {
+    const resolved = tool.resolveTarget!({kind, channel: 'retail'});
+    assert.equal(resolved.entityId, 'owned-sku-0001'); assert.ok(tool.validate(resolved.fields));
+    assert.equal((resolved.fields.previewRef as any).kind, kind);
+    seen.add((resolved.fields.previewRef as any).fingerprint);
+  }
+  assert.equal(seen.size, 3);
+  assert.equal(modern.nativeTargets!.filter(row => row.actionId === 'AI-ACT-230').length, 1);
+  assert.throws(() => tool.resolveTarget!({kind: 'invented', channel: 'retail'}));
+  assert.equal(before, cataloguePayloadHash({rows: [...f.repository.records], receipts: [...f.repository.receipts]}));
+  // A valid kind flag must not bypass malformed source summaries.
+  f.provider.handleProductPreview = async (...args) => {
+    const result = await originalRead(...args) as any;
+    return {...result, reference: {...result.reference, revision: '1'}};
+  };
+  await assert.rejects(f.context.read(f.actor, {...base, nativeProductPreviewVersion: 1}), /context_unavailable/u);
+  for (const bad of [{title: ''}, {skuId: {}}, {revision: '1'}, {channels: ['wholesale', 'bulk']}]) {
+    f.provider.handleProductPreview = async (...args) => {
+      const page = await originalRead(...args) as any;
+      return {...page, items: page.items.map((row: object) => ({...row, ...bad}))};
+    };
+    await assert.rejects(f.context.read(f.actor, {...base, entityId: null, nativeProductPreviewVersion: 1}), /context_unavailable/u);
+  }
+  f.provider.handleProductPreview = originalRead;
+  const rows = new Map<string, {fingerprint: string; result: PreparationState}>();
+  let modelCalls = 0, reserves = 0;
+  const requests: PreparationRequestStore = {
+    async claim(key, fingerprint) {
+      const prior = rows.get(key); if (prior) return prior.fingerprint === fingerprint ? prior.result : {state: 'conflict'};
+      rows.set(key, {fingerprint, result: {state: 'pending'}}); return {state: 'claimed', lease: key};
+    },
+    async read(key) {return rows.get(key)?.result;},
+    async finish(key, _lease, result) {rows.get(key)!.result = result; return result;},
+    async cancel() {return undefined;},
+  };
+  const service = new AssistantPreparationService({projectId: f.actor.projectId, plans: f.plans, context: f.context, requests,
+    now: () => new Date(at), usage: {async reserve() {reserves++; return {id: 'HOST-preview-permit', validUntil: '2026-10-16T12:01:00.000Z'};}, async settle() {}},
+    model: {async prepare(_input, tools, _signal, reference) {
+      modelCalls++; assert.equal(tools.length, 1); assertStrictSchema(tools[0]!.parameters);
+      const projection = reference as any;
+      assert.deepEqual(projection.products, [], 'Preview preparation exposes summaries, not unrelated full product inputs.');
+      assert.equal(projection.previewOriginals.length, 3);
+      assert.ok(projection.previewOriginals.every((row: any) => row.skuId === 'owned-sku-0001'));
+      assert.ok(!JSON.stringify(projection).includes('owned-sku-0002'));
+      assert.deepEqual((tools[0]!.parameters.properties as any).skuId.enum, ['owned-sku-0001']);
+      return {kind: 'tool', name: tools[0]!.name, arguments: {skuId: 'owned-sku-0001', kind: 'saved-draft', channel: 'retail'}};
+    }}});
+  const payload = {...base, requestId: 'HOST-preview-prepare', entityId: null, nativeProductPreviewVersion: 1 as const,
+    nativeTargets: [{actionId: 'AI-ACT-230', entityId: 'owned-sku-0001'}]};
+  const prepared = await service.handle(f.actor, {operation: 'prepare', payload});
+  assert.equal(prepared.state, 'ready');
+  if (prepared.state === 'ready' && prepared.reply.outcome.kind === 'proposal') {
+    assert.equal((prepared.reply.outcome.fields.previewRef as any).kind, 'saved-draft');
+  } else assert.fail('The actual service must return the typed native proposal.');
+  assert.deepEqual(await service.handle(f.actor, {operation: 'prepare', payload}), prepared);
+  assert.deepEqual(await service.handle(f.actor, {operation: 'status', payload: {scope: payload.scope, requestId: payload.requestId}}), prepared);
+  assert.equal(modelCalls, 1); assert.equal(reserves, 1);
+  assert.equal(before, cataloguePayloadHash({rows: [...f.repository.records], receipts: [...f.repository.receipts]}));
+  f.revokeMember();
+  await assert.rejects(f.context.read(f.actor, {...base, nativeProductPreviewVersion: 1}));
+});
 
 for (const channel of ['wholesale', 'bulk'] as const) {
   test(`AI-DOMAIN owned Store Restock ${channel} search uses the original public source without selecting inventory`, async () => {

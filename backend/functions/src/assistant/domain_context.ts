@@ -1,7 +1,8 @@
 import type {AccountPlansService, PlansReadback} from "../account/plans_service.js";
 import type {AccountProfileActor} from "../account/profile_service.js";
 import type {WorkspaceCatalogueService, StoreSkuRecord} from "../workspace/workspace_catalogue_service.js";
-import {normalizeStorePublicDetails} from "../workspace/workspace_catalogue_service.js";
+import {normalizeStorePublicDetails, cataloguePayloadHash, checkedStoreProductPreviewOriginal,
+  type StoreProductPreviewReference, type StoreProductPreviewKind} from "../workspace/workspace_catalogue_service.js";
 import type {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, WorkspaceBulkQuoteService, PurchaseReference, ProductFeedbackTarget} from "../workspace/workspace_purchase_projection_service.js";
 import type {WorkspacePromotionService,StoreCouponRecord} from '../workspace/workspace_promotion_service.js';
 import type {PreparationContextSource} from "./model_service.js";
@@ -625,7 +626,7 @@ const originalOwnedReadVersions = {supplierTaxReadbackVersion: 1, productFactsRe
 /** Original owned catalogue reader; no local inventory is promoted to a master. */
 export class OriginalStoreProductPreparationContext implements PreparationContextSource {
   constructor(private readonly deps: {projectId: string; authority: PreparationContextSource;
-    catalogue: Pick<WorkspaceCatalogueService, "listSkus">; now?: () => Date}) {}
+    catalogue: Pick<WorkspaceCatalogueService, "listSkus"> & Partial<Pick<WorkspaceCatalogueService, "handleProductPreview">>; now?: () => Date}) {}
   private now() {return (this.deps.now?.() ?? new Date()).getTime();}
   private async authority(actor: AccountProfileActor, input: PreparationRequest) {
     return approvedWorkspacePreparationAuthority(this.deps.authority,actor,input,this.now());
@@ -672,6 +673,101 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
       after = page.nextCursor as string | null;
     } while (after !== null);
     return {realm, records};
+  }
+  private async previewSnapshot(actor: AccountProfileActor, input: PreparationRequest, realm: string | null) {
+    if ((realm !== 'evaluation' && realm !== 'production') || !this.deps.catalogue.handleProductPreview) return fail('context_unavailable');
+    let until = this.now() + 60_000;
+    const references = await Promise.all((['catalogue-sku', 'submitted-original', 'saved-draft'] as const).map(async kind => {
+      const rows: StoreProductPreviewReference[] = [], cursors = new Set<string>(), seen = new Set<string>();
+      let cursor: string | null = null;
+      do {
+        const fixed = input.entityId !== null;
+        const raw = await this.deps.catalogue.handleProductPreview!(actor.uid, fixed ? 'readStoreProductPreviewOriginal' : 'listStoreProductPreviewSources', {
+          productPreviewVersion: 1, actorAccountId: actor.uid, realm, storeId: input.scope.storeId, kind,
+          ...(fixed ? {skuId: input.entityId, expectedRevision: null, expectedFingerprint: null} : {limit: 50, cursor}),
+        });
+        const page = object(raw), observed = typeof page.observedAt === 'string' ? Date.parse(page.observedAt) : NaN;
+        if (page.schemaVersion !== 1 || page.productPreviewVersion !== 1 || page.actorAccountId !== actor.uid ||
+            page.realm !== realm || page.storeId !== input.scope.storeId || page.kind !== kind || !Number.isFinite(observed) ||
+            observed > this.now() || observed + 60_000 <= this.now()) return fail('context_unavailable');
+        until = Math.min(until, observed + 60_000);
+        let items: unknown[];
+        if (fixed) {
+          if (page.skuId !== input.entityId || !['found', 'none'].includes(String(page.state))) return fail('context_unavailable');
+          if (page.state === 'none') {
+            if (page.record !== null || page.reference !== null) return fail('context_unavailable');
+            items = [];
+          } else {
+            const checked = checkedStoreProductPreviewOriginal(kind, page.record, realm, input.scope.storeId!, input.entityId!);
+            if (cataloguePayloadHash(checked.reference) !== cataloguePayloadHash(page.reference)) return fail('context_unavailable');
+            items = [checked.reference];
+          }
+          cursor = null;
+        } else {
+          if (!Array.isArray(page.items) || page.items.length > 50 || page.nextCursor !== null &&
+              (page.items.length !== 50 || typeof page.nextCursor !== 'string' || page.nextCursor.length > 2048 ||
+                !/^[A-Za-z0-9_-]+$/u.test(page.nextCursor) || cursors.has(page.nextCursor))) return fail('context_unavailable');
+          items = page.items; cursor = page.nextCursor as string | null;
+          if (cursor !== null) cursors.add(cursor);
+        }
+        for (const value of items) {
+          const row = object(value), keys = ['kind', 'skuId', 'revision', 'fingerprint', 'title', 'brand', 'variant', 'pack', 'channels', 'publicListingRequested'];
+          if (Object.keys(row).length !== keys.length || keys.some(key => !Object.hasOwn(row, key)) || row.kind !== kind ||
+              typeof row.skuId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(row.skuId) ||
+              input.entityId !== null && row.skuId !== input.entityId || seen.has(row.skuId) ||
+              !Number.isSafeInteger(row.revision) || (row.revision as number) < 1 || (row.revision as number) > 1_000_000_000 ||
+              typeof row.fingerprint !== 'string' || !/^[A-F0-9]{64}$/u.test(row.fingerprint) ||
+              Object.entries({title: 240, brand: 160, variant: 240, pack: 160}).some(([key, limit]) => typeof row[key] !== 'string' || (row[key] as string).length > limit) ||
+              !(row.title as string).trim() || !(row.pack as string).trim() || !Array.isArray(row.channels) || row.channels.length > 2 ||
+              new Set(row.channels).size !== row.channels.length || row.channels.some(value => typeof value !== 'string' || !['retail', 'wholesale', 'bulk'].includes(value)) ||
+              row.channels.includes('wholesale') && row.channels.includes('bulk') ||
+              (kind === 'catalogue-sku' ? typeof row.publicListingRequested !== 'boolean' : row.publicListingRequested !== null)) return fail('context_unavailable');
+          if (rows.length && rows.at(-1)!.skuId >= row.skuId) return fail('context_unavailable');
+          seen.add(row.skuId); rows.push(row as unknown as StoreProductPreviewReference);
+        }
+        if (rows.length > 2500) return fail('context_unavailable');
+      } while (cursor !== null);
+      return rows;
+    }));
+    const records = references.flat().sort((a, b) => a.skuId < b.skuId ? -1 : a.skuId > b.skuId ? 1 : a.kind.localeCompare(b.kind));
+    if (new Set(records.map(row => row.skuId)).size > 2500) return fail('context_unavailable');
+    return {records, validUntil: until};
+  }
+  private previewTool(actor: AccountProfileActor, input: PreparationRequest, authority: PreparationContext,
+      realm: string | null, records: readonly StoreProductPreviewReference[]) {
+    const choices = records.filter(row => row.channels.length > 0), skus = [...new Set(choices.map(row => row.skuId))];
+    const proof = (skuId: string) => 'store-preview-originals:' + realm + ':' +
+      digest([actor.projectId, actor.uid, input.scope.storeId, authority.revision, records.filter(row => row.skuId === skuId)]);
+    if (!choices.length) return undefined;
+    const fields = (row: StoreProductPreviewReference, channel: unknown) => ({previewRef: {
+      kind: row.kind, skuId: row.skuId, revision: row.revision, fingerprint: row.fingerprint, channel,
+    }});
+    const validate = (raw: Readonly<Record<string, unknown>>) => {
+      if (Object.keys(raw).length !== 1 || !Object.hasOwn(raw, 'previewRef')) return false;
+      const ref = object(raw.previewRef);
+      return Object.keys(ref).length === 5 && ['kind', 'skuId', 'revision', 'fingerprint', 'channel'].every(key => Object.hasOwn(ref, key)) &&
+        choices.some(row => row.kind === ref.kind && row.skuId === ref.skuId && row.revision === ref.revision &&
+          row.fingerprint === ref.fingerprint && row.channels.includes(String(ref.channel)));
+    };
+    const tool: PreparationTool = {name: 'store_preview_owned_original', actionId: 'AI-ACT-230', entityId: input.entityId,
+      sourceRevision: input.entityId === null ? 'store-preview-selection:' + digest(records) : proof(input.entityId),
+      ...(input.entityId === null ? {targetSelector: 'skuId'} : {}),
+      description: 'Preview an actual owned product version. Keep saved drafts, submitted copies and verified SKU copies distinct; their revision counters are incomparable. Ask which copy when the request is ambiguous. Native Review re-reads the exact original; only the original public reader can confirm publication. No Save, submission, publication, Stock or ordering effect is prepared.',
+      parameters: {type: 'object', properties: {...(input.entityId === null ? {skuId: {type: 'string', enum: skus}} : {}),
+        kind: {type: 'string', enum: [...new Set(choices.map(row => row.kind))]},
+        channel: {type: 'string', enum: [...new Set(choices.flatMap(row => row.channels))]}},
+        required: [...(input.entityId === null ? ['skuId'] : []), 'kind', 'channel'], additionalProperties: false},
+      validate,
+      resolveTarget: args => {
+        if (Object.keys(args).length !== (input.entityId === null ? 3 : 2)) return fail('invalid_model_result');
+        const skuId = input.entityId ?? args.skuId, row = choices.find(value => value.skuId === skuId && value.kind === args.kind && value.channels.includes(String(args.channel)));
+        if (!row) return fail('invalid_model_result');
+        const value = fields(row, args.channel); if (!validate(value)) return fail('invalid_model_result');
+        const label = row.kind === 'saved-draft' ? 'Saved draft' : row.kind === 'submitted-original' ? 'Submitted copy' : 'Saved verified copy';
+        return {entityId: row.skuId, sourceRevision: proof(row.skuId), fields: value, title: 'Preview product',
+          summary: [row.title, row.variant, row.pack, label, args.channel].filter(Boolean).join(' · ')};
+      }};
+    return {tool, targets: skus.map(skuId => ({actionId: 'AI-ACT-230', entityId: skuId, sourceRevision: proof(skuId)}))};
   }
   private references(record: StoreSkuRecord): Readonly<Record<string, unknown>> {
     return {sourceCanonicalId: record.canonicalProductId, sourceSku: record.sku, sourcePack: record.pack.label,
@@ -864,6 +960,11 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
     proposal: Extract<PreparationReply["outcome"], {kind: "proposal"}>): Promise<PreparationContext> {
     if (proposal.actionId !== input.actionId || proposal.entityId !== input.entityId) return fail("stale_preparation", 409);
+    if (proposal.actionId === 'AI-ACT-230' && /^store-preview-originals:(evaluation|production):[a-f0-9]{64}$/u.test(proposal.sourceRevision)) {
+      // Only a stored server-generated proof opts status into this contract.
+      // Do not substitute the current client version or an older published preview.
+      return this.read(actor, {...input, nativeProductPreviewVersion: 1});
+    }
     if (proposal.actionId === 'AI-ACT-225' || proposal.actionId === 'AI-ACT-374') {
       if (proposal.entityId !== null || Object.keys(proposal.fields).length !== 1 ||
           typeof proposal.fields.originalCapture !== 'string' || !/^[a-f0-9]{64}$/u.test(proposal.fields.originalCapture)) return fail('stale_preparation', 409);
@@ -881,12 +982,17 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
     const started = this.now(), before = await this.authority(actor, input);
     const ownerOnly = input.actionId !== null && (storeProductOwnerActions.has(input.actionId)||storeStockOwnerActions.has(input.actionId)||
       input.actionId==='AI-ACT-223'&&input.entityId===null);
-    const first = await this.snapshot(actor, input.scope.storeId, input.entityId, ownerOnly);
-    const second = await this.snapshot(actor, input.scope.storeId, input.entityId, ownerOnly);
+    const previewEnabled = input.nativeProductPreviewVersion === 1 && this.deps.catalogue.handleProductPreview !== undefined && (input.actionId === null || input.actionId === 'AI-ACT-230');
+    const captureOwnerOnly = ownerOnly || previewEnabled && input.actionId === 'AI-ACT-230';
+    const first = await this.snapshot(actor, input.scope.storeId, input.entityId, captureOwnerOnly);
+    const firstPreview = previewEnabled ? await this.previewSnapshot(actor, input, first.realm) : null;
+    const second = await this.snapshot(actor, input.scope.storeId, input.entityId, captureOwnerOnly);
+    const secondPreview = previewEnabled ? await this.previewSnapshot(actor, input, second.realm) : null;
     const after = await this.authority(actor, input);
-    if (before.revision !== after.revision || canonical(first) !== canonical(second)) return fail("stale_preparation", 409);
-    const until = Math.min(started + 60_000, Date.parse(before.validUntil), Date.parse(after.validUntil));
-    if (until <= this.now() || input.entityId !== null && !second.records.length) return fail("context_unavailable");
+    if (before.revision !== after.revision || canonical(first) !== canonical(second) ||
+        canonical(firstPreview?.records ?? null) !== canonical(secondPreview?.records ?? null)) return fail("stale_preparation", 409);
+    const until = Math.min(started + 60_000, Date.parse(before.validUntil), Date.parse(after.validUntil), secondPreview?.validUntil ?? Infinity);
+    if (until <= this.now() || input.entityId !== null && !second.records.length && !secondPreview?.records.some(row => row.skuId === input.entityId)) return fail("context_unavailable");
     const proof = (record: StoreSkuRecord) => `store-owned-product:${second.realm}:${record.revision}:` +
       digest([actor.projectId, actor.uid, input.scope.storeId, after.revision, second.realm, record]);
     const eligible = (actionId: string) => actionId === "AI-ACT-370"
@@ -894,6 +1000,7 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
         ? second.records.filter(record => record.channels.some(channel => channel.kind === "wholesale" || channel.kind === "bulk")) : second.records;
     const tools: PreparationTool[] = [];
     for (const actionId of storeProductActions) {
+      if (previewEnabled && actionId === 'AI-ACT-230') continue;
       if (input.actionId !== null && input.actionId !== actionId || !second.records.length) continue;
       // Root223 explicitly chooses an original saved native SKU. Fixed-entity
       // requests retain the earlier mirrored contract for saved preparations.
@@ -1059,17 +1166,21 @@ export class OriginalStoreProductPreparationContext implements PreparationContex
             title: price ? "Review sale prices" : "Review product changes", summary: [record.content.title, record.content.variant, record.pack.label].filter(Boolean).join(" · ")};
         }});
     }
+    const preview = secondPreview ? this.previewTool(actor, input, after, second.realm, secondPreview.records) : undefined;
+    if (preview) tools.push(preview.tool);
     tools.push(...this.nativeOwnerTools(actor, input, after, second.realm));
     if (input.actionId !== null && !tools.length) return fail("context_unavailable");
-    return {revision: "store-owned-products:" + digest([actor.projectId, actor.uid, input.scope.storeId, after.revision, second]),
+    return {revision: "store-owned-products:" + digest([actor.projectId, actor.uid, input.scope.storeId, after.revision, second, ...(secondPreview ? [secondPreview.records] : [])]),
       validUntil: new Date(until).toISOString(), tools,
       nativeTargets: [
-        ...tools.filter(tool => storeProductActions.has(tool.actionId)&&tool.name!=='store_review_saved_private_product').flatMap(tool => eligible(tool.actionId).map(record => ({actionId: tool.actionId, entityId: record.skuId, sourceRevision: proof(record)}))),
+        ...(preview?.targets ?? []),
+        ...tools.filter(tool => storeProductActions.has(tool.actionId)&&tool.name!=='store_review_saved_private_product'&&tool.name!=='store_preview_owned_original').flatMap(tool => eligible(tool.actionId).map(record => ({actionId: tool.actionId, entityId: record.skuId, sourceRevision: proof(record)}))),
         ...(input.entityId===null&&(input.actionId===null||input.actionId==='AI-ACT-223')?second.records.map(record=>({actionId:'AI-ACT-223',entityId:record.skuId,sourceRevision:proof(record)})):[]),
         ...tools.filter(tool=>tool.name==='store_review_saved_private_product').map(tool=>({actionId:tool.actionId,entityId:null,sourceRevision:tool.sourceRevision})),
         ...tools.filter(tool => storeProductOwnerActions.has(tool.actionId)||storeStockOwnerActions.has(tool.actionId)).map(tool => ({actionId: tool.actionId, entityId: null, sourceRevision: tool.sourceRevision})),
       ],
       modelContext: {audience: "workspace", storeId: input.scope.storeId, sourceKind: 'original-store-owned-skus-v1',
+        ...(secondPreview ? {previewOriginals: secondPreview.records, previewSource: 'Separate actual originals only; no copy is selected by comparing counters across source kinds. Native original read and read-only customer presentation are required.'} : {}),
         priceAttentionSource: "Original native commodity-price reads and final confirmation remain native. This preparation has not read attention status or confirmed a price.",
         defaultsSource: "Existing account/Store-owned native preferences only. Their current values have not been read here; native snapshot and confirmation own them. Requesting a customer listing never confirms publication.",
         originalRequestSource: "Retained listing/family originals are native-owned, not inferred from the current catalogue. No pending identity, receipt, submission or publication status has been read here. Native review must bind the exact frozen original and preserve it.",

@@ -51,7 +51,8 @@ abstract interface class AssistantDomainContextGatewaySource {
 class AssistantDomainContextGateway {
   AssistantDomainContextGateway({required this.owner, required this.isCurrent,
       required SocialContentCredentials credentials, SocialContentTransport? transport,
-      DateTime Function()? clock, this.compactStoreSelection = false})
+      DateTime Function()? clock, this.compactStoreSelection = false,
+      this.productPreviewSupported = const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_PREVIEW_V1')})
       : _credentials = credentials, _clock = clock ?? DateTime.now,
         _transport = transport ?? IoSocialContentTransport(
           followRedirects: false, maximumResponseBytes: 2 * 1024 * 1024) {
@@ -62,7 +63,7 @@ class AssistantDomainContextGateway {
   }
   final AccountProfileOwner owner;
   final bool Function() isCurrent;
-  final bool compactStoreSelection;
+  final bool compactStoreSelection, productPreviewSupported;
   final SocialContentCredentials _credentials;
   final SocialContentTransport _transport;
   final DateTime Function() _clock;
@@ -105,6 +106,7 @@ class AssistantDomainContextGateway {
       headers: {'Authorization': 'Bearer $token', 'X-Firebase-AppCheck': proof},
       body: {'operation': 'read', 'payload': {'scope': scope,
         if (compact) 'nativeSelectionVersion': 1,
+        if (productPreviewSupported && context.inWorkspace) 'nativeProductPreviewVersion': 1,
         if (selection != null) 'catalogueListingIds': selection,
         if (quotes != null) 'retainedSupplierQuoteIds': quotes}});
     check();
@@ -179,6 +181,9 @@ class AssistantDomainContextGateway {
         !RegExp(r'^buyer-product-stars:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))_invalid();
       if (assistantStoreProductContextActions.contains(action) && (!context.inWorkspace ||
           entity == null && !(action=='AI-ACT-223'&&RegExp(r'^store-product-submission-owner:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision)))) _invalid();
+      if (action == 'AI-ACT-230' && productPreviewSupported &&
+          (!context.workspaceApproved || !context.storeWorkspace || entity == null ||
+          !RegExp(r'^store-preview-originals:(evaluation|production):[a-f0-9]{64}$').hasMatch(revision))) _invalid();
       if (assistantStoreOwnerContextActions.contains(action) &&
           (!context.inWorkspace || entity != null && !assistantStoreRestockOwnerContextActions.contains(action))) _invalid();
       if (const {'AI-ACT-229', 'AI-ACT-369'}.contains(action) &&
@@ -223,6 +228,7 @@ class AssistantDomainContextGateway {
     check();
     return AssistantCanonicalContextSnapshot(binding: context.binding,
       revisions: revisions, validUntil: until, catalogueListingIds: selection,
+      nativeProductPreviewVersion: productPreviewSupported && context.inWorkspace ? 1 : null,
       nativeSelection: compact ? AssistantCanonicalNativeSelection(fingerprint: selectionFingerprint!, proofs: masked) : null);
   }
 }

@@ -33,7 +33,7 @@ export async function handleAssistantCanonicalContextRequest(input: {method: str
       }}, false, false);
     if (!actor) throw new AssistantModelError("authentication_required", 401);
     if (!deps.enabled || !deps.context) throw new AssistantModelError("context_unavailable");
-    const current = await deps.context.read(actor, contextReadSelection(scope, selection.catalogueListingIds, selection.retainedSupplierQuoteIds));
+    const current = await deps.context.read(actor, contextReadSelection(scope, selection.catalogueListingIds, selection.retainedSupplierQuoteIds, selection.nativeProductPreviewVersion));
     const until = Date.parse(current.validUntil), now = (deps.now?.() ?? new Date()).getTime();
     if (!Number.isFinite(until) || until <= now || new Date(until).toISOString() !== current.validUntil) {
       throw new AssistantModelError("stale_preparation", 409);

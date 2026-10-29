@@ -8066,10 +8066,10 @@ class _OriginalFamilyJournal implements WorkspaceVariantFamilyJournal {
 }
 class _Published230Host {
   _Published230Host(this.channel, {this.fault, this.reviewedAlias = false, this.acknowledged = true,
-    this.quantityVisibility = false, this.counterSale = true, this.pendingListing = false,this.submissions=false,this.restoreListing=true,this.families=false});
+    this.quantityVisibility = false, this.counterSale = true, this.pendingListing = false,this.submissions=false,this.restoreListing=true,this.families=false,this.previewOriginals=false,this.previewCatalogue=false,this.draftSync=false});
   final BuyV2OfferClass channel;
   final String? fault;
-  final bool reviewedAlias, acknowledged, quantityVisibility, counterSale, pendingListing,submissions,restoreListing,families;
+  final bool reviewedAlias, acknowledged, quantityVisibility, counterSale, pendingListing,submissions,restoreListing,families,previewOriginals,previewCatalogue,draftSync;
   final submissionJournal=_SubmissionReviewJournal();
   bool failSubmissionRead=false;
   Future<void> Function()? beforeSubmissionRead;
@@ -8082,6 +8082,17 @@ class _Published230Host {
     'record':original==null?null:{'schemaVersion':1,'realm':original.scope.realm,'storeId':store,'skuId':product.id,
       'revision':original.expectedRevision+1,'submittedAt':catalogue_fixture.at.toIso8601String(),
       'submittedBy':original.scope.account,'fingerprint':original.candidateFingerprint,'product':original.input.toJson()}};
+  final previewAt=DateTime.now().toUtc();
+  final draftRecords=<String,Map<String,Object?>>{},draftSaveCounts=<String,int>{};
+  int draftActive=0,draftMaximum=0;
+  String? unknownDraftSku;
+  Future<void> Function(Map<String,Object?>)? beforeDraftSave;
+  Map<String,Object?> draftResponse(Map<String,Object?> body) {
+    final sku=body['skuId']??(body['draft'] as Map)['skuId'];
+    return {'schemaVersion':1,'productDraftVersion':1,'actorAccountId':body['actorAccountId'],
+      'realm':'evaluation','storeId':store,'skuId':sku,'observedAt':catalogue_fixture.at.toIso8601String(),
+      'state':draftRecords[sku]==null?'not_found':'saved','record':draftRecords[sku]};
+  }
   final bindingJournal=_OriginalListingJournal();
   final familyJournals=<String,_OriginalFamilyJournal>{};
   String? familyReceipt;
@@ -8131,6 +8142,11 @@ class _Published230Host {
       'policy':{'id':'host-policy-sku-one','storeId':store,'revision':'policy-v1','title':'Host supplier terms',
         'body':'HOST source terms','productIds':['sku-one'],'requiresAcceptance':true,
         'validUntil':catalogue_fixture.at.add(const Duration(hours:1)).toIso8601String()}};
+    if(previewCatalogue) {
+      return jsonDecode(jsonEncode(data)
+        .replaceAll(catalogue_fixture.at.add(const Duration(hours:1)).toIso8601String(),previewAt.add(const Duration(hours:1)).toIso8601String())
+        .replaceAll(catalogue_fixture.at.toIso8601String(),previewAt.toIso8601String())) as Map<String,dynamic>;
+    }
     return data;
   }
   Map<String,dynamic> ownedPage() {
@@ -8142,6 +8158,27 @@ class _Published230Host {
     if(mirroredFamilyTitle!=null)(row['content'] as Map)['title']=mirroredFamilyTitle;
     return {'schemaVersion':1,'realm':'evaluation','storeId':store,'items':[row],'nextCursor':null};
   }
+  WorkspaceProductDraftIntent get previewIntent => WorkspaceProductDraftIntent(
+    scope:(account:'host-native-scope-user',store:store,realm:'evaluation',sku:product.id),
+    expectedRevision:0,idempotencyKey:'HOST-private-preview',input:WorkspaceProductDraftInput.fromSaved(product));
+  Map<String,Object?> previewReference() {
+    if(previewCatalogue) {
+      final record=WorkspaceCatalogueOwnedSku.decode((ownedPage()['items'] as List).single,
+        storeId:store,skuId:product.id,realm:'evaluation',now:previewAt).toJson();
+      Object? canonical(Object? value) => value is Map
+        ? {for(final key in value.keys.cast<String>().toList()..sort())key:canonical(value[key])}
+        : value is List ? value.map(canonical).toList() : value;
+      final content=record['content'] as Map,pack=record['pack'] as Map;
+      return {'kind':'catalogue-sku','skuId':product.id,'revision':record['revision'],
+        'fingerprint':crypto.sha256.convert(utf8.encode(jsonEncode(canonical(record)))).toString().toUpperCase(),
+        'title':content['title'],'brand':content['brand'],'variant':content['variant'],'pack':pack['label'],
+        'channels':(record['channels'] as List).map((row)=>(row as Map)['kind']).toList(),'publicListingRequested':true};
+    }
+    final input=previewIntent.input.toJson(),content=input['content'] as Map,pack=input['pack'] as Map;
+    return {'kind':'saved-draft','skuId':product.id,'revision':1,'fingerprint':previewIntent.fingerprint,
+      'title':content['title'],'brand':content['brand'],'variant':content['variant'],'pack':pack['label'],
+      'channels':(input['channels'] as List).map((row)=>(row as Map)['kind']).toList(),'publicListingRequested':null};
+  }
   Future<void> ready(WidgetTester tester) async {
     // Isolated host persistence for the real signed-in Root Buy owner.
     final previousPreferences = SharedPreferencesAsyncPlatform.instance;
@@ -8149,6 +8186,35 @@ class _Published230Host {
     addTearDown(() => SharedPreferencesAsyncPlatform.instance = previousPreferences);
     transport=catalogue_fixture.OwnerTransport((body)async{
       final op=body['operation'] as String;operations.add(op);
+      if(draftSync&&const {'readStoreProductDraft','saveStoreProductDraft'}.contains(op)) {
+        if(op=='saveStoreProductDraft') {
+          draftActive++;if(draftActive>draftMaximum)draftMaximum=draftActive;
+          try {
+            await beforeDraftSave?.call(body);
+            final input=WorkspaceProductDraftInput.fromJson(body['draft']);
+            final original=WorkspaceProductDraftIntent(scope:(account:body['actorAccountId'] as String,store:store,realm:'evaluation',sku:input.skuId),
+              expectedRevision:body['expectedRevision'] as int,idempotencyKey:body['idempotencyKey'] as String,input:input);
+            draftSaveCounts.update(input.skuId,(count)=>count+1,ifAbsent:()=>1);
+            draftRecords[input.skuId]={'schemaVersion':1,'realm':'evaluation','storeId':store,'skuId':input.skuId,
+              'revision':original.expectedRevision+1,'savedAt':catalogue_fixture.at.toIso8601String(),
+              'savedBy':original.scope.account,'fingerprint':original.fingerprint,'draft':input.toJson(),'catalogueOrigin':null};
+            if(unknownDraftSku==input.skuId)return const SocialContentResponse(statusCode:503,body:'{}');
+          } finally {draftActive--;}
+        }
+        return SocialContentResponse(statusCode:200,body:jsonEncode({'ok':true,'data':draftResponse(body)}));
+      }
+      if(previewOriginals&&const {'listStoreProductPreviewSources','readStoreProductPreviewOriginal'}.contains(op)) {
+        final reference=previewReference(),now=(previewCatalogue?previewAt:DateTime.now().toUtc()).toIso8601String(),found=body['kind']==(previewCatalogue?'catalogue-sku':'saved-draft');
+        return SocialContentResponse(statusCode:200,body:jsonEncode({'ok':true,'data':{
+          'schemaVersion':1,'productPreviewVersion':1,'actorAccountId':'host-native-scope-user','realm':'evaluation',
+          'storeId':store,'kind':body['kind'],'observedAt':now,
+          if(op=='listStoreProductPreviewSources')...{'items':found?[reference]:[],'nextCursor':null}
+          else...{'skuId':product.id,'state':found?'found':'none','reference':found?reference:null,'record':found?(previewCatalogue?(ownedPage()['items'] as List).single:{
+            'schemaVersion':1,'realm':'evaluation','storeId':store,'skuId':product.id,'revision':1,
+            'savedAt':now,'savedBy':'host-native-scope-user','fingerprint':previewIntent.fingerprint,
+            'draft':previewIntent.input.toJson(),'catalogueOrigin':null}):null},
+        }}));
+      }
       if(op=='readStoreVariantFamily'&&families) {
         readFamilies.add(body['familyId'] as String);
         if(failFamilyRead)return const SocialContentResponse(statusCode:503,body:'{}');
@@ -8234,7 +8300,8 @@ class _Published230Host {
       return const SocialContentResponse(statusCode:503,body:'{}');
     });
     api=AuthenticatedWorkspaceCatalogueGateway(realm:'evaluation',endpoint:Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
-      credentials:catalogue_fixture.Credentials(),transport:transport,now:()=>catalogue_fixture.at,
+      credentials:catalogue_fixture.Credentials(),transport:transport,now:()=>previewCatalogue?previewAt:previewOriginals?DateTime.now().toUtc():catalogue_fixture.at,
+      productPreviewSupported:previewOriginals,productDraftSupported:draftSync,
       stockSnapshotsSupported:quantityVisibility,stockQuantityVisibilitySupported:quantityVisibility,productSubmissionSupported:submissions,
       reviewedFamilyReadbackSupported:families);
     bindingJournal.read=()async{bindingReads++;return bindingJournal.saved;};
@@ -8245,6 +8312,8 @@ class _Published230Host {
       catalogueBindingPendingStoreFactory:(_)=>bindingJournal,
       stockVisibilityJournalFactory:(_)=>visibilityJournal,
       productSubmissionJournalFactory:(_)=>submissionJournal,
+      productDraftJournalFactory:previewOriginals||draftSync?(_)=>SecureWorkProductDraftJournal(
+        currentAccount:()=>native.principal.currentFirebasePrincipal?.userId):null,
       variantFamilyJournalFactory:(scope)=>familyJournals.putIfAbsent(scope.family,()=>_OriginalFamilyJournal()),
       inventoryStore:inventory,tradingPreferencesStoreFactory:(_)=>trading,catalogueReference:workspaceMasterCatalogue));
     native=makeNative();
@@ -8315,7 +8384,9 @@ class _Published230Host {
     actionId:'AI-ACT-230',binding:controller.context.binding,requestRevision:controller.requestRevision,
     entitlementRevision:controller.entitlementRevision!,sourceRevision:snapshot.sourceRevision,
     validUntil:DateTime.now().add(const Duration(minutes:5)),title:'View published product',summary:'Open its current public listing.',
-    entityId:product.id,fields:{...StoreProductInitialData.referenceFields(product),'channel':channel.name});
+    entityId:product.id,fields:previewOriginals?{'previewRef':{
+      for(final key in ['kind','skuId','revision','fingerprint'])key:previewReference()[key],'channel':channel.name}}
+      :{...StoreProductInitialData.referenceFields(product),'channel':channel.name});
   Future<void> openComposer(WidgetTester tester)async{
     final ownerControl=find.text('Store overview');
     expect(ownerControl.hitTestable(),findsOneWidget);
@@ -9383,6 +9454,209 @@ void main() {
     });
   }
   }
+
+  for(final scale in [1.0,1.8]) {
+    testWidgets('AGG02 typed saved-original Review stays visible after native handoff at $scale and never writes', (tester) async {
+      tester.view.physicalSize=const Size(360,800);tester.view.devicePixelRatio=1;
+      addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
+      tester.platformDispatcher.textScaleFactorTestValue=scale;addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final h=_Published230Host(BuyV2OfferClass.retail,previewOriginals:true);
+      try {
+        await h.ready(tester);
+        final before=h.saved,writes=h.native.writes;
+        final ref=h.previewReference(),snapshot=await h.adapter.snapshot(h.native.readContext(),h.product.id);
+        expect(h.adapter.allowedFields, const {'previewRef'});
+        final sources=await h.native.work.readWorkspaceProductPreviewSources(current:()=>true);
+        expect(sources,isNotNull);expect(sources!.references.length,1);
+        final original=await h.native.work.readWorkspaceProductPreviewOriginal(h.product.id,WorkspaceProductOriginalKind.savedDraft,
+          expected:sources.references.single,current:()=>true);
+        expect(original,isNotNull);expect(original!.current(),isTrue);
+        expect(snapshot,isNotNull);
+        final proposal=scope_contract.MoolAssistantProposal(id:'HOST-typed-preview',actionId:'AI-ACT-230',
+          binding:h.native.readContext().binding,requestRevision:1,entitlementRevision:'HOST-paid',
+          sourceRevision:snapshot!.sourceRevision,entityId:h.product.id,validUntil:DateTime.now().add(const Duration(minutes:1)),
+          title:'Preview saved draft',summary:'HOST only',fields:{'previewRef':{
+            for(final key in ['kind','skuId','revision','fingerprint'])key:ref[key],'channel':'retail'}});
+        scope_contract.MoolAssistantReviewResult? early;
+        final opened=h.adapter.openReview(proposal,()=>true).then((value){early=value;return value;});await tester.pumpAndSettle();
+        expect(find.byType(OwnedStoreProductCustomerPreview),findsOneWidget,reason:'Result $early; original operations ${h.operations}');
+        expect(find.text('Unpublished'),findsOneWidget);
+        expect(find.text('Close this preview and reopen the saved product to check its latest details.'),findsNothing);
+        expect(tester.takeException(),isNull);expect(h.saved,before);expect(h.native.writes,writes);
+        expect(h.operations.where((op)=>op.startsWith('save')||op.startsWith('submit')||op.startsWith('reconcile')),isEmpty);
+        await tester.tap(find.text('Close preview').first);await tester.pumpAndSettle();
+        expect(await opened,scope_contract.MoolAssistantReviewResult.opened);
+        expect(h.saved,before);expect(h.native.writes,writes);
+      } finally {await h.dispose(tester);}
+    });
+  }
+
+  for(final retire in [false,true]) {
+    testWidgets('AGG02 typed preview from actual composer ${retire?'retires on account loss':'returns without replay'}', (tester) async {
+      final h=_Published230Host(BuyV2OfferClass.retail,previewOriginals:true);
+      try {
+        await h.ready(tester);final before=h.saved,writes=(h.native.contact.clears,h.native.trading.saves,h.native.trading.clears,h.native.purchase.saves,h.native.inventory.saves),contact=Map<String,Object?>.from(h.native.contact.value??{})..remove('savedAt');
+        await h.openComposer(tester);await h.tapReview(tester);
+        expect(find.byType(OwnedStoreProductCustomerPreview),findsOneWidget);
+        expect(find.text('Unpublished'),findsOneWidget);
+        if(retire) {
+          h.native.principal.identity=null;h.native.principal.changes.add(null);
+          await tester.pump();await tester.pump(const Duration(milliseconds:300));
+          expect(find.text('Unpublished').hitTestable(),findsNothing);
+        } else {
+          await tester.tap(find.text('Close preview').first);await tester.pumpAndSettle();
+          expect(find.byType(OwnedStoreProductCustomerPreview),findsNothing);
+          expect(find.byType(MoolAssistantPage),findsOneWidget);
+        }
+        expect(h.saved,before);
+        // Existing route lifecycle may flush the unchanged contact draft. It
+        // may update its flush timestamp; its fields and every business/financial write boundary stay unchanged.
+        expect(Map<String,Object?>.from(h.native.contact.value??{})..remove('savedAt'),contact);
+        expect((h.native.contact.clears,h.native.trading.saves,h.native.trading.clears,h.native.purchase.saves,h.native.inventory.saves),writes);
+        expect(tester.takeException(),isNull);
+        expect(h.operations.where((op)=>op.startsWith('save')||op.startsWith('submit')||op.startsWith('reconcile')),isEmpty);
+      } finally {await h.dispose(tester);}
+    });
+  }
+
+  testWidgets('AGG02 typed published original uses the actual public reader without a private projection', (tester) async {
+    final h=_Published230Host(BuyV2OfferClass.retail,previewOriginals:true,previewCatalogue:true);
+    try {
+      await h.ready(tester);final before=h.saved;
+      await h.openComposer(tester);await h.tapReview(tester);
+      expect(h.actualRouter.state.uri.path,'/app/buy',reason:h.controller.proposalNotice);
+      expect(find.byType(OwnedStoreProductCustomerPreview),findsNothing);
+      final buy=tester.widget<BuyV2Screen>(find.byType(BuyV2Screen).last).session;
+      expect(buy.selectedProduct!.publicListingIdentity!.skuId,h.product.id);
+      expect(h.publicReads,greaterThanOrEqualTo(2));expect(h.saved,before);
+    } finally {await h.dispose(tester);}
+  });
+
+  for(final mode in ['confirmed','unknown','cancelled']) {
+    testWidgets('AGG02 confirmed CSV private sync $mode is bounded, joins duplicate work and never retries Stock', (tester) async {
+      final h=_Published230Host(BuyV2OfferClass.retail,draftSync:true);
+      try {
+        await h.ready(tester);
+        final ids=[h.product.id,for(var n=2;n<=7;n++)'sku-$n'];
+        for(final id in ids.skip(1)) {
+          final product=catalogue_fixture.listingItem(id).copyWith(sku:'HOST-$id');
+          expect(h.native.work.addOrUpdateWorkspaceProduct(product,stockEntryMethod:WorkspaceStockEntryMethod.csv),isTrue);
+        }
+        expect(await h.native.work.workspaceInventorySaved,isTrue);
+        final saved=h.saved,inventorySaves=h.native.inventory.saves;
+        var current=true;
+        h.unknownDraftSku=mode=='unknown'?ids.first:null;
+        h.beforeDraftSave=(body)async{
+          if(mode=='cancelled')current=false;
+          await Future<void>.delayed(const Duration(milliseconds:10));
+        };
+        final result=await tester.runAsync(() async {
+          final one=h.native.work.syncWorkspaceSavedProductDrafts([...ids,ids.first],current:()=>current);
+          final two=h.native.work.syncWorkspaceSavedProductDrafts(ids.reversed,current:()=>current);
+          if(mode!='cancelled')expect(identical(one,two),isTrue);
+          return one;
+        });
+        expect(result,isNotNull);expect(result!.requested.length,7);expect(h.draftMaximum,lessThanOrEqualTo(3));
+        expect(h.draftSaveCounts.values.every((count)=>count==1),isTrue);
+        expect(h.saved,saved);expect(h.native.inventory.saves,inventorySaves);
+        if(mode=='confirmed') {
+          expect(result.states.values.every((state)=>state==WorkspaceProductDraftWriteState.saved),isTrue);
+          expect(result.states.length,7);expect(h.draftMaximum,3);
+          final retry=await tester.runAsync(()=>h.native.work.syncWorkspaceSavedProductDrafts(ids,current:()=>true));
+          expect(retry!.states.length,7);expect(h.draftSaveCounts.values.every((count)=>count==1),isTrue);
+        } else {
+          expect(result.states.length,lessThanOrEqualTo(3));
+          expect(result.states.values,contains(WorkspaceProductDraftWriteState.unknown));
+        }
+        expect(h.operations, isNot(contains('reconcileStoreProductDraft')));
+        expect(h.native.inventory.saves,inventorySaves);
+      } finally {await h.dispose(tester);}
+    });
+  }
+
+  for(final save in [false,true]) {
+    testWidgets('AGG02 actual CSV Review ${save?'final Save syncs private copies':'Cancel never syncs'} through the original importer', (tester) async {
+      final h=_Published230Host(BuyV2OfferClass.retail,draftSync:true);
+      scope_contract.MoolAssistantController? controller;
+      try {
+        await h.ready(tester);
+        final bytes=Uint8List.fromList(utf8.encode('title,brand,pack,purchasePrice,sellingPrice,stock,sku\n'
+          'HOST CSV rice,HOST,1 kg,40,50,2,HOST-CSV-A\nHOST CSV oil,HOST,1 L,60,75,3,HOST-CSV-B\n'));
+        final overview=tester.element(find.text('Store overview'));
+        final stableScope=overview.getElementForInheritedWidgetOfExactType<MoolAssistantNativeScope>()!;
+        final nativeAdapters=(stableScope.widget as MoolAssistantNativeScope).readAdapters(stableScope).toList();
+        controller=scope_contract.MoolAssistantController(currentContext:h.native.readContext,
+          contextChanges:Listenable.merge([h.native.journey,h.native.work,h.native.mode]),entitlements:h.access,nativeAdapters:nativeAdapters,
+          mediaPicker:MoolAssistantNativeMediaPicker(documents:()async=>WorkPickedProof(fileName:'HOST-original.csv',contentType:'text/csv',bytes:bytes)));
+        final adapter=nativeAdapters.singleWhere((item)=>item.actionId=='AI-ACT-228');
+        final nativeContext=tester.element(find.text('Store overview'));
+        final navigator=Navigator.of(nativeContext,rootNavigator:true);
+        final route=MaterialPageRoute<void>(settings:const RouteSettings(name:'mool-assistant'),
+          builder:(_)=>MoolAssistantPage(controller:controller!));
+        if(adapter is MoolAssistantRouteBoundNativeAdapter)adapter.bindAssistantRoute(route,navigator);
+        unawaited(navigator.push<void>(route));await tester.pumpAndSettle();
+        await controller.refreshAccess();controller.setDraft('Review my product CSV');
+        await controller.pickMedia(ChatAttachmentKind.document);
+        final snapshot=await adapter.snapshot(h.native.readContext(),null);expect(snapshot,isNotNull);
+        final proposal=scope_contract.MoolAssistantProposal(id:'HOST-original-csv-sync',actionId:'AI-ACT-228',
+          binding:controller.context.binding,requestRevision:controller.requestRevision,entitlementRevision:controller.entitlementRevision!,
+          sourceRevision:snapshot!.sourceRevision,validUntil:DateTime.now().add(const Duration(minutes:1)),
+          title:'Review selected CSV',summary:'HOST only',fields:{'attachmentRef':controller.selectedDocumentReferences.single.id});
+        expect(controller.receiveProposal(proposal),isTrue);
+        scope_contract.MoolAssistantReviewResult? early;
+        final opened=controller.reviewProposal().then((value){early=value;return value;});
+        for(var n=0;n<60&&find.byType(StoreProductImportReviewScreen).evaluate().isEmpty;n++)await tester.pump(const Duration(milliseconds:50));
+        await tester.pumpAndSettle();expect(find.byType(StoreProductImportReviewScreen),findsOneWidget,
+          reason:'Result $early; notice ${controller.proposalNotice}; error ${h.native.work.errorMessage}; trading ${h.native.work.workspaceTradingPreferencesError}; operations ${h.operations}');
+        expect(h.draftRecords,isEmpty);expect(h.draftSaveCounts,isEmpty);
+        final before=h.saved;
+        if(save) {
+          await tester.tap(find.byKey(const Key('work-import-save')));await tester.pumpAndSettle();
+          expect(find.byType(StoreProductImportReviewScreen),findsNothing);
+          expect(h.native.work.workspaceCatalogueItems.where((item)=>item.sku.startsWith('HOST-CSV-')).length,2);
+          expect(h.draftSaveCounts.length,2);expect(h.draftSaveCounts.values.every((count)=>count==1),isTrue);
+          for(final record in h.draftRecords.values) {
+            final draft=record['draft'] as Map;
+            expect(draft.containsKey('stock'),isFalse);expect(draft.containsKey('purchasePrice'),isFalse);
+            expect((draft['provenance'] as Map)['entryMethod'],'csv');
+          }
+        } else {
+          await tester.pageBack();await tester.pumpAndSettle();expect(h.saved,before);expect(h.draftRecords,isEmpty);
+        }
+        expect(await opened,scope_contract.MoolAssistantReviewResult.opened);
+        expect(tester.takeException(),isNull);
+      } finally {controller?.dispose();await h.dispose(tester);}
+    });
+  }
+
+  testWidgets('AGG02 201 saved CSV products sync without an item cap or additional Stock writes', (tester) async {
+    final h=_Published230Host(BuyV2OfferClass.retail,draftSync:true);
+    try {
+      await h.ready(tester);
+      final products=[for(var n=3;n<=201;n++)catalogue_fixture.listingItem('HOST-batch-$n')
+        .copyWith(title:'HOST private CSV item $n',sku:'HOST-BATCH-$n')];
+      expect(h.native.work.importWorkspaceProducts(products,addOnly:true,stockEntryMethod:WorkspaceStockEntryMethod.csv),isTrue);
+      expect(await h.native.work.workspaceInventorySaved,isTrue);
+      final saved=h.saved,writes=h.native.inventory.saves;
+      final ids=h.native.work.workspaceCatalogueItems.map((item)=>item.id).toList(growable:false);
+      expect(ids.length,201);
+      final result=await tester.runAsync(()=>h.native.work.syncWorkspaceSavedProductDrafts(ids,current:()=>true));
+      expect(result!.requested.length,201);expect(result.states.length,201);
+      expect(result.states.values.every((state)=>state==WorkspaceProductDraftWriteState.saved),isTrue);
+      expect(h.draftSaveCounts.length,201);expect(h.draftSaveCounts.values.every((count)=>count==1),isTrue);
+      expect(h.draftMaximum,lessThanOrEqualTo(3));expect(h.saved,saved);expect(h.native.inventory.saves,writes);
+      expect(tester.takeException(),isNull);
+    } finally {await h.dispose(tester);}
+  });
+  testWidgets('AGG02 unavailable private sync does not issue one failed request per CSV row', (tester) async {
+    final h=_Published230Host(BuyV2OfferClass.retail);
+    try {
+      await h.ready(tester);final before=h.saved,writes=h.native.writes;
+      final result=await h.native.work.syncWorkspaceSavedProductDrafts([h.product.id],current:()=>true);
+      expect(result.available,isFalse);expect(result.states,isEmpty);expect(h.operations,isEmpty);
+      expect(h.saved,before);expect(h.native.writes,writes);
+    } finally {await h.dispose(tester);}
+  });
 
   for(final acknowledged in [true,false]) {
     testWidgets('FE-PRODUCT-01 ACT230 canonical guard requires original acknowledgement $acknowledged before real public route',(tester)async{

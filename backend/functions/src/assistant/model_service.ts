@@ -108,10 +108,13 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
     }
     if (value.sourceKind === 'original-store-owned-skus-v1') {
       if (!Array.isArray(value.products)) return fail('context_unavailable');
+      if (value.previewOriginals !== undefined && !Array.isArray(value.previewOriginals)) return fail('context_unavailable');
       return {...value, products: value.products.filter(row => {
         const sku = object(row).skuId; if (typeof sku !== 'string') return fail('context_unavailable');
         return skus.has(sku);
-      })};
+      }), ...(value.previewOriginals === undefined ? {} : {previewOriginals: (value.previewOriginals as unknown[]).filter(row => {
+        const sku = object(row).skuId; if (typeof sku !== 'string') return fail('context_unavailable'); return skus.has(sku);
+      })})};
     }
     if (value.sourceKind === 'composite-original-context-v1') {
       if (!Array.isArray(value.sources)) return fail('context_unavailable');

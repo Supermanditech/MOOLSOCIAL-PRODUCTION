@@ -579,6 +579,23 @@ void main() {
       'ownerKey':sha256.convert(utf8.encode(jsonEncode(['fixture-project','domain-host-a','workspace','store-one']))).toString()};
     await expectLater(_source(_Wire(()=>_ok(foreign))).read(workspace,()=>true),throwsA(isA<AssistantModelFailure>()));
   });
+  test('AGG02 context read negotiates only the owned typed preview proof', () async {
+    const context=MoolAssistantContext(accountScope:_owner,authenticationRevision:1,workspaceId:'store-one',
+      workspaceRevision:1,storeWorkspace:true,workspaceApproved:true);
+    final proof='store-preview-originals:evaluation:${'a'*64}';
+    final data={..._data(),'scope':{'audience':'workspace','storeId':'store-one'},
+      'ownerKey':sha256.convert(utf8.encode(jsonEncode(['fixture-project','domain-host-a','workspace','store-one']))).toString(),
+      'revisions':[{'actionId':'AI-ACT-230','entityId':'sku-one','sourceRevision':proof}]};
+    final wire=_Wire(()=>_ok(data));
+    final source=AssistantDomainContextGateway(owner:_owner,isCurrent:()=>true,credentials:_Credentials(),transport:wire,
+      clock:()=>_at,productPreviewSupported:true);
+    final snapshot=await source.read(context,()=>true);
+    expect(snapshot.nativeProductPreviewVersion,1);
+    expect(snapshot.revisions,{('AI-ACT-230','sku-one'):proof});
+    expect((wire.bodies.single['payload'] as Map)['nativeProductPreviewVersion'],1);
+    data['revisions']=[{'actionId':'AI-ACT-230','entityId':'sku-one','sourceRevision':'store-owned-product:evaluation:1:${'a'*64}'}];
+    await expectLater(source.read(context,()=>true),throwsA(isA<AssistantModelFailure>()));
+  });
   test('Domain gateway exact read-only request returns bound registered revisions with standard proof', () async {
     final credentials = _Credentials(), wire = _Wire(() => _ok(_data()));
     final value = await _source(wire, credentials: credentials).read(_context, () => true);

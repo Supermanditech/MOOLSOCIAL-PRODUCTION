@@ -1691,11 +1691,11 @@ class WorkspaceMasterCataloguePage {
   factory WorkspaceMasterCataloguePage.decode(Object? raw, WorkspaceMasterCatalogueScope scope, DateTime now,
     {required String search, required String? code, required int pageSize}) {
     final v = _map(raw);
-    _keys(v, ['schemaVersion', 'masterCatalogueVersion', 'realm', 'storeId', 'observedAt', 'state', 'query', 'snapshotId',
+    _keys(v, ['schemaVersion', 'masterCatalogueVersion', 'actorAccountId', 'realm', 'storeId', 'observedAt', 'state', 'query', 'snapshotId',
       'items', 'nextCursor', 'scannedCount', 'verifiedPackCount', 'missingSourceCount']);
     final query = _map(v['query']); _keys(query, ['search', 'code']);
     final at = _time(v['observedAt']);
-    if (v['schemaVersion'] is! int || v['masterCatalogueVersion'] is! int || v['schemaVersion'] != 1 || v['masterCatalogueVersion'] != 1 || v['realm'] != scope.realm || v['storeId'] != scope.store ||
+    if (v['schemaVersion'] is! int || v['masterCatalogueVersion'] is! int || v['schemaVersion'] != 1 || v['masterCatalogueVersion'] != 1 || v['actorAccountId'] != scope.account || v['realm'] != scope.realm || v['storeId'] != scope.store ||
       v['state'] != 'ready' || at.isAfter(now.toUtc()) || query['search'] != search || query['code'] != code ||
       v['snapshotId'] is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(v['snapshotId'] as String)) throw const FormatException();
     final scanned = _int(v['scannedCount'], 0, pageSize), verified = _int(v['verifiedPackCount'], 0),
@@ -1754,9 +1754,10 @@ class WorkspaceProductDraftIntent {
   final String idempotencyKey;
   final WorkspaceProductDraftInput input;
   final WorkspaceMasterCatalogueOrigin? origin;
-  Map<String, Object?> get body => {'realm': scope.realm, 'storeId': scope.store, 'expectedRevision': expectedRevision,
+  Map<String, Object?> get body => {'actorAccountId': scope.account, 'realm': scope.realm, 'storeId': scope.store, 'expectedRevision': expectedRevision,
     'idempotencyKey': idempotencyKey, 'draft': input.toJson(), 'catalogueOrigin': origin?.toJson()};
-  Map<String, Object?> toJson() => {'schemaVersion': 1, 'accountId': scope.account, ...body};
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'accountId': scope.account,
+    ...(Map<String, Object?>.of(body)..remove('actorAccountId'))};
   String get fingerprint => _catalogueHash({'ownerUserId': scope.account, 'realm': scope.realm,
     'storeId': scope.store, 'expectedRevision': expectedRevision, 'draft': input.toJson(), 'catalogueOrigin': origin?.toJson()});
   factory WorkspaceProductDraftIntent.fromJson(Object? raw) {
@@ -1802,8 +1803,204 @@ class WorkspaceProductDraftPresentation {
   factory WorkspaceProductDraftPresentation.fromRecord(WorkspaceProductDraftRecord record,
     WorkspaceProductSubmissionScope scope, {required String storeName, required BuyV2OfferClass channel}) {
     record = WorkspaceProductDraftRecord.decode(record.toJson(), scope, record.observedAt);
+    final view = _projectOwnedProduct(record.input.toJson(), scope, storeName: storeName, channel: channel,
+      sourcePrefix: 'private-draft', fingerprint: record.fingerprint, revision: record.revision, observedAt: record.observedAt);
+    return WorkspaceProductDraftPresentation._(record, view.product, view.content);
+  }
+}
+
+enum WorkspaceProductOriginalKind {catalogueSku, submittedOriginal, savedDraft}
+
+String _productOriginalKindValue(WorkspaceProductOriginalKind kind) => switch (kind) {
+  WorkspaceProductOriginalKind.catalogueSku => 'catalogue-sku',
+  WorkspaceProductOriginalKind.submittedOriginal => 'submitted-original',
+  WorkspaceProductOriginalKind.savedDraft => 'saved-draft',
+};
+WorkspaceProductOriginalKind _productOriginalKind(Object? raw) => switch (raw) {
+  'catalogue-sku' => WorkspaceProductOriginalKind.catalogueSku,
+  'submitted-original' => WorkspaceProductOriginalKind.submittedOriginal,
+  'saved-draft' => WorkspaceProductOriginalKind.savedDraft,
+  _ => throw const FormatException('Choose an original product version.'),
+};
+class WorkspaceProductPreviewReference {
+  WorkspaceProductPreviewReference._(this.kind, this.skuId, this.revision, this.fingerprint,
+    this.title, this.brand, this.variant, this.pack, this.channels, this.publicListingRequested);
+  final WorkspaceProductOriginalKind kind;
+  final String skuId, fingerprint, title, brand, variant, pack;
+  final int revision;
+  final List<String> channels;
+  final bool? publicListingRequested;
+  String get wireKind => _productOriginalKindValue(kind);
+  Map<String, Object?> toJson() => {'kind': wireKind, 'skuId': skuId, 'revision': revision,
+    'fingerprint': fingerprint, 'title': title, 'brand': brand, 'variant': variant, 'pack': pack,
+    'channels': List<String>.of(channels), 'publicListingRequested': publicListingRequested};
+  factory WorkspaceProductPreviewReference.decode(Object? raw) {
+    final v = _map(raw);
+    _keys(v, ['kind', 'skuId', 'revision', 'fingerprint', 'title', 'brand', 'variant', 'pack', 'channels', 'publicListingRequested']);
+    final kind = _productOriginalKind(v['kind']), fingerprint = _string(v['fingerprint']);
+    final channels = _list(v['channels'], 2).map((value) => _string(value)).toList(growable: false);
+    if (!RegExp(r'^[A-F0-9]{64}$').hasMatch(fingerprint) || channels.toSet().length != channels.length ||
+        channels.any((value) => !const {'retail', 'wholesale', 'bulk'}.contains(value)) ||
+        channels.contains('wholesale') && channels.contains('bulk') ||
+        (kind == WorkspaceProductOriginalKind.catalogueSku ? v['publicListingRequested'] is! bool : v['publicListingRequested'] != null)) {
+      throw const FormatException();
+    }
+    return WorkspaceProductPreviewReference._(kind, _id(v['skuId']), _int(v['revision'], 1, 1000000000), fingerprint,
+      _string(v['title'], 240), _string(v['brand'], 160, true), _string(v['variant'], 240, true), _string(v['pack'], 160),
+      List.unmodifiable(channels), v['publicListingRequested'] as bool?);
+  }
+}
+class WorkspaceProductPreviewPage {
+  WorkspaceProductPreviewPage._(this.kind, this.items, this.nextCursor, this.observedAt);
+  final WorkspaceProductOriginalKind kind;
+  final List<WorkspaceProductPreviewReference> items;
+  final String? nextCursor;
+  final DateTime observedAt;
+  factory WorkspaceProductPreviewPage.decode(Object? raw, WorkspaceMasterCatalogueScope scope,
+      WorkspaceProductOriginalKind kind, DateTime now, {required int limit}) {
+    _id(scope.account); _id(scope.store); _int(limit, 1, 50);
+    final v = _map(raw);
+    _keys(v, ['schemaVersion', 'productPreviewVersion', 'actorAccountId', 'realm', 'storeId', 'kind', 'observedAt', 'items', 'nextCursor']);
+    final observed = _time(v['observedAt']);
+    if (v['schemaVersion'] is! int || v['schemaVersion'] != 1 || v['productPreviewVersion'] is! int || v['productPreviewVersion'] != 1 ||
+        !const {'evaluation', 'production'}.contains(scope.realm) || v['actorAccountId'] != scope.account ||
+        v['realm'] != scope.realm || v['storeId'] != scope.store || _productOriginalKind(v['kind']) != kind ||
+        observed.isAfter(now.toUtc()) || now.toUtc().difference(observed) > const Duration(minutes: 5) ||
+        observed.toIso8601String() != v['observedAt']) throw const FormatException();
+    final items = _list(v['items'], limit).map(WorkspaceProductPreviewReference.decode).toList(growable: false);
+    if (items.any((item) => item.kind != kind) || items.map((item) => item.skuId).toSet().length != items.length) throw const FormatException();
+    for (var index = 1; index < items.length; index++) {
+      if (items[index - 1].skuId.compareTo(items[index].skuId) >= 0) throw const FormatException();
+    }
+    final cursor = v['nextCursor'] == null ? null : _string(v['nextCursor'], 2048);
+    if (cursor != null && (items.length != limit || !RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(cursor))) throw const FormatException();
+    return WorkspaceProductPreviewPage._(kind, List.unmodifiable(items), cursor, observed);
+  }
+}
+abstract interface class WorkspaceProductPreviewGateway {
+  bool get productPreviewSupported;
+  Future<WorkspaceProductPreviewPage> listProductPreviewSources(WorkspaceMasterCatalogueScope scope,
+    WorkspaceProductOriginalKind kind, {required bool Function() current, int limit = 30, String? cursor});
+  Future<WorkspaceProductPreviewOriginal?> readProductPreviewOriginal(WorkspaceProductSubmissionScope scope,
+    WorkspaceProductOriginalKind kind, {required bool Function() current, WorkspaceProductPreviewReference? expected});
+}
+
+/// The checked record retains its real type. No saved draft is manufactured
+/// from a submission or verified SKU to satisfy a different decoder.
+class WorkspaceProductPreviewOriginal {
+  WorkspaceProductPreviewOriginal._(this.scope, this.reference, this.original, this.observedAt);
+  final WorkspaceProductSubmissionScope scope;
+  final WorkspaceProductPreviewReference reference;
+  final Object original;
+  final DateTime observedAt;
+  static WorkspaceProductPreviewOriginal? decode(Object? raw, WorkspaceProductSubmissionScope scope,
+      WorkspaceProductOriginalKind expectedKind, DateTime now, {WorkspaceProductPreviewReference? expected}) {
+    _id(scope.account);
+    final v = _map(raw);
+    _keys(v, ['schemaVersion', 'productPreviewVersion', 'actorAccountId', 'realm', 'storeId', 'kind', 'skuId', 'observedAt', 'state', 'reference', 'record']);
+    final observed = _time(v['observedAt']);
+    if (v['schemaVersion'] is! int || v['schemaVersion'] != 1 || v['productPreviewVersion'] is! int || v['productPreviewVersion'] != 1 ||
+        v['actorAccountId'] != scope.account || !const {'evaluation', 'production'}.contains(scope.realm) ||
+        v['realm'] != scope.realm || v['storeId'] != scope.store || v['skuId'] != scope.sku ||
+        _productOriginalKind(v['kind']) != expectedKind || observed.isAfter(now.toUtc()) ||
+        now.toUtc().difference(observed) > const Duration(minutes: 5) || observed.toIso8601String() != v['observedAt']) {
+      throw const FormatException();
+    }
+    if (v['state'] == 'none') {
+      if (v['reference'] != null || v['record'] != null || expected != null) throw const FormatException();
+      return null;
+    }
+    if (v['state'] != 'found') throw const FormatException();
+    final reference = WorkspaceProductPreviewReference.decode(v['reference']);
+    if (reference.kind != expectedKind || reference.skuId != scope.sku ||
+        expected != null && _catalogueHash(expected.toJson()) != _catalogueHash(reference.toJson())) throw const FormatException();
+    final Object original;
+    final Map<String, dynamic> payload;
+    final int revision;
+    final String fingerprint;
+    bool? listing;
+    if (expectedKind == WorkspaceProductOriginalKind.catalogueSku) {
+      final row = WorkspaceCatalogueOwnedSku.decode(v['record'], storeId: scope.store, skuId: scope.sku, realm: scope.realm, now: observed);
+      original = row; payload = row.input; revision = row.revision; fingerprint = _catalogueHash(row.toJson());
+      listing = row.toJson()['publicListing'] as bool;
+    } else if (expectedKind == WorkspaceProductOriginalKind.submittedOriginal) {
+      final row = WorkspaceProductSubmissionRecord.decode(v['record'], scope, observed);
+      original = row; payload = row.input.toJson(); revision = row.revision; fingerprint = row.fingerprint;
+    } else {
+      final row = WorkspaceProductDraftRecord.decode(v['record'], scope, observed);
+      original = row; payload = row.input.toJson(); revision = row.revision; fingerprint = row.fingerprint;
+    }
+    final content = _map(payload['content']), pack = _map(payload['pack']);
+    final actual = {'kind': _productOriginalKindValue(expectedKind), 'skuId': scope.sku, 'revision': revision, 'fingerprint': fingerprint,
+      'title': content['title'], 'brand': content['brand'], 'variant': content['variant'], 'pack': pack['label'],
+      'channels': _list(payload['channels'], 2).map((value) => _map(value)['kind']).toList(growable: false), 'publicListingRequested': listing};
+    if (_catalogueHash(actual) != _catalogueHash(reference.toJson())) throw const FormatException();
+    return WorkspaceProductPreviewOriginal._(scope, reference, original, observed);
+  }
+  WorkspaceProductOriginalPresentation presentation({required String storeName, required BuyV2OfferClass channel}) {
+    if (!reference.channels.contains(channel.name)) throw const FormatException('This channel is not configured in the selected version.');
+    return switch (original) {
+      WorkspaceCatalogueOwnedSku row => WorkspaceProductOriginalPresentation.fromUnlistedSku(row, scope,
+        observedAt: observedAt, storeName: storeName, channel: channel),
+      WorkspaceProductSubmissionRecord row => WorkspaceProductOriginalPresentation.fromSubmission(row, scope,
+        observedAt: observedAt, storeName: storeName, channel: channel),
+      WorkspaceProductDraftRecord row => WorkspaceProductOriginalPresentation.fromDraft(row, scope, storeName: storeName, channel: channel),
+      _ => throw const FormatException(),
+    };
+  }
+}
+
+/// Descriptive projection of a checked original. This is never access,
+/// publication or ordering authority; callers retain the original read fences.
+class WorkspaceProductOriginalPresentation {
+  WorkspaceProductOriginalPresentation._(this.kind, this.scope, this.original, this.revision,
+    this.fingerprint, this.observedAt, this.product, this.content);
+  final WorkspaceProductOriginalKind kind;
+  final WorkspaceProductSubmissionScope scope;
+  final Object original;
+  final int revision;
+  final String fingerprint;
+  final DateTime observedAt;
+  final BuyV2Product product;
+  final BuyV2ProductContentSnapshot content;
+  factory WorkspaceProductOriginalPresentation.fromDraft(WorkspaceProductDraftRecord record,
+      WorkspaceProductSubmissionScope scope, {required String storeName, required BuyV2OfferClass channel}) {
+    final view = WorkspaceProductDraftPresentation.fromRecord(record, scope, storeName: storeName, channel: channel);
+    return WorkspaceProductOriginalPresentation._(WorkspaceProductOriginalKind.savedDraft, scope, view.record,
+      view.record.revision, view.record.fingerprint, view.record.observedAt, view.product, view.content);
+  }
+  factory WorkspaceProductOriginalPresentation.fromSubmission(WorkspaceProductSubmissionRecord record,
+      WorkspaceProductSubmissionScope scope, {required DateTime observedAt, required String storeName, required BuyV2OfferClass channel}) {
+    _id(scope.account);
+    record = WorkspaceProductSubmissionRecord.decode(record.toJson(), scope, observedAt);
+    final view = _projectOwnedProduct(record.input.toJson(), scope, storeName: storeName, channel: channel,
+      sourcePrefix: 'private-submitted', fingerprint: record.fingerprint, revision: record.revision, observedAt: observedAt);
+    return WorkspaceProductOriginalPresentation._(WorkspaceProductOriginalKind.submittedOriginal, scope, record,
+      record.revision, record.fingerprint, observedAt.toUtc(), view.product, view.content);
+  }
+  factory WorkspaceProductOriginalPresentation.fromUnlistedSku(WorkspaceCatalogueOwnedSku record,
+      WorkspaceProductSubmissionScope scope, {required DateTime observedAt, required String storeName, required BuyV2OfferClass channel}) {
+    _id(scope.account);
+    record = WorkspaceCatalogueOwnedSku.decode(record.toJson(), storeId: scope.store, skuId: scope.sku,
+      now: observedAt, realm: scope.realm);
+    if (record.toJson()['publicListing'] != false) {
+      throw const FormatException('Use the original published-product reader for this saved version.');
+    }
+    final fingerprint = _catalogueHash(record.toJson());
+    final view = _projectOwnedProduct(record.input, scope, storeName: storeName, channel: channel,
+      sourcePrefix: 'private-catalogue', canonicalId: record.canonicalProductId,
+      fingerprint: fingerprint, revision: record.revision, observedAt: observedAt);
+    return WorkspaceProductOriginalPresentation._(WorkspaceProductOriginalKind.catalogueSku, scope, record,
+      record.revision, fingerprint, observedAt.toUtc(), view.product, view.content);
+  }
+}
+
+({BuyV2Product product, BuyV2ProductContentSnapshot content}) _projectOwnedProduct(Map<String, dynamic> input,
+    WorkspaceProductSubmissionScope scope, {required String storeName, required BuyV2OfferClass channel,
+      required String sourcePrefix, String canonicalId = '', required String fingerprint,
+      required int revision, required DateTime observedAt}) {
     _string(storeName, 240);
-    final input = record.input.toJson(), rawContent = _map(input['content']), pack = _map(input['pack']);
+    final rawContent = _map(input['content']), pack = _map(input['pack']);
     final channels = _list(input['channels'], 2).map(_map).where((row) => row['kind'] == channel.name).toList(growable: false);
     if (channels.length != 1) throw const FormatException('This selling channel is not configured in the saved product.');
     final terms = channels.single, facts = rawContent.containsKey('productFacts')
@@ -1811,12 +2008,15 @@ class WorkspaceProductDraftPresentation {
     final rawTax = terms['supplierTax'];
     final gst = rawTax is Map && rawTax['version'] == 2 ? BuyV2SupplierGstRate.fromChannelJson(rawTax) : null;
     final tax = rawTax != null && gst == null ? BuyV2SupplierTaxAmount.fromJson(rawTax) : null;
-    final id = 'private-draft-${record.fingerprint.toLowerCase()}-${channel.name}';
+    final id = '$sourcePrefix-${fingerprint.toLowerCase()}-${channel.name}';
     final structured = pack['quantityMilli'] != null;
-    final packTerms = !structured ? null : BuyV2PackTerms(skuId: id,
-      revision: 'private-${record.revision}-${record.fingerprint.toLowerCase()}', sellUnit: 'pack',
-      containedUnits: pack['unitsPerCase'] as int, netContentMilli: pack['quantityMilli'] as int,
-      contentUnit: pack['unit'] as String, quantityStep: terms['quantityStep'] as int,
+    final authoredPackPricing = terms['quantityStep'] != 1 || _list(terms['tiers'], 20).isNotEmpty || gst != null || tax != null;
+    final packTerms = !structured && !authoredPackPricing ? null : BuyV2PackTerms(skuId: id,
+      revision: 'private-${revision}-${fingerprint.toLowerCase()}', sellUnit: 'pack',
+      // One selling pack is the price basis, not a claim about its inner units.
+      // Unknown measurements stay null; no weight/unit conversion is supplied.
+      containedUnits: pack['unitsPerCase'] as int? ?? 1, netContentMilli: pack['quantityMilli'] as int?,
+      contentUnit: pack['unit'] as String?, quantityStep: terms['quantityStep'] as int,
       supplierGst: gst, supplierTax: tax,
       // Authored quantity prices remain visible in read-only details. No
       // confirmation timestamp, validity window or Stock/delivery is invented.
@@ -1824,7 +2024,7 @@ class WorkspaceProductDraftPresentation {
         final row = _map(value);
         return BuyV2PackPriceTier(minimumPacks: row['minimumQuantity'] as int, priceMinor: row['unitPriceMinor'] as int);
       })));
-    final product = BuyV2Product(id: id, canonicalId: '', storeId: scope.store,
+    final product = BuyV2Product(id: id, canonicalId: canonicalId, storeId: scope.store,
       destination: channel == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale,
       categoryId: rawContent['categoryId'] as String, brand: rawContent['brand'] as String,
       title: rawContent['title'] as String, variant: rawContent['variant'] as String,
@@ -1836,13 +2036,13 @@ class WorkspaceProductDraftPresentation {
       regulatoryNote: facts?.regulatoryNote, requiresPrescription: facts?.requiresPrescription ?? false,
       catalogueListing: false);
     final details = _authoredCatalogueDetails(rawContent);
-    return WorkspaceProductDraftPresentation._(record, product, BuyV2ProductContentSnapshot(productId: id,
+    return (product: product, content: BuyV2ProductContentSnapshot(productId: id,
       state: BuyV2ProductContentState.ready,
-      sourceId: 'private-draft:${scope.realm}:${scope.store}:${scope.sku}:${record.revision}:${record.fingerprint}',
-      observedAt: record.observedAt, description: details.description,
+      sourceId: '$sourcePrefix:${scope.realm}:${scope.store}:${scope.sku}:${revision}:${fingerprint}',
+      observedAt: observedAt, description: details.description,
       highlights: details.highlights, specifications: details.specifications, media: const []));
-  }
 }
+
 enum WorkspaceProductDraftWriteState {notSent, rejected, unknown, saved, notFound}
 class WorkspaceProductDraftWriteResult {
   const WorkspaceProductDraftWriteResult(this.state, [this.record]);
@@ -5208,6 +5408,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     productSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_SUBMISSIONS_V1'),
     productDraftSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_DRAFTS_V1'),
     masterCatalogueSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_MASTER_CATALOGUE_V1'),
+    productPreviewSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_PREVIEW_V1'),
     productMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_PRODUCT_MEDIA_V1'),
     reviewedProductSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_REVIEW_V1'),
     reviewedProductMediaSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_MEDIA_REVIEW_V1'),
@@ -5421,7 +5622,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway, WorkspaceCommodityPriceGateway,
       WorkspacePublicDetailsOwnerGateway, WorkspaceVariantFamilyOwnerGateway, WorkspaceProductSubmissionOwnerGateway,
       WorkspaceReviewedProductSubmissionGateway, WorkspaceProductMediaGateway, WorkspaceStoreStockOwnerGateway,
-      WorkspaceStockQuantityPublicGateway, WorkspaceStockVisibilityGateway, WorkspaceProductDraftGateway, WorkspaceMasterCatalogueGateway {
+      WorkspaceStockQuantityPublicGateway, WorkspaceStockVisibilityGateway, WorkspaceProductDraftGateway, WorkspaceMasterCatalogueGateway, WorkspaceProductPreviewGateway {
   AuthenticatedWorkspaceCatalogueGateway({
     required this.endpoint,
     required this.credentials,
@@ -5436,6 +5637,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.productSubmissionSupported = false,
     this.productDraftSupported = false,
     this.masterCatalogueSupported = false,
+    this.productPreviewSupported = false,
     this.productMediaSupported = false,
     WorkspaceProductMediaUploadTransport? productMediaTransport,
     this.reviewedProductSubmissionSupported = false,
@@ -5518,6 +5720,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool productDraftSupported;
   @override
   final bool masterCatalogueSupported;
+  @override
+  final bool productPreviewSupported;
   @override
   final bool productMediaSupported;
   final WorkspaceProductMediaUploadTransport? _productMediaTransportOverride;
@@ -5612,6 +5816,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       productSubmissionSupported: productSubmissionSupported,
       productDraftSupported: productDraftSupported,
       masterCatalogueSupported: masterCatalogueSupported,
+      productPreviewSupported: productPreviewSupported,
       productMediaSupported: productMediaSupported,
       productMediaTransport: _productMediaTransportOverride,
       reviewedProductSubmissionSupported: reviewedProductSubmissionSupported,
@@ -5727,11 +5932,44 @@ class AuthenticatedWorkspaceCatalogueGateway
     bool valid() => current() && masterCatalogueSupported && scope.realm == realm && ownerAccountId == scope.account;
     if (!valid()) throw const FormatException('The master catalogue is not connected.');
     final response = await _ownerRequest({'operation': 'readStoreMasterCatalogue', 'masterCatalogueVersion': 1,
-      'realm': scope.realm, 'storeId': scope.store, 'query': {'search': search, 'code': code}, 'pageSize': pageSize, 'cursor': cursor}, valid, mutation: false);
+      'actorAccountId': scope.account, 'realm': scope.realm, 'storeId': scope.store, 'query': {'search': search, 'code': code}, 'pageSize': pageSize, 'cursor': cursor}, valid, mutation: false);
     if (!valid() || response?.statusCode != 200) throw const FormatException();
     final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
     if (envelope['ok'] != true) throw const FormatException();
     return WorkspaceMasterCataloguePage.decode(envelope['data'], scope, now(), search: search, code: code, pageSize: pageSize);
+  }
+
+  bool _productPreviewOwner(WorkspaceMasterCatalogueScope scope, bool Function() current) => current() &&
+    productPreviewSupported && const {'evaluation', 'production'}.contains(scope.realm) && scope.realm == realm && ownerAccountId == scope.account;
+  @override
+  Future<WorkspaceProductPreviewPage> listProductPreviewSources(WorkspaceMasterCatalogueScope scope,
+      WorkspaceProductOriginalKind kind, {required bool Function() current, int limit = 30, String? cursor}) async {
+    _id(scope.account); _id(scope.store); _int(limit, 1, 50);
+    if (cursor != null && (_string(cursor, 2048).isEmpty || !RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(cursor))) throw const FormatException();
+    bool valid() => _productPreviewOwner(scope, current);
+    if (!valid()) throw const FormatException('Original product preview is not connected.');
+    final response = await _ownerRequest({'operation': 'listStoreProductPreviewSources', 'productPreviewVersion': 1,
+      'actorAccountId': scope.account, 'realm': scope.realm, 'storeId': scope.store, 'kind': _productOriginalKindValue(kind),
+      'limit': limit, 'cursor': cursor}, valid, mutation: false);
+    if (!valid() || response?.statusCode != 200) throw const FormatException();
+    final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+    if (envelope['ok'] != true) throw const FormatException();
+    return WorkspaceProductPreviewPage.decode(envelope['data'], scope, kind, now(), limit: limit);
+  }
+  @override
+  Future<WorkspaceProductPreviewOriginal?> readProductPreviewOriginal(WorkspaceProductSubmissionScope scope,
+      WorkspaceProductOriginalKind kind, {required bool Function() current, WorkspaceProductPreviewReference? expected}) async {
+    _id(scope.account); _id(scope.store); _id(scope.sku);
+    if (expected != null && (expected.kind != kind || expected.skuId != scope.sku)) throw const FormatException();
+    bool valid() => _productPreviewOwner((account: scope.account, store: scope.store, realm: scope.realm), current);
+    if (!valid()) throw const FormatException('Original product preview is not connected.');
+    final response = await _ownerRequest({'operation': 'readStoreProductPreviewOriginal', 'productPreviewVersion': 1,
+      'actorAccountId': scope.account, 'realm': scope.realm, 'storeId': scope.store, 'kind': _productOriginalKindValue(kind),
+      'skuId': scope.sku, 'expectedRevision': expected?.revision, 'expectedFingerprint': expected?.fingerprint}, valid, mutation: false);
+    if (!valid() || response?.statusCode != 200) throw const FormatException();
+    final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
+    if (envelope['ok'] != true) throw const FormatException();
+    return WorkspaceProductPreviewOriginal.decode(envelope['data'], scope, kind, now(), expected: expected);
   }
 
   bool _productDraftOwner(WorkspaceProductSubmissionScope scope, bool Function() current) => current() &&
@@ -5739,9 +5977,9 @@ class AuthenticatedWorkspaceCatalogueGateway
   WorkspaceProductDraftRecord? _productDraftResponse(Object? raw, WorkspaceProductSubmissionScope scope,
     {WorkspaceProductDraftIntent? original, bool reconcile = false}) {
     final v = _map(raw);
-    _keys(v, ['schemaVersion', 'productDraftVersion', 'realm', 'storeId', 'skuId', 'observedAt', 'state', 'record']);
+    _keys(v, ['schemaVersion', 'productDraftVersion', 'actorAccountId', 'realm', 'storeId', 'skuId', 'observedAt', 'state', 'record']);
     final at = _time(v['observedAt']);
-    if (v['schemaVersion'] is! int || v['productDraftVersion'] is! int || v['schemaVersion'] != 1 || v['productDraftVersion'] != 1 || v['realm'] != scope.realm ||
+    if (v['schemaVersion'] is! int || v['productDraftVersion'] is! int || v['schemaVersion'] != 1 || v['productDraftVersion'] != 1 || v['actorAccountId'] != scope.account || v['realm'] != scope.realm ||
       v['storeId'] != scope.store || v['skuId'] != scope.sku || at.isAfter(now().toUtc())) throw const FormatException();
     if (v['state'] == 'not_found') {
       if (v['record'] != null || original != null && !reconcile) throw const FormatException();
@@ -5757,7 +5995,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     bool valid() => _productDraftOwner(scope, current);
     if (!valid()) throw const FormatException('Saved product sync is not connected.');
     final response = await _ownerRequest({'operation': 'readStoreProductDraft', 'productDraftVersion': 1,
-      'realm': scope.realm, 'storeId': scope.store, 'skuId': scope.sku}, valid, mutation: false);
+      'actorAccountId': scope.account, 'realm': scope.realm, 'storeId': scope.store, 'skuId': scope.sku}, valid, mutation: false);
     if (!valid() || response?.statusCode != 200) throw const FormatException();
     final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
     if (envelope['ok'] != true) throw const FormatException();

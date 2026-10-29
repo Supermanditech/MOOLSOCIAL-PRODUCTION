@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
 import 'package:moolsocial/features/work/work_services.dart';
+import 'package:moolsocial/features/shared/social_content_gateway.dart' show SocialContentResponse;
 import 'package:moolsocial/features/work/work_models.dart' show WorkspaceCatalogueItem;
 import 'package:moolsocial/features/buy/buy_v2_models.dart' show BuyV2OfferClass;
 import 'work_catalogue_gateway_test.dart' show listingItem, Credentials, Transport;
@@ -19,14 +20,27 @@ Map<String, dynamic> _record(WorkspaceProductDraftIntent intent) => {
   'fingerprint': intent.fingerprint, 'draft': intent.input.toJson(), 'catalogueOrigin': intent.origin?.toJson(),
 };
 Map<String, dynamic> _response(WorkspaceProductDraftIntent intent, {bool found = true}) => {
-  'schemaVersion': 1, 'productDraftVersion': 1, 'realm': intent.scope.realm,
+  'schemaVersion': 1, 'productDraftVersion': 1, 'actorAccountId': intent.scope.account, 'realm': intent.scope.realm,
   'storeId': intent.scope.store, 'skuId': intent.scope.sku, 'observedAt': _now.toIso8601String(),
   'state': found ? 'saved' : 'not_found', 'record': found ? _record(intent) : null,
 };
-AuthenticatedWorkspaceCatalogueGateway _gateway(Transport transport, {bool supported = true, String owner = 'owner-one', Credentials? credentials}) =>
+AuthenticatedWorkspaceCatalogueGateway _gateway(Transport transport, {bool supported = true, bool previewSupported = false, String owner = 'owner-one', Credentials? credentials}) =>
   AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
     credentials: credentials ?? Credentials(), transport: transport, realm: 'evaluation', ownerAccountId: owner,
-    productDraftSupported: supported, now: () => _now);
+    productDraftSupported: supported, productPreviewSupported: previewSupported, now: () => _now);
+class _RetiringPreviewCredentials extends Credentials {
+  _RetiringPreviewCredentials(this.retire);
+  final void Function() retire;
+  @override Future<String> firebaseIdToken() async {retire(); return super.firebaseIdToken();}
+}
+class _RetiringPreviewTransport extends Transport {
+  _RetiringPreviewTransport(super.data, this.retire);
+  final void Function() retire;
+  @override Future<SocialContentResponse> postJson(Uri endpoint, {required Map<String, String> headers,
+      required Map<String, Object?> body}) async {
+    final response = await super.postJson(endpoint, headers: headers, body: body); retire(); return response;
+  }
+}
 class _Journal implements WorkspaceProductDraftJournal {
   WorkspaceProductDraftIntent? pending;
   bool fail = false;
@@ -61,6 +75,14 @@ class _DraftGateway implements WorkspaceProductDraftGateway {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('AGG02 initiating account pin does not alter the retained original journal or fingerprint', () {
+    final original = _intent(), stored = original.toJson();
+    expect(original.body['actorAccountId'], _scope.account);
+    expect(stored.containsKey('actorAccountId'), isFalse);
+    final recovered = WorkspaceProductDraftIntent.fromJson(stored);
+    expect(recovered.toJson(), stored); expect(recovered.fingerprint, original.fingerprint);
+    expect(recovered.body['actorAccountId'], _scope.account);
+  });
   test('AGG02 controller journals before Save and never repeats an unknown original automatically', () async {
     final journal = _Journal(), input = _intent().input;
     final gateway = _DraftGateway(journal);
@@ -112,6 +134,116 @@ void main() {
     await expectLater(journal.readPending(_scope), throwsA(isA<WorkGatewayException>()));
     account = 'owner-one'; await journal.removePending(original);
     expect(await journal.readPending(_scope), isNull);
+  });
+  test('AGG02 preview gateway uses actor-bound read operations and exact original response', () async {
+    final path = Platform.environment['AGG02_PREVIEW_ORIGINALS']; expect(path, isNotNull);
+    final capture = jsonDecode(File(path!).readAsStringSync()) as Map<String, dynamic>;
+    final frame = Map<String, dynamic>.from(capture['saved-draft'] as Map);
+    final transport = Transport(Map<String, dynamic>.from(frame['page'] as Map)), credentials = Credentials();
+    final gateway = _gateway(transport, previewSupported: true, credentials: credentials).forOwnerAccount(_scope.account);
+    expect(gateway.productPreviewSupported, isTrue);
+    final page = await gateway.listProductPreviewSources((account: _scope.account, store: _scope.store, realm: _scope.realm),
+      WorkspaceProductOriginalKind.savedDraft, current: () => true, limit: 1);
+    expect(page.items.single.kind, WorkspaceProductOriginalKind.savedDraft);
+    expect(transport.sent!['operation'], 'listStoreProductPreviewSources');
+    expect(transport.sent!['actorAccountId'], _scope.account); expect(transport.sent!['realm'], _scope.realm);
+    transport.data = Map<String, dynamic>.from(frame['original'] as Map);
+    final original = await gateway.readProductPreviewOriginal(_scope, WorkspaceProductOriginalKind.savedDraft,
+      current: () => true, expected: page.items.single);
+    expect(original!.reference.fingerprint, page.items.single.fingerprint);
+    expect(transport.sent!['operation'], 'readStoreProductPreviewOriginal');
+    expect(transport.sent!['expectedRevision'], page.items.single.revision);
+    expect(transport.sent!['expectedFingerprint'], page.items.single.fingerprint);
+    expect(transport.sent!.containsKey('draft'), isFalse); expect(transport.sent!.containsKey('idempotencyKey'), isFalse);
+    expect(credentials.modes.map((mode) => mode.name), ['standard', 'standard']);
+  });
+  test('AGG02 preview gateway rejects disabled or retired accounts before dispatch and drops late replies', () async {
+    final path = Platform.environment['AGG02_PREVIEW_ORIGINALS']; expect(path, isNotNull);
+    final capture = jsonDecode(File(path!).readAsStringSync()) as Map<String, dynamic>;
+    final data = Map<String, dynamic>.from(capture['saved-draft']['original'] as Map);
+    for (final make in <AuthenticatedWorkspaceCatalogueGateway Function(Transport)>[
+      (transport) => _gateway(transport),
+      (transport) => _gateway(transport, previewSupported: true, owner: 'other-owner'),
+    ]) {
+      final transport = Transport(data);
+      await expectLater(make(transport).readProductPreviewOriginal(_scope, WorkspaceProductOriginalKind.savedDraft,
+        current: () => true), throwsFormatException);
+      expect(transport.sent, isNull);
+    }
+    var active = true;
+    final transport = Transport(data), credentials = _RetiringPreviewCredentials(() => active = false);
+    await expectLater(_gateway(transport, previewSupported: true, credentials: credentials)
+      .readProductPreviewOriginal(_scope, WorkspaceProductOriginalKind.savedDraft, current: () => active), throwsFormatException);
+    expect(transport.sent, isNull);
+    active = true;
+    final late = _RetiringPreviewTransport(data, () => active = false);
+    await expectLater(_gateway(late, previewSupported: true).readProductPreviewOriginal(_scope,
+      WorkspaceProductOriginalKind.savedDraft, current: () => active), throwsFormatException);
+    expect(late.sent!['operation'], 'readStoreProductPreviewOriginal');
+    final foreign = Transport({...data, 'actorAccountId': 'other-owner'});
+    await expectLater(_gateway(foreign, previewSupported: true).readProductPreviewOriginal(_scope,
+      WorkspaceProductOriginalKind.savedDraft, current: () => true), throwsFormatException);
+  });
+  test('AGG02 actual repository typed originals preserve record kind and share descriptive projection', () {
+    final path = Platform.environment['AGG02_PREVIEW_ORIGINALS'];
+    expect(path, isNotNull, reason: 'Use the actual local repository preview export.');
+    final capture = jsonDecode(File(path!).readAsStringSync()) as Map<String, dynamic>;
+    final originals = <WorkspaceProductOriginalPresentation>[];
+    for (final pair in <(String, WorkspaceProductOriginalKind)>[
+      ('catalogue-sku', WorkspaceProductOriginalKind.catalogueSku),
+      ('submitted-original', WorkspaceProductOriginalKind.submittedOriginal),
+      ('saved-draft', WorkspaceProductOriginalKind.savedDraft),
+    ]) {
+      final frame = Map<String, dynamic>.from(capture[pair.$1] as Map);
+      final raw = Map<String, dynamic>.from(frame['original'] as Map);
+      final page = Map<String, dynamic>.from(frame['page'] as Map);
+      final reference = WorkspaceProductPreviewReference.decode((page['items'] as List).single);
+      final checked = WorkspaceProductPreviewOriginal.decode(raw, _scope, pair.$2, _now, expected: reference)!;
+      expect(checked.reference.kind, pair.$2); expect(checked.reference.revision, 1);
+      final presentation = checked.presentation(storeName: 'Host original Store', channel: BuyV2OfferClass.retail);
+      originals.add(presentation);
+      expect(presentation.kind, pair.$2); expect(presentation.fingerprint, reference.fingerprint);
+      expect(presentation.product.title, reference.title); expect(presentation.product.pack, reference.pack);
+      expect(presentation.product.publicListingIdentity, isNull); expect(presentation.product.catalogueListing, isFalse);
+      expect(presentation.product.deliveryPromise, isEmpty); expect(presentation.product.returnPolicy, isNull);
+      if (pair.$2 == WorkspaceProductOriginalKind.catalogueSku) {
+        expect(presentation.original, isA<WorkspaceCatalogueOwnedSku>());
+        expect(presentation.product.canonicalId, 'canonical-one');
+      } else {
+        expect(presentation.product.canonicalId, isEmpty);
+        expect(presentation.original, pair.$2 == WorkspaceProductOriginalKind.submittedOriginal
+          ? isA<WorkspaceProductSubmissionRecord>() : isA<WorkspaceProductDraftRecord>());
+      }
+    }
+    expect(originals.map((view) => view.product.id).toSet().length, 3);
+    expect(originals.map((view) => view.fingerprint).toSet().length, 3);
+  });
+  test('AGG02 typed original decoder rejects wrong source, scope, stale metadata and altered summary', () {
+    final path = Platform.environment['AGG02_PREVIEW_ORIGINALS']; expect(path, isNotNull);
+    final capture = jsonDecode(File(path!).readAsStringSync()) as Map<String, dynamic>;
+    final frame = Map<String, dynamic>.from(capture['saved-draft'] as Map);
+    final raw = Map<String, dynamic>.from(frame['original'] as Map);
+    final reference = WorkspaceProductPreviewReference.decode((frame['page']['items'] as List).single);
+    Map<String, dynamic> copy() => Map<String, dynamic>.from(jsonDecode(jsonEncode(raw)) as Map);
+    for (final mutate in <void Function(Map<String, dynamic>)>[
+      (v) => v['actorAccountId'] = 'other-owner', (v) => v['realm'] = 'production', (v) => v['storeId'] = 'other-store', (v) => v['skuId'] = 'other-sku',
+      (v) => v['kind'] = 'submitted-original', (v) => v['reference']['kind'] = 'catalogue-sku',
+      (v) => v['reference']['title'] = 'Not the original title',
+      (v) => v['record'] = capture['submitted-original']['original']['record'],
+      (v) => v['record']['draft']['content']['title'] = 'Altered original body',
+      (v) => v['observedAt'] = _now.subtract(const Duration(minutes: 6)).toIso8601String(),
+    ]) {
+      final changed = copy(); mutate(changed);
+      expect(() => WorkspaceProductPreviewOriginal.decode(changed, _scope, WorkspaceProductOriginalKind.savedDraft,
+        _now, expected: reference), throwsFormatException);
+    }
+    final foreignReference = WorkspaceProductPreviewReference.decode((capture['submitted-original']['page']['items'] as List).single);
+    expect(() => WorkspaceProductPreviewOriginal.decode(raw, _scope, WorkspaceProductOriginalKind.savedDraft,
+      _now, expected: foreignReference), throwsFormatException);
+    final none = copy()..['state'] = 'none'..['reference'] = null..['record'] = null;
+    expect(WorkspaceProductPreviewOriginal.decode(none, _scope, WorkspaceProductOriginalKind.savedDraft, _now), isNull);
+    expect(() => WorkspaceProductPreviewOriginal.decode(none, _scope, WorkspaceProductOriginalKind.savedDraft,
+      _now, expected: reference), throwsFormatException);
   });
   test('AGG02 actual repository master page and private Save are accepted by the mobile boundary', () async {
     final path = Platform.environment['AGG02_ORIGINAL_RESPONSES'];
@@ -183,10 +315,15 @@ void main() {
         expect(view.product.badge, isEmpty); expect(view.product.unitPrice, isEmpty); expect(view.product.confirmedOn, isEmpty);
         expect(view.product.deliveryPromise, isEmpty); expect(view.product.returnPolicy, isNull); expect(view.product.purchaseProtection, isNull);
         expect(view.content.media, isEmpty); expect(view.product.mediaAssets, isEmpty);
-        if (row['type'] == 'unknown-pack') {
+        if (row['type'] == 'unknown-pack' || row['type'] == 'unknown-wholesale' && channel == BuyV2OfferClass.retail) {
           expect(view.product.packTerms, isNull);
         } else {
           expect(view.product.quantityStep, terms['quantityStep']);
+          if (row['type'] == 'unknown-wholesale') {
+            expect(input['pack']['quantityMilli'], isNull); expect(input['pack']['unitsPerCase'], isNull);
+            expect(view.product.packTerms!.netContentMilli, isNull); expect(view.product.packTerms!.contentUnit, isNull);
+            expect(view.product.hasValidPackTerms, isFalse, reason: 'A private preview cannot manufacture a verified pack or current trade quote.');
+          }
           expect(view.product.packTerms!.priceObservedAt, isNull); expect(view.product.packTerms!.priceValidUntil, isNull);
           expect(view.product.packTerms!.priceTiers.map((tier) => tier.priceMinor),
             (terms['tiers'] as List).map((tier) => tier['unitPriceMinor']));

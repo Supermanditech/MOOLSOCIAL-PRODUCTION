@@ -110,3 +110,16 @@ test('Domain retained quote read hints are bounded exact buyer-owned identifiers
   assert.throws(() => contextReadSelection(workspace, undefined, ids));
   assert.throws(() => canonicalContextRequest({operation: 'read', payload: {scope, retainedSupplierQuoteIds: ids, acceptQuote: true}}));
 });
+
+
+test('AGG02 typed preview opt-in stays explicit through the read-only context query', () => {
+  const where = {audience: 'workspace' as const, storeId: 'store-one'};
+  assert.deepEqual(canonicalContextRequest({operation: 'read', payload: {scope: where}}), {scope: where});
+  assert.deepEqual(canonicalContextRequest({operation: 'read', payload: {scope: where, nativeProductPreviewVersion: 1}}),
+    {scope: where, nativeProductPreviewVersion: 1});
+  assert.equal(Object.hasOwn(contextReadSelection(where), 'nativeProductPreviewVersion'), false);
+  assert.equal(contextReadSelection(where, undefined, undefined, 1).nativeProductPreviewVersion, 1);
+  for (const value of [null, true, 0, 2, '1']) assert.throws(() => canonicalContextRequest({operation: 'read',
+    payload: {scope: where, nativeProductPreviewVersion: value}}));
+  assert.throws(() => canonicalContextRequest({operation: 'read', payload: {scope, nativeProductPreviewVersion: 1}}));
+});

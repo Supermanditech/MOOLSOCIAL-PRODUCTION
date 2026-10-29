@@ -151,6 +151,7 @@ import {
   storeVariantFamilyOperation,
   storeProductSubmissionOperation,
   productDraftOperation,
+  productPreviewOperation,
   catalogueProductionOperation,
   storeStockOperation,
   storeStockVisibilityOperation,
@@ -3176,6 +3177,7 @@ export const moolSocialWorkspace = onRequest(
       const variantFamilyOperation = storeVariantFamilyOperation(operation);
       const productSubmissionOperation = storeProductSubmissionOperation(operation);
       const privateProductDraftOperation = productDraftOperation(operation);
+      const ownedProductPreviewOperation = productPreviewOperation(operation);
       const catalogueProductionAction = catalogueProductionOperation(operation);
       const bulkQuoteAction = bulkSupplierQuoteOperation(operation);
       const bulkQuoteOperation = bulkQuoteAction !== undefined;
@@ -3246,7 +3248,7 @@ export const moolSocialWorkspace = onRequest(
         'confirmStoreCommodityPrice', 'readStoreCommodityPrice', 'reconcileStoreCommodityPrice',
         'requestPublicCommodityPriceRefresh',
         "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery", 'readStoreMasterCatalogue',
-        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || privateProductDraftOperation !== undefined || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation || stockOperation !== undefined || stockVisibilityOperation !== undefined || catalogueProductionAction !== undefined;
+        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || ownedProductPreviewOperation !== undefined || privateProductDraftOperation !== undefined || variantFamilyOperation !== undefined || productSubmissionOperation !== undefined || productMediaOperation || stockOperation !== undefined || stockVisibilityOperation !== undefined || catalogueProductionAction !== undefined;
       const orderMutation = operation === "acceptRetailerOrder" ||
         operation === "packRetailerOrder" ||
         operation === "requestRetailerDelivery" ||
@@ -3337,6 +3339,8 @@ export const moolSocialWorkspace = onRequest(
         ? await workspaceCatalogueService().handleProductMedia(ownerUserId, operation, catalogueBody)
         : operation === 'readStoreMasterCatalogue'
         ? await workspaceCatalogueService().readMasterCatalogue(ownerUserId, catalogueBody)
+        : ownedProductPreviewOperation !== undefined
+        ? await workspaceCatalogueService().handleProductPreview(ownerUserId, operation, catalogueBody)
         : privateProductDraftOperation !== undefined
         ? await workspaceCatalogueService().handleProductDraft(ownerUserId, operation, catalogueBody)
         : productSubmissionOperation !== undefined

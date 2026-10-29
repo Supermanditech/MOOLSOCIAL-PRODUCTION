@@ -33,31 +33,35 @@ export const storePublicDetailsActions=new Set(['AI-ACT-320','AI-ACT-321']);
 export const storeNativeMaskActions = new Set([...storeProductActions, ...storeProductOwnerActions,...storeStockOwnerActions,...storeRestockOwnerActions,...storeOrderOriginalActions,...storeOperationalActions,...storeOrderBoardActions,...storeSupplierDraftActions,...storePurchaseRootActions,...storeReceivingOriginalActions,...storeCouponActions,...storeReportOwnerActions,...storePublicDetailsActions]);
 export const cataloguePriceRefreshActions = new Set(["AI-ACT-060", "AI-ACT-352"]);
 export const catalogueSearchActions = new Set(["AI-ACT-001", "AI-ACT-002", "AI-ACT-003", "AI-ACT-004", "AI-ACT-005", ...catalogueProductActions, ...cataloguePriceRefreshActions]);
-export function canonicalContextRequest(value: unknown): {scope: PlansScope; catalogueListingIds?: readonly string[]; retainedSupplierQuoteIds?: readonly string[]; nativeSelectionVersion?: 1} {
+export function canonicalContextRequest(value: unknown): {scope: PlansScope; catalogueListingIds?: readonly string[]; retainedSupplierQuoteIds?: readonly string[]; nativeSelectionVersion?: 1; nativeProductPreviewVersion?: 1} {
   const request = object(value, ["operation", "payload"]);
   if (request.operation !== "read") return fail("invalid_request", 400);
   const raw = object(request.payload);
   const payload = object(raw, ["scope", ...(Object.hasOwn(raw, "catalogueListingIds") ? ["catalogueListingIds"] : []),
     ...(Object.hasOwn(raw, 'retainedSupplierQuoteIds') ? ['retainedSupplierQuoteIds'] : []),
-    ...(Object.hasOwn(raw, "nativeSelectionVersion") ? ["nativeSelectionVersion"] : [])]);
+    ...(Object.hasOwn(raw, "nativeSelectionVersion") ? ["nativeSelectionVersion"] : []),
+    ...(Object.hasOwn(raw, "nativeProductPreviewVersion") ? ["nativeProductPreviewVersion"] : [])]);
   const scope = decodePlansScope(payload.scope);
+  if (Object.hasOwn(payload, 'nativeProductPreviewVersion') && (payload.nativeProductPreviewVersion !== 1 || scope.audience !== 'workspace')) return fail('invalid_request', 400);
   if (Object.hasOwn(payload, 'retainedSupplierQuoteIds') && scope.audience !== 'personal') return fail('invalid_request', 400);
   if (Object.hasOwn(payload, "nativeSelectionVersion") && (payload.nativeSelectionVersion !== 1 || scope.audience !== "workspace")) return fail("invalid_request", 400);
   return {scope, ...(Object.hasOwn(payload, "catalogueListingIds") ?
     {catalogueListingIds: catalogueListingSelection(payload.catalogueListingIds)} : {}),
     ...(Object.hasOwn(payload, 'retainedSupplierQuoteIds') ? {retainedSupplierQuoteIds: retainedSupplierQuoteSelection(payload.retainedSupplierQuoteIds)} : {}),
-    ...(Object.hasOwn(payload, "nativeSelectionVersion") ? {nativeSelectionVersion: 1 as const} : {})};
+    ...(Object.hasOwn(payload, "nativeSelectionVersion") ? {nativeSelectionVersion: 1 as const} : {}),
+    ...(Object.hasOwn(payload, "nativeProductPreviewVersion") ? {nativeProductPreviewVersion: 1 as const} : {})};
 }
 export function canonicalContextOwner(actor: AccountProfileActor, scope: PlansScope): string {
   return digest([actor.projectId, actor.uid, scope.audience, scope.storeId]);
 }
-export function contextReadSelection(scope: PlansScope, catalogueListingIds?: readonly string[], retainedSupplierQuoteIds?: readonly string[]): PreparationRequest {
+export function contextReadSelection(scope: PlansScope, catalogueListingIds?: readonly string[], retainedSupplierQuoteIds?: readonly string[], nativeProductPreviewVersion?: 1): PreparationRequest {
   if (retainedSupplierQuoteIds !== undefined && scope.audience !== 'personal') return fail('invalid_request', 400);
   // Pure source query only: never claimed in the preparation/usage store and
   // never dispatched to a model. These constants are not a saved operation.
   return {scope, requestId: "canonical-source-read", requestRevision: 0,
     expectedEntitlementRevision: "source-read-only", message: "Read current permitted sources",
     language: "English", history: [], actionId: null, entityId: null,
+    ...(nativeProductPreviewVersion === 1 ? {nativeProductPreviewVersion} : {}),
     ...(catalogueListingIds === undefined ? {} : {catalogueListingIds: catalogueListingSelection(catalogueListingIds)}),
     ...(retainedSupplierQuoteIds === undefined ? {} : {
       nativeTargets: retainedSupplierQuoteSelection(retainedSupplierQuoteIds).map(entityId => ({actionId: 'AI-ACT-349', entityId}))})};

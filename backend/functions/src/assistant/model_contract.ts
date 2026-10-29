@@ -40,6 +40,8 @@ export interface PreparationRequest {
   readonly nativeTargetMask?: PreparationTargetMask;
   /** Opaque frozen-native-intent bindings, never model-authored identities. */
   readonly nativeOriginalCaptures?: readonly PreparationOriginalCapture[];
+  /** Explicit opt-in: older clients retain the published-only preview contract. */
+  readonly nativeProductPreviewVersion?: 1;
 }
 export const nativeOriginalRequestActions = new Set(['AI-ACT-225', 'AI-ACT-374']);
 export interface PreparationOriginalCapture {readonly actionId: string; readonly digest: string;}
@@ -97,11 +99,13 @@ export function command(value: unknown): AssistantCommand {
     ...(Object.hasOwn(payload, "catalogueListingIds") ? ["catalogueListingIds"] : []),
     ...(Object.hasOwn(payload, "nativeTargets") ? ["nativeTargets"] : []),
     ...(Object.hasOwn(payload, "nativeTargetMask") ? ["nativeTargetMask"] : []),
-    ...(Object.hasOwn(payload, "nativeOriginalCaptures") ? ["nativeOriginalCaptures"] : [])] : ["scope", "requestId"]);
+    ...(Object.hasOwn(payload, "nativeOriginalCaptures") ? ["nativeOriginalCaptures"] : []),
+    ...(Object.hasOwn(payload, "nativeProductPreviewVersion") ? ["nativeProductPreviewVersion"] : [])] : ["scope", "requestId"]);
   const scope = decodePlansScope(p.scope), requestId = id(p.requestId);
   if (!prepare) return {operation: row.operation as "status" | "cancel", payload: {scope, requestId}};
   if (Object.hasOwn(p, "nativeTargetMask") && scope.audience !== "workspace") return fail("invalid_request", 400);
   if (Object.hasOwn(p, 'nativeOriginalCaptures') && scope.audience !== 'workspace') return fail('invalid_request', 400);
+  if (Object.hasOwn(p, 'nativeProductPreviewVersion') && (p.nativeProductPreviewVersion !== 1 || scope.audience !== 'workspace')) return fail('invalid_request', 400);
   if (!Number.isSafeInteger(p.requestRevision) || (p.requestRevision as number) < 0) return fail("invalid_request", 400);
   if (typeof p.language !== "string" || !preparationLanguages.has(p.language)) return fail("invalid_request", 400);
   if (!Array.isArray(p.history) || p.history.length > 20) return fail("invalid_request", 400);
@@ -113,7 +117,8 @@ export function command(value: unknown): AssistantCommand {
     ...(Object.hasOwn(p, "catalogueListingIds") ? {catalogueListingIds: catalogueListingSelection(p.catalogueListingIds)} : {}),
     ...(Object.hasOwn(p, "nativeTargets") ? {nativeTargets: nativeTargetSelection(p.nativeTargets)} : {}),
     ...(Object.hasOwn(p, "nativeTargetMask") ? {nativeTargetMask: nativeTargetMaskSelection(p.nativeTargetMask)} : {}),
-    ...(Object.hasOwn(p, 'nativeOriginalCaptures') ? {nativeOriginalCaptures: nativeOriginalCaptureSelection(p.nativeOriginalCaptures)} : {})}};
+    ...(Object.hasOwn(p, 'nativeOriginalCaptures') ? {nativeOriginalCaptures: nativeOriginalCaptureSelection(p.nativeOriginalCaptures)} : {}),
+    ...(Object.hasOwn(p, 'nativeProductPreviewVersion') ? {nativeProductPreviewVersion: 1 as const} : {})}};
 }
 export interface PreparationNativeTarget {
   readonly actionId: string; readonly entityId: string | null; readonly sourceRevision: string;

@@ -45,7 +45,7 @@ class AssistantCanonicalNativeSelection {
 class AssistantCanonicalContextSnapshot {
   AssistantCanonicalContextSnapshot({required this.binding,
     required Map<AssistantContextKey, String> revisions, required this.validUntil,
-    List<String>? catalogueListingIds, this.nativeSelection})
+    List<String>? catalogueListingIds, this.nativeSelection, this.nativeProductPreviewVersion})
     : revisions = Map.unmodifiable(revisions),
       catalogueListingIds = catalogueListingIds == null ? null : assistantCatalogueListingSelection(catalogueListingIds);
   final Object binding;
@@ -53,6 +53,7 @@ class AssistantCanonicalContextSnapshot {
   final DateTime validUntil;
   final List<String>? catalogueListingIds;
   final AssistantCanonicalNativeSelection? nativeSelection;
+  final int? nativeProductPreviewVersion;
 }
 typedef AssistantCanonicalContextReader = Future<AssistantCanonicalContextSnapshot>
     Function(MoolAssistantContext context, bool Function() current);
@@ -65,7 +66,7 @@ class _NativeAnchor {
 
 /// Binds original local snapshots BEFORE inference. A later fresh native token
 /// can never be substituted to make an older server preparation look current.
-class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, MoolAssistantRecoveredReviewGuard, MoolAssistantNativeSelectionGuard, MoolAssistantCompactNativeSelectionGuard, MoolAssistantOriginalRequestSelectionGuard {
+class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, MoolAssistantRecoveredReviewGuard, MoolAssistantNativeSelectionGuard, MoolAssistantCompactNativeSelectionGuard, MoolAssistantOriginalRequestSelectionGuard, MoolAssistantProductPreviewSelectionGuard {
   AssistantProfileContextGuard({required this.readCanonical,
     required this.readContext, required this.ownerChanges,
     required Iterable<MoolAssistantNativeAdapter> nativeAdapters,
@@ -95,6 +96,7 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
   int _generation = 0;
   late Object _observedBinding;
   bool _disposed = false;
+  @override int? get nativeProductPreviewVersion => current ? _canonical?.nativeProductPreviewVersion : null;
   @override List<String>? get catalogueListingIds => current ? _canonical?.catalogueListingIds : null;
   @override List<AssistantNativeTargetHint>? get nativeTargets => current
     ? assistantNativeTargetSelection([for (final key in _anchors.keys.where((key) => _canonicalActions.contains(key.$1) && _canonical?.nativeSelection?.proofs.containsKey(key) != true))
@@ -195,6 +197,7 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
         !mapEquals(source.revisions, fresh.revisions) ||
         source.nativeSelection?.fingerprint != fresh.nativeSelection?.fingerprint ||
         !mapEquals(source.nativeSelection?.proofs, fresh.nativeSelection?.proofs) ||
+        source.nativeProductPreviewVersion != fresh.nativeProductPreviewVersion ||
         !listEquals(source.catalogueListingIds, fresh.catalogueListingIds) || !fresh.validUntil.isAfter(_clock())) {
       throw const AssistantModelFailure('stale_preparation');
     }
@@ -202,6 +205,7 @@ class AssistantProfileContextGuard implements MoolAssistantPreparationGuard, Moo
       revisions: fresh.revisions,
       catalogueListingIds: fresh.catalogueListingIds,
       nativeSelection: fresh.nativeSelection,
+      nativeProductPreviewVersion: fresh.nativeProductPreviewVersion,
       validUntil: source.validUntil.isBefore(fresh.validUntil) ? source.validUntil : fresh.validUntil);
     _anchors = Map.unmodifiable(anchors);
     _originalRequestChecks=List.unmodifiable(originalChecks);

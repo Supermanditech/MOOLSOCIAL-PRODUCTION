@@ -601,6 +601,9 @@ class WorkspaceAssistantRestockReadHints {
   final bool Function() current;
 }
 
+typedef WorkspaceProductDraftBatchSyncResult = ({bool available, bool busy,
+  Set<String> requested, Map<String, WorkspaceProductDraftWriteState> states});
+
 class WorkSession extends ChangeNotifier {
   // New identities must not collide when the device clock repeats or changes.
   // Persisted identities and submission/recovery markers remain authoritative.
@@ -648,6 +651,7 @@ class WorkSession extends ChangeNotifier {
     this.catalogueBindingPendingStoreFactory,
     this.variantFamilyJournalFactory,
     this.productSubmissionJournalFactory,
+    this.productDraftJournalFactory,
     this.storeStockJournalFactory,
     this.stockVisibilityJournalFactory,
     this.productMediaJournalFactory,
@@ -720,6 +724,7 @@ class WorkSession extends ChangeNotifier {
     this.catalogueBindingPendingStoreFactory,
     this.variantFamilyJournalFactory,
     this.productSubmissionJournalFactory,
+    this.productDraftJournalFactory,
     this.storeStockJournalFactory,
     this.stockVisibilityJournalFactory,
     this.productMediaJournalFactory,
@@ -1471,6 +1476,7 @@ class WorkSession extends ChangeNotifier {
   final WorkspaceCatalogueBindingPendingStore Function(WorkspaceCatalogueBindingScope scope)? catalogueBindingPendingStoreFactory;
   final WorkspaceVariantFamilyJournal Function(WorkspaceVariantFamilyScope scope)? variantFamilyJournalFactory;
   final WorkspaceProductSubmissionJournal Function(WorkspaceProductSubmissionScope scope)? productSubmissionJournalFactory;
+  final WorkspaceProductDraftJournal Function(WorkspaceProductSubmissionScope scope)? productDraftJournalFactory;
   final WorkspaceStoreStockJournal Function(WorkspaceStoreStockScope scope)? storeStockJournalFactory;
   final _storeStockControllers = <WorkspaceStoreStockScope, WorkspaceStoreStockController>{};
   final WorkspaceStockVisibilityJournal Function(WorkspaceStoreStockScope scope)? stockVisibilityJournalFactory;
@@ -1618,9 +1624,142 @@ class WorkSession extends ChangeNotifier {
   bool get workspaceMasterCatalogueConnectionConfigured => workspaceStoreAuthoringAvailable && gateway is! ReviewWorkGateway &&
     catalogueGateway is AuthenticatedWorkspaceCatalogueGateway &&
     (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).masterCatalogueSupported;
+  bool get workspaceProductPreviewConnectionConfigured => workspaceStoreAuthoringAvailable && gateway is! ReviewWorkGateway &&
+    catalogueGateway is AuthenticatedWorkspaceCatalogueGateway &&
+    (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).productPreviewSupported;
   bool get workspaceProductDraftConnectionConfigured => workspaceStoreAuthoringAvailable && gateway is! ReviewWorkGateway &&
     catalogueGateway is AuthenticatedWorkspaceCatalogueGateway &&
     (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).productDraftSupported;
+  Future<({List<WorkspaceProductPreviewReference> references, String signature, bool Function() current})?>
+      readWorkspaceProductPreviewSources({required bool Function() current}) async {
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
+    final navigation = navigationScopeRevision, owner = publicationPreferencesContext, inventory = workspaceInventoryRevision;
+    var failed = false;
+    bool valid() => !failed && !_disposed && workspaceInventoryRevision == inventory && current() && workspaceProductPreviewConnectionConfigured &&
+      !workspaceAccountRecoveryPending && !workspaceAccountRecoveryFailed && _contactAccountScope == account &&
+      activeWorkspace?.id == store && navigationScopeRevision == navigation && publicationPreferencesContext == owner &&
+      identical(catalogueGateway, source);
+    if (account == null || account.isEmpty || store == null || source is! AuthenticatedWorkspaceCatalogueGateway || !valid()) return null;
+    final scope = (account: account, store: store, realm: source.realm), reader = source.forOwnerAccount(account);
+    DateTime? validUntil;
+    Future<List<WorkspaceProductPreviewReference>> readKind(WorkspaceProductOriginalKind kind) async {
+      final references = <WorkspaceProductPreviewReference>[], cursors = <String>{}, ids = <String>{};
+      String? cursor;
+      do {
+        if (!valid()) throw const FormatException('Your Store changed. Open its saved products again.');
+        final page = await reader.listProductPreviewSources(scope, kind, current: valid, limit: 50, cursor: cursor);
+        if (!valid()) throw const FormatException();
+        final expiry = page.observedAt.add(const Duration(minutes: 5));
+        if (validUntil == null || expiry.isBefore(validUntil!)) validUntil = expiry;
+        for (final reference in page.items) {
+          if (!ids.add(reference.skuId) || references.isNotEmpty && references.last.skuId.compareTo(reference.skuId) >= 0) {
+            throw const FormatException('Saved product versions changed. Refresh the list.');
+          }
+          references.add(reference);
+        }
+        if (references.length > 2500) throw const FormatException('Choose a product before opening its saved version.');
+        cursor = page.nextCursor;
+        if (cursor != null && !cursors.add(cursor)) throw const FormatException();
+      } while (cursor != null);
+      return references;
+    }
+    final groups = await Future.wait(WorkspaceProductOriginalKind.values.map((kind) async {
+      try {return await readKind(kind);} catch (_) {failed = true; rethrow;}
+    }));
+    if (!valid()) return null;
+    final references = groups.expand((rows) => rows).toList(growable: false)
+      ..sort((a, b) {final sku = a.skuId.compareTo(b.skuId); return sku != 0 ? sku : a.kind.index.compareTo(b.kind.index);});
+    final signature = crypto.sha256.convert(utf8.encode(jsonEncode([
+      account, store, source.realm, for (final reference in references) reference.toJson(),
+    ]))).toString();
+    bool alive() => valid() && validUntil != null && reader.now().toUtc().isBefore(validUntil!);
+    return alive() ? (references: List<WorkspaceProductPreviewReference>.unmodifiable(references), signature: signature, current: alive) : null;
+  }
+  Future<({WorkspaceProductPreviewOriginal original, bool Function() current})?> readWorkspaceProductPreviewOriginal(
+      String skuId, WorkspaceProductOriginalKind kind, {WorkspaceProductPreviewReference? expected,
+      required bool Function() current}) async {
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
+    final navigation = navigationScopeRevision, owner = publicationPreferencesContext;
+    bool valid() => !_disposed && current() && workspaceProductPreviewConnectionConfigured &&
+      !workspaceAccountRecoveryPending && !workspaceAccountRecoveryFailed && _contactAccountScope == account &&
+      activeWorkspace?.id == store && navigationScopeRevision == navigation && publicationPreferencesContext == owner &&
+      identical(catalogueGateway, source);
+    if (account == null || account.isEmpty || store == null || source is! AuthenticatedWorkspaceCatalogueGateway || !valid()) return null;
+    final scope = (account: account, store: store, realm: source.realm, sku: skuId), reader = source.forOwnerAccount(account);
+    // Read only. Neither journal restoration nor source lookup may replay a Save.
+    if (kind == WorkspaceProductOriginalKind.savedDraft) {
+      final journal = productDraftJournalFactory?.call(scope) ?? SecureWorkProductDraftJournal();
+      if (await journal.readPending(scope).timeout(const Duration(seconds: 10)) != null) {
+        throw const FormatException('Check the previous product Save before previewing this copy.');
+      }
+    } else if (kind == WorkspaceProductOriginalKind.submittedOriginal) {
+      final journal = productSubmissionJournalFactory?.call(scope) ?? SecureWorkProductSubmissionJournal();
+      if (await journal.readPending(scope).timeout(const Duration(seconds: 10)) != null) {
+        throw const FormatException('Check the previous product submission before previewing this copy.');
+      }
+    } else {
+      if (!await restoreWorkspaceCatalogueListing() || !valid() || workspaceCatalogueListingBusy ||
+          workspaceCatalogueListingPendingSkuId == skuId) {
+        throw const FormatException('Check the previous product change before previewing this copy.');
+      }
+    }
+    if (!valid()) return null;
+    final original = await reader.readProductPreviewOriginal(scope, kind, current: valid, expected: expected);
+    if (!valid() || original == null) return null;
+    final local = workspaceCatalogueItems.where((item) => item.id == skuId).singleOrNull;
+    final localSignature = local == null || kind != WorkspaceProductOriginalKind.savedDraft
+      ? null : jsonEncode(_savedProductDraftInput(skuId).toJson());
+    final initialDraftFingerprint = _productDrafts[scope]?.record?.fingerprint;
+    final initialSubmissionFingerprint = kind == WorkspaceProductOriginalKind.submittedOriginal
+      ? workspaceProductSubmission(skuId)?.head?.fingerprint : null;
+    if (kind == WorkspaceProductOriginalKind.savedDraft && localSignature != null &&
+        localSignature != jsonEncode((original.original as WorkspaceProductDraftRecord).input.toJson())) {
+      throw const FormatException('Your saved edits are not synced yet. Check product sync before previewing.');
+    }
+    bool alive() {
+      if (!valid() || !reader.now().toUtc().isBefore(original.observedAt.add(const Duration(minutes: 5)))) return false;
+      if (kind == WorkspaceProductOriginalKind.savedDraft) {
+        final controller = _productDrafts[scope], fingerprint = controller?.record?.fingerprint;
+        if (controller?.pending != null || fingerprint != null && fingerprint != initialDraftFingerprint &&
+            fingerprint != original.reference.fingerprint) return false;
+      }
+      if (kind == WorkspaceProductOriginalKind.submittedOriginal) {
+        final controller = workspaceProductSubmission(skuId), fingerprint = controller?.head?.fingerprint;
+        if (controller?.pending != null || fingerprint != null && fingerprint != initialSubmissionFingerprint &&
+            fingerprint != original.reference.fingerprint) return false;
+      }
+      if (kind == WorkspaceProductOriginalKind.catalogueSku && (workspaceCatalogueListingBusy || workspaceCatalogueListingPendingSkuId == skuId)) return false;
+      try {
+        final rows = workspaceCatalogueItems.where((item) => item.id == skuId).toList(growable: false);
+        if (local == null) return rows.isEmpty;
+        if (rows.length != 1) return false;
+        return kind == WorkspaceProductOriginalKind.savedDraft
+          ? jsonEncode(_savedProductDraftInput(skuId).toJson()) == localSignature : identical(rows.single, local);
+      } catch (_) {return false;}
+    }
+    return alive() ? (original: original, current: alive) : null;
+  }
+  Future<WorkspacePublicCatalogueEntry?> readWorkspacePublishedProductPreview(WorkspaceProductPreviewOriginal original,
+      BuyV2OfferClass channel, {required bool Function() current}) async {
+    final source = catalogueGateway, account = _contactAccountScope, navigation = navigationScopeRevision;
+    final owner = publicationPreferencesContext, store = activeWorkspace?.id;
+    final record = original.original;
+    bool valid() => !_disposed && current() && workspaceProductPreviewConnectionConfigured &&
+      account == original.scope.account && _contactAccountScope == account && store == original.scope.store && activeWorkspace?.id == store &&
+      navigationScopeRevision == navigation && publicationPreferencesContext == owner && identical(catalogueGateway, source);
+    if (!valid() || source is! AuthenticatedWorkspaceCatalogueGateway || source.realm != original.scope.realm ||
+        original.reference.kind != WorkspaceProductOriginalKind.catalogueSku || original.reference.publicListingRequested != true ||
+        record is! WorkspaceCatalogueOwnedSku || !original.reference.channels.contains(channel.name)) return null;
+    final entry = await source.forOwnerAccount(account!).readPublicEntry(storeId: store!, skuId: original.scope.sku,
+      channel: channel, current: valid);
+    if (!valid()) return null;
+    final listing = entry?.product.publicListingIdentity;
+    if (entry == null || listing == null || !listing.matches(entry.product) || listing.realm != source.realm ||
+        listing.storeId != store || listing.skuId != original.scope.sku || listing.channel != channel ||
+        listing.canonicalProductId != record.canonicalProductId || listing.verifiedPackId != record.verifiedPackId ||
+        entry.readback.skuRevision != original.reference.revision) return null;
+    return entry;
+  }
   WorkspaceProductDraftInput _savedProductDraftInput(String skuId) {
     final rows = workspaceCatalogueItems.where((item) => item.id == skuId).toList(growable: false);
     if (rows.length != 1) throw const FormatException('The saved product changed.');
@@ -1680,7 +1819,7 @@ class WorkSession extends ChangeNotifier {
       _productDrafts.remove(scope); previous.removeListener(notifyListeners); previous.dispose();
     }
     return _productDrafts.putIfAbsent(scope, () => WorkspaceProductDraftController(scope: scope,
-      gateway: source.forOwnerAccount(account), journal: SecureWorkProductDraftJournal(),
+      gateway: source.forOwnerAccount(account), journal: productDraftJournalFactory?.call(scope) ?? SecureWorkProductDraftJournal(),
       current: () => !_disposed && workspaceStoreAuthoringAvailable && _contactAccountScope == account &&
         activeWorkspace?.id == store && navigationScopeRevision == epoch)..addListener(notifyListeners));
   }
@@ -1710,6 +1849,62 @@ class WorkSession extends ChangeNotifier {
         jsonEncode(controller.record!.origin?.toJson()) == jsonEncode(selectedOrigin?.toJson())) return WorkspaceProductDraftWriteState.saved;
       return await controller.save(input, origin: selectedOrigin, idempotencyKey: _newCounterIdentity('product-draft'), inputCurrent: inputCurrent);
     } catch (_) {return WorkspaceProductDraftWriteState.notSent;}
+  }
+  Future<WorkspaceProductDraftBatchSyncResult>? _productDraftBatch;
+  String? _productDraftBatchKey;
+  Future<WorkspaceProductDraftBatchSyncResult> syncWorkspaceSavedProductDrafts(Iterable<String> skuIds,
+      {required bool Function() current}) {
+    final ids = List<String>.unmodifiable(skuIds.toSet());
+    WorkspaceProductDraftBatchSyncResult result(bool available, bool busy, Map<String, WorkspaceProductDraftWriteState> states) =>
+      (available: available, busy: busy, requested: Set<String>.unmodifiable(ids),
+        states: Map<String, WorkspaceProductDraftWriteState>.unmodifiable(states));
+    final account = _contactAccountScope, store = activeWorkspace?.id, gatewayOwner = catalogueGateway;
+    final navigation = navigationScopeRevision, owner = publicationPreferencesContext;
+    bool valid() => !_disposed && current() && workspaceProductDraftConnectionConfigured &&
+      account != null && _contactAccountScope == account && activeWorkspace?.id == store &&
+      navigationScopeRevision == navigation && publicationPreferencesContext == owner && identical(catalogueGateway, gatewayOwner);
+    if (!valid()) return Future.value(result(false, false, const {}));
+    // Freeze only the final persisted presentation input, never costs or Stock.
+    final signatures = <String, String>{}, states = <String, WorkspaceProductDraftWriteState>{};
+    for (final id in ids) {
+      try {signatures[id] = jsonEncode(_savedProductDraftInput(id).toJson());}
+      catch (_) {states[id] = WorkspaceProductDraftWriteState.notSent;}
+    }
+    final key = jsonEncode([account, store, (gatewayOwner as AuthenticatedWorkspaceCatalogueGateway).realm,
+      navigation, [for (final id in ids.toList()..sort()) [id, signatures[id]]]]);
+    if (_productDraftBatch != null) return _productDraftBatchKey == key ? _productDraftBatch!
+      : Future.value(result(true, true, const {}));
+    var next = 0, stopped = false;
+    bool rowCurrent(String id) {
+      if (!valid()) return false;
+      try {return signatures[id] == jsonEncode(_savedProductDraftInput(id).toJson());}
+      catch (_) {return false;}
+    }
+    Future<void> worker() async {
+      while (!stopped && valid() && next < ids.length) {
+        final id = ids[next++];
+        if (!signatures.containsKey(id) || !rowCurrent(id)) {
+          states[id] = WorkspaceProductDraftWriteState.notSent; continue;
+        }
+        WorkspaceProductDraftWriteState state;
+        try {state = await syncWorkspaceSavedProductDraft(id, current: () => rowCurrent(id)) ?? WorkspaceProductDraftWriteState.notSent;}
+        catch (_) {state = WorkspaceProductDraftWriteState.unknown;}
+        states[id] = state;
+        // Existing codecs cannot classify every uncertain rejection. Stop
+        // scheduling on unknown results or an unavailable initial read; retain
+        // every original journal. This method never reconciles or retries Stock.
+        if (!valid() || state == WorkspaceProductDraftWriteState.unknown || workspaceSavedProductDraft(id)?.loaded != true) stopped = true;
+      }
+    }
+    late final Future<WorkspaceProductDraftBatchSyncResult> batch;
+    _productDraftBatchKey = key;
+    batch = Future(() async {
+      await Future.wait(List.generate(ids.length < 3 ? ids.length : 3, (_) => worker()));
+      return result(true, false, states);
+    }).whenComplete(() {
+      if (identical(_productDraftBatch, batch)) {_productDraftBatch = null; _productDraftBatchKey = null;}
+    });
+    return _productDraftBatch = batch;
   }
   final Map<WorkspaceProductSubmissionScope, WorkspaceProductSubmissionController> _productSubmissions = {};
   final Map<WorkspaceProductSubmissionScope, WorkspaceProductSubmissionController> _productSubmissionLoads = {};

@@ -2049,6 +2049,9 @@ abstract interface class MoolAssistantCompactNativeSelectionGuard {
   AssistantNativeTargetMask? get nativeTargetMask;
   Set<String> get nativeMaskedActionIds;
 }
+abstract interface class MoolAssistantProductPreviewSelectionGuard {
+  int? get nativeProductPreviewVersion;
+}
 abstract interface class MoolAssistantOriginalRequestSelectionGuard {
   List<AssistantNativeOriginalCapture>? get nativeOriginalCaptures;
 }
@@ -2252,7 +2255,9 @@ class MoolAssistantController extends ChangeNotifier {
           final originals=guard is MoolAssistantOriginalRequestSelectionGuard
             ? (guard as MoolAssistantOriginalRequestSelectionGuard).nativeOriginalCaptures:null;
           input = input.withCatalogueListingIds(selection.catalogueListingIds).withNativeTargets(targets).withNativeTargetMask(compact?.nativeTargetMask)
-            .withNativeOriginalCaptures(originals==null||originals.isEmpty?null:originals);
+            .withNativeOriginalCaptures(originals==null||originals.isEmpty?null:originals)
+            .withProductPreviewVersion(guard is MoolAssistantProductPreviewSelectionGuard
+              ? (guard as MoolAssistantProductPreviewSelectionGuard).nativeProductPreviewVersion : null);
           _modelInput = input;
         }
       }

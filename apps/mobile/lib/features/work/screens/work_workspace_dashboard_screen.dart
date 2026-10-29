@@ -6649,12 +6649,20 @@ Iterable<MoolAssistantNativeAdapter> _productNativeAdapters(BuildContext hostCon
   final uri = router.state.uri, page = router.state.pageKey;
   bool routeCurrent() => mounted && hostContext.mounted && identical(widget.session, source) &&
     router.state.uri == uri && router.state.pageKey == page;
+  if (source.workspaceProductPreviewConnectionConfigured) {
+    yield _StoreOriginalProductPreviewAdapter(
+      nativeRoute: ModalRoute.of(hostContext), navigator: Navigator.of(hostContext, rootNavigator: true),
+      readSnapshot: (ctx, entity) async => (await _originalProductPreviewSnapshots(hostContext, source, ctx, [entity], routeCurrent)).entries[entity],
+      readSnapshots: (ctx, entities) => _originalProductPreviewSnapshots(hostContext, source, ctx, entities, routeCurrent),
+      open: (proposal, current, changes) => _openOriginalProductPreview(hostContext, source, proposal, current, changes, routeCurrent));
+  } else {
   yield _StorePublishedProductAssistantAdapter(
     nativeRoute: ModalRoute.of(hostContext), navigator: Navigator.of(hostContext, rootNavigator: true),
     readSnapshot: (ctx, entity) => _publishedProductSnapshot(hostContext, source, ctx, entity, routeCurrent),
     readNativeIdentity: (proposal, current) => _productAssistantNativeIdentity(hostContext, source, proposal, current),
     readSnapshots: (ctx, entities) => _productAssistantNativeBatch(hostContext, source, 'AI-ACT-230', ctx, entities, routeCurrent: routeCurrent),
     open: (proposal, current, changes) => _openPublishedProduct(hostContext, source, proposal, current, changes, routeCurrent));
+  }
   for (final action in StoreProductNativeInitial.actions) {
     final read = (MoolAssistantContext ctx, String? entity) =>
       _productNativeSnapshot(hostContext, source, action, ctx, entity, routeCurrent);
@@ -7084,6 +7092,79 @@ Future<MoolAssistantReviewResult> _openProductOriginal(BuildContext host,WorkSes
 // ACT230 reads the authentic published listing. Unpublished drafts have no
 // accepted preview service and must never use SavedStoreProductCustomerPreview.
 bool _publishedProductAssistantOpen = false;
+Future<MoolAssistantNativeBatchSnapshot> _originalProductPreviewSnapshots(BuildContext host, WorkSession source,
+    MoolAssistantContext ctx, List<String?> entities, bool Function() routeCurrent) async {
+  bool actor() => mounted && host.mounted && routeCurrent() && identical(source, session) && _financePermitted(ctx) &&
+    _financeAssistantContext(host)?.binding == ctx.binding && source.workspaceProductPreviewConnectionConfigured &&
+    !_productEditorOpen(source) && !_financeSheetOpen && !_couponsSheetOpen;
+  final empty = MoolAssistantNativeBatchSnapshot(owner: source, sourceRevision: 'unavailable:original-preview-v1',
+    entries: const {}, current: () => false);
+  if (!actor()) return empty;
+  try {
+    final frame = await source.readWorkspaceProductPreviewSources(current: actor);
+    if (frame == null || !frame.current() || !actor()) return empty;
+    final rows = <String?, MoolAssistantNativeSnapshot?>{};
+    for (final entity in entities) {
+      final copies = frame.references.where((copy) => copy.skuId == entity && copy.channels.isNotEmpty).toList(growable: false);
+      rows[entity] = entity == null || copies.isEmpty ? null : MoolAssistantNativeSnapshot(binding: ctx.binding,
+        entityId: entity, permitted: true, sourceRevision: 'native-original-preview:' +
+          assistant_hash.sha256.convert(utf8.encode(jsonEncode(copies.map((copy) => copy.toJson()).toList(growable: false)))).toString());
+    }
+    return MoolAssistantNativeBatchSnapshot(owner: source, sourceRevision: 'native-original-preview:${frame.signature}',
+      entries: rows, current: () => actor() && frame.current());
+  } on Object {return empty;}
+}
+Future<MoolAssistantReviewResult> _openOriginalProductPreview(BuildContext host, WorkSession source,
+    MoolAssistantProposal proposal, bool Function() requestCurrent, Listenable? ownerChanges, bool Function() routeCurrent) async {
+  if (_publishedProductAssistantOpen || !requestCurrent()) return MoolAssistantReviewResult.unavailable;
+  final ctx = _financeAssistantContext(host), ref = proposal.fields['previewRef'];
+  if (ctx == null || ctx.binding != proposal.binding || ref is! Map || ref['skuId'] != proposal.entityId) return MoolAssistantReviewResult.stale;
+  final gateway = source.catalogueGateway, navigation = source.navigationScopeRevision, owner = source.publicationPreferencesContext;
+  final store = source.activeWorkspace?.id, actor = widget.accountIdentity;
+  var handedOff = false;
+  bool current() => mounted && host.mounted && (handedOff || routeCurrent() && requestCurrent()) && identical(source, session) &&
+    identical(actor, widget.accountIdentity) && identical(source.catalogueGateway, gateway) && source.activeWorkspace?.id == store &&
+    source.navigationScopeRevision == navigation && source.publicationPreferencesContext == owner && _financePermitted(ctx) &&
+    _financeAssistantContext(host)?.binding == ctx.binding;
+  if (!current() || gateway is! AuthenticatedWorkspaceCatalogueGateway || proposal.entityId == null) return MoolAssistantReviewResult.stale;
+  _publishedProductAssistantOpen = true;
+  try {
+    final snapshot = await _originalProductPreviewSnapshots(host, source, ctx, [proposal.entityId], routeCurrent);
+    if (!current() || !snapshot.current() || snapshot.entries[proposal.entityId]?.sourceRevision != proposal.sourceRevision) return MoolAssistantReviewResult.stale;
+    final frame = await source.readWorkspaceProductPreviewSources(current: current);
+    if (!current() || frame == null || !frame.current()) return MoolAssistantReviewResult.stale;
+    final selected = frame.references.where((copy) => copy.skuId == proposal.entityId && copy.wireKind == ref['kind'] &&
+      copy.revision == ref['revision'] && copy.fingerprint == ref['fingerprint'] && copy.channels.contains(ref['channel'])).singleOrNull;
+    if (selected == null) return MoolAssistantReviewResult.stale;
+    final captured = await source.readWorkspaceProductPreviewOriginal(proposal.entityId!, selected.kind,
+      expected: selected, current: () => current() && frame.current());
+    if (!current() || captured == null || !captured.current()) return MoolAssistantReviewResult.stale;
+    final channel = BuyV2OfferClass.values.where((value) => value.name == ref['channel']).singleOrNull;
+    if (channel == null) return MoolAssistantReviewResult.unavailable;
+    if (selected.kind == WorkspaceProductOriginalKind.catalogueSku && selected.publicListingRequested == true) {
+      final entry = await source.readWorkspacePublishedProductPreview(captured.original, channel,
+        current: () => current() && captured.current());
+      if (!current() || !captured.current()) return MoolAssistantReviewResult.stale;
+      if (entry == null) return MoolAssistantReviewResult.unavailable;
+      final router = GoRouter.of(host);
+      await router.push<void>(Uri(path: '/app/buy', queryParameters: {
+        'sub': (channel == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale).name,
+        'view': 'product', 'workspaceProduct': selected.skuId, 'product': entry.product.id, 'return': router.state.uri.toString(),
+      }).toString());
+    } else {
+      final presentation = captured.original.presentation(storeName: source.activeWorkspace!.name, channel: channel);
+      // Transfer the read-only snapshot lifetime to its native owner. Covering
+      // the assistant route is expected; account, Store, source and expiry guards remain.
+      handedOff = true;
+      await Navigator.of(host, rootNavigator: true).push<void>(MaterialPageRoute(builder: (_) =>
+        OwnedStoreProductCustomerPreview.original(work: source, presentation: presentation,
+          sourceCurrent: () => current() && captured.current())));
+    }
+    return MoolAssistantReviewResult.opened;
+  } on Object {return current() ? MoolAssistantReviewResult.unavailable : MoolAssistantReviewResult.stale;}
+  finally {_publishedProductAssistantOpen = false;}
+}
+
 Future<MoolAssistantNativeSnapshot?> _publishedProductSnapshot(BuildContext host, WorkSession source,
     MoolAssistantContext ctx, String? entity, bool Function() routeCurrent,
     {WorkspaceCatalogueItem? capturedProduct, String? sharedSignature}) async {
@@ -32686,6 +32767,11 @@ class _WorkspaceCatalogueSurfaceState
       if (!current()) return 'Your store changed. Import the file again.';
       if (!mounted) return null;
       var savedCount = 0;
+      WorkspaceProductDraftBatchSyncResult? productSync;
+      Future<void> syncPrivateCopies(List<WorkspaceCatalogueItem> products) async {
+        if (widget.session.gateway is ReviewWorkGateway) return;
+        productSync = await widget.session.syncWorkspaceSavedProductDrafts(products.map((product) => product.id), current: current);
+      }
       Map<String, String>? attemptedReview, attemptedStock;
       onReviewShown?.call();
       final saved = await Navigator.of(context).push<bool>(
@@ -32845,11 +32931,11 @@ class _WorkspaceCatalogueSurfaceState
                   )) {
                     return 'The reviewed products changed. Keep this review open and check the unsaved Store stock.';
                   }
-                  return await widget.session.retryWorkspaceInventorySave() &&
-                          current()
-                      ? null
-                      : widget.session.workspaceInventoryError ??
-                            'Stock was not saved. Retry.';
+                  if (!await widget.session.retryWorkspaceInventorySave() || !current()) {
+                    return widget.session.workspaceInventoryError ?? 'Stock was not saved. Retry.';
+                  }
+                  await syncPrivateCopies(products);
+                  return null;
                 }
               }
               // Recheck against live inventory: it may have changed while reviewing.
@@ -32874,7 +32960,7 @@ class _WorkspaceCatalogueSurfaceState
               if (!widget.session.importWorkspaceProducts(
                 products.map((p) => p.copyWith(publicListing: false)).toList(),
                 addOnly: true,
-                stockEntryMethod: csvOnly ? WorkspaceStockEntryMethod.csv : null,
+                stockEntryMethod: fileName.toLowerCase().endsWith('.csv') ? WorkspaceStockEntryMethod.csv : null,
                 variantFamilyFingerprints: review.variantFamilyFingerprints,
               )) {
                 return 'Goods receipt is being saved. Your reviewed products are kept; try again when it finishes.';
@@ -32894,6 +32980,7 @@ class _WorkspaceCatalogueSurfaceState
                 return widget.session.workspaceInventoryError ??
                     'Stock was not saved. Keep this review open and retry.';
               }
+              await syncPrivateCopies(products);
               // Original Save may already be committed. A retired AI review
               // must report its changed owner rather than pop another route.
               if (reviewCurrent != null && !current()) {
@@ -32915,7 +33002,12 @@ class _WorkspaceCatalogueSurfaceState
       }
       setState(() {});
       onSaved?.call();
-      return '$savedCount products saved to Store stock. Nothing was published.';
+      final sync = productSync;
+      final synced = sync?.states.values.where((state) => state == WorkspaceProductDraftWriteState.saved).length ?? 0;
+      final syncNote = sync == null ? '' : !sync.available ? ' Customer preview sync is unavailable right now.'
+        : synced == sync.requested.length ? ' Customer previews synced.'
+        : ' Customer previews: $synced synced, ${sync.requested.length - synced} need sync. Check product sync in the saved products.';
+      return '$savedCount products saved to Store stock. Nothing was published.$syncNote';
     } on FormatException catch (error) {
       return error.message;
     } catch (_) {
@@ -35706,28 +35798,33 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
 /// Authenticated private original, rendered by the existing public read-only
 /// product view. It never supplies a public listing or touches the real Cart.
 class OwnedStoreProductCustomerPreview extends StatefulWidget {
-  const OwnedStoreProductCustomerPreview({super.key, required this.work, required this.controller,
-    required this.presentation, required this.sourceCurrent});
+  OwnedStoreProductCustomerPreview({super.key, required this.work, required WorkspaceProductDraftController controller,
+    required WorkspaceProductDraftPresentation presentation, required this.sourceCurrent})
+    : controller = controller, presentation = WorkspaceProductOriginalPresentation.fromDraft(presentation.record,
+        controller.scope, storeName: presentation.product.seller, channel: presentation.product.offerClass!);
+  const OwnedStoreProductCustomerPreview.original({super.key, required this.work,
+    required this.presentation, required this.sourceCurrent}) : controller = null;
   final WorkSession work;
-  final WorkspaceProductDraftController controller;
-  final WorkspaceProductDraftPresentation presentation;
+  final WorkspaceProductDraftController? controller;
+  final WorkspaceProductOriginalPresentation presentation;
   final bool Function() sourceCurrent;
   @override State<OwnedStoreProductCustomerPreview> createState() => _OwnedStoreProductCustomerPreviewState();
 }
 class _OwnedStoreProductCustomerPreviewState extends State<OwnedStoreProductCustomerPreview> {
   late final Object _owner = widget.work.publicationPreferencesContext;
   late final int? _navigation = widget.work.navigationScopeRevision;
-  late final String _fingerprint = widget.presentation.record.fingerprint;
+  late final String _fingerprint = widget.presentation.fingerprint;
   Timer? _expiry;
   bool _retired = false;
   final _scroll = ScrollController();
   bool get _current {
     if (_retired) return false;
-    final valid = mounted && widget.sourceCurrent() && widget.controller.active && widget.controller.loaded && !widget.controller.busy &&
+    final valid = mounted && widget.sourceCurrent() &&
+      (widget.controller == null || widget.controller!.active && widget.controller!.loaded && !widget.controller!.busy &&
+        widget.controller!.pending == null && widget.controller!.record?.fingerprint == _fingerprint) &&
       widget.work.workspaceStoreAuthoringAvailable && widget.work.gateway is! ReviewWorkGateway &&
-      widget.controller.pending == null && widget.controller.record?.fingerprint == _fingerprint &&
       widget.work.publicationPreferencesContext == _owner && widget.work.navigationScopeRevision == _navigation &&
-      DateTime.now().toUtc().isBefore(widget.presentation.record.observedAt.add(const Duration(minutes: 5)));
+      DateTime.now().toUtc().isBefore(widget.presentation.observedAt.add(const Duration(minutes: 5)));
     if (!valid) _retired = true;
     return valid;
   }
@@ -35737,19 +35834,19 @@ class _OwnedStoreProductCustomerPreviewState extends State<OwnedStoreProductCust
   late final BuyV2Session _buy = BuyV2Session(core: _core, reviewDataEnabled: false,
     cataloguePageSource: _source, productContentAdapter: _source,
     marketplaceTrustAdapter: BuyV2CatalogueMarketplaceTrustAdapter(storeSource: (_) => null),
-    customerStateStore: _SavedProductPreviewStateStore('private-draft:${widget.controller.scope.account}:${widget.controller.scope.store}:${
-      widget.controller.scope.realm}:${widget.controller.scope.sku}:$_fingerprint', () => _current),
+    customerStateStore: _SavedProductPreviewStateStore('private-original:${widget.presentation.kind.name}:${widget.presentation.scope.account}:${widget.presentation.scope.store}:${
+      widget.presentation.scope.realm}:${widget.presentation.scope.sku}:$_fingerprint', () => _current),
     cartBenefitsAdapter: const BuyV2DisabledCartBenefitsAdapter(),
     orderResolutionAdapter: const BuyV2UnavailableOrderResolutionAdapter(),
     shoppingAlertsAdapter: const BuyV2UnavailableShoppingAlertsAdapter(), commerceAdapter: const BuyV2UnavailableCommerceAdapter());
   @override void initState() {
     super.initState(); _buy;
-    final remaining = widget.presentation.record.observedAt.add(const Duration(minutes: 5)).difference(DateTime.now().toUtc());
+    final remaining = widget.presentation.observedAt.add(const Duration(minutes: 5)).difference(DateTime.now().toUtc());
     _expiry = Timer(remaining.isNegative ? Duration.zero : remaining, () {if (mounted) setState(() {});});
   }
   @override void dispose() {_expiry?.cancel(); _scroll.dispose(); _buy.dispose(); _core.dispose(); super.dispose();}
   @override Widget build(BuildContext context) => Scaffold(body: SafeArea(child: AnimatedBuilder(
-    animation: Listenable.merge([widget.work, widget.controller]), builder: (context, _) {
+    animation: Listenable.merge([widget.work, if (widget.controller != null) widget.controller!]), builder: (context, _) {
       if (!_current) return Center(child: Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
         const Text('Close this preview and reopen the saved product to check its latest details.'),
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close preview'))])));
@@ -35762,9 +35859,9 @@ class _OwnedStoreProductCustomerPreviewState extends State<OwnedStoreProductCust
 }
 class _OwnedDraftProductSource implements BuyV2CataloguePageSource, BuyV2ProductContentAdapter {
   _OwnedDraftProductSource(this.presentation, this.current);
-  final WorkspaceProductDraftPresentation presentation;
+  final WorkspaceProductOriginalPresentation presentation;
   final bool Function() current;
-  String get _snapshot => 'private-original:${presentation.record.revision}:${presentation.record.fingerprint}';
+  String get _snapshot => 'private-original:${presentation.revision}:${presentation.fingerprint}';
   @override Future<List<BuyV2Product>> resolveProducts(Set<String> ids) async =>
     current() && ids.contains(presentation.product.id) ? [presentation.product] : [];
   @override Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(BuyV2CatalogueQuery query,
@@ -35774,7 +35871,7 @@ class _OwnedDraftProductSource implements BuyV2CataloguePageSource, BuyV2Product
     {String? cursor, required int pageSize}) async => BuyV2CataloguePage(queryKey: query.key, snapshotId: _snapshot, startIndex: 0, items: const []);
   @override BuyV2ProductContentSnapshot snapshotFor(BuyV2Product selected) => current() &&
       selected.id == presentation.product.id && selected.storeId == presentation.product.storeId &&
-      selected.offerClass == presentation.product.offerClass && selected.canonicalId.isEmpty && selected.publicListingIdentity == null
+      selected.offerClass == presentation.product.offerClass && selected.canonicalId == presentation.product.canonicalId && selected.publicListingIdentity == null
     ? presentation.content : BuyV2ProductContentSnapshot(productId: selected.id, state: BuyV2ProductContentState.unavailable,
       sourceId: _snapshot);
 }
@@ -36122,6 +36219,53 @@ class _StorePublishedProductAssistantAdapter implements MoolAssistantOwnerAwareN
       !const ['sourceCanonicalId','sourceSku','sourcePack'].every((key)=>fields[key] is String&&(fields[key]! as String).trim().isNotEmpty)||
       fields['sourceRetailEnabled'] is! bool||fields['sourceWholesaleEnabled'] is! bool)
       return 'Use the original SKU, pack and selling-channel references.';
+    return null;
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entity) => readSnapshot(ctx, entity);
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) => _open(proposal, isCurrent, null);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
+      {required bool Function() isCurrent, required Listenable ownerChanges}) => _open(proposal, isCurrent, ownerChanges);
+  Future<MoolAssistantReviewResult> _open(MoolAssistantProposal proposal, bool Function() current, Listenable? changes) async {
+    if (proposal.actionId != actionId || validateFields(proposal.fields) != null) return MoolAssistantReviewResult.unavailable;
+    var retired = false;
+    bool active() { if (!retired && (!current() || !_routeCurrent)) retired = true; return !retired; }
+    final lifetime = Listenable.merge([changes, nativeRoute?.secondaryAnimation, if (_assistantRoute is TransitionRoute<void>) (_assistantRoute as TransitionRoute<void>).secondaryAnimation]);
+    void changed() { active(); }
+    lifetime.addListener(changed);
+    try { return active() ? await open(proposal, active, lifetime) : MoolAssistantReviewResult.stale; }
+    finally { lifetime.removeListener(changed); }
+  }
+}
+
+class _StoreOriginalProductPreviewAdapter implements MoolAssistantOwnerAwareNativeAdapter, MoolAssistantRouteBoundNativeAdapter,
+    MoolAssistantBatchNativeAdapter {
+  _StoreOriginalProductPreviewAdapter({required this.readSnapshot, required this.open, required this.nativeRoute, required this.navigator,
+    required this.readSnapshots});
+  final Future<MoolAssistantNativeBatchSnapshot> Function(MoolAssistantContext, List<String?>) readSnapshots;
+  @override Future<MoolAssistantNativeBatchSnapshot> snapshots(MoolAssistantContext context, List<String?> entities) => readSnapshots(context, entities);
+  final ModalRoute<dynamic>? nativeRoute;
+  final NavigatorState navigator;
+  Route<void>? _assistantRoute;
+  bool _invalidRoute = false;
+  @override void bindAssistantRoute(Route<void> route, NavigatorState owner) {
+    if (!identical(owner, navigator) || _assistantRoute != null && !identical(_assistantRoute, route)) { _invalidRoute = true; return; }
+    _assistantRoute = route;
+  }
+  bool get _routeCurrent => !_invalidRoute && navigator.mounted && nativeRoute?.isActive == true &&
+    (nativeRoute!.isCurrent || _assistantRoute?.isCurrent == true && identical(_assistantRoute?.navigator, navigator));
+  @override String get actionId => 'AI-ACT-230';
+  final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
+  final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function(), Listenable?) open;
+  @override Set<String> get allowedFields => const {'previewRef'};
+  @override String? validateFields(Map<String, Object?> fields) {
+    final raw = fields['previewRef'];
+    if (fields.length != 1 || raw is! Map || raw.length != 5 ||
+        !const ['kind', 'skuId', 'revision', 'fingerprint', 'channel'].every(raw.containsKey) ||
+        !const {'catalogue-sku','submitted-original','saved-draft'}.contains(raw['kind']) ||
+        raw['skuId'] is! String || !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$').hasMatch(raw['skuId'] as String) ||
+        raw['revision'] is! int || (raw['revision'] as int) < 1 || (raw['revision'] as int) > 1000000000 ||
+        raw['fingerprint'] is! String || !RegExp(r'^[A-F0-9]{64}$').hasMatch(raw['fingerprint'] as String) ||
+        !const {'retail','wholesale','bulk'}.contains(raw['channel'])) return 'Choose the saved product copy and selling channel.';
     return null;
   }
   @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx, String? entity) => readSnapshot(ctx, entity);
@@ -37180,6 +37324,45 @@ void _startNativeReview() {
       ])));
     if (channel == null || !mounted || !_reviewEditorCurrent || _hasUnsavedEdits ||
         !identical(widget.session.workspaceCatalogueItems.where((item) => item.id == saved.id).firstOrNull, saved)) { return; }
+    if (widget.session.gateway is! ReviewWorkGateway && widget.session.workspaceProductPreviewConnectionConfigured) {
+      bool current() => mounted && _reviewEditorCurrent && !_hasUnsavedEdits && !_savingInventory &&
+        identical(widget.session.workspaceCatalogueItems.where((item) => item.id == saved.id).firstOrNull, saved);
+      final kind = channel == BuyV2Destination.shop ? BuyV2OfferClass.retail
+        : saved.wholesaleOffer?.saleType == BuyV2WholesaleSaleType.bulk ? BuyV2OfferClass.bulk : BuyV2OfferClass.wholesale;
+      final frame = await widget.session.readWorkspaceProductPreviewSources(current: current);
+      if (!current() || frame == null || !frame.current()) return;
+      final copies = frame.references.where((row) => row.skuId == saved.id && row.channels.contains(kind.name)).toList(growable: false);
+      if (copies.isEmpty) {
+        widget.session.showError('No saved copy is available for this channel.'); return;
+      }
+      final selected = copies.length == 1 ? copies.single : await showModalBottomSheet<WorkspaceProductPreviewReference>(
+        context: context, builder: (sheet) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          for (final copy in copies) ListTile(title: Text(switch (copy.kind) {
+            WorkspaceProductOriginalKind.savedDraft => 'Saved draft',
+            WorkspaceProductOriginalKind.submittedOriginal => 'Submitted copy',
+            WorkspaceProductOriginalKind.catalogueSku => 'Verified product copy',
+          }), subtitle: Text([copy.title, copy.pack].where((value) => value.isNotEmpty).join(' · ')),
+            onTap: () => Navigator.pop(sheet, copy)),
+        ])));
+      if (selected == null || !current() || !frame.current()) return;
+      final original = await widget.session.readWorkspaceProductPreviewOriginal(saved.id, selected.kind,
+        expected: selected, current: () => current() && frame.current());
+      if (original == null || !original.current() || !current()) return;
+      if (selected.kind == WorkspaceProductOriginalKind.catalogueSku && selected.publicListingRequested == true) {
+        final entry = await widget.session.readWorkspacePublishedProductPreview(original.original, kind,
+          current: () => current() && original.current());
+        if (!current() || !original.current()) return;
+        if (entry == null) {widget.session.showError('The customer listing could not be verified. Try again later.'); return;}
+        final router = GoRouter.of(context);
+        await router.push<void>(Uri(path: '/app/buy', queryParameters: {'sub': channel.name, 'view': 'product',
+          'workspaceProduct': saved.id, 'product': entry.product.id, 'return': router.state.uri.toString()}).toString());
+        return;
+      }
+      final presentation = original.original.presentation(storeName: widget.session.activeWorkspace!.name, channel: kind);
+      await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => OwnedStoreProductCustomerPreview.original(
+        work: widget.session, presentation: presentation, sourceCurrent: original.current)));
+      return;
+    }
     if (widget.session.gateway is! ReviewWorkGateway) {
       final kind = channel == BuyV2Destination.shop ? BuyV2OfferClass.retail
         : saved.wholesaleOffer?.saleType == BuyV2WholesaleSaleType.bulk ? BuyV2OfferClass.bulk : BuyV2OfferClass.wholesale;
@@ -37195,6 +37378,8 @@ void _startNativeReview() {
     }
     await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => SavedStoreProductCustomerPreview(
       work: widget.session, saved: saved, channel: channel)));
+    } catch (_) {
+      if (mounted && _reviewEditorCurrent) widget.session.showError('This product copy could not be verified. Reopen preview to try again.');
     } finally {if (mounted) setState(() => _openingCustomerPreview = false);}
   }
 

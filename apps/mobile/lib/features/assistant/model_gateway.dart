@@ -75,6 +75,7 @@ class AssistantModelInput {
     this.nativeTargets,
     this.nativeTargetMask,
     this.nativeOriginalCaptures,
+    this.nativeProductPreviewVersion,
   });
   final AssistantModelScope scope;
   final String requestId, message, language, expectedEntitlementRevision;
@@ -85,23 +86,35 @@ class AssistantModelInput {
   final List<AssistantNativeTargetHint>? nativeTargets;
   final AssistantNativeTargetMask? nativeTargetMask;
   final List<AssistantNativeOriginalCapture>? nativeOriginalCaptures;
+  final int? nativeProductPreviewVersion;
   AssistantModelInput withCatalogueListingIds(List<String>? ids) => AssistantModelInput(
     scope: scope, requestId: requestId, requestRevision: requestRevision, message: message, language: language,
     expectedEntitlementRevision: expectedEntitlementRevision, actionId: actionId, entityId: entityId, history: history,
-    catalogueListingIds: ids == null ? null : assistantCatalogueListingSelection(ids), nativeTargets: nativeTargets, nativeTargetMask: nativeTargetMask,nativeOriginalCaptures:nativeOriginalCaptures);
+    catalogueListingIds: ids == null ? null : assistantCatalogueListingSelection(ids), nativeTargets: nativeTargets, nativeTargetMask: nativeTargetMask,nativeOriginalCaptures:nativeOriginalCaptures, nativeProductPreviewVersion:nativeProductPreviewVersion);
   AssistantModelInput withNativeTargets(List<AssistantNativeTargetHint>? targets) => AssistantModelInput(
     scope: scope, requestId: requestId, requestRevision: requestRevision, message: message, language: language,
     expectedEntitlementRevision: expectedEntitlementRevision, actionId: actionId, entityId: entityId, history: history,
-    catalogueListingIds: catalogueListingIds, nativeTargets: targets == null ? null : assistantNativeTargetSelection(targets), nativeTargetMask: nativeTargetMask,nativeOriginalCaptures:nativeOriginalCaptures);
+    catalogueListingIds: catalogueListingIds, nativeTargets: targets == null ? null : assistantNativeTargetSelection(targets), nativeTargetMask: nativeTargetMask,nativeOriginalCaptures:nativeOriginalCaptures, nativeProductPreviewVersion:nativeProductPreviewVersion);
   AssistantModelInput withNativeTargetMask(AssistantNativeTargetMask? mask) => AssistantModelInput(
     scope: scope, requestId: requestId, requestRevision: requestRevision, message: message, language: language,
     expectedEntitlementRevision: expectedEntitlementRevision, actionId: actionId, entityId: entityId, history: history,
-    catalogueListingIds: catalogueListingIds, nativeTargets: nativeTargets, nativeTargetMask: mask,nativeOriginalCaptures:nativeOriginalCaptures);
+    catalogueListingIds: catalogueListingIds, nativeTargets: nativeTargets, nativeTargetMask: mask,nativeOriginalCaptures:nativeOriginalCaptures, nativeProductPreviewVersion:nativeProductPreviewVersion);
   AssistantModelInput withNativeOriginalCaptures(List<AssistantNativeOriginalCapture>? captures)=>AssistantModelInput(
     scope:scope,requestId:requestId,requestRevision:requestRevision,message:message,language:language,
     expectedEntitlementRevision:expectedEntitlementRevision,actionId:actionId,entityId:entityId,history:history,
     catalogueListingIds:catalogueListingIds,nativeTargets:nativeTargets,nativeTargetMask:nativeTargetMask,
-    nativeOriginalCaptures:captures==null?null:assistantNativeOriginalCaptureSelection(captures));
+    nativeOriginalCaptures:captures==null?null:assistantNativeOriginalCaptureSelection(captures), nativeProductPreviewVersion:nativeProductPreviewVersion);
+  AssistantModelInput withProductPreviewVersion(int? version) {
+    if (version != null && (version != 1 || scope.audience != 'workspace')) throw const AssistantModelFailure('invalid_request');
+    return AssistantModelInput(scope:scope,requestId:requestId,requestRevision:requestRevision,message:message,language:language,
+      expectedEntitlementRevision:expectedEntitlementRevision,actionId:actionId,entityId:entityId,history:history,
+      catalogueListingIds:catalogueListingIds,nativeTargets:nativeTargets,nativeTargetMask:nativeTargetMask,
+      nativeOriginalCaptures:nativeOriginalCaptures,nativeProductPreviewVersion:version);
+  }
+  int _previewVersion() {
+    if (nativeProductPreviewVersion != 1 || scope.audience != 'workspace') throw const AssistantModelFailure('invalid_request');
+    return 1;
+  }
   List<Map<String,String>> _originalCaptureJson() {
     if(scope.audience!='workspace')throw const AssistantModelFailure('invalid_request');
     return assistantNativeOriginalCaptureSelection(nativeOriginalCaptures!).map((v)=>{'actionId':v.actionId,'digest':v.digest}).toList(growable:false);
@@ -125,6 +138,7 @@ class AssistantModelInput {
       .map((value) => {'actionId': value.actionId, 'entityId': value.entityId}).toList(growable: false),
     if (nativeTargetMask != null) 'nativeTargetMask': _maskJson(),
     if (nativeOriginalCaptures != null) 'nativeOriginalCaptures': _originalCaptureJson(),
+    if (nativeProductPreviewVersion != null) 'nativeProductPreviewVersion': _previewVersion(),
   };
 }
 
