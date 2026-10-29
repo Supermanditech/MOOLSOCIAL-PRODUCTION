@@ -603,6 +603,35 @@ foreach($row in @(@(0,3),@(1,6),@(2,1),@(3,0))) {
  Check (@(Get-AiDomainExpiredPriceStageOwners $row[0] $expiredPriceSeal).Count -eq $row[1]) "expired-price checkpoint exact stage $($row[0]) owner count"
 }
 
+$originalCatalogueSeal=$approval.aggregate02OriginalCatalogueCheckpoint
+Check (Test-AiDomainOriginalCatalogueCheckpoint $originalCatalogueSeal) 'exact qualified original-catalogue checkpoint'
+Check (@(Get-AiDomainOriginalCatalogueSealOwners).Count -eq 3) 'only three existing metadata owners for original-catalogue seal'
+foreach($property in @('sequence','baseline','namedBranchPushAuthorized','productionAcceptance')) {
+ $bad=($originalCatalogueSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'namedBranchPushAuthorized'){$false}elseif($property -eq 'productionAcceptance'){$true}else{'foreign'}
+ Check (!(Test-AiDomainOriginalCatalogueCheckpoint $bad)) "reject changed original-catalogue seal $property"
+}
+foreach($property in @('path','bytes','sha256','gitBlobOid')) {
+ $bad=($originalCatalogueSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.manifest.owners[0].$property=if($property -eq 'bytes'){1}else{'foreign'}
+ Check (!(Test-AiDomainOriginalCatalogueCheckpoint $bad)) "reject changed original-catalogue qualified source $property"
+}
+$bad=($originalCatalogueSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('backend/functions/src/foreign.ts')
+Check (!(Test-AiDomainOriginalCatalogueCheckpoint $bad)) 'reject original-catalogue source expansion'
+foreach($property in @('wholeScopeClosed','founderApprovalClaimed','productionAcceptance','liveEffect','apkBuiltOrInstalled')) {
+ $bad=($originalCatalogueSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainOriginalCatalogueCheckpoint $bad)) "reject expanded original-catalogue qualification $property"
+}
+$bad=($originalCatalogueSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.disposition.oppo.populatedAuthenticatedCatalogueOrPrivatePreviewJourneyQualified=$true
+Check (!(Test-AiDomainOriginalCatalogueCheckpoint $bad)) 'reject fabricated original-catalogue device execution'
+foreach($property in @('path','sha256')) {
+ $bad=($originalCatalogueSeal|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.evidence[0].$property='foreign'
+ Check (!(Test-AiDomainOriginalCatalogueCheckpoint $bad)) "reject changed original-catalogue evidence $property"
+}
+foreach($row in @(@(0,3),@(1,15),@(2,1),@(3,0))) {
+ Check (@(Get-AiDomainOriginalCatalogueStageOwners $row[0] $originalCatalogueSeal).Count -eq $row[1]) "original-catalogue checkpoint exact stage $($row[0]) owner count"
+}
+
 $aggregateTwoSourceAdmission=$approval.aggregate02SourceAdmission
 Check (Test-AiDomainAggregateTwoSourceAdmission $aggregateTwoSourceAdmission) 'exact original catalogue and owned-draft source admission'
 Check (@($aggregateTwoSourceAdmission.additionalOwners).Count -eq 7) 'only seven necessary additional runtime/test owners'

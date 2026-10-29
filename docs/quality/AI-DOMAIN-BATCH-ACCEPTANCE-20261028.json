@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 30,
+  "localMetadataCommits": 31,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -7325,5 +7325,424 @@
     "mediaActivation": false,
     "apk": false,
     "policyDevelopment": false
+  },
+  "aggregate02OriginalCatalogueCheckpoint": {
+    "sequence": "02-original-catalogue-private-save-slice",
+    "baseline": "0a253b32e4980e9c68bde1a133f61c7c5168ba02",
+    "manifest": {
+      "scope": "02-original-catalogue-private-save-slice",
+      "baseline": "0a253b32e4980e9c68bde1a133f61c7c5168ba02",
+      "branch": "work/codex-backend/ai-domain-batch-20261028",
+      "changedOwners": [
+        "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+        "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+        "apps/mobile/test/store_add_product_sheet_test.dart",
+        "apps/mobile/test/work_saved_product_draft_test.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "backend/functions/src/assistant/domain_context.ts",
+        "backend/functions/src/assistant/domain_context_contract.ts",
+        "backend/functions/src/index.ts",
+        "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+        "backend/functions/src/workspace/workspace_catalogue_service.ts"
+      ],
+      "owners": [
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.ts",
+          "bytes": 10550,
+          "sha256": "8CF56C6FC8024943211D9D25BB00FD2B79E55FD42E2A3710AE53E4BF3E31F5E6",
+          "gitBlobOid": "ed97a952052c4573ec02bfc4790af66ba30254b6"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.test.ts",
+          "bytes": 9403,
+          "sha256": "037EF49FA3023ED49BE24A12FD7D2781D50E4191190F50A8E2B77AC743A458A3",
+          "gitBlobOid": "36ab089807fd52246e1b0b125b1f875b371a1a91"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.ts",
+          "bytes": 214544,
+          "sha256": "461ADC41163945E579A8AAA66D0BF95D4A8D1DECACA3451B046225605B0C3A3A",
+          "gitBlobOid": "b912f596c782a38b21c0facf15848819c558c313"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.test.ts",
+          "bytes": 78634,
+          "sha256": "DDE6F1856B797EAAB1C7B0573088A712383D3262CE8A651A5EF6780C0FA7BE21",
+          "gitBlobOid": "36b70180c3fd0ff6bf412c2bb4771598065892e6"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.ts",
+          "bytes": 3284,
+          "sha256": "8ACC97FD4E10A2C4DDBDF42515402ABE9BEC4BEEC53AC155C90BAB35C86EAF71",
+          "gitBlobOid": "4da7bbec53ad915bdd6569fd6e1f033361aec0b6"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.test.ts",
+          "bytes": 5373,
+          "sha256": "CD77B75EF8E7EE01980DB7CC200233944C5CA60C88A454BF7F4E4B4242A25598",
+          "gitBlobOid": "aaec24000807da73e92fa7563fefa7a897ccfd57"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_integration.test.ts",
+          "bytes": 107464,
+          "sha256": "B37BC1A8388E3AE6E1D806E7EAE9D757F6345BA399C51EF0DB1F62325450033B",
+          "gitBlobOid": "262b4365bf2d211e5d7cf3aaab476b3373dd7c93"
+        },
+        {
+          "path": "backend/functions/src/index.ts",
+          "bytes": 154254,
+          "sha256": "5A6AA7C6CA2CA6BAB402B6807EABB400ABA065FD53EBE7B5F2B7C38CAB43AB3C",
+          "gitBlobOid": "3520b5dd46347129418347df4e38a2c37cbbe98c"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+          "bytes": 17488,
+          "sha256": "10A8DF9065678FFAA04182521353C0CBA509841598833849B6A3A8338AF5BFAC",
+          "gitBlobOid": "34f506f330eee8711b9063b2436e20a68d29c32e"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/profile_context.dart",
+          "bytes": 18268,
+          "sha256": "2A2902F853D5FB6AA693D79F3FBA3FD7412B4A49D1D30490EE7F69E0855472A6",
+          "gitBlobOid": "6da659d0791dbe402cae8f083b8fce83fd8be21e"
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+          "bytes": 91081,
+          "sha256": "F8ABB359ADF4714C9DD330AD17D34DAD5D441D6763D2902B9F0A177F5E4DD6A8",
+          "gitBlobOid": "0a1b8f3f814fbf517e8cd43e9b29563acdd99215"
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+          "bytes": 79399,
+          "sha256": "2570BB48BDFA8F9E9EA0D61348A0F1B3CD778105565FB8784C6FE156F5928342",
+          "gitBlobOid": "624089b250cb5cee594dbc7377302ed72ab6ecf3"
+        },
+        {
+          "path": "apps/mobile/lib/app/moolsocial_app.dart",
+          "bytes": 24302,
+          "sha256": "82EEADE801CB2A7C04AF8C95819FA6EC30B138357753F426EB95741EDA101FD6",
+          "gitBlobOid": "48928f20d1f30bfe9c417c037e3a13d334806a7d"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+          "bytes": 23682,
+          "sha256": "4DEDA735C5EDD84D830155B31F5E9E133E143EC5D897E820B46478DA3034C3B3",
+          "gitBlobOid": "6ef85365af9ee52511d3f8f32822957493897b56"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "bytes": 1286333,
+          "sha256": "9A3D5F14C5DE7BAC9853FCB847B6B41172E9406ED5B51786CB312B7F60C23F47",
+          "gitBlobOid": "9cc105b977dceccf75b1653744bcd31db33869cc"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+          "bytes": 208676,
+          "sha256": "5D3AAF88764035306EA953C003A3E8FD9CF97AD368C9F759ABB81F81FDEB5C89",
+          "gitBlobOid": "4bcecc4240109fd15eb3792e83a8b42bd44d75f8"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+          "bytes": 2961623,
+          "sha256": "3B88E8A7C47E2B3F576E48A6754D528AA275394CE42B9ACEE8B4A1F1133F8F1E",
+          "gitBlobOid": "3365bb2ccfb13bc0543f60df5dcfb698a2e4d3ef"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+          "bytes": 50608,
+          "sha256": "58111F2356B142CD3C056AC03EE7D355CFC153BCD83A87BE9402CA204785BB37",
+          "gitBlobOid": "38068fd59ecb4ddb12c96007106b9f30aab16b28"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_guard_test.dart",
+          "bytes": 23093,
+          "sha256": "07FF247E0BD3D5723684EB9D2D964256FF412E8485563F2E86CC93B08018882A",
+          "gitBlobOid": "ba6eefe5ce1cd7ca1e4a258da52129ccd3cdb0bf"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_integration_test.dart",
+          "bytes": 28689,
+          "sha256": "62622ECDD2943569A447BBF67A97112238815D82D26A8D6BA41884F0D5BE1542",
+          "gitBlobOid": "ab63ef38408936a2af290c3aebc9e71d53fcb7da"
+        },
+        {
+          "path": "apps/mobile/test/assistant_profile_context_test.dart",
+          "bytes": 42768,
+          "sha256": "1ECF64F5F5616593D77A9F08056780AF1D2A9A4AFDFD1C9A4456E628E843FD8E",
+          "gitBlobOid": "c92a9cfd087af7007bcfdf64330dd2b586ab3f42"
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_flow_test.dart",
+          "bytes": 21891,
+          "sha256": "B28A93CB0D149BDE6D5F9626FB16A1735CAAFA7A92A85FCF54D2D95ED71DD045",
+          "gitBlobOid": "f10032c3246ec403981fa5e08caa9b406de4ba29"
+        },
+        {
+          "path": "apps/mobile/test/mool_assistant_test.dart",
+          "bytes": 209745,
+          "sha256": "243464A4A4BC28DF08880001EB54DD1305F4AB363359A7589AFF1292641A5F8B",
+          "gitBlobOid": "047997523bc4f1b5d1eb29be01791301ed527980"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.ts",
+          "bytes": 12353,
+          "sha256": "BB9C8812CC5C082A61F98A5F9F3083D147358A411028E027E14EDE2DE17A2473",
+          "gitBlobOid": "93a2fd5beec230a123d81fbc5348b940847e140c"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.test.ts",
+          "bytes": 7425,
+          "sha256": "9CC5DA02340D57584370E237D16A4C33D0977F8E69BA7BB5B4EA1FC2DAE7EBDF",
+          "gitBlobOid": "de5b8a64e908a1c706f5c71dfb000813ef266c48"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.ts",
+          "bytes": 28854,
+          "sha256": "685E39A82CEC5542B11B47B107E8C23013E02D13C82DA762EF6F50B6E5DA2F6A",
+          "gitBlobOid": "3f1ca53f82966c2fad745004bc94bda949015a1f"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.test.ts",
+          "bytes": 37545,
+          "sha256": "CFE0386B8FFB2072089381FA5EF5AFD0933516C21B228CD35B172C3069F10F97",
+          "gitBlobOid": "cf09fe0a6095a6bb17cd2477dd39db97c1179fbf"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/model_gateway.dart",
+          "bytes": 22299,
+          "sha256": "877B55A27C6C1D8886EC5CA630BFC00AED2F0F1A5E6DD86431A8ABCF11CDB2C5",
+          "gitBlobOid": "ed9e3f1aa2522bd888d2223022d9716996440b25"
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_gateway_test.dart",
+          "bytes": 15042,
+          "sha256": "1ADB4083861EEBEA9334E4949806067ADAA14EA3357AB95DBE02B4AE373EFFFB",
+          "gitBlobOid": "7c237c56100dc191e0d9431ee8bd8660c444a5ec"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+          "bytes": 105705,
+          "sha256": "8D1928EF537F55B9E3645A6D039F2ECDB2F01FC9A6DB4D2416CAF872934C7435",
+          "gitBlobOid": "079662fdd40a32059a0ea01cfe6355dc1ceb4130"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+          "bytes": 559819,
+          "sha256": "BEB9709A22BC1673B43ED0CEA9BF12B8003E218BC1C53730A2609C569F41755A",
+          "gitBlobOid": "6729fbed7391e67c7cf23d7f7097e47591cb724d"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_session.dart",
+          "bytes": 835211,
+          "sha256": "222FD025037C3276D6087F65065FD13AB52B8174907C7FC57E7241C8F66B8B6F",
+          "gitBlobOid": "74e4b0574d4d3d52bf23c8099e855b485ec99437"
+        },
+        {
+          "path": "apps/mobile/test/work_workspace_layout_safety_test.dart",
+          "bytes": 4515301,
+          "sha256": "D288D23BA58CE9BF152FFD587A70A660A92F178E3A38A2EC9AF3D72FA4B37031",
+          "gitBlobOid": "59a62061832a27f56d445a1bbefcb05fe7f93ca2"
+        },
+        {
+          "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "bytes": 875192,
+          "sha256": "57368C6E8B9E715CA3FA3383AE487FAE01F4113597695F0BD2F7BFC9E0AEAE18",
+          "gitBlobOid": "73c8a55421143413b70b9c6a827d34fc87eb7df0"
+        },
+        {
+          "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "bytes": 950105,
+          "sha256": "A8FBA26E9357025C951F6CF5904EA8F671AF5D2C19B8BE16F89DE323C1D90567",
+          "gitBlobOid": "00a2a79d20ba56c4d016af575c53aed838e7ab9d"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_catalogue_service.ts",
+          "bytes": 369633,
+          "sha256": "E84BFD13613BB0A6FB83867AEEF9BB4B5ADEF616DD9F387A3DD1B265459F22C7",
+          "gitBlobOid": "87621a6f1e1b59df0f2d7bb92dc22fdae2d46321"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+          "bytes": 470993,
+          "sha256": "2F3DE65C637924D41E61DFCBFCFE80CFE619E4D379AFA5EF229D5D3A2C4E564C",
+          "gitBlobOid": "669285b47db8e627379c23b78584a328abd2ed5e"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_services.dart",
+          "bytes": 407623,
+          "sha256": "E32FF809AAADBF66394561C724BC59A0631BF9F5EDE33D4A299D672060E1B862",
+          "gitBlobOid": "73f9fd84320b5ff1c04c9d7bdc92c225780d3aa1"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+          "bytes": 130055,
+          "sha256": "84BE1755B4E2A2BCE00B31B4EE7B39E70A67A0CB73D2CA577DF41E76AAB785B3",
+          "gitBlobOid": "9f1c8ca8e01404bd9247d845ff0ef0cfa121e26e"
+        },
+        {
+          "path": "apps/mobile/test/work_catalogue_gateway_test.dart",
+          "bytes": 1212240,
+          "sha256": "D47442FFD100048BFA85FB01B2F92168A2F230958DCF2366A23EB72FC19F4D6A",
+          "gitBlobOid": "19da0eefa892b15793fb58e9c0d153d396e66342"
+        },
+        {
+          "path": "apps/mobile/test/store_add_product_sheet_test.dart",
+          "bytes": 15577,
+          "sha256": "68B2513FCC87FD68E70939D657701898AC95C1793440B19CB553858F4FD370DE",
+          "gitBlobOid": "89bd95cf1cbe62396c14bb2086c35c55d52bd386"
+        },
+        {
+          "path": "apps/mobile/test/work_saved_product_draft_test.dart",
+          "bytes": 19312,
+          "sha256": "FC540BC8F029C89A305E4A62A85C59F4C4E2A9F6A1940C2DF59A984D960B3EA8",
+          "gitBlobOid": "36ff0c091a3950f1a85d495a8dff93bf95bbd729"
+        }
+      ]
+    },
+    "disposition": {
+      "wholeScopeClosed": false,
+      "founderApprovalClaimed": false,
+      "productionAcceptance": false,
+      "liveEffect": false,
+      "apkBuiltOrInstalled": false,
+      "implemented": [
+        "Immutable reviewed master-source hydration and query/code paging",
+        "Separate owner-private Save/read/list/reconcile and encrypted pending journal",
+        "Native catalogue descriptive prefill and conservative complete unique-match Review",
+        "Private saved-draft common customer renderer with no commerce side effects",
+        "229/369 original search/capture preparation with paid approved Store fences",
+        "Realm validation before repository access and original native private numeric bounds"
+      ],
+      "backend": {
+        "compile": "agg02-master-tsc-v11.log",
+        "regression": {
+          "log": "agg02-backend-regression-v2.log",
+          "passed": 376,
+          "failed": 0,
+          "skipped": 33
+        },
+        "actualRepository": {
+          "log": "agg02-master-emulator-v8/tests.log",
+          "passed": 12,
+          "failed": 0,
+          "skipped": 0,
+          "testData": "isolated volatile local host fixtures"
+        }
+      },
+      "mobile": {
+        "shared": {
+          "log": "agg02-gateway-regression-v3.jsonl",
+          "passed": 1184,
+          "skipped": 269,
+          "failed": 0
+        },
+        "native": {
+          "log": "agg02-native-regression-v2.jsonl",
+          "passed": 26,
+          "skipped": 94,
+          "failed": 0
+        },
+        "focused": {
+          "log": "agg02-master-mobile-tests-v3.jsonl",
+          "passed": 24,
+          "skipped": 0,
+          "failed": 0
+        },
+        "analysis": {
+          "path": "agg02-mobile-analysis-v5.log",
+          "errors": 0,
+          "warnings": 0,
+          "informational": 358
+        }
+      },
+      "oppo": {
+        "attempt": "oppo-agg02-source-v1",
+        "runtimeOwnersMatched": 16,
+        "savedDataFingerprintsUnchanged": 108,
+        "reachableScreens": [
+          "Protected labelled demo Cart recovery",
+          "Signed-out Profile",
+          "Security",
+          "Android Back to original Cart recovery"
+        ],
+        "runtimeAttachRestartInspectPassed": true,
+        "populatedAuthenticatedCatalogueOrPrivatePreviewJourneyQualified": false,
+        "demonstratedSharedAccessibilityDefect": "Exported Profile Close target overlaps content; centre tap opened Security. Recorded, not fixed or counted as Close success. No unadmitted Profile source changes."
+      },
+      "remaining": [
+        "AI230 explicit typed choice/readback for verified-unlisted StoreSku, submitted original and private saved draft; legacy published route preserved",
+        "CSV final-save private-sync reconciliation and original form/source parity",
+        "Authenticated populated OPPO source/model qualification unavailable; no phone data/provider injection",
+        "Aggregate01 remaining joins and aggregates03-10 remain open"
+      ],
+      "limits": "No full aggregate closure, production acceptance, live agent execution or founder approval. Payment/Google activation/model/media/voice/OCR/admin/APK/live transactions/publication remain deferred."
+    },
+    "evidence": [
+      {
+        "path": "AGG02-CONTRACT-v1.md",
+        "sha256": "20255A681EAF84BFF86D404E847DB013DF8D9DDF48DC1E39D6713BAFC0D750CA"
+      },
+      {
+        "path": "AGG02-SOURCE-AUDIT-v1.json",
+        "sha256": "DDD8231683F1A32B7821E5AA295BA6CF04A783847805A8090D56ECF1C1EEE199"
+      },
+      {
+        "path": "agg02-master-tsc-v11.log",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      {
+        "path": "agg02-backend-regression-v2.log",
+        "sha256": "7A573889098CF6C02FFA8B79CF7D2BD97A166CC26ADD4D96D35D0DA5A3E1B5D0"
+      },
+      {
+        "path": "agg02-master-emulator-v8/tests.log",
+        "sha256": "980EE30F8CE413DFA9DB84656C00453279AF47C37A52AEBA04BF579C979FC53D"
+      },
+      {
+        "path": "agg02-master-emulator-v8/RESULT.json",
+        "sha256": "D113FAC5C626245EDFF27418EF35B8D66DC3D31A6A062E9368CD2B8750BDC554"
+      },
+      {
+        "path": "agg02-master-emulator-v8/STOPPED.json",
+        "sha256": "F5AE09D7E5F8701E000CC4EF3EC2148375FDCBA53F0C1BD593CA5AA09A64746D"
+      },
+      {
+        "path": "agg02-gateway-regression-v3.jsonl",
+        "sha256": "1F330C7FC29E6EE3CE6D278C5ECD8DF0AE8E431E66FEF1EE0A23BBB3A73A461B"
+      },
+      {
+        "path": "agg02-native-regression-v2.jsonl",
+        "sha256": "C77CA9A3D7F3523EB95597A90B4BF08603CDBB2115C868484B3A48EAEEA55F35"
+      },
+      {
+        "path": "agg02-mobile-analysis-v5.log",
+        "sha256": "6280A3AC5E40DDF1DB18EE3D7B372A281B31584DDD5269E2427B9F9AB76259B8"
+      },
+      {
+        "path": "oppo-agg02-source-v1/VM-SOURCE-VERIFICATION.json",
+        "sha256": "F1FB7B650D91B845BC10BCC7A155E048BE1DA0BA89BA7C3423B3CBBEA47E60E1"
+      },
+      {
+        "path": "oppo-agg02-source-v1/PRESERVATION.json",
+        "sha256": "A74739C2AD3A6BE03A3E0A3F761227FADD400A2C3EF785683525526261150A4F"
+      },
+      {
+        "path": "oppo-agg02-source-v1/INSPECTION-ASSESSMENT.json",
+        "sha256": "52A45E26F48D371EE9A056B5AA2205049B4A6FD8557F53FF886F80431B9F25E8"
+      },
+      {
+        "path": "oppo-agg02-source-v1/runtime-inspection-gate.log",
+        "sha256": "C14F952554EF7947B02922A9C32C3A2E7723A7F684DFE3A664BF7601F196D59F"
+      }
+    ],
+    "namedBranchPushAuthorized": true,
+    "productionAcceptance": false,
+    "sourceCommit": null
   }
 }
