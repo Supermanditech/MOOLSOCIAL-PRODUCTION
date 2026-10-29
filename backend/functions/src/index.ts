@@ -168,6 +168,8 @@ import {
 import {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, WorkspaceBulkQuoteService,
   bulkSupplierQuoteOperation, requireDefaultPurchaseTenant}
   from "./workspace/workspace_purchase_projection_service.js";
+import {WorkspacePurchaseEntryService, purchaseEntryOperation} from './workspace/workspace_purchase_entry_service.js';
+import {FirestorePurchaseEntryRepository} from './workspace/workspace_purchase_entry_repository.js';
 
 const youtubeServerApiKey = defineSecret("YOUTUBE_SERVER_API_KEY");
 const youtubeOauthClientId = defineSecret("YOUTUBE_OAUTH_CLIENT_ID");
@@ -2627,6 +2629,7 @@ function assistantOriginalContextSource(projectId: string) {
   const storeProducts=original&&catalogue?new OriginalStoreProductPreparationContext({
     projectId,authority:original,catalogue:workspaceCatalogueService()}):undefined;
   const couponRealm=process.env.MOOLSOCIAL_CATALOGUE_REALM;
+  const purchaseEntryRealm = process.env.MOOLSOCIAL_PURCHASE_REALM;
   const reportPublic=process.env.MOOLSOCIAL_PRODUCT_PRESENTATIONS_V1==='true'||process.env.MOOLSOCIAL_STORE_PRESENTATIONS_V1==='true',
     reportJourney=process.env.MOOLSOCIAL_CART_ADDITIONS_V1==='true'||process.env.MOOLSOCIAL_CHECKOUT_ENTRIES_V1==='true';
   return new CompositePreparationContext({
@@ -2635,6 +2638,8 @@ function assistantOriginalContextSource(projectId: string) {
     nativeSupplierFormsEnabled: profile && catalogue,
     nativePurchaseFormsEnabled: profile && catalogue,
     ...(original ? {original} : {}),
+    ...(original && (purchaseEntryRealm === 'evaluation' || purchaseEntryRealm === 'production') ? {
+      supplierOriginal: {realm: purchaseEntryRealm, source: {read: (actor, body) => workspacePurchaseEntryService().read(actor, body)}}} : {}),
     ...(original&&catalogue&&(couponRealm==='evaluation'||couponRealm==='production')&&
       process.env.MOOLSOCIAL_PURCHASE_REALM===couponRealm&&process.env.MOOLSOCIAL_BULK_SUPPLIER_QUOTES_V1==='true'?{
       retainedQuotes:{realm:couponRealm,source:{read:(userId,body)=>workspaceBulkQuoteService().read(userId,body)}}}:{}),
@@ -3182,6 +3187,7 @@ export const moolSocialWorkspace = onRequest(
       const bulkQuoteAction = bulkSupplierQuoteOperation(operation);
       const bulkQuoteOperation = bulkQuoteAction !== undefined;
       const storeProcurementRead = operation === 'readStoreProcurementCatalogue';
+      const purchaseEntryAction = purchaseEntryOperation(operation);
       if (storeProcurementRead && process.env.MOOLSOCIAL_STORE_PROCUREMENT_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Store purchasing is not connected.', 503);
       }
@@ -3234,7 +3240,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "finishRetailerSetup" ||
         operation === "setRetailerAvailability" ||
         operation === "saveRetailerProduct" ||
-        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation ||
+        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation || purchaseEntryAction === 'saveSupplier' || purchaseEntryAction === 'savePurchaseDraft' ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || privateProductDraftOperation === 'save' || stockOperation === "save" || stockVisibilityOperation === "save" || stockVisibilityOperation === "close" || catalogueProductionAction !== undefined ||
         ['request', 'offer', 'accept', 'withdraw'].includes(bulkQuoteAction ?? '') ||
@@ -3275,7 +3281,7 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation) || purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
+            if (["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation) || purchaseEntryAction !== undefined || purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;
@@ -3307,7 +3313,9 @@ export const moolSocialWorkspace = onRequest(
         });
         return;
       }
-      const result = catalogueProductionAction !== undefined
+      const result = purchaseEntryAction !== undefined
+        ? await workspacePurchaseEntryService().handle({uid: ownerUserId, projectId: publicAuthProjectId()}, operation, catalogueBody)
+        : catalogueProductionAction !== undefined
         ? await workspaceCatalogueService().handleCatalogueProduction(ownerUserId, operation, catalogueBody)
         : storeProcurementRead
         ? await workspaceCatalogueService().readStoreProcurement(ownerUserId, catalogueBody)
@@ -3509,6 +3517,17 @@ function workspacePurchaseProjectionService(): WorkspacePurchaseProjectionServic
   }
   // Read-only HTTP consumer. No upstream placement source or create route here.
   return new WorkspacePurchaseProjectionService(getFirestore(), realm);
+}
+
+function workspacePurchaseEntryService(): WorkspacePurchaseEntryService {
+  const realm = process.env.MOOLSOCIAL_PURCHASE_REALM;
+  if (realm !== 'evaluation' && realm !== 'production') {
+    throw new WorkspaceProfileError('service_unavailable', 'The original purchase source is unavailable. Saved records are kept.', 503);
+  }
+  // B03's concrete transaction-bound membership reader is still absent. The
+  // repository deliberately refuses private IO without it; approved application
+  // status, paid entitlement and caller echoes cannot substitute for membership.
+  return new WorkspacePurchaseEntryService(new FirestorePurchaseEntryRepository(getFirestore(), realm, publicAuthProjectId()));
 }
 
 function workspacePromotionService(): WorkspacePromotionService {

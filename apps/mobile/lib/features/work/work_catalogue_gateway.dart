@@ -11,6 +11,7 @@ import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_publication_data.dart';
+import 'work_purchase_entry_gateway.dart';
 import 'work_models.dart' show WorkspaceVariantFamily, WorkspaceVariantMembership, WorkspaceCatalogueItem,
   WorkspaceProductCompliance,
   WorkspaceSavedInventory, WorkspaceStockMode,
@@ -5638,6 +5639,8 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.productDraftSupported = false,
     this.masterCatalogueSupported = false,
     this.productPreviewSupported = false,
+    this.purchaseEntrySupported = false,
+    this.purchaseDraftSupported = false,
     this.productMediaSupported = false,
     WorkspaceProductMediaUploadTransport? productMediaTransport,
     this.reviewedProductSubmissionSupported = false,
@@ -5722,6 +5725,9 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool masterCatalogueSupported;
   @override
   final bool productPreviewSupported;
+  /// Explicit original private-book contract, not a Store/membership grant.
+  final bool purchaseEntrySupported;
+  final bool purchaseDraftSupported;
   @override
   final bool productMediaSupported;
   final WorkspaceProductMediaUploadTransport? _productMediaTransportOverride;
@@ -5817,6 +5823,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       productDraftSupported: productDraftSupported,
       masterCatalogueSupported: masterCatalogueSupported,
       productPreviewSupported: productPreviewSupported,
+      purchaseEntrySupported: purchaseEntrySupported,
+      purchaseDraftSupported: purchaseDraftSupported,
       productMediaSupported: productMediaSupported,
       productMediaTransport: _productMediaTransportOverride,
       reviewedProductSubmissionSupported: reviewedProductSubmissionSupported,
@@ -5937,6 +5945,19 @@ class AuthenticatedWorkspaceCatalogueGateway
     final envelope = _map(jsonDecode(response!.body)); _keys(envelope, ['ok', 'data']);
     if (envelope['ok'] != true) throw const FormatException();
     return WorkspaceMasterCataloguePage.decode(envelope['data'], scope, now(), search: search, code: code, pageSize: pageSize);
+  }
+
+  WorkspacePurchaseEntryRemoteSource? originalPurchaseEntrySource({
+    required String accountId, required String storeId, required bool Function() current,
+  }) {
+    _id(accountId); _id(storeId);
+    if (!purchaseEntrySupported || procurementContext != null || _publicRestockCatalogue || !current()) return null;
+    final owner = forOwnerAccount(accountId);
+    bool active() => current() && owner.purchaseEntrySupported && owner.ownerAccountId == accountId &&
+      owner._procurementScopeCurrent;
+    return WorkspacePurchaseEntryRemoteSource(scope: (account: accountId, store: storeId, realm: realm),
+      connectionId: _bulkHash([endpoint.toString(), realm, accountId, storeId]),
+      request: owner._ownerRequest, current: active, purchaseDraftSupported: owner.purchaseDraftSupported, now: owner.now);
   }
 
   bool _productPreviewOwner(WorkspaceMasterCatalogueScope scope, bool Function() current) => current() &&

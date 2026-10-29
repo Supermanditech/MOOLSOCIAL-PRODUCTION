@@ -10,6 +10,7 @@ import {FirestorePromotionRepository,WorkspacePromotionService} from '../workspa
 import {initializeApp, deleteApp} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
 import {randomUUID} from 'node:crypto';
+import {WorkspacePurchaseEntryService, type PurchaseEntryBook} from '../workspace/workspace_purchase_entry_service.js';
 import {writeFileSync} from 'node:fs';
 import {isAbsolute} from 'node:path';
 import {WorkspaceBulkQuoteService, WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService,type TrustedPlacementReceipt, type TrustedOperationalOrderEvidence, type PurchaseReference,type ProductFeedbackTarget} from '../workspace/workspace_purchase_projection_service.js';
@@ -49,6 +50,53 @@ function supplierDraftFixture() {
     paid: (value: boolean) => {paid = value;}, approved: (value: boolean) => {approved = value;},
     member: (value: boolean) => {member = value;}, bump: () => {version++;}, advance: () => {clock = new Date(clock.getTime() + 60_001);}};
 }
+
+function supplierOriginalFixture() {
+  const authority = supplierDraftFixture(), storeId = authority.input.scope.storeId;
+  let reads = 0, writes = 0;
+  let current: PurchaseEntryBook | null = {version: 1, account: actor.uid, store: storeId, qa: false, revision: 4,
+    draft: null, profiles: [{id: 'HOST-owned-supplier', name: 'HOST મૂળ સપ્લાયર', phone: '', address: 'HOST source address',
+      gstin: '', source: 'manual', createdAt: '2026-10-27T00:00:00.123456Z', updatedAt: '2026-10-27T00:00:00.123456Z'}]};
+  const original = new WorkspacePurchaseEntryService({projectId: actor.projectId, realm: 'evaluation',
+    async read(who, scope) {reads++; assert.equal(who.uid, actor.uid); assert.equal(scope.store, storeId); return structuredClone(current);},
+    async saveSupplier() {writes++; throw Error('No Save during AI preparation');},
+    async status() {writes++; throw Error('No recovery writes during AI preparation');}}, () => at);
+  const source = new CompositePreparationContext({original: authority.original,
+    supplierOriginal: {realm: 'evaluation', source: original}, now: () => at});
+  return {authority, source, input: {...authority.input, actionId: 'AI-ACT-237', entityId: 'HOST-owned-supplier'},
+    counts: () => ({reads, writes}), book: () => current!, change: (book: PurchaseEntryBook | null) => {current = book;}};
+}
+
+test('AGG03 supplier edit prepares only original owned contact fields and rechecks current source before Review', async () => {
+  const f = supplierOriginalFixture(), context = await f.source.read(actor, f.input), tool = context.tools[0]!;
+  assert.equal(tool.entityId, f.input.entityId); assert.equal(tool.sourceRevision, 'supplier-directory:4');
+  assertStrictSchema(tool.parameters);
+  const target = tool.resolveTarget!({apply: ['phone'], name: '', phone: '+91 (98765) 43210', address: '', gstin: ''});
+  assert.deepEqual(target.fields, {phone: '+91 (98765) 43210'});
+  assert.equal(tool.validate({id: 'HOST-replacement'}), false); assert.equal(tool.validate({name: ''}), false);
+  const proposal = {kind: 'proposal' as const, id: 'HOST-supplier-edit-proposal', title: 'Review supplier changes', summary: 'HOST isolated original contact edits',
+    actionId: tool.actionId, entityId: target.entityId, sourceRevision: target.sourceRevision, fields: target.fields};
+  await f.source.readPrepared(actor, f.input, proposal);
+  assert.equal(f.counts().writes, 0);
+  f.change({...f.book(), revision: 5});
+  await assert.rejects(f.source.readPrepared(actor, f.input, proposal), /stale_preparation/u);
+  assert.equal(f.counts().writes, 0);
+});
+
+test('AGG03 supplier edit rejects unknown originals foreign source scope and unapproved unpaid access', async () => {
+  for (const fault of ['missing', 'unknown', 'foreign', 'qa', 'pending', 'revoked', 'unpaid']) {
+    const f = supplierOriginalFixture();
+    if (fault === 'missing') f.change(null);
+    if (fault === 'foreign') f.change({...f.book(), store: 'HOST-other-store'});
+    if (fault === 'qa') f.change({...f.book(), qa: true});
+    if (fault === 'pending') f.authority.approved(false);
+    if (fault === 'revoked') f.authority.member(false);
+    if (fault === 'unpaid') f.authority.paid(false);
+    await assert.rejects(f.source.read(actor, {...f.input, entityId: fault === 'unknown' ? 'HOST-invented' : f.input.entityId}));
+    if (['pending', 'revoked', 'unpaid'].includes(fault)) assert.equal(f.counts().reads, 0);
+    assert.equal(f.counts().writes, 0);
+  }
+});
 
 // Original owner-checked public-details service, isolated repository ports only.
 function storeDetailsFixture(){

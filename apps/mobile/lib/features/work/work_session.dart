@@ -11,6 +11,7 @@ import '../buy/buy_v2_models.dart' show BuyV2Product, BuyV2OfferClass, buyV2Whol
 import 'work_models.dart';
 import 'work_publication.dart';
 import 'work_services.dart';
+import 'work_purchase_entry_gateway.dart' show WorkspaceSupplierSaveIntent, WorkspacePurchaseDraftSaveIntent;
 import 'work_customer_feedback.dart';
 import 'work_catalogue_gateway.dart';
 import 'work_supplier_policy.dart';
@@ -2788,7 +2789,24 @@ class WorkSession extends ChangeNotifier {
         (purchaseEntryStore != null || _productionSession || localInventoryEnabled)
         ? (account, store, !_productionSession) : null;
   }
-  bool get workspaceSuppliersLoaded => _supplierDirectories.containsKey(_supplierKey);
+  bool get workspaceSuppliersLoaded {
+    if (!_supplierDirectories.containsKey(_supplierKey)) return false;
+    final source = _supplierStorage;
+    return source is! WorkPurchaseEntryCommandStore || source.sourceCurrent && source.originalScope == _supplierKey;
+  }
+  WorkPurchaseEntryCommandStore? get _currentSupplierCommand {
+    final source = _supplierStorage;
+    return source is WorkPurchaseEntryCommandStore && source.sourceCurrent && source.originalScope == _supplierKey ? source : null;
+  }
+  WorkspaceSupplierProfile? get workspacePendingSupplierProfile => _currentSupplierCommand?.pendingSupplierProfile;
+  int? get workspacePendingSupplierExpectedRevision => _currentSupplierCommand?.pendingSupplierExpectedRevision;
+  WorkspaceSupplierProfile? get workspaceRejectedSupplierProfile => _currentSupplierCommand?.lastRejectedSupplierProfile;
+  WorkPurchaseDraftCommandStore? get _currentPurchaseDraftCommand => switch (_currentSupplierCommand) {
+    final WorkPurchaseDraftCommandStore source => source, _ => null,
+  };
+  bool get workspacePurchaseEntryRemoteCapture => _currentPurchaseDraftCommand != null;
+  WorkspacePurchaseDraftSaveIntent? get workspacePendingPurchaseInput => _currentPurchaseDraftCommand?.pendingPurchaseInput;
+  WorkspacePurchaseDraftSaveIntent? get workspaceRejectedPurchaseInput => _currentPurchaseDraftCommand?.rejectedPurchaseInput;
   (String, String, bool)? get workspaceSupplierScope => _supplierKey;
   String newWorkspaceSupplierId() => _newCounterIdentity('local-supplier');
   String newWorkspacePurchaseDraftId() => _newCounterIdentity('manual-purchase-draft');
@@ -2808,6 +2826,10 @@ class WorkSession extends ChangeNotifier {
   Future<bool> loadWorkspaceSuppliers({bool retry = false}) {
     final key = _supplierKey;
     if (key == null) return Future.value(false);
+    if (_supplierStorage case final WorkPurchaseEntryCommandStore source when !source.sourceCurrent || source.originalScope != key) {
+      _supplierErrors[key] = 'The original purchase connection changed. Saved records are kept.';
+      return Future.value(false);
+    }
     if (_supplierLoads[key] != null) return _supplierLoads[key]!;
     if (workspaceSupplierSaving) return Future.value(false);
     if (!retry && !_supplierNeedsReload.contains(key) && _supplierDirectories.containsKey(key)) {
@@ -2817,6 +2839,12 @@ class WorkSession extends ChangeNotifier {
       try {
         final saved = await _supplierStorage.read(key.$1, key.$2, qa: key.$3);
         if (_supplierKey != key) return false;
+        if (saved != null && (saved.account != key.$1 || saved.store != key.$2 || saved.qa != key.$3)) {
+          throw const WorkGatewayException('Return to the original supplier list. Saved details are kept.');
+        }
+        if (_supplierStorage case final WorkPurchaseEntryCommandStore source when !source.sourceCurrent || source.originalScope != key) {
+          throw const WorkGatewayException('The original purchase connection changed.');
+        }
         _supplierDirectories[key] = saved;
         _updateRestockRecovery(_storeData, key);
         _supplierNeedsReload.remove(key);
@@ -2851,6 +2879,68 @@ class WorkSession extends ChangeNotifier {
     final old = _supplierDirectories[key];
     final profiles = old?.profiles ?? const <WorkspaceSupplierProfile>[];
     final existing = profiles.where((p) => p.id == profile.id).singleOrNull;
+
+    if (_supplierStorage case final WorkPurchaseEntryCommandStore source) {
+      bool rejectRemote(String message) {
+        _supplierValidationErrors[key] = message;
+        notifyListeners();
+        return false;
+      }
+      // A cached identical profile cannot bypass the original source check.
+      if (!source.sourceCurrent || source.originalScope != key) {
+        return rejectRemote('Supplier records changed. Reopen the supplier before saving.');
+      }
+      if (WorkspaceSupplierSaveIntent.validationError(profile) case final error?) return rejectRemote(error);
+      _supplierWrites.add(key);
+      _supplierErrors.remove(key);
+      _supplierValidationErrors.remove(key);
+      notifyListeners();
+      try {
+        final pending = source.pendingSupplierProfile;
+        final originalRetry = pending != null && source.pendingSupplierExpectedRevision == expectedRevision &&
+          jsonEncode(pending.toJson()) == jsonEncode(profile.toJson());
+        final result = old?.revision != expectedRevision && !originalRetry
+          ? await source.recoverSupplierProfile(profile, account: key.$1, store: key.$2, qa: key.$3, expectedRevision: expectedRevision)
+          : await source.saveSupplierProfile(profile, account: key.$1, store: key.$2, qa: key.$3, expectedRevision: expectedRevision);
+        if (_supplierKey != key || !source.sourceCurrent || source.originalScope != key) {
+          _supplierNeedsReload.add(key);
+          return false;
+        }
+        if (result == null) return rejectRemote('Supplier records changed. Reopen the supplier before saving.');
+        final confirmed = result.currentBook == null ? null : WorkspacePurchaseEntryBook.fromJson(result.currentBook!.toJson());
+        final resultRevision = result.resultRevision;
+        if (confirmed != null && (confirmed.account != key.$1 || confirmed.store != key.$2 || confirmed.qa != key.$3) ||
+            result.recorded && (confirmed == null || resultRevision == null || resultRevision < 1) ||
+            resultRevision != null && (confirmed == null || confirmed.revision < resultRevision) || result.operationKey.isEmpty ||
+            !const {'saved', 'not_saved'}.contains(result.status) ||
+            jsonEncode(result.originalProfile.toJson()) != jsonEncode(profile.toJson())) {
+          throw const WorkGatewayException('Recover the original supplier Save. Your details are kept.');
+        }
+        _supplierDirectories[key] = confirmed;
+        _supplierNeedsReload.remove(key);
+        if (!result.recorded) {
+          return rejectRemote(switch (result.reason) {
+            'duplicate_supplier' => 'These contact details belong to another supplier. Select the existing supplier or correct the details.',
+            'capacity_exceeded' => 'This supplier could not be added. Your details are kept; review the supplier list.',
+            _ => 'Supplier records changed. Reopen the supplier and review your details before saving.',
+          });
+        }
+        final current = confirmed!.profiles.where((item) => item.id == profile.id).singleOrNull;
+        if (current == null || jsonEncode(current.toJson()) != jsonEncode(profile.toJson())) {
+          return rejectRemote('The supplier Save is confirmed, but details changed again. Reopen the supplier.');
+        }
+        return true;
+      } on Object {
+        _supplierNeedsReload.add(key);
+        if (_supplierKey == key) {
+          _supplierErrors[key] = 'Supplier Save could not be confirmed. Recover the original Save; your details are kept.';
+        }
+        return false;
+      } finally {
+        _supplierWrites.remove(key);
+        if (_supplierKey == key) notifyListeners();
+      }
+    }
     if (existing != null && jsonEncode(existing.toJson()) == jsonEncode(profile.toJson())) {
       dismissWorkspacePurchaseValidation(key);
       return true;
@@ -2902,6 +2992,120 @@ class WorkSession extends ChangeNotifier {
       if (_supplierKey == key) notifyListeners();
     }
   }
+  /// Status only: never dispatches a Save, including for an older open editor.
+  Future<WorkPurchaseDraftSaveOutcome?> readWorkspacePurchaseAttempt(WorkspacePurchaseDraftSaveIntent original) async {
+    final scope = _supplierKey, source = _currentPurchaseDraftCommand;
+    if (scope == null || source == null || scope.$3 || source.originalScope != scope ||
+        original.scope.account != scope.$1 || original.scope.store != scope.$2 ||
+        workspaceSupplierSaving || _supplierLoads.containsKey(scope)) return null;
+    _supplierWrites.add(scope); _supplierErrors.remove(scope); notifyListeners();
+    try {
+      final result = await source.readPurchaseAttempt(original);
+      if (_supplierKey != scope || !source.sourceCurrent || source.originalScope != scope) {
+        _supplierNeedsReload.add(scope); return null;
+      }
+      if (result == null) {
+        _supplierErrors[scope] = 'The original save is not confirmed yet. Your entries are kept.';
+        return null;
+      }
+      final current = result.currentBook, revision = result.resultRevision;
+      if (result.original.idempotencyKey != original.idempotencyKey || result.original.fingerprint != original.fingerprint ||
+          !const {'saved', 'not_saved'}.contains(result.status) ||
+          current != null && (current.account != scope.$1 || current.store != scope.$2 || current.qa) ||
+          result.recorded && (current == null || revision == null || revision < 1) ||
+          revision != null && (current == null || current.revision < revision)) {
+        throw const WorkGatewayException('The original purchase result could not be verified.');
+      }
+      _supplierDirectories[scope] = current == null ? null : WorkspacePurchaseEntryBook.fromJson(current.toJson());
+      _supplierNeedsReload.remove(scope);
+      return result;
+    } on Object {
+      _supplierNeedsReload.add(scope);
+      if (_supplierKey == scope) _supplierErrors[scope] = 'Cannot check the original save. Your entries are kept; retry.';
+      return null;
+    } finally {
+      _supplierWrites.remove(scope); if (_supplierKey == scope) notifyListeners();
+    }
+  }
+  Future<bool> retryWorkspacePurchaseAttempt(WorkspacePurchaseDraftSaveIntent original) async {
+    final scope = _supplierKey;
+    if (scope == null || scope.$3 || original.scope.account != scope.$1 || original.scope.store != scope.$2) return false;
+    return _saveOriginalPurchaseData(original.profile, scope: scope, draft: original.draft,
+      expectedRevision: original.expectedRevision, reviewedCopy: original.reviewedCopy,
+      replaceReviewedDraftId: original.replaceReviewedDraftId, retainedAttempt: original);
+  }
+  Future<bool> _saveOriginalPurchaseData(WorkspaceSupplierProfile profile, {
+    required (String, String, bool) scope, required WorkspacePurchaseEntryDraft draft, required int? expectedRevision,
+    WorkspacePurchaseSavedCopy? reviewedCopy, String? replaceReviewedDraftId,
+    WorkspacePurchaseDraftSaveIntent? retainedAttempt,
+  }) async {
+    bool reject(String message) {
+      if (_supplierKey == scope) {_supplierValidationErrors[scope] = message; notifyListeners();}
+      return false;
+    }
+    if (WorkspacePurchaseDraftSaveIntent.validationError(profile, draft, reviewedCopy: reviewedCopy,
+        replaceReviewedDraftId: replaceReviewedDraftId) case final error?) return reject(error);
+    if (_supplierNeedsReload.contains(scope) && !await loadWorkspaceSuppliers(retry: true)) return false;
+    final source = _currentPurchaseDraftCommand;
+    if (_supplierKey != scope || source == null || !workspaceSuppliersLoaded || workspaceSupplierSaving || _supplierLoads.containsKey(scope)) {
+      return reject('Purchase saving is unavailable. Your entries are kept; reopen this Store.');
+    }
+    final pending = source.pendingPurchaseInput;
+    final originalRetry = pending != null && pending.expectedRevision == expectedRevision && pending.matchesInput(profile, draft,
+      reviewedCopy: reviewedCopy, replaceReviewedDraftId: replaceReviewedDraftId);
+    if (source.hasUnresolvedPurchaseSave && !originalRetry) return reject('Check the earlier save before changing purchase details. Your entries are kept.');
+    final old = _supplierDirectories[scope];
+    _supplierWrites.add(scope); _supplierErrors.remove(scope); _supplierValidationErrors.remove(scope); notifyListeners();
+    try {
+      final result = retainedAttempt != null ? await source.retryPurchaseAttempt(retainedAttempt)
+        : !source.purchaseDraftSaveAvailable || old?.revision != expectedRevision && !originalRetry
+        ? await source.recoverPurchaseDraft(profile, draft, account: scope.$1, store: scope.$2, qa: scope.$3,
+            expectedRevision: expectedRevision, reviewedCopy: reviewedCopy, replaceReviewedDraftId: replaceReviewedDraftId)
+        : await source.savePurchaseDraft(profile, draft, account: scope.$1, store: scope.$2, qa: scope.$3,
+            expectedRevision: expectedRevision, reviewedCopy: reviewedCopy, replaceReviewedDraftId: replaceReviewedDraftId);
+      if (_supplierKey != scope || !source.sourceCurrent || source.originalScope != scope) {
+        _supplierNeedsReload.add(scope); return false;
+      }
+      if (result == null) {
+        if (source.hasUnresolvedPurchaseSave) {
+          _supplierErrors[scope] = 'The original purchase save still needs checking. Your entries are kept.';
+          _supplierNeedsReload.add(scope); return false;
+        }
+        return reject(source.purchaseDraftSaveAvailable ? 'Purchase records changed. Reopen this bill before saving again.'
+          : 'Purchase saving is currently unavailable. Your entries are kept.');
+      }
+      final original = result.original, revision = result.resultRevision,
+        current = result.currentBook == null ? null : WorkspacePurchaseEntryBook.fromJson(result.currentBook!.toJson());
+      if (original.scope.account != scope.$1 || original.scope.store != scope.$2 || scope.$3 ||
+          !original.matchesInput(profile, draft, reviewedCopy: reviewedCopy, replaceReviewedDraftId: replaceReviewedDraftId) ||
+          current != null && (current.account != scope.$1 || current.store != scope.$2 || current.qa) ||
+          result.recorded && (current == null || revision == null || revision < 1) ||
+          revision != null && (current == null || current.revision < revision) ||
+          !const {'saved', 'not_saved'}.contains(result.status)) {
+        throw const WorkGatewayException('Recover the original purchase save. Your entries are kept.');
+      }
+      _supplierDirectories[scope] = current; _supplierNeedsReload.remove(scope);
+      if (!result.recorded) return reject(switch (result.reason) {
+        'duplicate_supplier' => 'These contact details belong to another supplier. Select the existing supplier.',
+        'duplicate_invoice' => 'This supplier bill is already saved for the same financial year. Open its saved copy or correct the bill details.',
+        'immutable_copy_conflict' => 'This saved copy has different details. Reopen Purchases; earlier copies are kept.',
+        'private_original_unavailable' => 'Original files cannot be saved yet. Your entries and files are kept.',
+        'incomplete_reviewed_copy' => 'Check the supplier, bill number/date and items before saving a purchase copy.',
+        'capacity_exceeded' => 'This bill is too large to save as one record. Your entries are kept.',
+        _ => 'Purchase records changed. Reopen this bill before saving again.',
+      });
+      final copyCurrent = reviewedCopy == null ? current!.draft != null && original.matchesDraft(current.draft!)
+        : current!.copies.any((copy) => copy.id == reviewedCopy.id && original.matchesReviewedCopy(copy));
+      if (!copyCurrent) return reject('The save is confirmed, but purchase details changed again. Reopen Purchases.');
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(scope);
+      if (_supplierKey == scope) _supplierErrors[scope] = 'Purchase save could not be confirmed. Recover the original save; your entries are kept.';
+      return false;
+    } finally {
+      _supplierWrites.remove(scope); if (_supplierKey == scope) notifyListeners();
+    }
+  }
   Future<bool> saveWorkspacePurchaseEntry(WorkspaceSupplierProfile profile, {
     required (String, String, bool) scope, required WorkspacePurchaseEntryDraft draft,
     required int? expectedRevision,
@@ -2912,6 +3116,10 @@ class WorkSession extends ChangeNotifier {
     if (key == null || key != scope || !workspaceSuppliersLoaded || workspaceSupplierSaving ||
         _supplierLoads.containsKey(key)) {
       return false;
+    }
+    if (_supplierStorage is WorkPurchaseEntryCommandStore) {
+      return _saveOriginalPurchaseData(profile, draft: draft, scope: scope, expectedRevision: expectedRevision,
+        reviewedCopy: reviewedCopy, replaceReviewedDraftId: replaceReviewedDraftId);
     }
     final old = _supplierDirectories[key];
     if (reviewedCopy != null) {
@@ -4730,7 +4938,9 @@ class WorkSession extends ChangeNotifier {
   Future<bool> get workspaceInventorySaved => _storeData.inventoryWrites;
   bool get workspaceGoodsReceiptBusy => _storeData.inventoryReceiptBusy;
   bool get workspaceGoodsReceiptRecoveryPending => _storeData.inventoryReceiptRecoveryPending || _storeData.inventoryRestockRecoveryPending;
-  bool get workspaceSupplierRecoveryRequired => _supplierKey != null && _supplierNeedsReload.contains(_supplierKey);
+  bool get workspaceSupplierRecoveryRequired => _supplierKey != null &&
+      (_supplierNeedsReload.contains(_supplierKey) || workspacePendingSupplierProfile != null ||
+        _currentPurchaseDraftCommand?.hasUnresolvedPurchaseSave == true);
   bool get workspaceGoodsReceiptCancellationAvailable => workspaceSupplierOpeningConfirmationAvailable &&
       _supplierStorage is WorkPurchaseReceiptReviewAbandonment;
   String newWorkspaceGoodsReceiptId() => _newCounterIdentity('supplier-arrival');

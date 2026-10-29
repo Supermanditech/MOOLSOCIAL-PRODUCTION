@@ -23,6 +23,7 @@ import '../buy/buy_session.dart';
 import '../buy/buy_v2_session.dart';
 import '../buy/buy_v2_saved_products_store.dart';
 import 'work_models.dart';
+import 'work_purchase_entry_gateway.dart';
 import 'work_document_preview.dart';
 import 'work_customer_feedback.dart';
 import 'work_catalogue_gateway.dart';
@@ -2143,6 +2144,174 @@ abstract interface class WorkPurchaseEntryStore {
   Future<void> save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision});
 }
 
+/// A remote original accepts explicit native intent, never a whole-book PUT.
+/// Its read method must not dispatch or retry a Save. Financial/Stock guards
+/// are separate interfaces and are not supplied by this command capability.
+abstract interface class WorkPurchaseEntryCommandStore implements WorkPurchaseEntryStore {
+  bool get sourceCurrent;
+  (String, String, bool) get originalScope;
+  WorkspaceSupplierProfile? get pendingSupplierProfile;
+  int? get pendingSupplierExpectedRevision;
+  WorkspaceSupplierProfile? get lastRejectedSupplierProfile;
+  Future<WorkSupplierProfileSaveOutcome?> recoverSupplierProfile(
+    WorkspaceSupplierProfile profile, {required String account, required String store,
+    required bool qa, required int? expectedRevision});
+  Future<WorkSupplierProfileSaveOutcome> saveSupplierProfile(
+    WorkspaceSupplierProfile profile, {required String account, required String store,
+    required bool qa, required int? expectedRevision});
+}
+abstract interface class WorkPurchaseDraftCommandStore implements WorkPurchaseEntryCommandStore {
+  bool get purchaseDraftSaveAvailable;
+  bool get hasUnresolvedPurchaseSave;
+  WorkspacePurchaseDraftSaveIntent? get pendingPurchaseInput;
+  WorkspacePurchaseDraftSaveIntent? get rejectedPurchaseInput;
+  Future<WorkPurchaseDraftSaveOutcome?> readPurchaseAttempt(WorkspacePurchaseDraftSaveIntent original);
+  Future<WorkPurchaseDraftSaveOutcome> retryPurchaseAttempt(WorkspacePurchaseDraftSaveIntent original);
+  Future<WorkPurchaseDraftSaveOutcome?> recoverPurchaseDraft(WorkspaceSupplierProfile profile, WorkspacePurchaseEntryDraft draft,
+    {required String account, required String store, required bool qa, required int? expectedRevision,
+    WorkspacePurchaseSavedCopy? reviewedCopy, String? replaceReviewedDraftId});
+  Future<WorkPurchaseDraftSaveOutcome> savePurchaseDraft(WorkspaceSupplierProfile profile, WorkspacePurchaseEntryDraft draft,
+    {required String account, required String store, required bool qa, required int? expectedRevision,
+    WorkspacePurchaseSavedCopy? reviewedCopy, String? replaceReviewedDraftId});
+}
+
+/// Local routing adoption only, never server permission or financial authority.
+/// The bind callback performs local metadata IO; no HTTP belongs in this lock.
+abstract interface class WorkPurchaseEntryOriginalAdoptionGuard {
+  Future<void> withPristineOriginalBinding(String account, String store, {
+    required bool qa, required Future<void> Function() bind,
+  });
+}
+
+class WorkSupplierProfileSaveOutcome {
+  const WorkSupplierProfileSaveOutcome({required this.currentBook, required this.status, required this.reason,
+    required this.originalProfile, required this.resultRevision, required this.operationKey});
+  final WorkspacePurchaseEntryBook? currentBook;
+  final WorkspaceSupplierProfile originalProfile;
+  final int? resultRevision;
+  final String status;
+  final String? reason;
+  bool get recorded => status == 'saved';
+  final String operationKey;
+}
+class WorkPurchaseDraftSaveOutcome extends WorkSupplierProfileSaveOutcome {
+  WorkPurchaseDraftSaveOutcome({required this.original, required super.currentBook, required super.status,
+    required super.reason, required super.resultRevision}) : super(originalProfile: original.profile, operationKey: original.idempotencyKey);
+  final WorkspacePurchaseDraftSaveIntent original;
+}
+
+/// The single original private-book adapter. It never writes the retained
+/// local book, infers a whole-book transition or implements financial guards.
+class RemoteWorkPurchaseEntryStore implements WorkPurchaseDraftCommandStore {
+  RemoteWorkPurchaseEntryStore._(this.controller);
+  final WorkspaceSupplierSaveController controller;
+  static Future<RemoteWorkPurchaseEntryStore> openOriginal({
+    required WorkspacePurchaseEntryRemoteSource source, required WorkPurchaseEntryStore retainedLocal,
+    required bool qa, FlutterSecureStorage? storage, String Function()? newKey,
+  }) async {
+    if (qa || !source.current || retainedLocal is WorkPurchaseEntryCommandStore ||
+        retainedLocal is! WorkPurchaseEntryOriginalAdoptionGuard) {
+      throw const WorkGatewayException('Use the original non-review purchase source. Saved records are kept.');
+    }
+    final journal = WorkspacePurchaseEntryJournal(scope: source.scope, connectionId: source.connectionId,
+      current: () => source.current, storage: storage);
+    // A changed connection is blocked before any new source read or adoption.
+    await journal.readPending();
+    final localGuard = retainedLocal as WorkPurchaseEntryOriginalAdoptionGuard;
+    await localGuard.withPristineOriginalBinding(source.scope.account, source.scope.store, qa: false, bind: () async {});
+    await source.readBook();
+    if (!source.current) throw const WorkGatewayException('The original purchase connection changed.');
+    // Recheck under the existing local queue after HTTP, then record the marker
+    // before any later local writer can pass its own original-source check.
+    await localGuard.withPristineOriginalBinding(source.scope.account, source.scope.store, qa: false, bind: () async {
+      if (!source.current) throw const WorkGatewayException('The original purchase connection changed.');
+      await journal.adoptConfirmedOriginal();
+      if (!source.current) throw const WorkGatewayException('The original purchase connection changed.');
+    });
+    final result = RemoteWorkPurchaseEntryStore._(WorkspaceSupplierSaveController(source: source, journal: journal, newKey: newKey));
+    await result.controller.readCurrent();
+    return result;
+  }
+  @override bool get sourceCurrent => controller.current;
+  @override (String, String, bool) get originalScope => (controller.source.scope.account, controller.source.scope.store, false);
+  @override WorkspaceSupplierProfile? get pendingSupplierProfile => controller.pending is WorkspaceSupplierSaveIntent ? controller.pending?.profile : null;
+  @override int? get pendingSupplierExpectedRevision => controller.pending is WorkspaceSupplierSaveIntent ? controller.pending?.expectedRevision : null;
+  @override WorkspaceSupplierProfile? get lastRejectedSupplierProfile => controller.lastResolution?.saved == false &&
+    controller.lastResolution?.original is WorkspaceSupplierSaveIntent ? controller.lastResolution?.original.profile : null;
+  @override bool get purchaseDraftSaveAvailable => sourceCurrent && controller.source.purchaseDraftSupported;
+  @override bool get hasUnresolvedPurchaseSave => controller.pending != null;
+  @override WorkspacePurchaseDraftSaveIntent? get pendingPurchaseInput => switch (controller.pending) {
+    final WorkspacePurchaseDraftSaveIntent original => original, _ => null,
+  };
+  @override WorkspacePurchaseDraftSaveIntent? get rejectedPurchaseInput => controller.lastResolution?.saved != false ? null :
+    switch (controller.lastResolution?.original) {final WorkspacePurchaseDraftSaveIntent original => original, _ => null};
+  void _check(String account, String store, bool qa) {
+    if (!sourceCurrent || qa || controller.source.scope.account != account || controller.source.scope.store != store) {
+      throw const WorkGatewayException('Return to the same original purchase source. Saved records are kept.');
+    }
+  }
+  WorkSupplierProfileSaveOutcome _confirmation(WorkspacePurchaseEntryReadback result) {
+    final receipt = result.receipt, book = result.book;
+    if (receipt == null || receipt.original is! WorkspaceSupplierSaveIntent || receipt.saved && book == null || !sourceCurrent) {
+      throw const WorkGatewayException('Recover the original supplier Save. Your details are kept.');
+    }
+    return WorkSupplierProfileSaveOutcome(currentBook: book, status: receipt.status, reason: receipt.reason,
+      originalProfile: receipt.profile, resultRevision: receipt.resultRevision, operationKey: receipt.original.idempotencyKey);
+  }
+  @override Future<WorkspacePurchaseEntryBook?> read(String account, String store, {required bool qa}) async {
+    _check(account, store, qa); final result = await controller.readCurrent(); _check(account, store, qa);
+    return result.book;
+  }
+  @override Future<void> save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision}) =>
+    Future.error(const WorkGatewayException('This purchase action needs its original confirmed command. Saved records are kept.'));
+  @override Future<WorkSupplierProfileSaveOutcome?> recoverSupplierProfile(WorkspaceSupplierProfile profile,
+    {required String account, required String store, required bool qa, required int? expectedRevision}) async {
+    _check(account, store, qa); final result = await controller.recoverOnly(profile, expectedRevision); _check(account, store, qa);
+    return result == null ? null : _confirmation(result);
+  }
+  @override Future<WorkSupplierProfileSaveOutcome> saveSupplierProfile(WorkspaceSupplierProfile profile,
+    {required String account, required String store, required bool qa, required int? expectedRevision}) async {
+    _check(account, store, qa); final result = await controller.save(profile, expectedRevision); _check(account, store, qa);
+    return _confirmation(result);
+  }
+  WorkPurchaseDraftSaveOutcome _purchaseConfirmation(WorkspacePurchaseEntryReadback result) {
+    final receipt = result.receipt, original = result.receipt?.original;
+    if (receipt == null || original is! WorkspacePurchaseDraftSaveIntent || receipt.saved && result.book == null || !sourceCurrent) {
+      throw const WorkGatewayException('Recover the original purchase save. Your details are kept.');
+    }
+    return WorkPurchaseDraftSaveOutcome(original: original, currentBook: result.book,
+      status: receipt.status, reason: receipt.reason, resultRevision: receipt.resultRevision);
+  }
+  @override Future<WorkPurchaseDraftSaveOutcome?> readPurchaseAttempt(WorkspacePurchaseDraftSaveIntent original) async {
+    _check(original.scope.account, original.scope.store, false);
+    final result = await controller.readRetainedAttempt(original);
+    _check(original.scope.account, original.scope.store, false);
+    return result.receipt == null ? null : _purchaseConfirmation(result);
+  }
+  @override Future<WorkPurchaseDraftSaveOutcome> retryPurchaseAttempt(WorkspacePurchaseDraftSaveIntent original) async {
+    _check(original.scope.account, original.scope.store, false);
+    final result = await controller.retryPurchaseDraft(original);
+    _check(original.scope.account, original.scope.store, false);
+    return _purchaseConfirmation(result);
+  }
+  @override Future<WorkPurchaseDraftSaveOutcome?> recoverPurchaseDraft(WorkspaceSupplierProfile profile, WorkspacePurchaseEntryDraft draft,
+    {required String account, required String store, required bool qa, required int? expectedRevision,
+    WorkspacePurchaseSavedCopy? reviewedCopy, String? replaceReviewedDraftId}) async {
+    _check(account, store, qa);
+    final result = await controller.recoverPurchaseDraft(profile, draft, expectedRevision: expectedRevision,
+      reviewedCopy: reviewedCopy, replaceReviewedDraftId: replaceReviewedDraftId);
+    _check(account, store, qa); return result == null ? null : _purchaseConfirmation(result);
+  }
+  @override Future<WorkPurchaseDraftSaveOutcome> savePurchaseDraft(WorkspaceSupplierProfile profile, WorkspacePurchaseEntryDraft draft,
+    {required String account, required String store, required bool qa, required int? expectedRevision,
+    WorkspacePurchaseSavedCopy? reviewedCopy, String? replaceReviewedDraftId}) async {
+    _check(account, store, qa);
+    final result = await controller.savePurchaseDraft(profile, draft, expectedRevision: expectedRevision,
+      reviewedCopy: reviewedCopy, replaceReviewedDraftId: replaceReviewedDraftId);
+    _check(account, store, qa); return _purchaseConfirmation(result);
+  }
+}
+
 /// Local confirmation must share the purchase writer's serialization boundary.
 /// Production needs equivalent authoritative transaction semantics, not this lock.
 abstract interface class WorkPurchaseEntryRevisionGuard {
@@ -2787,7 +2956,7 @@ class WorkPurchaseInvoiceSuggestions {
 /// Uses the existing encrypted, serialized, revision-checked checkpoint pattern.
 /// Contacts never share an inventory or financial-journal key.
 class SecureWorkPurchaseEntryStore
-    implements WorkPurchaseEntryStore, WorkPurchaseEntryRevisionGuard, WorkPurchaseReceiptReviewAbandonment,
+    implements WorkPurchaseEntryStore, WorkPurchaseEntryOriginalAdoptionGuard, WorkPurchaseEntryRevisionGuard, WorkPurchaseReceiptReviewAbandonment,
       WorkPurchaseBillGoodsReviewGuard, WorkPurchaseBillGoodsReviewAbandonment,
       WorkPurchaseGoodsReceiptReviewGuard, WorkPurchaseRestockArrivalGuard {
   SecureWorkPurchaseEntryStore({required this.accountScope, FlutterSecureStorage? storage})
@@ -2810,8 +2979,30 @@ class SecureWorkPurchaseEntryStore
     unawaited(tail.then((_) { if (identical(_tails[key], tail)) _tails.remove(key); }));
     return result;
   }
+  Future<void> _checkOriginalBinding(String account, String store, bool qa) async {
+    if (qa) return;
+    for (final realm in const ['evaluation', 'production']) {
+      final bound = await WorkspacePurchaseEntryJournal.hasOriginalBinding((account: account, store: store, realm: realm),
+        storage: _storage, current: () => accountScope() == account);
+      _check(account, store);
+      if (bound) throw const WorkGatewayException('The original purchase source is unavailable. Local records are kept; retry that source.');
+    }
+  }
+  @override
+  Future<void> withPristineOriginalBinding(String account, String store, {
+    required bool qa, required Future<void> Function() bind,
+  }) => _serial(_key(account, store, qa), () async {
+    _check(account, store);
+    if (qa) throw const WorkGatewayException('Review data cannot activate the original purchase source.');
+    final raw = await _storage.read(key: _key(account, store, qa));
+    _check(account, store);
+    if (raw != null) throw const WorkGatewayException('Existing purchase records need an explicit source migration. They have been kept.');
+    await bind();
+    _check(account, store);
+  });
   Future<WorkspacePurchaseEntryBook?> _read(String account, String store, bool qa) async {
     _check(account, store);
+    await _checkOriginalBinding(account, store, qa);
     final raw = await _storage.read(key: _key(account, store, qa));
     _check(account, store);
     if (raw == null) return null;

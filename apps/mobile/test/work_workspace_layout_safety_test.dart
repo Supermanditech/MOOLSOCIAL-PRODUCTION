@@ -58,6 +58,7 @@ import 'work_catalogue_gateway_test.dart' as catalogue_fixture;
 import 'work_order_identity_gateway_test.dart' as purchase_fixture;
 import 'ui_v2/buy/buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
+import 'package:moolsocial/features/work/work_purchase_entry_gateway.dart' show WorkspacePurchaseDraftSaveIntent;
 import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
 import 'package:moolsocial/features/work/widgets/workspace_purchase_originals.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart' show SocialContentResponse;
@@ -2508,6 +2509,95 @@ class _NativeScopeInventoryStore extends _ProductPrefillInventory {
   @override Future<WorkspaceSavedInventory?> read(String account, String store, {required bool qa}) {
     reads++;
     return super.read(account, store, qa: qa);
+  }
+}
+
+/// Scripted HOST command outcomes for native-form tests only. Durable original
+/// authority and receipts are independently tested through the actual SDK.
+class _OriginalSupplierCommandFixture implements WorkPurchaseEntryCommandStore {
+  String store = 'WK-510001';
+  @override bool sourceCurrent = true;
+  @override (String, String, bool) get originalScope => ('host-native-scope-user', store, false);
+  WorkspacePurchaseEntryBook? value;
+  @override WorkspaceSupplierProfile? pendingSupplierProfile;
+  @override int? pendingSupplierExpectedRevision;
+  @override WorkspaceSupplierProfile? lastRejectedSupplierProfile;
+  WorkspaceSupplierProfile? lastProfile;
+  int? lastExpectedRevision;
+  int commandCalls = 0, wholeBookWrites = 0;
+  bool allowSave = false;
+  void seedPending() {
+    final at = DateTime.utc(2026, 10, 29);
+    pendingSupplierProfile = WorkspaceSupplierProfile(id: 'HOST-pending-original', name: 'HOST original pending', createdAt: at, updatedAt: at);
+    value = WorkspacePurchaseEntryBook(account: originalScope.$1, store: store, qa: false, revision: 3, profiles: const []);
+  }
+  @override Future<WorkspacePurchaseEntryBook?> read(String account, String store, {required bool qa}) async => value;
+  @override Future<void> save(WorkspacePurchaseEntryBook book, {required int? expectedRevision}) async {
+    wholeBookWrites++; throw StateError('HOST forbids generic book writes');
+  }
+  @override Future<WorkSupplierProfileSaveOutcome?> recoverSupplierProfile(WorkspaceSupplierProfile profile,
+    {required String account, required String store, required bool qa, required int? expectedRevision}) async => null;
+  @override Future<WorkSupplierProfileSaveOutcome> saveSupplierProfile(WorkspaceSupplierProfile profile,
+    {required String account, required String store, required bool qa, required int? expectedRevision}) async {
+    expect((account, store, qa), originalScope);
+    commandCalls++; lastProfile = profile; lastExpectedRevision = expectedRevision;
+    final reason = pendingSupplierProfile == null ? 'duplicate_supplier' : 'stale_book';
+    pendingSupplierProfile = null;
+    if (allowSave) {
+      value = WorkspacePurchaseEntryBook(account: account, store: store, qa: qa, revision: (value?.revision ?? 0) + 1, profiles: [profile]);
+      lastRejectedSupplierProfile = null;
+    } else {lastRejectedSupplierProfile = profile;}
+    return WorkSupplierProfileSaveOutcome(currentBook: value, originalProfile: profile, resultRevision: value?.revision,
+      status: allowSave ? 'saved' : 'not_saved', reason: allowSave ? null : reason, operationKey: 'HOST-retained-original-key');
+  }
+}
+
+/// Labelled native-form fault fixture. The real SDK repository is tested separately.
+class _OriginalPurchaseCommandFixture extends _OriginalSupplierCommandFixture implements WorkPurchaseDraftCommandStore {
+  @override bool purchaseDraftSaveAvailable = true;
+  @override WorkspacePurchaseDraftSaveIntent? pendingPurchaseInput;
+  @override WorkspacePurchaseDraftSaveIntent? rejectedPurchaseInput;
+  @override bool get hasUnresolvedPurchaseSave => pendingPurchaseInput != null || pendingSupplierProfile != null;
+  int draftCalls = 0, statusCalls = 0;
+  bool loseAcknowledgement = false, statusAvailable = true, refuseDraft = false;
+  WorkspacePurchaseDraftSaveIntent? lastInput;
+  WorkPurchaseDraftSaveOutcome? terminal;
+  @override Future<WorkPurchaseDraftSaveOutcome?> readPurchaseAttempt(WorkspacePurchaseDraftSaveIntent original) async {
+    statusCalls++;
+    if (!statusAvailable || terminal?.original.fingerprint != original.fingerprint) return null;
+    if (pendingPurchaseInput?.fingerprint == original.fingerprint) pendingPurchaseInput = null;
+    return terminal;
+  }
+  @override Future<WorkPurchaseDraftSaveOutcome> retryPurchaseAttempt(WorkspacePurchaseDraftSaveIntent original) async {
+    final result = await readPurchaseAttempt(original);
+    if (result == null) throw const WorkGatewayException('HOST original status unavailable');
+    return result;
+  }
+  @override Future<WorkPurchaseDraftSaveOutcome?> recoverPurchaseDraft(WorkspaceSupplierProfile profile, WorkspacePurchaseEntryDraft draft,
+    {required String account, required String store, required bool qa, required int? expectedRevision,
+    WorkspacePurchaseSavedCopy? reviewedCopy, String? replaceReviewedDraftId}) async => null;
+  @override Future<WorkPurchaseDraftSaveOutcome> savePurchaseDraft(WorkspaceSupplierProfile profile, WorkspacePurchaseEntryDraft draft,
+    {required String account, required String store, required bool qa, required int? expectedRevision,
+    WorkspacePurchaseSavedCopy? reviewedCopy, String? replaceReviewedDraftId}) async {
+    expect((account, store, qa), originalScope); draftCalls++;
+    final original = pendingPurchaseInput ?? WorkspacePurchaseDraftSaveIntent(
+      scope: (account: account, store: store, realm: 'evaluation'), expectedRevision: expectedRevision,
+      idempotencyKey: 'HOST-native-draft-$draftCalls', profile: profile, draft: draft,
+      reviewedCopy: reviewedCopy, replaceReviewedDraftId: replaceReviewedDraftId);
+    expect(original.matchesInput(profile, draft, reviewedCopy: reviewedCopy, replaceReviewedDraftId: replaceReviewedDraftId), isTrue);
+    lastInput = original;
+    if (!refuseDraft) {
+      value = WorkspacePurchaseEntryBook(account: account, store: store, qa: false, revision: (value?.revision ?? 0) + 1,
+        profiles: [profile], draft: draft, copies: [...?value?.copies, if (reviewedCopy != null) reviewedCopy]);
+    }
+    terminal = WorkPurchaseDraftSaveOutcome(original: original, currentBook: value,
+      status: refuseDraft ? 'not_saved' : 'saved', reason: refuseDraft ? 'duplicate_invoice' : null, resultRevision: value?.revision);
+    if (loseAcknowledgement) {
+      loseAcknowledgement = false; pendingPurchaseInput = original;
+      throw const WorkGatewayException('HOST acknowledgement lost after original save');
+    }
+    pendingPurchaseInput = null; rejectedPurchaseInput = refuseDraft ? original : null;
+    return terminal!;
   }
 }
 
@@ -28209,6 +28299,41 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
     } finally {await tester.pumpWidget(const SizedBox.shrink()); source.dispose();}
   }, skip: const String.fromEnvironment('AI_DOMAIN_SUPPLIER_DRAFT_EXPORT_PATH') == '');
 
+  testWidgets('AGG03 native supplier final Save distinguishes refusal from success and blocks another Store', (tester) async {
+    final original = _OriginalSupplierCommandFixture();
+    final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) => WorkSession.production(
+      gateway: ReviewWorkGateway(), contactDraftStore: contact, purchaseEntryStore: original,
+      inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading));
+    await f.ready();
+    try {
+      expect(f.work.workspaceSupplierScope, original.originalScope);
+      expect(await f.work.loadWorkspaceSuppliers(retry: true), isTrue);
+      await mountSupplierPrefill(tester, f.work);
+      final save = find.byKey(const Key('work-add-supplier-save'));
+      await tester.enterText(find.byKey(const Key('work-add-supplier-name')), 'HOST\u0000invalid');
+      await tester.ensureVisible(save); await tester.tap(save); await tester.pumpAndSettle();
+      expect(original.commandCalls, 0); expect(f.work.workspaceSupplierRecoveryError, isNull);
+      expect(original.pendingSupplierProfile, isNull);
+      await tester.enterText(find.byKey(const Key('work-add-supplier-name')), 'HOST suggested supplier');
+      await tester.ensureVisible(save); await tester.tap(save); await tester.pumpAndSettle();
+      expect(original.commandCalls, 1); expect(original.wholeBookWrites, 0);
+      expect(f.work.workspaceSuppliers, isEmpty);
+      expect(f.work.workspaceSupplierRecoveryError, isNull);
+      expect(find.byKey(const Key('work-add-supplier-error')), findsOneWidget);
+      expect(find.byKey(const Key('work-add-supplier-form')), findsOneWidget);
+      expect(original.lastRejectedSupplierProfile, isNotNull);
+      original.allowSave = true;
+      await tester.tap(save); await tester.pumpAndSettle();
+      expect(original.commandCalls, 2); expect(f.work.workspaceSuppliers.single.name, 'HOST suggested supplier');
+      expect(original.wholeBookWrites, 0);
+      original.store = 'HOST-other-store';
+      expect(f.work.workspaceSuppliersLoaded, isFalse);
+      expect(f.work.workspacePendingSupplierProfile, isNull);
+      expect(await f.work.loadWorkspaceSuppliers(retry: true), isFalse);
+      expect(tester.takeException(), isNull);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await f.dispose();}
+  });
+
   testWidgets('FE-SUPPLIER-01 prefill opens existing Add without writes or selection', (tester) async {
     FlutterSecureStorage.setMockInitialValues({});
     final entry = _SupplierPrefillStore();
@@ -28329,14 +28454,14 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
       'phone': '+91 92222 22222'}, bool Function()? ownerCurrent, bool settle = true,
   }) async {
     final scope = work.workspaceSupplierScope!, revision = work.workspacePurchaseEntryRevision;
-    final original = work.workspaceSuppliers.first;
+    final original = query == null ? work.workspaceSuppliers.first : null;
     final result = Completer<MoolAssistantReviewResult>();
     await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Builder(builder: (context) => Scaffold(
       body: TextButton(key: const Key('host-open-supplier-existing'), onPressed: () async {
         final opened = query != null
           ? await showStoreSupplierLookupReview(context, work, query: query, expectedScope: scope,
             expectedRevision: revision, isCurrent: () => true, ownerCurrent: ownerCurrent)
-          : await showStoreSupplierEditReview(context, work, originalProfile: original,
+          : await showStoreSupplierEditReview(context, work, originalProfile: original!,
             initialData: StoreSupplierEditInitialData.fromFields(edits), expectedScope: scope,
             expectedRevision: revision, isCurrent: () => true, ownerCurrent: ownerCurrent);
         result.complete(opened);
@@ -28354,6 +28479,31 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
     for (final invalid in <Map<String, Object?>>[
       {}, {'phone': 123}, {'id': 'new-id'}, {'createdAt': 'invented'}, {'updatedAt': 'invented'},
     ]) { expect(() => StoreSupplierEditInitialData.fromFields(invalid), throwsFormatException); }
+  });
+
+  testWidgets('AGG03 restarted supplier list restores original pending fields and nonce review', (tester) async {
+    final original = _OriginalSupplierCommandFixture()..seedPending();
+    final f = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) => WorkSession.production(
+      gateway: ReviewWorkGateway(), contactDraftStore: contact, purchaseEntryStore: original,
+      inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading));
+    await f.ready();
+    try {
+      expect(await f.work.loadWorkspaceSuppliers(retry: true), isTrue);
+      expect(f.work.workspaceSupplierRecoveryRequired, isTrue);
+      await mountSupplierLookupEdit(tester, f.work, query: '');
+      expect(find.byKey(const Key('work-supplier-previous-save')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-supplier-previous-save'))); await tester.pumpAndSettle();
+      expect(tester.widget<TextFormField>(find.byKey(const Key('work-add-supplier-name'))).controller!.text, 'HOST original pending');
+      final pending = original.pendingSupplierProfile!;
+      final save = find.byKey(const Key('work-add-supplier-save'));
+      await tester.ensureVisible(save); await tester.tap(save); await tester.pumpAndSettle();
+      expect(original.lastProfile!.toJson(), pending.toJson()); expect(original.lastExpectedRevision, isNull);
+      expect(original.commandCalls, 1); expect(original.wholeBookWrites, 0);
+      expect(f.work.workspaceSupplierRecoveryError, isNull);
+      expect(f.work.workspaceSupplierRecoveryRequired, isFalse);
+      expect(f.work.workspaceSuppliers, isEmpty);
+      expect(tester.takeException(), isNull);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await f.dispose();}
   });
 
   testWidgets('FE-SUPPLIER-01 lookup seeds native search only and ignores result assignment', (tester) async {
@@ -29679,6 +29829,102 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
       });
     }
   }
+
+  Future<void> openHostOriginalPurchase(WidgetTester tester, _AuthenticatedNativeScopeFixture host) async {
+    await tester.pumpWidget(host.app); await tester.pumpAndSettle();
+    for (final key in ['work-store-stock', 'work-incoming-purchases']) {
+      final target = find.byKey(Key(key)); await tester.ensureVisible(target);
+      await tester.tap(target); await tester.pumpAndSettle();
+    }
+    await openPurchaseEntryFromList(tester, owner: host.work);
+  }
+  Future<_AuthenticatedNativeScopeFixture> originalPurchaseHost(_OriginalPurchaseCommandFixture source) async {
+    final host = _AuthenticatedNativeScopeFixture(makeWork: (contact, purchase, inventory, trading) => WorkSession.production(
+      gateway: ReviewWorkGateway(), contactDraftStore: contact, purchaseEntryStore: source,
+      inventoryStore: inventory, tradingPreferencesStoreFactory: (_) => trading));
+    await host.ready();
+    final at = DateTime.now().toUtc().subtract(const Duration(hours: 1)), scope = host.work.workspaceSupplierScope!;
+    final supplier = WorkspaceSupplierProfile(id: 'HOST-native-draft-supplier', name: 'HOST original supplier', createdAt: at, updatedAt: at);
+    source.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: false, revision: 1,
+      profiles: [supplier], draft: WorkspacePurchaseEntryDraft(id: 'HOST-native-draft', supplierId: supplier.id,
+        invoiceReference: 'HOST-ORIGINAL-1', invoiceDate: '29/10/2026', createdAt: at, updatedAt: at,
+        goods: const [{'name': 'HOST printed item', 'pack': '1 kg', 'quantity': '2', 'cost': ''}]));
+    expect(await host.work.loadWorkspaceSuppliers(retry: true), isTrue);
+    return host;
+  }
+  testWidgets('AGG03 original purchase copy freezes UTC through the actual native Save and avoids whole-book writes', (tester) async {
+    tester.view.physicalSize = const Size(420, 900); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final source = _OriginalPurchaseCommandFixture(), host = await originalPurchaseHost(source);
+    try {
+      await openHostOriginalPurchase(tester, host);
+      final preview = find.byKey(const Key('work-purchase-preview'));
+      await tester.ensureVisible(preview); await tester.tap(preview); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('purchase-full-screen-preview')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('purchase-full-screen-close'))); await tester.pumpAndSettle();
+      final save = find.byKey(const Key('work-purchase-copy-save'));
+      await tester.ensureVisible(save); await tester.tap(save); await tester.pumpAndSettle();
+      expect(source.draftCalls, 1); expect(source.wholeBookWrites, 0);
+      expect(source.lastInput!.reviewedCopy!.savedAt.isUtc, isTrue);
+      expect(source.lastInput!.draft.goods.single['cost'], '');
+      expect(host.work.workspacePurchaseCopies.single.id, source.lastInput!.reviewedCopy!.id);
+      expect(tester.takeException(), isNull);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+  });
+  testWidgets('AGG03 unknown native purchase save restores frozen fields and checks status without resending', (tester) async {
+    tester.view.physicalSize = const Size(420, 900); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final source = _OriginalPurchaseCommandFixture()..loseAcknowledgement = true..statusAvailable = false;
+    final host = await originalPurchaseHost(source);
+    try {
+      await openHostOriginalPurchase(tester, host);
+      final save = find.byKey(const Key('work-purchase-draft-save'));
+      await tester.ensureVisible(save); await tester.tap(save); await tester.pumpAndSettle();
+      expect(source.draftCalls, 1); expect(source.pendingPurchaseInput, isNotNull);
+      final frozen = source.pendingPurchaseInput!.fingerprint;
+      await tester.pumpWidget(const SizedBox.shrink()); await tester.pumpAndSettle();
+      await openHostOriginalPurchase(tester, host);
+      final reference = find.byKey(const Key('work-purchase-reference'));
+      await tester.ensureVisible(reference);
+      expect(tester.widget<TextField>(reference).controller!.text, 'HOST-ORIGINAL-1');
+      expect(tester.widget<TextField>(reference).readOnly, isTrue);
+      final check = find.byKey(const Key('work-purchase-check-save'));
+      await tester.ensureVisible(check); await tester.tap(check); await tester.pumpAndSettle();
+      expect(source.statusCalls, 1); expect(source.draftCalls, 1);
+      expect(source.pendingPurchaseInput!.fingerprint, frozen);
+      source.statusAvailable = true;
+      await tester.ensureVisible(check); await tester.tap(check); await tester.pumpAndSettle();
+      expect(source.statusCalls, 2); expect(source.draftCalls, 1); expect(source.wholeBookWrites, 0);
+      expect(source.pendingPurchaseInput, isNull); expect(host.work.workspacePurchaseEntryDraft!.invoiceReference, 'HOST-ORIGINAL-1');
+      expect(tester.takeException(), isNull);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+  });
+
+  testWidgets('AGG03 refused native purchase keeps entered fields for explicit correction without changing the original', (tester) async {
+    tester.view.physicalSize = const Size(420, 900); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final source = _OriginalPurchaseCommandFixture()..refuseDraft = true, host = await originalPurchaseHost(source);
+    final before = jsonEncode(source.value!.toJson());
+    try {
+      await openHostOriginalPurchase(tester, host);
+      final save = find.byKey(const Key('work-purchase-draft-save'));
+      await tester.ensureVisible(save); await tester.tap(save); await tester.pumpAndSettle();
+      expect(source.draftCalls, 1); expect(jsonEncode(source.value!.toJson()), before);
+      expect(source.rejectedPurchaseInput, isNotNull); expect(source.pendingPurchaseInput, isNull);
+      final section = find.byKey(const Key('work-purchase-invoice-section'));
+      await tester.ensureVisible(section); await tester.tap(section); await tester.pumpAndSettle();
+      final reference = find.byKey(const Key('work-purchase-reference'));
+      await tester.ensureVisible(reference);
+      expect(tester.widget<TextField>(reference).controller!.text, 'HOST-ORIGINAL-1');
+      expect(tester.widget<TextField>(reference).readOnly, isFalse);
+      await tester.enterText(reference, 'HOST-CORRECTED-2'); source.refuseDraft = false;
+      await tester.ensureVisible(save); await tester.tap(save); await tester.pumpAndSettle();
+      expect(source.draftCalls, 2); expect(source.wholeBookWrites, 0);
+      expect(source.lastInput!.expectedRevision, 1);
+      expect(host.work.workspacePurchaseEntryDraft!.invoiceReference, 'HOST-CORRECTED-2');
+      expect(tester.takeException(), isNull);
+    } finally {await tester.pumpWidget(const SizedBox.shrink()); await host.dispose();}
+  });
 
   // INSIDE main(), after existing postingOpeningFixture / supplier-return helper.
   Future<({WorkSession work, _SupplierPrefillStore entry, _LedgerCheckpointFixtureStore checkpoint,

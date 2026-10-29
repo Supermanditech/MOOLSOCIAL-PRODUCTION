@@ -59,6 +59,7 @@ import 'work_invoice_pdf_screen.dart';
 import 'store_add_product_sheet.dart';
 import '../work_services.dart';
 import '../work_catalogue_gateway.dart';
+import '../work_purchase_entry_gateway.dart' show WorkspacePurchaseDraftSaveIntent;
 import '../work_session.dart';
 
 class _StoreRestockNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
@@ -8893,7 +8894,7 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
     // directory uses its private String namespace; they are different types.
     // Trusted approved-Workspace binding and native account recovery bridge
     // those owners; never compare their storage keys as account identifiers.
-    return identical(widget.session, source) && _financePermitted(ctx) &&
+    return identical(widget.session, source) && _financePermitted(ctx) && !source.workspaceSupplierRecoveryRequired &&
         scope != null && ctx.workspaceId == scope.$2;
   }
 
@@ -21786,6 +21787,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   WorkspaceSupplierProfile? _supplier;
   WorkspacePurchaseEntryDraft? _original;
   WorkspacePurchaseSavedCopy? _copyAttempt;
+  WorkspacePurchaseDraftSaveIntent? _remoteAttempt;
+  bool get _pendingPurchase => _remoteAttempt != null;
   bool _copyVerified = false;
   int _shortageReadGeneration = 0;
   bool _shortageDraftKnown = false, _shortageDraftPresent = false;
@@ -21919,7 +21922,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       await session.recoverCustomerLedger();
       if (!mounted || !_current || generation != _shortageReadGeneration) return;
     }
-    if (widget.startNew && copy == null && !session.workspacePurchaseDraftReviewed) {
+    final pending = copy == null ? session.workspacePendingPurchaseInput : null;
+    if (widget.startNew && copy == null && pending == null && !session.workspacePurchaseDraftReviewed) {
       setState(() { _loading = false; _error = 'Finish and save the current purchase copy before starting another bill. Return to Purchases to resume it.'; });
       return;
     }
@@ -21948,10 +21952,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       ..clear()
       ..addAll((_original?.goods ?? [<String, String>{}]).map(_PurchaseGoodsInput.new));
     _baseline = _input;
+    if (pending != null) _restorePurchaseInput(pending);
     final initial = widget.assistantInitialData;
     if (initial != null && !_assistantInitialAttempted) {
       _assistantInitialAttempted = true;
-      if (copy != null || _original != null || _copyAttempt != null || _sourceSaving || _sourceLoading ||
+      if (pending != null || copy != null || _original != null || _copyAttempt != null || _sourceSaving || _sourceLoading ||
           widget.assistantPrefillCurrent?.call() == false ||
           widget.assistantSourceSignature != _assistantPurchaseSourceSignature(session, 'AI-ACT-252', null) ||
           !initial.referencesCurrent(session)) {
@@ -21989,6 +21994,80 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       WidgetsBinding.instance.addPostFrameCallback((_) { if (_current) unawaited(_readBillInvoice(zoom: true)); });
     }
     if (copy != null) unawaited(_readShortageActionDraft(copy, generation));
+  }
+  void _restorePurchaseInput(WorkspacePurchaseDraftSaveIntent original) {
+    final draft = original.draft, profile = original.profile;
+    _remoteAttempt = original;
+    _original = draft; _supplier = profile; _supplierId = profile.id; _draftId = draft.id;
+    _revision = original.expectedRevision; _replaceReviewedDraftId = original.replaceReviewedDraftId;
+    _name.text = profile.name; _phone.text = profile.phone; _address.text = profile.address; _gstin.text = profile.gstin;
+    _reference.text = draft.invoiceReference; _date.text = draft.invoiceDate;
+    for (final e in _details.entries) { e.value.text = draft.details[e.key] ?? ''; }
+    _attachments..clear()..addAll(draft.attachments);
+    for (final field in _additional) { field.dispose(); }
+    _additional..clear()..addAll(draft.additionalFields.map(_PurchaseAdditionalInput.new));
+    for (final row in _taxRows) { for (final controller in row.values) { controller.dispose(); } }
+    _taxRows..clear()..addAll([for (final row in draft.printedTaxRows)
+      {for (final key in WorkspacePurchaseEntryDraft.printedTaxKeys) key: TextEditingController(text: row[key] ?? '')}]);
+    for (final line in _goods) { line.dispose(); }
+    _goods..clear()..addAll(draft.goods.map(_PurchaseGoodsInput.new));
+    _copyAttempt = original.reviewedCopy; _copyAttemptInput = _input;
+    _expandedSections.addAll({'work-purchase-supplier-section', 'work-purchase-invoice-section', 'work-purchase-items-section'});
+  }
+  Future<void> _checkPurchaseSave() async {
+    final original = _remoteAttempt;
+    if (original == null || _busy || !_current) return;
+    FocusScope.of(context).unfocus();
+    setState(() { _busy = true; _error = null; });
+    final result = await widget.session.readWorkspacePurchaseAttempt(original);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!_current) return;
+    if (result == null) {
+      _showSaveError(widget.session.workspaceSupplierError ?? 'The original save still needs checking. Your entries are kept.');
+    } else if (result.recorded) {
+      _baseline = _input; _remoteAttempt = null;
+      widget.onBack(); // The session contains the independently current book.
+    } else {
+      setState(() {
+        _remoteAttempt = null; _copyAttempt = null; _copyAttemptInput = null;
+        _revision = widget.session.workspacePurchaseEntryRevision;
+      });
+      _showSaveError(result.reason == 'private_original_unavailable'
+        ? 'Original files cannot be saved yet. This bill was not saved; your entries and files are kept.'
+        : 'This bill was not saved. Check the details before trying again; your entries are kept.');
+    }
+  }
+  Future<void> _retryPurchaseSave() async {
+    final original = _remoteAttempt;
+    if (original == null || _busy || !_current || _scope == null) return;
+    setState(() { _busy = true; _error = null; });
+    final saved = await widget.session.retryWorkspacePurchaseAttempt(original);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!_current) return;
+    if (saved) { _baseline = _input; _remoteAttempt = null; widget.onBack(); }
+    else if (widget.session.workspacePendingPurchaseInput == null) {
+      // Read the same terminal original; do not infer a result from absence.
+      await _checkPurchaseSave();
+    } else {
+      _showSaveError(widget.session.workspaceSupplierError ?? 'The original save still needs checking. Your entries are kept.');
+    }
+  }
+  void _reviewUnsavedPurchase() {
+    final original = widget.session.workspaceRejectedPurchaseInput;
+    if (original == null || _busy || !_current || _dirty || _pendingPurchase) return;
+    final current = widget.session.workspacePurchaseEntryDraft;
+    if (current != null && current.id != original.draft.id) {
+      _showSaveError('Another purchase draft is saved. Return to Purchases to finish it before reviewing these unsaved details.');
+      return;
+    }
+    setState(() {
+      _restorePurchaseInput(original); _remoteAttempt = null;
+      _revision = widget.session.workspacePurchaseEntryRevision;
+      _copyAttempt = null; _copyAttemptInput = null;
+      _error = 'These details were not saved. Check them before saving again.';
+    });
   }
   Future<void> _readShortageActionDraft(WorkspacePurchaseSavedCopy copy, int generation) async {
     final session = widget.session, key = widget.session.supplierShortageRecoveryFormKey(copy);
@@ -22057,11 +22136,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     if (!mounted) return false;
     _leaving = true;
     FocusScope.of(context).unfocus();
-    final discard = !_dirty || await showDialog<bool>(context: context, builder: (context) =>
+    final discard = !_dirty && !_pendingPurchase || await showDialog<bool>(context: context, builder: (context) =>
       AlertDialog(title: const Text('Leave purchase draft?'),
-        content: const Text('Unsaved changes will be discarded. Your last saved draft stays available.'),
+        content: Text(_pendingPurchase ? 'The original save still needs checking. Reopen Purchases to recover it; leaving will not cancel or repeat the save.'
+          : 'Unsaved changes will be discarded. Your last saved draft stays available.'),
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard changes'))])) == true;
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(_pendingPurchase ? 'Leave' : 'Discard changes'))])) == true;
     _leaving = false;
     if (mounted && discard && !_readOnly && _scope != null) {
       widget.session.dismissWorkspacePurchaseValidation(_scope!);
@@ -22126,8 +22206,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     }
   }
   Future<void> _save({bool reviewed = false}) async {
-    if (_readOnly || _busy || !_current || _scope == null || _assistantPrefillRejected) return;
-    final now = DateTime.now();
+    if (_readOnly || _busy || !_current || _scope == null || _assistantPrefillRejected || _pendingPurchase) return;
+    final captured = DateTime.now();
+    final now = widget.session.workspacePurchaseEntryRemoteCapture ? captured.toUtc() : captured;
     var profile = WorkspaceSupplierProfile(id: _supplierId, name: _name.text.trim(),
       phone: _phone.text.trim().replaceAll(RegExp(r'[\s()-]'), ''),
       address: _address.text.trim(), gstin: _gstin.text.trim().toUpperCase(),
@@ -22188,6 +22269,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       _baseline = _input;
       widget.onBack();
     } else {
+      final pending = widget.session.workspacePendingPurchaseInput;
+      if (pending != null && _current) {
+        setState(() => _restorePurchaseInput(pending));
+      } else if (widget.session.workspacePurchaseEntryRemoteCapture) {
+        // A definitive refusal allows explicit correction with a fresh copy.
+        _copyAttempt = null; _copyAttemptInput = null;
+      }
       _showSaveError(widget.session.workspaceSupplierError ??
         'Return to the Store where you started this bill. Your entries are kept.');
     }
@@ -22204,6 +22292,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   Future<void> _refreshSaved() async {
     if (_busy || !_current) return;
+    if (_pendingPurchase) { await _checkPurchaseSave(); return; }
     if (_draftId.isEmpty || _readOnly) { await _load(retry: true); return; }
     setState(() { _busy = true; _error = null; });
     final opened = await widget.session.loadWorkspaceSuppliers(retry: true);
@@ -22480,7 +22569,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       _ when label.endsWith('%') => 'e.g. 5',
       _ => null,
     };
-    return TextField(key: Key(key), controller: controller,
+    return TextField(key: Key(key), controller: controller, readOnly: _pendingPurchase,
     focusNode: focus, maxLength: limit, maxLengthEnforcement: MaxLengthEnforcement.none, keyboardType: keyboard,
     minLines: 1, maxLines: multiline ? null : 1,
     textAlign: keyboard?.index == TextInputType.number.index ? TextAlign.right : TextAlign.left,
@@ -23433,7 +23522,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
 
   Future<void> _capture(WorkProofSource source) async {
-    if (_busy || !_current || _scope == null) return;
+    if (_busy || !_current || _scope == null || _pendingPurchase) return;
     if (_attachments.length >= 3) { setState(() => _error = 'Keep up to 3 invoice pages or files.'); return; }
     FocusScope.of(context).unfocus();
     setState(() { _busy = true; _error = null; });
@@ -23677,7 +23766,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       () => _current && !_readOnly && widget.session.navigationScopeRevision == navigation &&
         identical(_lastAddedPurchaseItem, line) && _goods.contains(line)));
   }
-  Widget _draftActions() => AbsorbPointer(absorbing: _busy, child: Container(
+  Widget _draftActions() => AbsorbPointer(key: const Key('work-purchase-actions-owner'), absorbing: _busy, child: Container(
     key: const Key('work-purchase-draft-actions'),
     padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
     decoration: const BoxDecoration(color: Color(0xfffffefb),
@@ -23686,6 +23775,16 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       const Text('Draft only — stock, dues and payments stay unchanged.',
         style: TextStyle(fontSize: 11, color: _paperMuted)),
       Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 4, children: [
+        if (_pendingPurchase) ...[
+          TextButton(onPressed: _back, child: const Text('Leave')),
+          TextButton(key: const Key('work-purchase-retry-original'), onPressed: _retryPurchaseSave,
+            child: const Text('Retry original save')),
+          FilledButton(key: const Key('work-purchase-check-save'), onPressed: _checkPurchaseSave,
+            child: Text(_busy ? 'Checking…' : 'Check saved status')),
+        ] else ...[
+        if (widget.session.workspaceRejectedPurchaseInput != null && !_dirty)
+          TextButton(key: const Key('work-purchase-review-unsaved'), onPressed: _reviewUnsavedPurchase,
+            child: const Text('Review unsaved bill details')),
         Tooltip(message: 'Add another item manually from the supplier invoice', child: TextButton.icon(
           key: const Key('work-purchase-add-line'), onPressed: _addPurchaseItem,
           icon: const Icon(Icons.add, size: 18), label: const Text('Add item'))),
@@ -23710,10 +23809,15 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             backgroundColor: MoolColors.navy, foregroundColor: Colors.white,
             textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           onPressed: () => _save(), child: Text(_busy ? 'Saving…' : 'Save draft')),
+        ],
       ]),
     ])));
-  List<Widget> _purchaseFormSections(List<Widget> sections) => _goods.length > 20
-    ? sections : [Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: sections)];
+  List<Widget> _purchaseFormSections(List<Widget> sections) {
+    final contents = [for (final section in sections)
+      if (_pendingPurchase && section.key != const Key('work-purchase-actions-owner'))
+        ExcludeFocus(child: AbsorbPointer(child: section)) else section];
+    return _goods.length > 20 ? contents : [Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: contents)];
+  }
   @override
   Widget build(BuildContext context) {
     final body=_buildPurchaseReceiving(context);
@@ -23755,12 +23859,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               IconButton(key: const Key('work-purchase-camera'),
                 tooltip: 'Take a clear photo of the full supplier bill',
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                onPressed: _busy ? null : () => _capture(WorkProofSource.camera),
+                onPressed: _busy || _pendingPurchase ? null : () => _capture(WorkProofSource.camera),
                 icon: const Icon(Icons.camera_alt_outlined, size: 20, color: MoolColors.navy)),
               IconButton(key: const Key('work-purchase-attach'),
                 tooltip: 'Attach a supplier bill photo or PDF',
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                onPressed: _busy ? null : () => _capture(WorkProofSource.upload),
+                onPressed: _busy || _pendingPurchase ? null : () => _capture(WorkProofSource.upload),
                 icon: const Icon(Icons.attach_file_rounded, size: 20, color: MoolColors.navy)),
             ],
           ]),
@@ -25806,9 +25910,24 @@ class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
       : _name.text != original.name || _phone.text != original.phone ||
         _address.text != original.address || _gstin.text != original.gstin;
   }
-  void _startEdit(WorkspaceSupplierProfile profile) {
+  void _reviewPreviousSupplierSave() {
     if (!_current || _busy || _adding || widget.session.workspaceSupplierSaving ||
         widget.lockedSupplierId != null || widget.eligibleSupplierIds != null) return;
+    final session = widget.session, pending = session.workspacePendingSupplierProfile;
+    final profile = pending ?? session.workspaceRejectedSupplierProfile;
+    if (profile == null) return;
+    setState(() {
+      _editingOriginal = session.workspaceSuppliers.where((p) => p.id == profile.id).singleOrNull;
+      _name.text = profile.name; _phone.text = profile.phone;
+      _address.text = profile.address; _gstin.text = profile.gstin;
+      _revision = pending != null ? session.workspacePendingSupplierExpectedRevision : session.workspacePurchaseEntryRevision;
+      _attempt = pending; _uncertain = pending != null; _adding = true; _error = null;
+    });
+  }
+  void _startEdit(WorkspaceSupplierProfile profile) {
+    if (!_current || _busy || _adding || widget.session.workspaceSupplierSaving ||
+        widget.lockedSupplierId != null || widget.eligibleSupplierIds != null ||
+        widget.session.workspaceSupplierRecoveryRequired) return;
     final latest = widget.session.workspaceSuppliers.where((p) => p.id == profile.id).singleOrNull;
     if (latest == null) return;
     setState(() {
@@ -25842,6 +25961,10 @@ class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
       }
       final initial = widget.initialData;
       if (!ready || initial == null || _initialApplied || _prefillError != null) return;
+      if (widget.session.workspaceSupplierRecoveryRequired) {
+        _prefillError = 'A previous supplier Save needs checking. Close this review and reopen the supplier list to recover it.';
+        return;
+      }
       if (widget.prefillCurrent?.call() == false ||
           widget.session.workspacePurchaseEntryRevision != widget.initialRevision ||
           _adding || _dirty || _attempt != null || widget.lockedSupplierId != null ||
@@ -25992,9 +26115,18 @@ class _StoreSupplierSelectorState extends State<_StoreSupplierSelector> {
                 style: const TextStyle(fontSize: 12, color: MoolColors.muted)))),
             if (widget.lockedSupplierId == null && widget.eligibleSupplierIds == null) SliverToBoxAdapter(child: Align(alignment: Alignment.centerLeft,
               child: Padding(padding: const EdgeInsets.only(left: 8), child: TextButton.icon(
-                key: const Key('work-supplier-add'), onPressed: session.workspaceSupplierSaving ? null : () {
+                key: const Key('work-supplier-add'), onPressed: session.workspaceSupplierSaving || session.workspaceSupplierRecoveryRequired ? null : () {
                   setState(() { _adding = true; _revision = session.workspacePurchaseEntryRevision; });
                 }, icon: const Icon(Icons.add, size: 18), label: const Text('Add supplier'))))),
+            if (session.workspacePendingPurchaseInput != null) const SliverToBoxAdapter(child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text('Reopen Purchases to check the earlier bill save before changing supplier details.'))),
+            if (widget.lockedSupplierId == null && widget.eligibleSupplierIds == null &&
+                (session.workspacePendingSupplierProfile != null || session.workspaceRejectedSupplierProfile != null))
+              SliverToBoxAdapter(child: Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+                key: const Key('work-supplier-previous-save'), onPressed: session.workspaceSupplierSaving ? null : _reviewPreviousSupplierSave,
+                icon: const Icon(Icons.restore, size: 18), label: Text(session.workspacePendingSupplierProfile != null
+                  ? 'Check previous supplier Save' : 'Review unsaved supplier details')))),
             if (widget.lockedSupplierId != null) const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(12),
               child: Text('This purchase keeps its linked supplier.', style: TextStyle(fontSize: 12)))),
             if (suppliers.isEmpty) SliverFillRemaining(hasScrollBody: false, child: Center(child: Padding(padding: const EdgeInsets.all(16),
