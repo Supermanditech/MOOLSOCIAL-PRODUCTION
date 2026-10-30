@@ -1838,6 +1838,67 @@ function Invoke-AiDomainNativeDeviceTextParityCheckpoint($Checkpoint,[string]$He
   }}
  }
 }
+function Get-AiDomainOriginalCouponV2SealOwners {
+ @('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json','scripts/ai-domain-batch-admission.ps1','scripts/test-ai-domain-batch-admission.ps1')
+}
+function Test-AiDomainOriginalCouponV2Checkpoint($Checkpoint) {
+ if($null -eq $Checkpoint -or $Checkpoint.sequence -cne '09-original-coupon-v2' -or
+   $Checkpoint.baseline -cne '0aed8868d70c86657356ff1fa17d45304dacfa5d' -or
+   $Checkpoint.namedBranchPushAuthorized -isnot [bool] -or !$Checkpoint.namedBranchPushAuthorized -or
+   $Checkpoint.productionAcceptance -isnot [bool] -or $Checkpoint.productionAcceptance){return $false}
+ $pins=@{manifest='AEEA762DC9C77FDC951D99AE6DD40C8EAB19913E365C15A936655802328067D2';
+   disposition='A0985503A3E200FA526396CA274C04510F0226FC8A00AEE8317BCD8C3B0733F6';
+   evidence='103577A9E32AB905789593D9D54618BC38D17F19EAF3A666D1FE18A26B097046'}
+ foreach($part in $pins.Keys){
+  $raw=$Checkpoint.$part|ConvertTo-Json -Depth 60 -Compress
+  if([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($raw))) -cne $pins[$part]){return $false}
+ }
+ return $true
+}
+function Get-AiDomainOriginalCouponV2StageOwners([int]$Count,$Checkpoint) {
+ switch($Count){0{@(Get-AiDomainOriginalCouponV2SealOwners)}1{@($Checkpoint.manifest.changedOwners)}2{@('docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')}default{@()}}
+}
+function Invoke-AiDomainOriginalCouponV2Checkpoint($Checkpoint,[string]$Head,[string]$Phase,[switch]$Continuation) {
+ Assert-Coordination (Test-AiDomainOriginalCouponV2Checkpoint $Checkpoint) 'Only the exact tested twenty-owner original coupon v2 source checkpoint is admitted.'
+ $base=$Checkpoint.baseline;$approvalOwner='docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json'
+ $chain=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"${base}..${Head}"))
+ Assert-Coordination ($chain.Count -le 3) 'Only exact original-coupon-v2 metadata, source and evidence commits are admitted.'
+ $subjects=@('coordination(ai-domain-batch-20261028): admit qualified original coupon v2 checkpoint',
+   'feat(ai-domain-batch-20261028): connect original coupon v2 source and eligibility',
+   'test(ai-domain-batch-20261028): record original coupon v2 qualification and limits')
+ for($i=0;$i -lt $chain.Count;$i++){
+  $parent=if($i -eq 0){$base}else{$chain[$i-1]};$expected=@(Get-AiDomainOriginalCouponV2StageOwners $i $Checkpoint)
+  Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$chain[$i]))[0]) -ceq $parent -and
+   (@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$chain[$i]))[0]) -ceq $subjects[$i] -and
+   (@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$parent,$chain[$i])|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Original coupon checkpoint parent, subject or exact owners changed.'
+ }
+ if($chain.Count -gt 0){
+  $sealed=(@(Get-OctoberCompatibilityGitLines @('show',"$($chain[0]):$approvalOwner"))-join "`n")|ConvertFrom-Json
+  Assert-Coordination (Test-AiDomainOriginalCouponV2Checkpoint $sealed.aggregate09CouponCheckpoint) 'Committed original coupon v2 qualification changed.'
+ }
+ foreach($row in $Checkpoint.manifest.owners){
+  if($chain.Count -lt 2){Assert-Coordination ((Get-Sha256 (Join-Path $root $row.path)) -ceq $row.sha256 -and
+    (@(Get-OctoberCompatibilityGitLines @('hash-object',"--path=$($row.path)",$row.path))[0]) -ceq $row.gitBlobOid) 'Working original-coupon-v2 source differs from qualification.'}
+  else{Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($chain[1]):$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Committed original-coupon-v2 source differs from qualification.'}
+ }
+ if(!$Continuation){foreach($owner in @(Get-AiDomainBatchMetadataOwners)){
+
+  if(($chain.Count -eq 0 -and $owner -cin @(Get-AiDomainOriginalCouponV2SealOwners)) -or
+    ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit' -and $owner -ceq $approvalOwner)){continue}
+  Get-OctoberCompatibilityGitLines @('diff','--exit-code',$Head,'--',$owner)|Out-Null
+ }
+ }
+ if($chain.Count -eq 3 -or ($chain.Count -eq 2 -and $Phase -ceq 'pre_commit')){
+  Assert-Coordination ($Checkpoint.sourceCommit -ceq $chain[1]) 'Original coupon evidence must name its qualified source commit before closure.'
+ }
+ if(!$Continuation -and $Phase -ceq 'pre_commit'){
+  $expected=@(Get-AiDomainOriginalCouponV2StageOwners $chain.Count $Checkpoint)
+  Assert-Coordination ($expected.Count -gt 0 -and (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')|Sort-Object)-join '|') -ceq (@($expected|Sort-Object)-join '|')) 'Only exact original-coupon-v2-checkpoint stage may be committed.'
+  if($chain.Count -eq 1){foreach($row in $Checkpoint.manifest.owners){
+   Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',":$($row.path)"))[0]) -ceq $row.gitBlobOid) 'Staged original-coupon-v2 source differs from qualification.'
+  }}
+ }
+}
 function Test-AiDomainPrivateStarsTestAdmission($Admission) {
  if($null -eq $Admission){return $false}
  $raw=$Admission|ConvertTo-Json -Depth 20 -Compress
@@ -2179,6 +2240,7 @@ function Invoke-AiDomainBatchAdmission {
  $nativeTextParityCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'aggregate08NativeTextParityCheckpoint'){$approval.aggregate08NativeTextParityCheckpoint}else{$null}
  $aggregateNineAdmission=if($approval.PSObject.Properties.Name -ccontains 'aggregate09SourceAdmission'){$approval.aggregate09SourceAdmission}else{$null}
  $draftRecoveryAdmission=if($approval.PSObject.Properties.Name -ccontains 'aggregate09DraftRecoveryAdmission'){$approval.aggregate09DraftRecoveryAdmission}else{$null}
+ $couponCheckpoint=if($approval.PSObject.Properties.Name -ccontains 'aggregate09CouponCheckpoint'){$approval.aggregate09CouponCheckpoint}else{$null}
  $runtime=if($null -ne $privateStarsAdmission){@(Get-AiDomainPrivateStarsRuntimeOwners $privateStarsAdmission $cache)}elseif($null -ne $cache){@(Get-AiDomainCurrentRuntimeOwners $cache)}else{@(Get-AiDomainBatchRuntimeOwners)}
  if($null -ne $aggregateTwoAdmission){Assert-Coordination (Test-AiDomainAggregateTwoSourceAdmission $aggregateTwoAdmission) 'Exact seven original source owners required.';$runtime=@($runtime)+@($aggregateTwoAdmission.additionalOwners)}
  if($null -ne $aggregateThreeAdmission){Assert-Coordination (Test-AiDomainAggregateThreeSourceAdmission $aggregateThreeAdmission) 'Exact five original purchase-book source owners required.';$runtime=@($runtime)+@($aggregateThreeAdmission.additionalOwners)}
@@ -2199,7 +2261,7 @@ function Invoke-AiDomainBatchAdmission {
  $scopeTwo = $approval.scope02Admission
  $scopeTwoCheckpoint = $approval.scope02Checkpoint
  $middle=if($approval.PSObject.Properties.Name -ccontains 'scope03Through07Checkpoint'){$approval.scope03Through07Checkpoint}else{$null}
- $metadataCount = if($null -ne $draftRecoveryAdmission){45} elseif($null -ne $aggregateNineAdmission){44} elseif($null -ne $nativeTextParityCheckpoint){43} elseif($null -ne $privateDeviceCheckpoint){42} elseif($null -ne $aggregateEightAdmission){41} elseif($null -ne $retainedOrderStatusCheckpoint){40} elseif($null -ne $counterCustomerCheckpoint){39} elseif($null -ne $aggregateSixAdmission){38} elseif($null -ne $supplierMoneyCheckpoint){37} elseif($null -ne $originalLedgerCheckpoint){36} elseif($null -ne $aggregateFourAdmission){35} elseif($null -ne $purchaseDataCheckpoint){34} elseif($null -ne $aggregateThreeAdmission){33} elseif($null -ne $typedPreviewCheckpoint){32} elseif($null -ne $aggregateTwoCheckpoint){31} elseif($null -ne $aggregateTwoAdmission){30} elseif($null -ne $expiredPriceCheckpoint){29} elseif($null -ne $selectedRestockCheckpoint){28} elseif($null -ne $retainedQuoteCheckpoint){27} elseif($null -ne $quoteRecurrence){26} elseif($null -ne $cartClearCheckpoint){24} elseif($null -ne $purchaseReferenceCheckpoint){23} elseif($null -ne $publicationReadyCheckpoint){22} elseif($null -ne $storeSettingsCheckpoint){21} elseif($null -ne $storeReportsCheckpoint){20} elseif($null -ne $storeCouponsCheckpoint){19} elseif($null -ne $storeOperationsCheckpoint){18} elseif($null -ne $originalReceivingCheckpoint){17} elseif($null -ne $purchaseRootCheckpoint){16} elseif($null -ne $supplierDraftCheckpoint){15} elseif($null -ne $privateStarsCheckpoint){14} elseif($null -ne $privateStarsAdmission){13} elseif($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
+ $metadataCount = if($null -ne $couponCheckpoint){46} elseif($null -ne $draftRecoveryAdmission){45} elseif($null -ne $aggregateNineAdmission){44} elseif($null -ne $nativeTextParityCheckpoint){43} elseif($null -ne $privateDeviceCheckpoint){42} elseif($null -ne $aggregateEightAdmission){41} elseif($null -ne $retainedOrderStatusCheckpoint){40} elseif($null -ne $counterCustomerCheckpoint){39} elseif($null -ne $aggregateSixAdmission){38} elseif($null -ne $supplierMoneyCheckpoint){37} elseif($null -ne $originalLedgerCheckpoint){36} elseif($null -ne $aggregateFourAdmission){35} elseif($null -ne $purchaseDataCheckpoint){34} elseif($null -ne $aggregateThreeAdmission){33} elseif($null -ne $typedPreviewCheckpoint){32} elseif($null -ne $aggregateTwoCheckpoint){31} elseif($null -ne $aggregateTwoAdmission){30} elseif($null -ne $expiredPriceCheckpoint){29} elseif($null -ne $selectedRestockCheckpoint){28} elseif($null -ne $retainedQuoteCheckpoint){27} elseif($null -ne $quoteRecurrence){26} elseif($null -ne $cartClearCheckpoint){24} elseif($null -ne $purchaseReferenceCheckpoint){23} elseif($null -ne $publicationReadyCheckpoint){22} elseif($null -ne $storeSettingsCheckpoint){21} elseif($null -ne $storeReportsCheckpoint){20} elseif($null -ne $storeCouponsCheckpoint){19} elseif($null -ne $storeOperationsCheckpoint){18} elseif($null -ne $originalReceivingCheckpoint){17} elseif($null -ne $purchaseRootCheckpoint){16} elseif($null -ne $supplierDraftCheckpoint){15} elseif($null -ne $privateStarsCheckpoint){14} elseif($null -ne $privateStarsAdmission){13} elseif($null -ne $orderCheckpoint){12} elseif($null -ne $cacheCheckpoint){11} elseif($null -ne $cache){10} elseif($null -ne $middle){9} elseif ($null -ne $scopeTwoCheckpoint) {8} elseif ($null -ne $scopeTwo) {6} elseif ($null -ne $checkpoint) {5} else {4}
  Assert-Coordination ($approval.acceptedUiCommit -ceq $base -and $approval.uiContractSha256 -ceq $hash -and $approval.founderAnswer -ceq 'EXECUTE' -and $approval.localMetadataCommits -eq $metadataCount -and !$approval.sourceFeatureCommits -and !$approval.backendBranchPush -and !$approval.deployment -and !$approval.productionAcceptance) 'Exact acceptance/authority differs.'
  if ($null -ne $checkpoint) {Assert-Coordination ($binding.id -ceq 'ai_domain_batch_20261028' -and $binding.state -ceq 'founder_authorized_2026_10_28') 'Correct current batch identity required; no stale Profile or History binding.'}
  Assert-Coordination ((Get-Sha256 (Join-Path $root 'docs/quality/AI-DOMAIN-ORIGINAL-PROVIDER-TEST-20261028.md')) -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $record.backendAdmission.originalProviderTestAddendum.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22' -and $approval.originalProviderTestAdmission.sha256 -ceq 'A378750F4EDC2235D61EDE50154D3E571BB5279E69693F5B0E5FE4C7978BCA22') 'Exact original-provider test boundary changed.'
@@ -2257,7 +2319,8 @@ function Invoke-AiDomainBatchAdmission {
  if($null -ne $privateDeviceCheckpoint){Assert-Coordination ($null -ne $aggregateEightAdmission -and (Test-AiDomainPrivateOriginalDeviceCheckpoint $privateDeviceCheckpoint)) 'Exact preserved original source admission and private device qualification required.'}
  if($null -ne $nativeTextParityCheckpoint){Assert-Coordination ($null -ne $privateDeviceCheckpoint -and (Test-AiDomainNativeDeviceTextParityCheckpoint $nativeTextParityCheckpoint)) 'Exact preserved private-device checkpoint and native text parity qualification required.'}
  if($null -ne $aggregateNineAdmission){Assert-Coordination ($null -ne $nativeTextParityCheckpoint -and (Test-AiDomainAggregateNineSourceAdmission $aggregateNineAdmission)) 'Preserved sealed native text correction and exact original coupon admission required.'}
- $maximumCommits = if($null -ne $draftRecoveryAdmission){101} elseif($null -ne $aggregateNineAdmission){100} elseif($null -ne $nativeTextParityCheckpoint){99} elseif($null -ne $privateDeviceCheckpoint){96} elseif($null -ne $aggregateEightAdmission){93} elseif($null -ne $retainedOrderStatusCheckpoint){92} elseif($null -ne $counterCustomerCheckpoint){89} elseif($null -ne $aggregateSixAdmission){86} elseif($null -ne $supplierMoneyCheckpoint){85} elseif($null -ne $originalLedgerCheckpoint){82} elseif($null -ne $aggregateFourAdmission){79} elseif($null -ne $purchaseDataCheckpoint){78} elseif($null -ne $aggregateThreeAdmission){75} elseif($null -ne $typedPreviewCheckpoint){74} elseif($null -ne $aggregateTwoCheckpoint){71} elseif($null -ne $aggregateTwoAdmission){68} elseif($null -ne $expiredPriceCheckpoint){67} elseif($null -ne $selectedRestockCheckpoint){64} elseif($null -ne $retainedQuoteCheckpoint){61} elseif($null -ne $quoteRecurrence){58} elseif($null -ne $cartClearCheckpoint){56} elseif($null -ne $purchaseReferenceCheckpoint){53} elseif($null -ne $publicationReadyCheckpoint){50} elseif($null -ne $storeSettingsCheckpoint){47} elseif($null -ne $storeReportsCheckpoint){44} elseif($null -ne $storeCouponsCheckpoint){41} elseif($null -ne $storeOperationsCheckpoint){38} elseif($null -ne $originalReceivingCheckpoint){35} elseif($null -ne $purchaseRootCheckpoint){32} elseif($null -ne $supplierDraftCheckpoint){29} elseif($null -ne $privateStarsCheckpoint){26} elseif($null -ne $privateStarsAdmission){23} elseif($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
+ if($null -ne $couponCheckpoint){Assert-Coordination ($null -ne $draftRecoveryAdmission -and (Test-AiDomainOriginalCouponV2Checkpoint $couponCheckpoint)) 'Exact original coupon admission and qualified source/evidence required.'}
+ $maximumCommits = if($null -ne $couponCheckpoint){104} elseif($null -ne $draftRecoveryAdmission){101} elseif($null -ne $aggregateNineAdmission){100} elseif($null -ne $nativeTextParityCheckpoint){99} elseif($null -ne $privateDeviceCheckpoint){96} elseif($null -ne $aggregateEightAdmission){93} elseif($null -ne $retainedOrderStatusCheckpoint){92} elseif($null -ne $counterCustomerCheckpoint){89} elseif($null -ne $aggregateSixAdmission){86} elseif($null -ne $supplierMoneyCheckpoint){85} elseif($null -ne $originalLedgerCheckpoint){82} elseif($null -ne $aggregateFourAdmission){79} elseif($null -ne $purchaseDataCheckpoint){78} elseif($null -ne $aggregateThreeAdmission){75} elseif($null -ne $typedPreviewCheckpoint){74} elseif($null -ne $aggregateTwoCheckpoint){71} elseif($null -ne $aggregateTwoAdmission){68} elseif($null -ne $expiredPriceCheckpoint){67} elseif($null -ne $selectedRestockCheckpoint){64} elseif($null -ne $retainedQuoteCheckpoint){61} elseif($null -ne $quoteRecurrence){58} elseif($null -ne $cartClearCheckpoint){56} elseif($null -ne $purchaseReferenceCheckpoint){53} elseif($null -ne $publicationReadyCheckpoint){50} elseif($null -ne $storeSettingsCheckpoint){47} elseif($null -ne $storeReportsCheckpoint){44} elseif($null -ne $storeCouponsCheckpoint){41} elseif($null -ne $storeOperationsCheckpoint){38} elseif($null -ne $originalReceivingCheckpoint){35} elseif($null -ne $purchaseRootCheckpoint){32} elseif($null -ne $supplierDraftCheckpoint){29} elseif($null -ne $privateStarsCheckpoint){26} elseif($null -ne $privateStarsAdmission){23} elseif($null -ne $orderCheckpoint){22} elseif($null -ne $cacheCheckpoint){19} elseif($null -ne $cache){16} elseif($null -ne $middle){15} elseif ($null -ne $scopeTwoCheckpoint) {12} elseif ($null -ne $scopeTwo) {8} elseif ($null -ne $checkpoint) {7} else {4}
  Assert-Coordination ($commits.Count -le $maximumCommits -and @(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$base..$head")).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count -eq 0 -and @(Get-OctoberCompatibilityGitLines @('ls-files','-v')|Where-Object {$_ -cmatch '^[a-zS] '}).Count -eq 0) 'Only exact admitted checkpoint history; no history/index overrides.'
  $changed=@(@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$base))+@(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')))|Sort-Object -Unique
  Assert-AiDomainBatchOwners $changed $owners
@@ -2359,7 +2422,10 @@ function Invoke-AiDomainBatchAdmission {
                                           Invoke-AiDomainNativeDeviceTextParityCheckpoint $nativeTextParityCheckpoint 'a665d21f8fbef116a58b967df4bea243a8fc0a6e' 'implementation' -Continuation
                                           if($null -ne $draftRecoveryAdmission){
                                            Invoke-AiDomainAggregateNineSourceAdmission $aggregateNineAdmission '6580507d5eb04da564c77e9215a5ca4c0b5b6bcc' 'implementation' -Continuation
-                                           Invoke-AiDomainAggregateNineDraftRecoveryAdmission $draftRecoveryAdmission $head $ProductionPhase
+                                           if($null -ne $couponCheckpoint){
+                                            Invoke-AiDomainAggregateNineDraftRecoveryAdmission $draftRecoveryAdmission '0aed8868d70c86657356ff1fa17d45304dacfa5d' 'implementation' -Continuation
+                                            Invoke-AiDomainOriginalCouponV2Checkpoint $couponCheckpoint $head $ProductionPhase
+                                           }else{Invoke-AiDomainAggregateNineDraftRecoveryAdmission $draftRecoveryAdmission $head $ProductionPhase}
                                           }else{Invoke-AiDomainAggregateNineSourceAdmission $aggregateNineAdmission $head $ProductionPhase}
                                          }else{Invoke-AiDomainNativeDeviceTextParityCheckpoint $nativeTextParityCheckpoint $head $ProductionPhase}
                                         }else{Invoke-AiDomainPrivateOriginalDeviceCheckpoint $privateDeviceCheckpoint $head $ProductionPhase}

@@ -1003,6 +1003,30 @@ Check (!(Test-AiDomainNativeDeviceTextParityCheckpoint $bad)) 'reject changed qu
 $bad=($nativeTextParityCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendActualSDKPassed=0
 Check (!(Test-AiDomainNativeDeviceTextParityCheckpoint $bad)) 'reject changed native-device-text-parity evidence'
 
+$couponCheckpoint=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate09CouponCheckpoint
+Check (Test-AiDomainOriginalCouponV2Checkpoint $couponCheckpoint) 'exact host-qualified original original-coupon-v2 source checkpoint'
+Check (!(Test-AiDomainOriginalCouponV2Checkpoint $null)) 'reject absent original original-coupon-v2 checkpoint'
+Check (@(Get-AiDomainOriginalCouponV2StageOwners 0 $couponCheckpoint).Count -eq 3) 'three exact existing original-coupon-v2 checkpoint metadata owners'
+Check (@(Get-AiDomainOriginalCouponV2StageOwners 1 $couponCheckpoint).Count -eq 20) 'twenty exact qualified source owners'
+Check (@(Get-AiDomainOriginalCouponV2StageOwners 2 $couponCheckpoint).Count -eq 1) 'one sanitized evidence owner'
+Check (@(Get-AiDomainOriginalCouponV2StageOwners 3 $couponCheckpoint).Count -eq 0) 'no extra checkpoint stage'
+foreach($property in @('sequence','baseline')) {
+ $bad=($couponCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainOriginalCouponV2Checkpoint $bad)) "reject changed original-coupon-v2 $property"
+}
+$bad=($couponCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.productionAcceptance=$true
+Check (!(Test-AiDomainOriginalCouponV2Checkpoint $bad)) 'host qualification is not production acceptance'
+foreach($property in @('wholeAggregateComplete','populatedStoreDeviceQualified','connectedAuthenticRuntimeAuthorityAvailable','syntheticFinanceSnapshot','cloudActivation','financialLivePosting','founderApprovalClaimed','productionAcceptance')) {
+ $bad=($couponCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainOriginalCouponV2Checkpoint $bad)) "reject invented original-coupon-v2 qualification $property"
+}
+$bad=($couponCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('foreign')
+Check (!(Test-AiDomainOriginalCouponV2Checkpoint $bad)) 'reject expanded original-coupon-v2 owners'
+$bad=($couponCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.owners[0].sha256='foreign'
+Check (!(Test-AiDomainOriginalCouponV2Checkpoint $bad)) 'reject changed qualified source hash'
+$bad=($couponCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendActualSDKPassed=0
+Check (!(Test-AiDomainOriginalCouponV2Checkpoint $bad)) 'reject changed original-coupon-v2 evidence'
+
 $creditAdmission=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate05CreditDocumentAdmission
 Check (Test-AiDomainCreditDocumentAdmission $creditAdmission) 'exact existing credit model admission under standing authority'
 Check (!(Test-AiDomainCreditDocumentAdmission $null)) 'reject absent credit model admission'

@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 45,
+  "localMetadataCommits": 46,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -12480,5 +12480,961 @@
     "deployment": false,
     "paymentIntegration": false,
     "apk": false
+  },
+  "aggregate09CouponCheckpoint": {
+    "sequence": "09-original-coupon-v2",
+    "baseline": "0aed8868d70c86657356ff1fa17d45304dacfa5d",
+    "manifest": {
+      "scope": "09-original-coupon-v2",
+      "baseline": "0aed8868d70c86657356ff1fa17d45304dacfa5d",
+      "branch": "work/codex-backend/ai-domain-batch-20261028",
+      "changedOwners": [
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/widgets/store_product_promotions.dart",
+        "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+        "apps/mobile/lib/features/work/work_product_promotions.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart",
+        "apps/mobile/test/work_product_promotions_test.dart",
+        "backend/functions/src/assistant/domain_context.test.ts",
+        "backend/functions/src/assistant/domain_context.ts",
+        "backend/functions/src/index.ts",
+        "backend/functions/src/workspace/workspace_catalogue_service.ts",
+        "backend/functions/src/workspace/workspace_coupon_v2_codec.test.ts",
+        "backend/functions/src/workspace/workspace_coupon_v2_codec.ts",
+        "backend/functions/src/workspace/workspace_promotion_service.test.ts",
+        "backend/functions/src/workspace/workspace_promotion_service.ts",
+        "backend/functions/src/workspace/workspace_purchase_entry_service.ts"
+      ],
+      "owners": [
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.ts",
+          "sha256": "4E4A4496A5DDF41FA5DCDCF111196350BFCD3FA65DB9BF12B44004D159997648",
+          "gitBlobOid": "5b0f127671cf8bc42122d4f21a4fc223a06bfd19",
+          "bytes": 11722
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.test.ts",
+          "sha256": "58517BA82EA4F68437C7011D7F109F09E073A33CF3E2CC4832671117EC7D8152",
+          "gitBlobOid": "8fa120c7a73697d966f2a09a30685b872bf45e37",
+          "bytes": 10479
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.ts",
+          "sha256": "9C97BECBAF2D24368C1A38AD6459A84AABF4415975AF14DC407AEA46033D70A4",
+          "gitBlobOid": "714600cf90e747b850a3136d3d4ee250ae6d3b5a",
+          "bytes": 294541
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.test.ts",
+          "sha256": "FEB3C56DA02D9038C3AC1A02B8B578AC46EE9C46DF526DDB0D258E58FE19CF82",
+          "gitBlobOid": "6c59164e57a0d23f9607af5ca0ce21da0b50598e",
+          "bytes": 101469
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.ts",
+          "sha256": "6F1FCAFAC94D0A8FDC35BD8C2E878B2D55418D8284A5DC710EB3BEE92855B07B",
+          "gitBlobOid": "9ca060984db51c54a93d3069d9ed96e7936cb435",
+          "bytes": 3373
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.test.ts",
+          "sha256": "CD77B75EF8E7EE01980DB7CC200233944C5CA60C88A454BF7F4E4B4242A25598",
+          "gitBlobOid": "aaec24000807da73e92fa7563fefa7a897ccfd57",
+          "bytes": 5373
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_integration.test.ts",
+          "sha256": "094E87BB7C1B81997676D1E3F1D682B9ABD15AC16DC66F2CD2106F63E21B06A4",
+          "gitBlobOid": "59d5be658873bcb5bb28b248d401a0479661f918",
+          "bytes": 116389
+        },
+        {
+          "path": "backend/functions/src/index.ts",
+          "sha256": "C1B30BE79380D4DDAD3BCE24DC57D7D3C0F9C2E8A9895C47E76B612EA4F520BE",
+          "gitBlobOid": "b20a40f96007073f5aa8d3b6ae247c58d24afe92",
+          "bytes": 156649
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+          "sha256": "8C226BC55774FBDCA8E1B01C8A87ECF327EFE0C1566F0275A4988FA38D1D890C",
+          "gitBlobOid": "11cf3afb771f8f6d8dd1f9bd3e7f2e1221f7fa6d",
+          "bytes": 19542
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/profile_context.dart",
+          "sha256": "C61DAA145A9EDF785897069D217E54CC2CF8FE2F4600925200AFC14FAF0D1E41",
+          "gitBlobOid": "4b27303aa0a19f4078f89f73a3f170a8b2f562c6",
+          "bytes": 18946
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+          "sha256": "F8ABB359ADF4714C9DD330AD17D34DAD5D441D6763D2902B9F0A177F5E4DD6A8",
+          "gitBlobOid": "0a1b8f3f814fbf517e8cd43e9b29563acdd99215",
+          "bytes": 91081
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+          "sha256": "2570BB48BDFA8F9E9EA0D61348A0F1B3CD778105565FB8784C6FE156F5928342",
+          "gitBlobOid": "624089b250cb5cee594dbc7377302ed72ab6ecf3",
+          "bytes": 79399
+        },
+        {
+          "path": "apps/mobile/lib/app/moolsocial_app.dart",
+          "sha256": "82EEADE801CB2A7C04AF8C95819FA6EC30B138357753F426EB95741EDA101FD6",
+          "gitBlobOid": "48928f20d1f30bfe9c417c037e3a13d334806a7d",
+          "bytes": 24302
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+          "sha256": "7228EBEA44098E43C68EB4D788D9E41E2F3392E8B1CA8D0C32C164A1F1CFFC6C",
+          "gitBlobOid": "0a3049b9af7b29f7c9f10a7ff95f29bcad895f03",
+          "bytes": 24703
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "sha256": "2101247B6CE295D5FA0A6FBA609D517F11F40228C382A52C003D95F5C3689936",
+          "gitBlobOid": "d8df2938f65c0a4ca10c2fdecd99446b9bec21a7",
+          "bytes": 1286849
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+          "sha256": "5D3AAF88764035306EA953C003A3E8FD9CF97AD368C9F759ABB81F81FDEB5C89",
+          "gitBlobOid": "4bcecc4240109fd15eb3792e83a8b42bd44d75f8",
+          "bytes": 208676
+        },
+        {
+          "path": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+          "sha256": "ABAB97AA032F59E8F9FD5AC49C582076590EB2D357C43DFD550243EECF1132E1",
+          "gitBlobOid": "90b99ee4794dedc7c38367fcd29e035380f30c6a",
+          "bytes": 3075551
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+          "sha256": "0DFEB806BFD0556D339E36A84A2C1BC02369D930142B1E80A91CC11CE8798D8D",
+          "gitBlobOid": "77818fccdb45ff84fba08644d311a0146aba990a",
+          "bytes": 76166
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_guard_test.dart",
+          "sha256": "07FF247E0BD3D5723684EB9D2D964256FF412E8485563F2E86CC93B08018882A",
+          "gitBlobOid": "ba6eefe5ce1cd7ca1e4a258da52129ccd3cdb0bf",
+          "bytes": 23093
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_integration_test.dart",
+          "sha256": "62622ECDD2943569A447BBF67A97112238815D82D26A8D6BA41884F0D5BE1542",
+          "gitBlobOid": "ab63ef38408936a2af290c3aebc9e71d53fcb7da",
+          "bytes": 28689
+        },
+        {
+          "path": "apps/mobile/test/assistant_profile_context_test.dart",
+          "sha256": "1ECF64F5F5616593D77A9F08056780AF1D2A9A4AFDFD1C9A4456E628E843FD8E",
+          "gitBlobOid": "c92a9cfd087af7007bcfdf64330dd2b586ab3f42",
+          "bytes": 42768
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_flow_test.dart",
+          "sha256": "B28A93CB0D149BDE6D5F9626FB16A1735CAAFA7A92A85FCF54D2D95ED71DD045",
+          "gitBlobOid": "f10032c3246ec403981fa5e08caa9b406de4ba29",
+          "bytes": 21891
+        },
+        {
+          "path": "apps/mobile/test/mool_assistant_test.dart",
+          "sha256": "243464A4A4BC28DF08880001EB54DD1305F4AB363359A7589AFF1292641A5F8B",
+          "gitBlobOid": "047997523bc4f1b5d1eb29be01791301ed527980",
+          "bytes": 209745
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.ts",
+          "sha256": "7EC95DF6BE7D93D97BC97E27282302244EB0C42581919125B979571ECDB007DE",
+          "gitBlobOid": "f5bdac2c5b88f765fd6a26fa4dcced6508f14119",
+          "bytes": 12863
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.test.ts",
+          "sha256": "18D92CB9E196D1F501B2F85A60875A4C48548EA4135F5952889EC60518EACC44",
+          "gitBlobOid": "cb55eec4c1059396702bc35740cb7de543668229",
+          "bytes": 8615
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.ts",
+          "sha256": "F67AEA9155662E9120348FA2425568FF6AB64594CB3295C6BF04D77067131EB5",
+          "gitBlobOid": "8f7ab8ba82ef48fbba30ae513ae31dfda2647067",
+          "bytes": 30127
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.test.ts",
+          "sha256": "CFE0386B8FFB2072089381FA5EF5AFD0933516C21B228CD35B172C3069F10F97",
+          "gitBlobOid": "cf09fe0a6095a6bb17cd2477dd39db97c1179fbf",
+          "bytes": 37545
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/model_gateway.dart",
+          "sha256": "4A9CD24EF2E358A4E0B0F448E102C1E9FAAFE6B0CBD96B354A169D8AC3A4D8BA",
+          "gitBlobOid": "aa3d4a5348f5a138bf0a6aa15f252142d032cb35",
+          "bytes": 24008
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_gateway_test.dart",
+          "sha256": "EF8151C941E70B1309E1C3EADCFDE811D16213B44A380DF91DEDC8DC1D36A7C0",
+          "gitBlobOid": "ae8cb1b4359d2f159356f3b7b3374b7d72e1d17b",
+          "bytes": 16649
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+          "sha256": "19D16C732CD0393893DEBFCDAF3EBF3B3A9F8E89FF397E343D1C156E23A37D32",
+          "gitBlobOid": "bb133d828d23fb78a32496f8bb74bc39fd950e71",
+          "bytes": 109322
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+          "sha256": "A0768A986E677D4B6A65B656D6BF17D89A659F2E7C28301EE51724E575765600",
+          "gitBlobOid": "51c5b3a9fa0b15b49850304cd4c423a402cee2eb",
+          "bytes": 578215
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_session.dart",
+          "sha256": "D2F8ABBCFEECD1497C6667066849A6985DCE12E60B22B07995D2E01050E81D97",
+          "gitBlobOid": "c6a30f349966b7122904332a921be49d8328ff22",
+          "bytes": 961579
+        },
+        {
+          "path": "apps/mobile/test/work_workspace_layout_safety_test.dart",
+          "sha256": "3E552BF67838C25A0A5C14839EBC913FFB3D9F3E00AF9557D44210BBB3889D1A",
+          "gitBlobOid": "cc52bd2f2019d6a4b37ed5aafe0e962408f7e0ce",
+          "bytes": 4678947
+        },
+        {
+          "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "sha256": "20A44A435133BEB96D13B5ACD3FA6EFFC3B06F6EF3654D87C51CAF7CA423C3C5",
+          "gitBlobOid": "47b1f54950179f0f9acb6fa03fad7f8b480f4e9f",
+          "bytes": 875311
+        },
+        {
+          "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "sha256": "A8FBA26E9357025C951F6CF5904EA8F671AF5D2C19B8BE16F89DE323C1D90567",
+          "gitBlobOid": "00a2a79d20ba56c4d016af575c53aed838e7ab9d",
+          "bytes": 950105
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_catalogue_service.ts",
+          "sha256": "9F58E4D839AC0A1388BDD6E28B5B0FF8D122C592DCE9712BEB8F1071706E2034",
+          "gitBlobOid": "9633b7d652e9ec7911cbc1fde430c7d23c450ecc",
+          "bytes": 379010
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+          "sha256": "C2BFC3AFEEBFA913981CA27ACA146BF2B6FB3C15F45238465506174ED9948740",
+          "gitBlobOid": "4b6ec558905162c60198daca23871e97a820b13d",
+          "bytes": 495548
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_services.dart",
+          "sha256": "D93F4925B35C9E9CABA431511DEF3F3AB3A9E5BBC9B1984B4DF5904B393335F6",
+          "gitBlobOid": "ee34928039cda0c59b01031d03016fcbe68dfad8",
+          "bytes": 472108
+        },
+        {
+          "path": "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+          "sha256": "84BE1755B4E2A2BCE00B31B4EE7B39E70A67A0CB73D2CA577DF41E76AAB785B3",
+          "gitBlobOid": "9f1c8ca8e01404bd9247d845ff0ef0cfa121e26e",
+          "bytes": 130055
+        },
+        {
+          "path": "apps/mobile/test/work_catalogue_gateway_test.dart",
+          "sha256": "D47442FFD100048BFA85FB01B2F92168A2F230958DCF2366A23EB72FC19F4D6A",
+          "gitBlobOid": "19da0eefa892b15793fb58e9c0d153d396e66342",
+          "bytes": 1212240
+        },
+        {
+          "path": "apps/mobile/test/store_add_product_sheet_test.dart",
+          "sha256": "68B2513FCC87FD68E70939D657701898AC95C1793440B19CB553858F4FD370DE",
+          "gitBlobOid": "89bd95cf1cbe62396c14bb2086c35c55d52bd386",
+          "bytes": 15577
+        },
+        {
+          "path": "apps/mobile/test/work_saved_product_draft_test.dart",
+          "sha256": "1186C9D39107776FD88B4253C61F114C7C4050AB32DD0A5C67C6330D82BABA58",
+          "gitBlobOid": "7eaf0a479beac2f23be9d2240b28ef9afaae2922",
+          "bytes": 29988
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_service.ts",
+          "sha256": "B061CBBB6876361A4E9C4C426E00705516C00CEA58589D328B1CFF35B07BC1F0",
+          "gitBlobOid": "d45939b9a3d8c858d136f8be515b87e93cef947a",
+          "bytes": 45643
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_repository.ts",
+          "sha256": "41224490B2B8C15760878AB0316B9E305BAA7E7FE8FB5E0B43449D7139A1C473",
+          "gitBlobOid": "f859d6e3e4cc17deb386d03d5c46abd64ae7c9d1",
+          "bytes": 19418
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_service.test.ts",
+          "sha256": "997DC49C43F9D7402F4FD30BEFC1FA20E6CF5D3BC33C4ED86E72B933E39A11F7",
+          "gitBlobOid": "88c1e4a2f01c62d2955e6d439f438dc1b7c91395",
+          "bytes": 40256
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_purchase_entry_gateway.dart",
+          "sha256": "A4F538F09F46C63625453ABEEF6C2E5C25BE35F20AC2A6148EF267A93D35E033",
+          "gitBlobOid": "13966bf7f0930f5769b8aa796af7c85c11d3eb48",
+          "bytes": 41467
+        },
+        {
+          "path": "apps/mobile/test/work_purchase_entry_gateway_test.dart",
+          "sha256": "5B3866CA06A1CC53AFB64680224604EC6525D67E4A8D441009C4E35196B1A3E6",
+          "gitBlobOid": "9d10cb6a844ad8cd616456e00b3fd18d6e784a45",
+          "bytes": 35352
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_ledger_service.ts",
+          "sha256": "104FF6F5B16C8434500AF519D346B6DA4A71D09C452C3A6CBD1FD50DB3BCC556",
+          "gitBlobOid": "1edca9a4efcc95be07c18752866a3f573083809f",
+          "bytes": 116606
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_ledger_repository.ts",
+          "sha256": "C8CC64065187B0FD272C574D1F288EB697F609F6BECAA66E42C39EA8FC284CD8",
+          "gitBlobOid": "2c69448fe52599aa63df69e359ee9541a86cc8aa",
+          "bytes": 58937
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_ledger_service.test.ts",
+          "sha256": "94B4D5D7D58F2DB5E10D6C65B95A427CB25B93A9A73233D51D44F187A95F0C9C",
+          "gitBlobOid": "70621aab33ad7b2ec96bba63ebce8fa247f6d6ae",
+          "bytes": 254322
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_ledger_gateway.dart",
+          "sha256": "93AFA5BA18AE9B395A1EC3A7AF0CE7EA39D702C7059D88BC633A02C16C33A835",
+          "gitBlobOid": "add8d7107f0ba4814d12b6a2934fd4f1f5f4531e",
+          "bytes": 50487
+        },
+        {
+          "path": "apps/mobile/test/work_ledger_gateway_test.dart",
+          "sha256": "01841ACF92815AC7A3ABB4CEDA76AFE28015154CE7B63FCB1F33EE7929CF60E6",
+          "gitBlobOid": "3b7a049d70eb9d6a823eebf414e41a318f34b019",
+          "bytes": 136623
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_models.dart",
+          "sha256": "63A1252AD940E5B6400C98C4AF10ADF826B04FF804D838C389921F5F64A440E7",
+          "gitBlobOid": "be88c0651ead3e8508e21d7071466b34294d2786",
+          "bytes": 651841
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_customer_service.ts",
+          "sha256": "67C8F506F58854EDC101DDD2F0F5F845411A240B5EE406ED6EB1A0682FA50EB8",
+          "gitBlobOid": "dacb11574d29fdc26a6e87d8f3020a9574c3f962",
+          "bytes": 30561
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_customer_repository.ts",
+          "sha256": "79278A56B0D07AF2A0FF0159643B113F5E872D7EDB35C29677C49E0A4046208B",
+          "gitBlobOid": "5e882a9040c9a3ac7d07ad2f245b3ddc7af53a73",
+          "bytes": 13419
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_customer_service.test.ts",
+          "sha256": "C52888B0134C1C2DC195210674F9C852BB5C70A4E64B76864FF0D9F69ABC0A8E",
+          "gitBlobOid": "bed5fd44a98baeb4878223f750b3b19ec6a53374",
+          "bytes": 41398
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_customer_gateway.dart",
+          "sha256": "F9F3DE7C56B4AF8FDA41636894C7D15D6661A45E583260FD3698B1200DD62044",
+          "gitBlobOid": "e914abe22f1e7f07c6587861ba27cfd8db60eb65",
+          "bytes": 23046
+        },
+        {
+          "path": "apps/mobile/test/work_customer_gateway_test.dart",
+          "sha256": "10C5C0045EF29CBE4ECA4A25ECBDA26C0190DAB15007BEB0398E61B112C3E65C",
+          "gitBlobOid": "ee202818a1d6bef391b6f654c7e54912a08db6c5",
+          "bytes": 52150
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_projection_service.ts",
+          "sha256": "19D3EBDE04C338D3DCDE5514415A6B94DA14E61DBB67AF991FBB04D1DC2BAFA5",
+          "gitBlobOid": "ef8d30a915216c74fa495503af272ceb520b9a48",
+          "bytes": 173925
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_projection_service.test.ts",
+          "sha256": "356CED692B3BD0F4E115FE51591B04E420D0C4751A2C98D56E29D86ABE790641",
+          "gitBlobOid": "b1ceba9bb28cc5d1c40f3d1a1504c25245e2053f",
+          "bytes": 217771
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_order_identity_gateway.dart",
+          "sha256": "FD83015B1B8A7E65E32A423D9D9E396D97D64EE05680F4E8ACEAB6A46408DE52",
+          "gitBlobOid": "659b8954cedd740c1fa4f4c128f29fc2ae43d731",
+          "bytes": 160030
+        },
+        {
+          "path": "apps/mobile/test/work_order_identity_gateway_test.dart",
+          "sha256": "528657AE577273048EF1578662B4F5FCFD977943803B17314C6A60F9DD1C8A27",
+          "gitBlobOid": "f5b01a2928209f03457c73b1ea5e7fd2978e5e63",
+          "bytes": 323675
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_promotion_service.ts",
+          "sha256": "9A639333FBD5481F8289BBFA2EF6F98F379C34D37A90755E48DB799EF0E61C18",
+          "gitBlobOid": "a4878e03e966edf131f83f79c274cad944a428a2",
+          "bytes": 143755
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_promotion_service.test.ts",
+          "sha256": "700586C25587E8875089A0F19AC66A923CEDF4F613DAC7274A41D49480EEBC61",
+          "gitBlobOid": "43be0ae9f67a6212ee05597d381f6800ac694c67",
+          "bytes": 133327
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_coupon_v2_codec.ts",
+          "sha256": "24C9CF2C38E62B238B0FF779EB2334DBC6AC63F5B7138878DDD0F73770B95FC9",
+          "gitBlobOid": "89e042bc25d4b4f7139c7ed41d38cf3199f130be",
+          "bytes": 15477
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_coupon_v2_codec.test.ts",
+          "sha256": "A506ACC7EB3921F8A0D6C2BB43C12AF5A06330FA8196E3DD6B1F945D90748C87",
+          "gitBlobOid": "6057914770824ca667df7498ed83518d88da85f5",
+          "bytes": 11075
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_product_promotions.dart",
+          "sha256": "FD013A93089F2B9A4B5C4D7AD8BFCE0C76526FFD0DF6AF24966FA7B6FABB9950",
+          "gitBlobOid": "911004e73170c71b1760697ee12ba7f5e21167e1",
+          "bytes": 76681
+        },
+        {
+          "path": "apps/mobile/test/work_product_promotions_test.dart",
+          "sha256": "5558AC079D6CE89895F190538D9C9F3FD5F2A1D85FC320C00E79F001BBD61162",
+          "gitBlobOid": "d699a2ea3bd4a4b455962a784f81a8c51de683ad",
+          "bytes": 168518
+        },
+        {
+          "path": "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+          "sha256": "A49007DCD2F8919CD7DBD529D00257DF3DD0E4062E05A1AC9BCC3C2C1879F964",
+          "gitBlobOid": "f01b0de2f1a9958c31e4ad7c025796719c190120",
+          "bytes": 194953
+        },
+        {
+          "path": "apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart",
+          "sha256": "971A9952376AD82226E9CFD31B7B45AFAAC68D2CFC1EEE3DE6401B6D2C315D1D",
+          "gitBlobOid": "bc9e224ccf17d60de4f83917203a374dd1f33d77",
+          "bytes": 8534
+        },
+        {
+          "path": "apps/mobile/lib/features/work/widgets/store_product_promotions.dart",
+          "sha256": "4DC656859D7C7FB9DC54F8C55194A391446F1CB069811D7A12115E0B07B84D68",
+          "gitBlobOid": "651507d61bbe90399e1b29e844ff6bc2251441f3",
+          "bytes": 104156
+        }
+      ]
+    },
+    "disposition": {
+      "wholeAggregateComplete": false,
+      "oppoCurrentSourceQualified": true,
+      "populatedStoreDeviceQualified": false,
+      "connectedAuthenticRuntimeAuthorityAvailable": false,
+      "syntheticFinanceSnapshot": false,
+      "cloudActivation": false,
+      "financialLivePosting": false,
+      "founderApprovalClaimed": false,
+      "productionAcceptance": false,
+      "implemented": [
+        "Versioned native/backend coupon v2 source, paged literal originals, exact immutable receipts and explicit capability negotiation",
+        "Actor-owned private draft backing, observational recovery, exact native Save/retry and opaque309/310 original Review handoff",
+        "Original public structured projection and stable catalogue SKU/pack/listing/channel joins without private buyer references",
+        "Original bill/product discount eligibility, per-Store exact paise, selected SKU/channel checks, immutable origin and purchase hold lifecycle",
+        "Native versioned eligibility query/result and actual SDK wire parity; unsupported buyer/history/reward authorities stay unavailable",
+        "Demonstrated enlarged-text Cart overflow fixed by scrolling header with items while preserving pinned confirmation"
+      ],
+      "checks": {
+        "backendSDK": {
+          "passed": 292,
+          "failed": 0,
+          "skipped": 0,
+          "folder": "aggregate09-coupon-sdk-v10"
+        },
+        "nativeCombined": {
+          "passed": 210,
+          "failed": 0,
+          "skipped": 0,
+          "file": "aggregate09-native-coupon-cart-full-v19.log",
+          "includesOriginalReadOnlyBenefitCases": 27
+        },
+        "countsOverlapHistoricalRuns": true,
+        "analysisErrors": 0,
+        "analysisWarnings": 0,
+        "analysisStyleInfosRetained": 523
+      },
+      "countsOverlap": true,
+      "oppo": {
+        "aggregate": "09",
+        "runtimeOwnersVerified": 24,
+        "sourceOwnersPreserved": 71,
+        "savedDataFingerprintsUnchanged": 108,
+        "currentSourceRestartVerified": true,
+        "reachableScreens": [
+          "Existing Cart recovery hold; untouched",
+          "Coupons manager with retained private draft",
+          "Full saved coupon editor and unchanged close"
+        ],
+        "visualAssessment": "No demonstrated blocking clipping, overlap or unreachable control in inspected stable states; approved layout preserved",
+        "technicalAssessment": "Final exact VM24, source71 and protected108 parity verified. Two fresh unchanged editor returns passed. Earlier navigation observations retained separately.",
+        "noInputSavePublishRecoveryOrFinancialAction": true,
+        "phoneDataInjected": false,
+        "populatedAuthenticBackendQualified": false,
+        "paidStoreAIQualified": false,
+        "productionAcceptance": false,
+        "founderApprovalClaimed": false,
+        "limits": [
+          "Evaluation has no connected authenticated v2 private/public eligibility or paid Store AI services; those paths remain host-qualified only",
+          "Existing Cart recovery hold retained; no live eligibility/redemption demonstrated",
+          "Snapshot04 returned a null accessibility root and stale hierarchy; excluded in favour of fresh stable05",
+          "Current enlarged-text Cart correction is host-qualified, not populated authentic Cart/device qualification"
+        ],
+        "finalScreen": "17-editor-close-second.png",
+        "additionalSameSourceReview": "Earlier v4 inspected AI and inline coupon task; those native sources remain unchanged. No paid Store AI execution claimed.",
+        "cartLargeTextFix": "Current Cart-view source loaded; host combined210 and all27 original benefit checks pass. Populated Cart remains blocked by retained original recovery hold.",
+        "supersedes": "ASSESSMENT.json final-navigation claim; retained unchanged for audit",
+        "verifiedEditorReturnSnapshots": [
+          "15-editor-close-verified.xml",
+          "17-editor-close-second.xml"
+        ],
+        "finalPreservation": "PRESERVATION-FINAL.json",
+        "navigationObservations": [
+          "08 unexpectedly showed Profile rather than Coupons; excluded as a verified return. Cause not established.",
+          "10 center-tap of full-window Profile dismissal scrim hit a menu item; this is not a valid scrim-dismissal test. Native Back safely returned to Store.",
+          "Two fresh exact editor-close observations15 and17 correctly returned to the retained Coupons list."
+        ]
+      },
+      "preservation": {
+        "sourceUnchanged": true,
+        "sourceOwners": 71,
+        "savedDataUnchanged": true,
+        "beforeCount": 108,
+        "afterCount": 108
+      },
+      "acceptedContract": {
+        "text": "# AI-AGG-09 — existing private coupon, versioned terms and Cart source joins\n\nStarting checkpoint: clean and independently origin-exact\na665d21f8fbef116a58b967df4bea243a8fc0a6e on\nwork/codex-backend/ai-domain-batch-20261028. Existing approved UI reference remains\nc9d03bb37b6115f7fe63f3f1dd819892dc037fc9. Standing founder authority covers narrow\ncontract/owner reconciliation for this existing ticket; this is not a claim of\na new founder review of this exact document/hash.\n\nThe linked Scope18 and Scope06 evidence hashes have been checked. Preserve the\nqualified v1 manager/editor/publication review308-310, pending-command recovery,\npersonal Cart/non-stacking and Clear Cart. No redesign or new offer scheme.\n\n## Original input and source\n\nUse the already implemented StoreCouponCampaign v2, StoreCouponInput v2,\nStoreCouponIntent and StoreCouponRecord v2, BuyV2StoreOfferTerms v1 and public\noffer projection. The seven existing kinds are billDiscount, productDiscount,\nquantityPrice, nextPurchase, buyerDiscount, dealerIntro and extraQuantity.\nNative validators, selected SKU/selling-unit/listing/channel identities, dates,\ninteger minor-unit/quantity limits and private buyer-reference semantics are the\ninput contract; do not invent prices, thresholds, buyers, dates or terms.\n\nThe v2 input retains its exact native keys: schemaVersion, name, structuredTerms,\nbuyerReferences, startsAt, endsAt, totalUses, usesPerCustomer and active. The\nprivate publication record is the native v2 envelope with accountId, realm,\nstoreId, couponId, revision, observedAt and coupon, not a flattened v1 record.\nRecord accountId is the authenticated read scope. It is not permission and must\nnot be used to invent owner-transfer rules or adopt another account's drafts.\n\nPreserve literal nested ordering/strings where native pending fingerprints\ndepend on them. Keep semantic source hashes distinct from raw native intent\nfingerprints and from native campaign/server CAS revisions. Preserve canonical\nnative UTC timestamp precision without rewriting incoming v2 terms. Keep the\nexisting stricter v1 serialization unchanged. A pure backend codec may reuse the\nexisting canonical catalogue payload hash; it does not become a second master.\n\nExtend the existing save/read/list/reconcileStoreCoupon and public terms readers\nthrough explicit storeCouponTermsVersion2 negotiation. Keep legacy v1 requests,\nstored records, exact receipts and status semantics supported. Mixed-version\ndata must never silently lose structured records or downgrade them to v1.\nPrivate source reads/writes require current account/realm/Store authority. Public\nprojections expose allowlisted terms only, excluding account and buyer references.\nConfigured/published terms never prove buyer eligibility, reserved Stock, an order,\nredemption, remaining uses or confirmed Checkout savings.\n\nUse the existing original Store promotion repository/collections and native\ngateway/controller. Store/SKU/pack/listing/channel joins use original catalogue\nidentities and current permissions, rather than titles or today's guessed data.\nDo not replace original pending results when current terms subsequently change.\nSame retained operation and command returns the immutable original result; a\nchanged command conflicts. Status is observational and never resubmits.\n\nNative bounds include up to1000 selected SKUs and buyer references. Valid large\nterms must not be squeezed into one Firestore document or the legacy60KB wire\nlimit. Use bounded immutable version pages/literal payload storage under the\nsame original owner, with hashes/counts and exact reconstruction. Limit negotiated\ncoupon operations to8MiB request/response frames; keep unrelated/v1 limits.\nBound list pages by rows and bytes with truthful continuation. Complete public\nsnapshots preserve their existing completeness/unsupported contract, rather\nthan returning a truncated complete result or an invented empty catalogue.\n\n## Existing unpublished private draft\n\nThe existing actor/Store-owned native coupon book remains the editable source.\nAn authenticated durable backing record may retain that same campaign ID,\nnative revision and literal campaign, separately from the publication record.\nIt is not a new coupon master, publication or adoption of a remote-only draft.\n\nUse explicit save/read/list/reconcileStoreCouponDraft operations, negotiated by\nstoreCouponDraftVersion1. Save/reconcile carries storeId, couponId,\nexpectedSourceRevision, idempotencyKey and the existing campaign. Reads carry\nstoreId/couponId; lists use the existing bounded after/limit convention. The\nresponse binds accountId, realm, storeId, observation time and source revision,\nwith a null or exact campaign record and publicationConfirmed:false. Keep\nnative revision, server source revision, canonical source fingerprint and the\ncurrent published CAS head separate. Never invent a published head for a draft.\n\nOnly the existing explicit native Save may persist/synchronise a private draft.\nRetain its original unknown-result command before dispatch and recover by exact\nstatus. Preserve the local saved book and later edits on timeout, restart,\naccount/Store change or remote conflict. A read, model preparation, Review or\nopening the manager cannot save/synchronise/adopt a campaign, consume pending\nrecovery or clear publication status. Missing private backing means unavailable\nselection, not a made-up canonical ID. Opaque model selectors map only to original\nactor/Store-bound private IDs; do not broaden global ID validation.\n\nAI309 may prepare edits to an exact saved private original; AI310 may review its\nfirst publication when the original publication head is absent. Match original\nprivate bytes/revision and current published head before/after preparation and\nagain at native Review. Native final Save, funding acknowledgement and\nPublish/update/Pause remain explicit. Do not overwrite private edits from remote\nterms or construct a fake published record to open the existing form.\n\n## Cart, eligibility and usage\n\nExtend the existing authenticated eligibility/selection and original purchase\nusage-hold owners; do not create another Cart, pricing engine or usage ledger.\nBind the buyer and exact current Store, SKU, pack, listing, channel, quantities,\ncoupon/source revisions, price/quote and selection policy. Coupon/price/quantity/\naccount/source changes retire stale selections. Keep one exclusive offer per\nStore in a mixed-supplier Cart and the approved non-stacking behaviour.\n\nConfigured terms alone do not establish buyerDiscount identity, dealerIntro\nbusiness/first-order eligibility, nextPurchase qualifying completion/time/window,\nusage or redemption. Use an accepted original fact source or return an explicit\nunavailable result. Do not infer dealer status from a Store-type label or GSTIN,\ninvent purchase history, promise a future reward or equate an advertised limit\nwith remaining uses. Quantity prices and extra quantities must retain their\nexisting meaning; never represent a free physical reward as a made-up money\nrefund or force an unsupported reward through the legacy money-only allocation.\n\nEligibility is a candidate, not a reservation or final quote. The existing\noriginal purchase transaction must revalidate terms, allocations, usage and any\nreward Stock before a confirmed outcome. Existing internal hold/use events remain\nthe only authority for held/consumed/released usage; client reads do not create\nevents or release a hold. Unavailable Checkout/payment sources remain explicit.\nPayment integration and live redemption stay excluded.\n\n## Qualification and owners\n\nCompare actual native-emitted wire/intent fingerprints with the backend codec\nand actual Firestore SDK round trips, including all seven kinds, Unicode,\ncanonical date precision, nested ordering, native limits and paged large records.\nTest ownership/realm/Store and SKU/channel separation; private/public projection;\nstale private/public revisions; duplicate/change/conflict; expiry/cancel;\ntimeout/restart/original-status recovery; pending draft preservation; revocation\nand late responses; mixed-Store eligibility and original hold revalidation.\nRun relevant v1 regressions unchanged. Host fixtures are labelled and never\ninjected into OPPO. Inspect reachable current-source OPPO and preserve saved-data\nfingerprints; report missing authentic records/services as unverified.\n\nNecessary additional owners: existing workspace_promotion_service.ts and test;\nnew pure workspace_coupon_v2_codec.ts and test; existing work_product_promotions.dart\nand test; existing buy_v2_content_contracts.dart and its test. The separately\nreserved buy_v2_benefit_selection_continuity_test.dart stays unchanged and may\nrun read-only; new integration cases use already owned tests. Reuse the already admitted index,\nrequest-bound helper/tests, domain/model sources/tests, WorkSession, catalogue\ngateway/tests, native dashboard/layout tests and assistant adapters only where\nrequired. No unrelated owner or dependency admission.\n\nSeal tested source/evidence, clean state and exact named-branch remote readback\nbefore ticket10. No Google activation/deployment, payment/provider connection,\nlive model/media, admin, APK, live publication/transactions, new commercial rules\nor policy/governance development. This contract does not claim full agent,\npopulated device or production acceptance.\n\nAdmission reconciliation v2: eight necessary additional owners. A different\nrecorded task owns the existing benefit-continuity test; no takeover or edit is\nauthorised. This is a narrower owner list, not a feature/scope change.\n\nContinuation v3: source08 native text parity correction is separately sealed\nand origin-exact at this starting checkpoint. Preserve its source/evidence;\nresume only the same eight necessary09 owners. No new feature/scope authority.\n\n\n# Existing native private-draft recovery surface\n\nThis is a narrow continuation of AI-AGG-09 under the founder's standing exact\nadmission authority. Baseline HEAD6580507d5eb04da564c77e9215a5ca4c0b5b6bcc\ncontains only the previously admitted metadata checkpoint. Preserve its prior\nadmission and all current unsealed source preimages. No new founder screen\nacceptance or new business rules are claimed.\n\nAdmit only apps/mobile/lib/features/work/widgets/store_product_promotions.dart.\nReuse the existing native Coupons manager. Only when its explicitly configured\nprivate-draft connection exists, restore the original private pending journal\nobservationally on manager entry. Do not synchronize, save, publish, adopt a\nremote-only campaign, reconcile automatically or consume recovery on opening.\nThe approved default-disabled layout remains unchanged.\n\nWhen an original private save is unresolved, show a compact status with Check\ndraft save and Retry original save. Check is status-only. Retry requires an\nexplicit native confirmation of the exact retained original, preserves its\ncampaign and idempotency identity, and never sends a later local edit instead.\nCancellation, account/Store/navigation changes and repeated taps must not issue\nanother effect. A non-acknowledged original remains retained. Keep private save\nrecovery separate from publication recovery and native final publishing taps.\n\nUse the already admitted coupon test owner for status-only entry, unknown result,\nexact confirmed retry, cancellation, stale context, enlarged text and disabled\ncapability checks. Host fixtures remain labelled and never injected into OPPO.\nReinspect current-source reachable OPPO and preserve all protected data after\nimplementation. No unrelated redesign, payment, cloud, APK or live operation.\n\nThe admission reconciliation is one exact five-file metadata-only commit. Bind\nall70 current admitted source preimages plus the unchanged existing widget so\nthat this amendment cannot hide or replace unsealed work. Source/evidence seals\nstill require their separate tested checkpoint and exact remote readback.\n\n\n# Existing structured coupon public-source join\n\nContinue only the accepted AI-AGG-09 public projection/source requirements.\nKeep v1 readers and receipts unchanged. Negotiate v2 explicitly with the same\nexisting public coupon operations and complete-snapshot envelope. Reuse the\noriginal Store coupon heads, immutable revision pages and current approved\nprofile; do not create another public coupon master.\n\nThe private draft may contain no public listing bindings. Public readers may\nenrich the allowlisted configured terms ONLY from the original catalogue's\nsource-issued listingReadbackVersion1 bindings for that exact Store/SKU/pack\nlabel and selected channels. Never manufacture listing IDs from names or a\nclient digest. Verify any retained bindings against the original current\nbindings, including their exact listing digest and canonical product/pack IDs.\nKeep private records, buyer references and account IDs out of public output.\nNo persisted draft/publication input or receipt is rewritten by a read.\n\nReturn the existing BuyV2PublishedStoreCoupon.offer display contract. This is\nconfigured advertisement, not buyer eligibility, applied savings, remaining\nuses, a quote, Stock reservation or redemption. A selected-buyer configuration\nrequires the missing accepted customer-record to authenticated-buyer link;\ndo not equate its private customer reference with a Firebase user. Until that\nsource exists, report unavailable instead of silently claiming a complete\nsnapshot without those active offers or leaking the targeting list.\n\nRetain precise inactive/future/expired handling, bounded completeness and frame\nlimits. Re-read current coupon/profile and the required catalogue identities\naround asynchronous projection. A changed, partial, timed-out or unsupported\nsource is unavailable, not empty. Preserve mixed legacy/v2 configuration and\nthe existing public high-water protection.\n\nOnly the existing already admitted service/test, native catalogue reader/test\nand Buy public contract owners are needed. Use isolated host/SDK originals and\nactual native wire comparisons. No live publication, phone fixtures, Google\ndeployment, payment or new promotional/eligibility rule is authorized here.\n\n\n# Existing bill/product discount eligibility and immutable usage\n\nContinue only AI-AGG-09. Reuse the original authenticated coupon-price snapshot,\nmoney allocation, exclusive Store selection and purchase usage participant.\nDo not add a second Cart, pricing engine, ledger or redemption endpoint.\n\nThe currently actionable v2 money kinds are billDiscount and productDiscount.\nUse their existing flat/percentage/minimum eligible spend/cap and exact selected\nSKU/channel fields. Retain the original floor-once/per-Store exact-paise\napportionment. Non-selected lines and other Stores receive no allocation. Bind\nStore/SKU/public listing/canonical product/verified pack/source revisions,\nquantities, price and agreed quote inputs. Preserve the existing one-offer-per-\nStore replacement and final-quote checks; no automatic stacking or new rule.\n\nKeep storeCouponEligibilityVersion1/2/3 as the existing price-context protocols.\nNegotiate structured configuration independently with storeCouponTermsVersion2\non the existing eligibility operation. Return that marker only for a negotiated\nv2 result. Preserve every legacy request/result byte contract. The common money\nallocation/result and final native confirmation remain; native checks current\nidentity/price/quantity/eligible allocations and does not invent an amount.\n\nThe server alone resolves current configured terms and usage. A candidate read\ndoes not reserve, initialize or consume usage. Its opaque basket fingerprint\nbinds the full original v2 configuration and all original basket facts. The\nexisting purchase transaction recomputes/revalidates it against the same coupon\nrevision and immutable authoritative quote/order lines before staging a hold.\nV2 usage origins must verify the original immutable paged revision and receipt;\nretain v1-origin campaigns and exact historical status. No duplicate effects,\ncounter reset, guessed zero usage, public client hold or new lifecycle rule.\n\nDo not force quantity-price or extra-quantity schemes into a money result.\nSelected-buyer identity links, qualifying completed purchases/windows, business\nfirst-order facts and physical reward/price-quote authority remain named original\ndependencies until accepted sources exist. They are unavailable, not eligible\nby a Store-type label or invented history. Payment integration stays deferred.\n\nTest current-source wire parity, two kinds, selected/unselected/mixed Store and\nchannel/pack cases, exact paise, usage limits, source changes, duplicate purchase\nmaterialization, original receipt/lifecycle recovery and untouched v1 cases\nwith isolated host/SDK data. No phone authority injection or live order/payment.\nUpdate reachable OPPO assessment and seal tested source/evidence before10.\n",
+        "sha256": "F63BF5F331EFA51F04F776D7BCF7FBC29AF52F9EAE988A741F464C36FB172BC4",
+        "authority": "Existing bounded goal and standing narrow reconciliation; not new founder screen acceptance"
+      },
+      "remainingOriginalDependencies": {
+        "aggregate": "09",
+        "wholeAggregateComplete": false,
+        "notGoogleOnly": true,
+        "paymentIntegrationDeferred": true,
+        "dependencies": [
+          {
+            "area": "Buyer-specific offer",
+            "missing": "Original Store-customer reference to authenticated buyer identity link",
+            "resume": "Accepted identity readback; do not infer identity from phone text or Store type"
+          },
+          {
+            "area": "Next-purchase offer",
+            "missing": "Original completed qualifying purchase and issued eligibility/window readback",
+            "resume": "Accepted original completion/reward status contract; never invent history"
+          },
+          {
+            "area": "Dealer first-order offer",
+            "missing": "Original eligible business buyer and first completed business-order facts",
+            "resume": "Accepted business/first-order authority; GSTIN or Store category alone does not qualify"
+          },
+          {
+            "area": "Quantity prices / extra quantity",
+            "missing": "Accepted original price-quote/reward-line and reward Stock/fulfilment authority",
+            "resume": "Use original quotation and reward quantity/Stock contract; do not fabricate money savings or free physical lines"
+          },
+          {
+            "area": "Authentic device/live commerce",
+            "missing": "Connected authenticated original sources and paid Store AI; retained Cart recovery hold",
+            "resume": "Connect and qualify those services later; preserve holds and current local records"
+          }
+        ]
+      },
+      "limits": [
+        "Local SDK financial fixtures and isolated original price ports are not live order/payment qualification.",
+        "Only accepted bill/product kinds have original money eligibility; buyer/history/quantity-price/reward authorities remain explicit dependencies.",
+        "Final OPPO source24 and protected108 verified; populated Cart remains behind its retained original recovery hold.",
+        "Private publication backing and AI Review never replace native Save/funding acknowledgement/Publish confirmations.",
+        "Earlier navigation observations and failed fixture/layout attempts are retained, not relabelled passing.",
+        "No new schemes, business rules, policy/governance development, cloud/payment/model/media/admin activation, APK or live operations."
+      ]
+    },
+    "evidence": {
+      "backendActualSDKPassed": 292,
+      "nativeCombinedPassed": 210,
+      "originalReadOnlyBenefitCases": 27,
+      "analysisErrors": 0,
+      "analysisWarnings": 0,
+      "styleInfosRetained": 523,
+      "countsOverlap": true,
+      "readOnlyOriginalTest": {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",
+        "unchanged": true,
+        "sha256": "A3A8F66EAA0602D99673DCA2937AD9CE36D0E574F512B627F4A076EF1F4DA134",
+        "bootstrap": "aggregate09_original_benefit_continuity_host_v1_test.dart"
+      },
+      "hostOnlyPluginBootstrap": {
+        "source": "// Host-only plugin bootstrap. Original tests and application source stay intact.\nimport 'package:flutter_test/flutter_test.dart';\nimport 'package:flutter_secure_storage/flutter_secure_storage.dart';\nimport 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';\nimport 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';\nimport 'file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-domain-batch-20261028/apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart' as original;\n\nvoid main() {\n  TestWidgetsFlutterBinding.ensureInitialized();\n  setUp(() {\n    FlutterSecureStorage.setMockInitialValues({});\n    SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();\n  });\n  tearDown(() {\n    SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();\n  });\n  original.main();\n}\n",
+        "sha256": "1703B6FA285CDADADBC2C0F8B0A4D5737BDECEEBFB97C3B63A0BC64805FDA869",
+        "originalTestUnmodified": true,
+        "phoneInjection": false
+      },
+      "actualSdkMoneyWire": {
+        "fixture": "ISOLATED HOST actual SDK v2 original coupon and usage with isolated original price port; never phone authority",
+        "now": "2026-10-30T06:14:05.275Z",
+        "buyer": "host-v2-buyer",
+        "query": {
+          "storeCouponEligibilityVersion": 1,
+          "storeCouponTermsVersion": 2,
+          "storeId": "store-first-d006ff9f72d34a1ca1128f39e81e5416",
+          "couponId": "coupon-one",
+          "couponRevision": 1,
+          "selectionPolicy": "exclusive_store_basket",
+          "lines": [
+            {
+              "lineId": "listing-0a4923d7f458a9cc1c19670507ce6e33ff2f1a42120454fd81456d21d13750af",
+              "skuRevision": 1,
+              "listing": {
+                "schemaVersion": 1,
+                "realm": "evaluation",
+                "storeId": "store-first-d006ff9f72d34a1ca1128f39e81e5416",
+                "skuId": "sku-one",
+                "canonicalProductId": "canonical-sku-one",
+                "verifiedPackId": "pack-one",
+                "channel": "retail",
+                "listingId": "listing-0a4923d7f458a9cc1c19670507ce6e33ff2f1a42120454fd81456d21d13750af"
+              },
+              "offerId": "offer-retail",
+              "offerRevision": "offer-revision-1",
+              "quantity": 1
+            },
+            {
+              "lineId": "listing-f672ce32d94ce715c1a9f0b25f9c828aac135dab5365bb8d246de5e21cfd0f8f",
+              "skuRevision": 1,
+              "listing": {
+                "schemaVersion": 1,
+                "realm": "evaluation",
+                "storeId": "store-first-d006ff9f72d34a1ca1128f39e81e5416",
+                "skuId": "sku-two",
+                "canonicalProductId": "canonical-sku-two",
+                "verifiedPackId": "pack-two",
+                "channel": "wholesale",
+                "listingId": "listing-f672ce32d94ce715c1a9f0b25f9c828aac135dab5365bb8d246de5e21cfd0f8f"
+              },
+              "offerId": "offer-wholesale",
+              "offerRevision": "offer-revision-2",
+              "quantity": 2
+            }
+          ]
+        },
+        "result": {
+          "schemaVersion": 1,
+          "storeCouponEligibilityVersion": 1,
+          "realm": "evaluation",
+          "viewerUserId": "host-v2-buyer",
+          "storeId": "store-first-d006ff9f72d34a1ca1128f39e81e5416",
+          "selectionPolicy": "exclusive_store_basket",
+          "exclusiveSelectionRequired": true,
+          "state": "ready",
+          "eligible": true,
+          "reason": null,
+          "observedAt": "2026-10-30T06:14:05.275Z",
+          "validUntil": "2026-10-30T06:15:05.275Z",
+          "requestFingerprint": "E2630E0A3D51966F85B17BE92984004C277894E6932EDF55A719F2392A7B5129",
+          "orderingAvailable": false,
+          "reservationCreated": false,
+          "evaluation": {
+            "schemaVersion": 1,
+            "realm": "evaluation",
+            "storeId": "store-first-d006ff9f72d34a1ca1128f39e81e5416",
+            "buyerUserId": "host-v2-buyer",
+            "couponId": "coupon-one",
+            "couponRevision": 1,
+            "name": "Host Diwali savings",
+            "basketSourceId": "F10E4162D6218E8B2D6E8AF02C16F92C025C28E9BD46F309F791B7857F167686",
+            "basketSourceRevision": 7,
+            "basketFingerprint": "685B6043530B4F48E8955112B3F1E5652C9294561698DDC1ECAA65B8E3F1F511",
+            "eligibleSubtotalMinor": 20003,
+            "savingMinor": 1050,
+            "allocations": [
+              {
+                "lineId": "listing-0a4923d7f458a9cc1c19670507ce6e33ff2f1a42120454fd81456d21d13750af",
+                "skuId": "sku-one",
+                "packId": "pack-one",
+                "offerId": "offer-retail",
+                "offerRevision": "offer-revision-1",
+                "subtotalMinor": 10001,
+                "savingMinor": 524
+              },
+              {
+                "lineId": "listing-f672ce32d94ce715c1a9f0b25f9c828aac135dab5365bb8d246de5e21cfd0f8f",
+                "skuId": "sku-two",
+                "packId": "pack-two",
+                "offerId": "offer-wholesale",
+                "offerRevision": "offer-revision-2",
+                "subtotalMinor": 10002,
+                "savingMinor": 526
+              }
+            ]
+          },
+          "storeCouponTermsVersion": 2,
+          "attribution": {
+            "benefitRevision": "store-coupon-v1",
+            "sourceReference": "BDC0F236F5B3E620B9A9509CB3B9E00626949D8C3FE30DFC6D6603503AAB74CD",
+            "funderReference": "56CDD4AF82E5AA37E1B3B3E3ED7646837082B836FBA484231E302130C4986484"
+          }
+        },
+        "offer": {
+          "schemaVersion": 2,
+          "currency": "INR",
+          "realm": "evaluation",
+          "storeId": "store-first-d006ff9f72d34a1ca1128f39e81e5416",
+          "couponId": "coupon-one",
+          "revision": 1,
+          "name": "Host Diwali savings",
+          "publisherName": "Host Store",
+          "publisherType": "retailer",
+          "sourceId": "store-offer-v2:evaluation:store-first-d006ff9f72d34a1ca1128f39e81e5416:coupon-one:1",
+          "observedAt": "2026-10-30T06:14:05.275Z",
+          "validFrom": "2026-10-30T06:13:05.275Z",
+          "validUntil": "2026-10-30T07:14:05.275Z",
+          "structuredTerms": {
+            "schemaVersion": 1,
+            "storeId": "store-first-d006ff9f72d34a1ca1128f39e81e5416",
+            "kind": "billDiscount",
+            "skus": [],
+            "channels": [
+              "retail",
+              "wholesale"
+            ],
+            "discountKind": "flat",
+            "discountValue": 1050,
+            "minimumSpendMinor": 0,
+            "maximumSavingMinor": 1050,
+            "tiers": [],
+            "buyQuantity": null,
+            "rewardQuantity": null,
+            "rewardSku": null,
+            "nextPurchaseDays": null
+          },
+          "configuredTotalUses": 100,
+          "configuredUsesPerCustomer": 2,
+          "viewerAccountId": null
+        },
+        "page": {
+          "schemaVersion": 1,
+          "realm": "evaluation",
+          "storeId": "store-first-d006ff9f72d34a1ca1128f39e81e5416",
+          "observedAt": "2026-10-30T06:14:05.275Z",
+          "state": "ready",
+          "coverage": "verified_public_only",
+          "listingReadbackVersion": 1,
+          "listingCoverage": "complete",
+          "catalogueVersion": 7,
+          "nextCursor": null,
+          "items": [
+            {
+              "skuId": "sku-one",
+              "canonicalProductId": "canonical-sku-one",
+              "verifiedPackId": "pack-one",
+              "revision": 1,
+              "content": {
+                "title": "Host supplied product",
+                "variant": ""
+              },
+              "pack": {
+                "label": "Host pack"
+              },
+              "listings": [
+                {
+                  "schemaVersion": 1,
+                  "realm": "evaluation",
+                  "storeId": "store-first-d006ff9f72d34a1ca1128f39e81e5416",
+                  "skuId": "sku-one",
+                  "canonicalProductId": "canonical-sku-one",
+                  "verifiedPackId": "pack-one",
+                  "channel": "retail",
+                  "listingId": "listing-0a4923d7f458a9cc1c19670507ce6e33ff2f1a42120454fd81456d21d13750af"
+                }
+              ],
+              "channels": [
+                {
+                  "kind": "retail",
+                  "offerId": "offer-retail",
+                  "revision": "offer-revision-1",
+                  "validUntil": "2026-10-30T07:14:05.275Z",
+                  "priceMinor": 10001,
+                  "minimumOrder": 1,
+                  "quantityStep": 1,
+                  "tiers": []
+                }
+              ]
+            },
+            {
+              "skuId": "sku-two",
+              "canonicalProductId": "canonical-sku-two",
+              "verifiedPackId": "pack-two",
+              "revision": 1,
+              "content": {
+                "title": "Host supplied product",
+                "variant": ""
+              },
+              "pack": {
+                "label": "Host pack"
+              },
+              "listings": [
+                {
+                  "schemaVersion": 1,
+                  "realm": "evaluation",
+                  "storeId": "store-first-d006ff9f72d34a1ca1128f39e81e5416",
+                  "skuId": "sku-two",
+                  "canonicalProductId": "canonical-sku-two",
+                  "verifiedPackId": "pack-two",
+                  "channel": "wholesale",
+                  "listingId": "listing-f672ce32d94ce715c1a9f0b25f9c828aac135dab5365bb8d246de5e21cfd0f8f"
+                }
+              ],
+              "channels": [
+                {
+                  "kind": "wholesale",
+                  "offerId": "offer-wholesale",
+                  "revision": "offer-revision-2",
+                  "validUntil": "2026-10-30T07:14:05.275Z",
+                  "priceMinor": 5001,
+                  "minimumOrder": 1,
+                  "quantityStep": 1,
+                  "tiers": []
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "records": [
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG09-ORIGINAL-COUPON-CONTRACT-v3.md",
+          "sha256": "042752759CC1EB2E3BD52761EABCFD7CE7651DD1079F789A44D74E27C18C642F"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG09-DRAFT-RECOVERY-ADDENDUM-v1.md",
+          "sha256": "2A89C44ECE66D8C5F2EF4B642C0BE82F4AF63F7F0618DFBB8C51E8EE5349994C"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG09-PUBLIC-SOURCE-JOIN-ADDENDUM-v1.md",
+          "sha256": "857A97C3713D59751F04A823B111AB5D853D2746FCEC7514CC393CB454504573"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG09-MONEY-ELIGIBILITY-ADDENDUM-v1.md",
+          "sha256": "F76E17C68D0A91FAA047BFADA0FBD02758EBF0A2B2FCED47C99481653DBDFC97"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG09-FINAL-QUALIFICATION-v1.json",
+          "sha256": "CB326B84FC0B3B8198DB7B22CEBE0C15B263A06A746C8D5182FFC4FBBE5582BA"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG09-REMAINING-ORIGINAL-DEPENDENCIES-v1.json",
+          "sha256": "90F7ED6DDA6CB0EE3C75395CA518FE870CE514A8784A88B90FE1D88C0B95090A"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG09-CART-LARGE-TEXT-DEFECT-v1.json",
+          "sha256": "03F17CE41EB8E3D87A32B691E21DFCEEF7183EB486B639DA7C4C1D5658D435EA"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG09-PEER-REVIEW-LIMIT-v1.json",
+          "sha256": "E0C08269D9A68AABB0AAAAC700449AC0BBA07A5D75EF26D5AF64D5FD3EF93846"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-coupon-sdk-v10\\tests.log",
+          "sha256": "0A0347E1DFFABD922B32D9198291CD76E30604DF9D82E818F7D6FAEDBDDB2E37"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-coupon-sdk-v10\\RESULT.json",
+          "sha256": "3FFA21480FD820B586DC0237E10926591D14F59F26E48A0D250D4CB4D900F304"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-coupon-sdk-v10\\STOPPED.json",
+          "sha256": "47414E4A570CA87C2E36A08E26BB0E2BF9B5FF22727A038D8A97487BA7644C77"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-native-coupon-cart-full-v19.log",
+          "sha256": "75F06C45187BE20887666524D766676E892EE946FA6D24F5E2DC9ED0F95BC00B"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-final-native-analysis-v4.log",
+          "sha256": "E584903789D38EBA8B37ADCB36E48B550A0194AE4F9EC98644E4DB489CBA8950"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-tsc-v19.log",
+          "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-existing-benefit-continuity-v1.log",
+          "sha256": "59B3AECB982B26099DB8C3166932621ACF66A341A09FDF382F984C45FECEA0CF"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-existing-benefit-continuity-host-v1.log",
+          "sha256": "D2DB5FFE2A76A7C9C96086F1BECBC23799EAC2958B10ECEC317193C26E9630A5"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-existing-benefit-continuity-host-v2.log",
+          "sha256": "F4E55DD484239DB9A0A737BE3FE311ADD97340802305CA79072FD79ABE6C3284"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-existing-benefit-continuity-host-v3.log",
+          "sha256": "0DE962B36DE868A84CD883E8D3AA296CB692FE22DFA045B0F4E5CC987AA22103"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09_original_benefit_continuity_host_v1_test.dart",
+          "sha256": "1703B6FA285CDADADBC2C0F8B0A4D5737BDECEEBFB97C3B63A0BC64805FDA869"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-money-coupon-wire-v3.json",
+          "sha256": "E37DB5E7BBA9AC68C956D2EEBA987EBB3E49E0061D59D2AE4BF72AECC09C9E70"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-public-coupon-wire-v6.json",
+          "sha256": "5DE492754B0DEAD13FF1AC73D9D7AA1173426660B38CB40E24B7B8936EFC5476"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate09-before-source-seal-gate-v2.log",
+          "sha256": "ED7DDAE1D1FD04073B6B6BC4F60D744D37F1D4D6378EC2CFE34817ACF05BCCEA"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg09-coupon-source-v5\\ASSESSMENT-v2.json",
+          "sha256": "A922256A59E6EAE73D1EC14CEDE8628E9CB64F8B3399A3A8FE00D4A42E36E292"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg09-coupon-source-v5\\PRESERVATION-FINAL.json",
+          "sha256": "27CA0686F42CDF7432FE4D29DB6819F3A105301979D92C371F59CA024CC3931C"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg09-coupon-source-v5\\VM-SOURCE-VERIFICATION.json",
+          "sha256": "320B6E6BFCE20EC4575FC0DA8F093802C4AB51FF9DAACC92366FAA5A616DBD65"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg09-coupon-source-v5\\oppo-restart-gate.log",
+          "sha256": "4F832EDC4610A54E696CBD15E53A5AD33ECD20C2162083EB43DC91D7FF8555FB"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg09-coupon-source-v5\\SOURCE-RESTART.json",
+          "sha256": "5A5EB670E9C02C5D9CCB8A5487C2547607ADE18F3E82D7BE4D766B20ABD04063"
+        }
+      ]
+    },
+    "namedBranchPushAuthorized": true,
+    "productionAcceptance": false,
+    "sourceCommit": null
   }
 }
