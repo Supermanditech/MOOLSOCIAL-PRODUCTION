@@ -913,6 +913,30 @@ Check (!(Test-AiDomainRetainedOrderStatusCheckpoint $bad)) 'reject changed quali
 $bad=($retainedOrderStatusCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendContextPassed=0
 Check (!(Test-AiDomainRetainedOrderStatusCheckpoint $bad)) 'reject changed original-order-status evidence'
 
+$privateDeviceCheckpoint=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate08PrivateDeviceCheckpoint
+Check (Test-AiDomainPrivateOriginalDeviceCheckpoint $privateDeviceCheckpoint) 'exact host-qualified original private-original-device source checkpoint'
+Check (!(Test-AiDomainPrivateOriginalDeviceCheckpoint $null)) 'reject absent original private-original-device checkpoint'
+Check (@(Get-AiDomainPrivateOriginalDeviceStageOwners 0 $privateDeviceCheckpoint).Count -eq 3) 'three exact existing private-original-device checkpoint metadata owners'
+Check (@(Get-AiDomainPrivateOriginalDeviceStageOwners 1 $privateDeviceCheckpoint).Count -eq 17) 'seventeen exact qualified source owners'
+Check (@(Get-AiDomainPrivateOriginalDeviceStageOwners 2 $privateDeviceCheckpoint).Count -eq 1) 'one sanitized evidence owner'
+Check (@(Get-AiDomainPrivateOriginalDeviceStageOwners 3 $privateDeviceCheckpoint).Count -eq 0) 'no extra checkpoint stage'
+foreach($property in @('sequence','baseline')) {
+ $bad=($privateDeviceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainPrivateOriginalDeviceCheckpoint $bad)) "reject changed private-original-device $property"
+}
+$bad=($privateDeviceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.productionAcceptance=$true
+Check (!(Test-AiDomainPrivateOriginalDeviceCheckpoint $bad)) 'host qualification is not production acceptance'
+foreach($property in @('wholeAggregateComplete','populatedStoreDeviceQualified','originalRuntimeAuthorityAvailable','syntheticFinanceSnapshot','cloudActivation','financialLivePosting','founderApprovalClaimed','productionAcceptance')) {
+ $bad=($privateDeviceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainPrivateOriginalDeviceCheckpoint $bad)) "reject invented private-original-device qualification $property"
+}
+$bad=($privateDeviceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('foreign')
+Check (!(Test-AiDomainPrivateOriginalDeviceCheckpoint $bad)) 'reject expanded private-original-device owners'
+$bad=($privateDeviceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.owners[0].sha256='foreign'
+Check (!(Test-AiDomainPrivateOriginalDeviceCheckpoint $bad)) 'reject changed qualified source hash'
+$bad=($privateDeviceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendActualSDKPassed=0
+Check (!(Test-AiDomainPrivateOriginalDeviceCheckpoint $bad)) 'reject changed private-original-device evidence'
+
 $creditAdmission=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate05CreditDocumentAdmission
 Check (Test-AiDomainCreditDocumentAdmission $creditAdmission) 'exact existing credit model admission under standing authority'
 Check (!(Test-AiDomainCreditDocumentAdmission $null)) 'reject absent credit model admission'
