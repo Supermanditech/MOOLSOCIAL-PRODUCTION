@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 46,
+  "localMetadataCommits": 47,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -13436,5 +13436,327 @@
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
     "sourceCommit": "a406dbedfde4aaae3a7b6edec2a688425ec426d9"
+  },
+  "aggregate10SourceAdmission": {
+    "ticket": "AI-AGG-10",
+    "baseline": "215e7f2f628618ea69d333ea4c9712dec365e98c",
+    "contract": {
+      "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG10-PRIVATE-PREFERENCES-CONTRACT-v1.md",
+      "sha256": "AB8ACEAE63D14B41226D5C55378D34EE49C54DB355051F85AE57CA313730115D",
+      "text": "# AI-AGG-10 — existing private Store preferences and native Review\n\nClean origin-exact starting checkpoint:215e7f2f628618ea69d333ea4c9712dec365e98c\non work/codex-backend/ai-domain-batch-20261028. Preserve09's source/evidence and\nall earlier partial dispositions. Existing accepted UI reference remains c9d03bb.\nThis contract records the activated goal and standing narrow reconciliation;\nit does not claim a new founder review of its exact hash or new UI approval.\n\nImplement only the existing private preference forms and their source/wiring.\nDo not redesign them or reopen completed312/313/314/411,317 or320/321 work.\nNew backing is the original actor/Store-owned saved preference record, not a\nsecond Store master, public profile, membership ledger or serviceability engine.\n\n## Original records and validation\n\nUse four existing form groups:\n\n* status: acceptingOrders, visibleToCustomers, fulfilmentMode, busyMinutes,\n  reopensAt, openingTime, closingTime, maximumActiveOrders, alertSound,\n  alertVibration. It backs actions318/319/327 atomically.319 aliases\n  preparationMinutes/fulfilmentPreference map only to the existing native\n  busyMinutes/fulfilmentMode controls; do not create conflicting records.\n* pickup: city, area, pincode, pickupEnabled; action322.\n* invoice: mode; action323, only off/automatic/whatsapp/moolSocialChat.\n* staff: staffAccessEnabled, counterCount; action326.\n\nPreserve original whole-number, boolean, trading-time, fulfilment and PIN\nvalidation.0 active orders means Unlimited planning preference, not admission\ncontrol. Counter count remains1..20. Nonnegative native integers keep their full\nDart signed-int64 range; do not introduce a JavaScript-safe business limit.\nUse canonical decimal strings for integer fields in the new versioned wire.\nThe new private-preference proposal adapter converts these losslessly to native\nintegers before calling unchanged StoreSettingsInitialData.fromFields. Do not\nbroaden that shared factory's legacy/public validation. Retain exact original\ntext and Dart edge-whitespace semantics for validation; no silent normalization.\n\nStore private input only. Readiness/visibility does not activate a public listing,\nprove Stock/serviceability or change provider/order acceptance. Staff flags never\ngrant roles/membership. Invoice mode never proves consent or message dispatch.\nRetain native public-readiness refusals and truthful public-sync-pending wording.\nDo not change public320/321 source/approval or payment/UPI controls.\n\n## Read, Save and original recovery\n\nNegotiate storePrivatePreferencesVersion1, default off on client/server.\nUse existing authenticated Workspace request transport and original realm/project\nconfiguration, not a test runtime provider or a second endpoint framework.\nOperations: readStorePrivatePreferences, saveStorePrivatePreferences and\ncheckStorePrivatePreferencesSave. Scope binds authenticated actorAccountId,\nproject, realm, storeId and one closed kind. Mutation uses limited-use AppCheck;\nread/status use the existing normal AppCheck contract.\n\nManual free approved-Store access and paid-AI preparation stay separate. Every\nprivate repository read/write/status must obtain original transaction-bound\ncurrent membership authority. Reuse PurchaseEntryTransactionAuthority; do not\nmanufacture a production reader from profile ownership, application status,\nclient flags or subscription. Its currently unavailable concrete runtime reader\nremains an explicit shared B03/source dependency. Local actual-SDK qualification\nmay inject a clearly labelled original authority port; never inject phone data.\n\nUse exact versioned complete group fields, current record/CAS revision, canonical\nfingerprint and immutable idempotency receipt. Missing original is revision0/\nnull only after a successful authoritative read; unavailable is never empty.\nPreserve literal input/receipt even when a later Save changes the current head.\nStatus is observational and cannot retry, reset counters or substitute current\ndata for an earlier original result. Bound negotiated requests/responses to8MiB\nand use immutable private payload parts if needed; keep other frame limits.\n\nOnly explicit existing native Save writes/synchronises a complete group. Opening\na screen, model capture, Review, cancel, read and app restart never Save, adopt\nother actors' input, replay a command or clear an unknown outcome. Save must use\nthe originally loaded revision, not fetch a new revision to overwrite a conflict.\nKeep account/Store-bound pending command durable before dispatch. Timeout,\nfailed journal clear, cancellation, scope retirement and late responses retain\nthe exact original. Explicit Check reads status; explicit same-original retry\nretains identity. Changed input cannot replace an unresolved command.\n\nOriginal forms may read current same-actor saved input only while no local editor\nis dirty and no unknown Save is pending. Preserve local drafts on conflict and\naccount/Store switching. Do not report an acknowledged server Save from a merely\nsynchronous device mutation. Preserve existing manual behavior when unconfigured.\n\n## Preparation and native handoff\n\nRegister318/319/322/323/326/327 only behind a qualified original preference source,\nverified paid AI and current approved Store authority. Read before/after and\nvalidate again for native Review. Match source scope/revision/literal fields and\nall existing dirty-form/ABA/lifetime guards. No raw model text is authority.\n\nA genuine empty original may prepare only explicitly supplied fields for the\nexisting initial form; invent no defaults/current values or successful Save.\nKeep unspecified native controls unchanged. Use one shared partial-field adapter\nand existing complete-form validation. Review fills the actual form; the original\nnative Save remains the final confirmation. Source changes retire the proposal.\n\nPrivate preference storage is not an alert issuer.328 remains unavailable unless\nan accepted current ordinary-alert source can prove selection and requiredAction\nexclusion; never hide required-action alerts by a model-provided ID.\n\n## Existing source dependencies and exclusions\n\n315/409/410 still need completed original customer sales/collection/return/refund/\ncredit history, opening and covered-period readback. The new06 Counter draft\nrepository is not that source. Never turn phone finance snapshots or drafts into\na complete statement.412 needs an accepted published-Store canonical URL and\npublic entry resolver; the current Buy router resolves no Store identity. Do not\ninvent a URL or quietly add a route. These are not Google-only blockers.\n\nKeep all those exact resume conditions recorded and finish independent private\npreference work first. No payment integration, cloud activation/deployment,\nadmin, live model/media, APK, live financial/publication effects, new commercial\nrules, policy/governance development or unrelated verticals.\n\n## Qualification and minimal owners\n\nReuse WorkSession, its original preference persistence/forms, shared authenticated\ngateway, native Review, existing source/context contracts and original authority.\nNecessary new pure owners: workspace_store_preferences_service.ts and its test;\nwork_store_preferences.dart and its test. No other new runtime owner is admitted.\nExisting shared widget factories/tests remain unchanged unless separately needed.\n\nTest exact native/backend wire including full int64 and Unicode boundaries,\nactor/project/realm/Store/group isolation, stale revisions, duplicate/change/\nconflict, original receipt, timeout/restart/status/retry, canceled/retired callers,\ndirty drafts and missing authority. Test no implicit write on read/Review and no\npublic, membership, invoice-delivery, ledger or financial side effect. Use actual\nFirestore SDK locally and original native forms/fixtures, not an OPPO provider.\nInspect current-source reachable OPPO with recorded launch settings and saved\ndata preservation; distinguish unavailable authentic populated states. Seal exact\ntested source/evidence and normal named-branch readback before goal completion.\n"
+    },
+    "additionalOwners": [
+      "backend/functions/src/workspace/workspace_store_preferences_service.ts",
+      "backend/functions/src/workspace/workspace_store_preferences_service.test.ts",
+      "apps/mobile/lib/features/work/work_store_preferences.dart",
+      "apps/mobile/test/work_store_preferences_test.dart"
+    ],
+    "runtimeOwnersBefore": 71,
+    "runtimeOwnersAfter": 75,
+    "standingNarrowAuthority": true,
+    "newFounderApprovalClaimed": false,
+    "metadataOwners": [
+      "config/codex-subagent-coordination-policy.json",
+      "docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json",
+      "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "scripts/ai-domain-batch-admission.ps1",
+      "scripts/test-ai-domain-batch-admission.ps1"
+    ],
+    "admissionCommitSubject": "coordination(ai-domain-batch-20261028): admit existing private Store preference sources",
+    "preservedRuntime": [
+      {
+        "path": "backend/functions/src/assistant/domain_context_contract.ts",
+        "sha256": "4E4A4496A5DDF41FA5DCDCF111196350BFCD3FA65DB9BF12B44004D159997648"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_contract.test.ts",
+        "sha256": "58517BA82EA4F68437C7011D7F109F09E073A33CF3E2CC4832671117EC7D8152"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context.ts",
+        "sha256": "9C97BECBAF2D24368C1A38AD6459A84AABF4415975AF14DC407AEA46033D70A4"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context.test.ts",
+        "sha256": "FEB3C56DA02D9038C3AC1A02B8B578AC46EE9C46DF526DDB0D258E58FE19CF82"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_http.ts",
+        "sha256": "6F1FCAFAC94D0A8FDC35BD8C2E878B2D55418D8284A5DC710EB3BEE92855B07B"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_http.test.ts",
+        "sha256": "CD77B75EF8E7EE01980DB7CC200233944C5CA60C88A454BF7F4E4B4242A25598"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_integration.test.ts",
+        "sha256": "094E87BB7C1B81997676D1E3F1D682B9ABD15AC16DC66F2CD2106F63E21B06A4"
+      },
+      {
+        "path": "backend/functions/src/index.ts",
+        "sha256": "C1B30BE79380D4DDAD3BCE24DC57D7D3C0F9C2E8A9895C47E76B612EA4F520BE"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+        "sha256": "8C226BC55774FBDCA8E1B01C8A87ECF327EFE0C1566F0275A4988FA38D1D890C"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/profile_context.dart",
+        "sha256": "C61DAA145A9EDF785897069D217E54CC2CF8FE2F4600925200AFC14FAF0D1E41"
+      },
+      {
+        "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+        "sha256": "F8ABB359ADF4714C9DD330AD17D34DAD5D441D6763D2902B9F0A177F5E4DD6A8"
+      },
+      {
+        "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "sha256": "2570BB48BDFA8F9E9EA0D61348A0F1B3CD778105565FB8784C6FE156F5928342"
+      },
+      {
+        "path": "apps/mobile/lib/app/moolsocial_app.dart",
+        "sha256": "82EEADE801CB2A7C04AF8C95819FA6EC30B138357753F426EB95741EDA101FD6"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+        "sha256": "7228EBEA44098E43C68EB4D788D9E41E2F3392E8B1CA8D0C32C164A1F1CFFC6C"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "sha256": "2101247B6CE295D5FA0A6FBA609D517F11F40228C382A52C003D95F5C3689936"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "sha256": "5D3AAF88764035306EA953C003A3E8FD9CF97AD368C9F759ABB81F81FDEB5C89"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "sha256": "ABAB97AA032F59E8F9FD5AC49C582076590EB2D357C43DFD550243EECF1132E1"
+      },
+      {
+        "path": "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+        "sha256": "0DFEB806BFD0556D339E36A84A2C1BC02369D930142B1E80A91CC11CE8798D8D"
+      },
+      {
+        "path": "apps/mobile/test/assistant_domain_context_guard_test.dart",
+        "sha256": "07FF247E0BD3D5723684EB9D2D964256FF412E8485563F2E86CC93B08018882A"
+      },
+      {
+        "path": "apps/mobile/test/assistant_domain_context_integration_test.dart",
+        "sha256": "62622ECDD2943569A447BBF67A97112238815D82D26A8D6BA41884F0D5BE1542"
+      },
+      {
+        "path": "apps/mobile/test/assistant_profile_context_test.dart",
+        "sha256": "1ECF64F5F5616593D77A9F08056780AF1D2A9A4AFDFD1C9A4456E628E843FD8E"
+      },
+      {
+        "path": "apps/mobile/test/assistant_model_flow_test.dart",
+        "sha256": "B28A93CB0D149BDE6D5F9626FB16A1735CAAFA7A92A85FCF54D2D95ED71DD045"
+      },
+      {
+        "path": "apps/mobile/test/mool_assistant_test.dart",
+        "sha256": "243464A4A4BC28DF08880001EB54DD1305F4AB363359A7589AFF1292641A5F8B"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_contract.ts",
+        "sha256": "7EC95DF6BE7D93D97BC97E27282302244EB0C42581919125B979571ECDB007DE"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_contract.test.ts",
+        "sha256": "18D92CB9E196D1F501B2F85A60875A4C48548EA4135F5952889EC60518EACC44"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_service.ts",
+        "sha256": "F67AEA9155662E9120348FA2425568FF6AB64594CB3295C6BF04D77067131EB5"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_service.test.ts",
+        "sha256": "CFE0386B8FFB2072089381FA5EF5AFD0933516C21B228CD35B172C3069F10F97"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/model_gateway.dart",
+        "sha256": "4A9CD24EF2E358A4E0B0F448E102C1E9FAAFE6B0CBD96B354A169D8AC3A4D8BA"
+      },
+      {
+        "path": "apps/mobile/test/assistant_model_gateway_test.dart",
+        "sha256": "EF8151C941E70B1309E1C3EADCFDE811D16213B44A380DF91DEDC8DC1D36A7C0"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+        "sha256": "19D16C732CD0393893DEBFCDAF3EBF3B3A9F8E89FF397E343D1C156E23A37D32"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+        "sha256": "A0768A986E677D4B6A65B656D6BF17D89A659F2E7C28301EE51724E575765600"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_session.dart",
+        "sha256": "D2F8ABBCFEECD1497C6667066849A6985DCE12E60B22B07995D2E01050E81D97"
+      },
+      {
+        "path": "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "sha256": "3E552BF67838C25A0A5C14839EBC913FFB3D9F3E00AF9557D44210BBB3889D1A"
+      },
+      {
+        "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "sha256": "20A44A435133BEB96D13B5ACD3FA6EFFC3B06F6EF3654D87C51CAF7CA423C3C5"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "sha256": "A8FBA26E9357025C951F6CF5904EA8F671AF5D2C19B8BE16F89DE323C1D90567"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_catalogue_service.ts",
+        "sha256": "9F58E4D839AC0A1388BDD6E28B5B0FF8D122C592DCE9712BEB8F1071706E2034"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+        "sha256": "C2BFC3AFEEBFA913981CA27ACA146BF2B6FB3C15F45238465506174ED9948740"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_services.dart",
+        "sha256": "D93F4925B35C9E9CABA431511DEF3F3AB3A9E5BBC9B1984B4DF5904B393335F6"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+        "sha256": "84BE1755B4E2A2BCE00B31B4EE7B39E70A67A0CB73D2CA577DF41E76AAB785B3"
+      },
+      {
+        "path": "apps/mobile/test/work_catalogue_gateway_test.dart",
+        "sha256": "D47442FFD100048BFA85FB01B2F92168A2F230958DCF2366A23EB72FC19F4D6A"
+      },
+      {
+        "path": "apps/mobile/test/store_add_product_sheet_test.dart",
+        "sha256": "68B2513FCC87FD68E70939D657701898AC95C1793440B19CB553858F4FD370DE"
+      },
+      {
+        "path": "apps/mobile/test/work_saved_product_draft_test.dart",
+        "sha256": "1186C9D39107776FD88B4253C61F114C7C4050AB32DD0A5C67C6330D82BABA58"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_entry_service.ts",
+        "sha256": "B061CBBB6876361A4E9C4C426E00705516C00CEA58589D328B1CFF35B07BC1F0"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_entry_repository.ts",
+        "sha256": "41224490B2B8C15760878AB0316B9E305BAA7E7FE8FB5E0B43449D7139A1C473"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_entry_service.test.ts",
+        "sha256": "997DC49C43F9D7402F4FD30BEFC1FA20E6CF5D3BC33C4ED86E72B933E39A11F7"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_purchase_entry_gateway.dart",
+        "sha256": "A4F538F09F46C63625453ABEEF6C2E5C25BE35F20AC2A6148EF267A93D35E033"
+      },
+      {
+        "path": "apps/mobile/test/work_purchase_entry_gateway_test.dart",
+        "sha256": "5B3866CA06A1CC53AFB64680224604EC6525D67E4A8D441009C4E35196B1A3E6"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_ledger_service.ts",
+        "sha256": "104FF6F5B16C8434500AF519D346B6DA4A71D09C452C3A6CBD1FD50DB3BCC556"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_ledger_repository.ts",
+        "sha256": "C8CC64065187B0FD272C574D1F288EB697F609F6BECAA66E42C39EA8FC284CD8"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_ledger_service.test.ts",
+        "sha256": "94B4D5D7D58F2DB5E10D6C65B95A427CB25B93A9A73233D51D44F187A95F0C9C"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_ledger_gateway.dart",
+        "sha256": "93AFA5BA18AE9B395A1EC3A7AF0CE7EA39D702C7059D88BC633A02C16C33A835"
+      },
+      {
+        "path": "apps/mobile/test/work_ledger_gateway_test.dart",
+        "sha256": "01841ACF92815AC7A3ABB4CEDA76AFE28015154CE7B63FCB1F33EE7929CF60E6"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_models.dart",
+        "sha256": "63A1252AD940E5B6400C98C4AF10ADF826B04FF804D838C389921F5F64A440E7"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_customer_service.ts",
+        "sha256": "67C8F506F58854EDC101DDD2F0F5F845411A240B5EE406ED6EB1A0682FA50EB8"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_customer_repository.ts",
+        "sha256": "79278A56B0D07AF2A0FF0159643B113F5E872D7EDB35C29677C49E0A4046208B"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_customer_service.test.ts",
+        "sha256": "C52888B0134C1C2DC195210674F9C852BB5C70A4E64B76864FF0D9F69ABC0A8E"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_customer_gateway.dart",
+        "sha256": "F9F3DE7C56B4AF8FDA41636894C7D15D6661A45E583260FD3698B1200DD62044"
+      },
+      {
+        "path": "apps/mobile/test/work_customer_gateway_test.dart",
+        "sha256": "10C5C0045EF29CBE4ECA4A25ECBDA26C0190DAB15007BEB0398E61B112C3E65C"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_projection_service.ts",
+        "sha256": "19D3EBDE04C338D3DCDE5514415A6B94DA14E61DBB67AF991FBB04D1DC2BAFA5"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_projection_service.test.ts",
+        "sha256": "356CED692B3BD0F4E115FE51591B04E420D0C4751A2C98D56E29D86ABE790641"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_order_identity_gateway.dart",
+        "sha256": "FD83015B1B8A7E65E32A423D9D9E396D97D64EE05680F4E8ACEAB6A46408DE52"
+      },
+      {
+        "path": "apps/mobile/test/work_order_identity_gateway_test.dart",
+        "sha256": "528657AE577273048EF1578662B4F5FCFD977943803B17314C6A60F9DD1C8A27"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_promotion_service.ts",
+        "sha256": "9A639333FBD5481F8289BBFA2EF6F98F379C34D37A90755E48DB799EF0E61C18"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_promotion_service.test.ts",
+        "sha256": "700586C25587E8875089A0F19AC66A923CEDF4F613DAC7274A41D49480EEBC61"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_coupon_v2_codec.ts",
+        "sha256": "24C9CF2C38E62B238B0FF779EB2334DBC6AC63F5B7138878DDD0F73770B95FC9"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_coupon_v2_codec.test.ts",
+        "sha256": "A506ACC7EB3921F8A0D6C2BB43C12AF5A06330FA8196E3DD6B1F945D90748C87"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_product_promotions.dart",
+        "sha256": "FD013A93089F2B9A4B5C4D7AD8BFCE0C76526FFD0DF6AF24966FA7B6FABB9950"
+      },
+      {
+        "path": "apps/mobile/test/work_product_promotions_test.dart",
+        "sha256": "5558AC079D6CE89895F190538D9C9F3FD5F2A1D85FC320C00E79F001BBD61162"
+      },
+      {
+        "path": "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "sha256": "A49007DCD2F8919CD7DBD529D00257DF3DD0E4062E05A1AC9BCC3C2C1879F964"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart",
+        "sha256": "971A9952376AD82226E9CFD31B7B45AFAAC68D2CFC1EEE3DE6401B6D2C315D1D"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/widgets/store_product_promotions.dart",
+        "sha256": "4DC656859D7C7FB9DC54F8C55194A391446F1CB069811D7A12115E0B07B84D68"
+      }
+    ],
+    "sourceCommitsRequireLaterExactQualification": true,
+    "productionAcceptance": false,
+    "schemaVersion": 1,
+    "authority": "founder_standing_exact_narrow_admission",
+    "scope": "Existing four private native preference form groups and original Review/recovery only",
+    "newScope": false,
+    "deployment": false,
+    "paymentIntegration": false,
+    "apk": false
   }
 }

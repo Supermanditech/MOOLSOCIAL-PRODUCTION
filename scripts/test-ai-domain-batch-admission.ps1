@@ -771,6 +771,27 @@ foreach($property in @('legacyMigration','runtimeMembershipSourceAvailable','sta
  Check (!(Test-AiDomainAggregateEightSourceAdmission $bad)) "reject invented ledger dependency $property"
 }
 
+$aggregateTenAdmission=$approval.aggregate10SourceAdmission
+Check (Test-AiDomainAggregateTenSourceAdmission $aggregateTenAdmission) 'exact private preference source admission'
+Check (!(Test-AiDomainAggregateTenSourceAdmission $null)) 'reject absent preference admission'
+Check (@($aggregateTenAdmission.additionalOwners).Count -eq 4) 'four private preference owners only'
+Check (@($aggregateTenAdmission.preservedRuntime).Count -eq 71) 'preserve seventy-one sealed sources'
+Check (([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($aggregateTenAdmission.contract.text)))) -ceq $aggregateTenAdmission.contract.sha256) 'embedded contract is byte-faithful'
+foreach($property in @('baseline','authority','scope','admissionCommitSubject','standingNarrowAuthority','newFounderApprovalClaimed','sourceCommitsRequireLaterExactQualification','newScope','productionAcceptance','deployment','paymentIntegration','apk')){
+ $bad=($aggregateTenAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($bad.$property -is [bool]){!$bad.$property}else{'foreign'}
+ Check (!(Test-AiDomainAggregateTenSourceAdmission $bad)) "reject changed preference admission $property"
+}
+foreach($property in @('path','sha256','text')){
+ $bad=($aggregateTenAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.contract.$property='foreign'
+ Check (!(Test-AiDomainAggregateTenSourceAdmission $bad)) "reject changed preference contract $property"
+}
+foreach($property in @('additionalOwners','metadataOwners','preservedRuntime')){
+ $bad=($aggregateTenAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.$property+=@('foreign')
+ Check (!(Test-AiDomainAggregateTenSourceAdmission $bad)) "reject expanded preference admission $property"
+}
+$bad=($aggregateTenAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.preservedRuntime[0].sha256='foreign'
+Check (!(Test-AiDomainAggregateTenSourceAdmission $bad)) 'reject preference preimage replacement'
 $draftRecoveryAdmission=$approval.aggregate09DraftRecoveryAdmission
 Check (Test-AiDomainAggregateNineDraftRecoveryAdmission $draftRecoveryAdmission) 'exact existing coupon draft recovery admission'
 Check (@($draftRecoveryAdmission.additionalOwners).Count -eq 1) 'only one existing recovery widget'
@@ -1052,5 +1073,5 @@ Check (!(Test-AiDomainCreditDocumentAdmission $bad)) 'reject changed credit cont
 $bad=($creditAdmission|ConvertTo-Json -Depth 30)|ConvertFrom-Json;$bad|Add-Member -NotePropertyName unrelatedScope -NotePropertyValue $true
 Check (!(Test-AiDomainCreditDocumentAdmission $bad)) 'reject unrelated credit admission property'
 $creditRecord=Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json')|ConvertFrom-Json
-Check (@($creditRecord.backendAdmission.runtimeOwners).Count -eq $(if($null -ne $approval.aggregate09DraftRecoveryAdmission){71}elseif($null -ne $approval.aggregate09SourceAdmission){70}elseif($null -ne $approval.aggregate08SourceAdmission){62}elseif($null -ne $approval.aggregate06SourceAdmission){58}else{53})) 'exact original credit owners plus only admitted Counter/customer owners'
+Check (@($creditRecord.backendAdmission.runtimeOwners).Count -eq $(if($null -ne $approval.aggregate10SourceAdmission){75}elseif($null -ne $approval.aggregate09DraftRecoveryAdmission){71}elseif($null -ne $approval.aggregate09SourceAdmission){70}elseif($null -ne $approval.aggregate08SourceAdmission){62}elseif($null -ne $approval.aggregate06SourceAdmission){58}else{53})) 'exact original credit owners plus only admitted Counter/customer owners'
 Write-Output "AI domain batch admission checks passed: $n."
