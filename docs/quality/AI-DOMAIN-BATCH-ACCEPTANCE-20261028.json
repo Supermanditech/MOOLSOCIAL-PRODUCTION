@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 44,
+  "localMetadataCommits": 45,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -12165,5 +12165,320 @@
       "preparedMetadataPreserved": "aggregate09-preserved-admission-v2/MANIFEST.json",
       "applicationEditsBeforeAdmission": false
     }
+  },
+  "aggregate09DraftRecoveryAdmission": {
+    "schemaVersion": 1,
+    "ticketId": "AI-AGG-09",
+    "baseline": "6580507d5eb04da564c77e9215a5ca4c0b5b6bcc",
+    "authority": "founder_standing_exact_narrow_admission",
+    "scope": "Existing native private draft original recovery only",
+    "additionalOwners": [
+      "apps/mobile/lib/features/work/widgets/store_product_promotions.dart"
+    ],
+    "metadataOwners": [
+      "docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json",
+      "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "config/codex-subagent-coordination-policy.json",
+      "scripts/ai-domain-batch-admission.ps1",
+      "scripts/test-ai-domain-batch-admission.ps1"
+    ],
+    "contract": {
+      "sha256": "2A89C44ECE66D8C5F2EF4B642C0BE82F4AF63F7F0618DFBB8C51E8EE5349994C",
+      "text": "# Existing native private-draft recovery surface\n\nThis is a narrow continuation of AI-AGG-09 under the founder's standing exact\nadmission authority. Baseline HEAD6580507d5eb04da564c77e9215a5ca4c0b5b6bcc\ncontains only the previously admitted metadata checkpoint. Preserve its prior\nadmission and all current unsealed source preimages. No new founder screen\nacceptance or new business rules are claimed.\n\nAdmit only apps/mobile/lib/features/work/widgets/store_product_promotions.dart.\nReuse the existing native Coupons manager. Only when its explicitly configured\nprivate-draft connection exists, restore the original private pending journal\nobservationally on manager entry. Do not synchronize, save, publish, adopt a\nremote-only campaign, reconcile automatically or consume recovery on opening.\nThe approved default-disabled layout remains unchanged.\n\nWhen an original private save is unresolved, show a compact status with Check\ndraft save and Retry original save. Check is status-only. Retry requires an\nexplicit native confirmation of the exact retained original, preserves its\ncampaign and idempotency identity, and never sends a later local edit instead.\nCancellation, account/Store/navigation changes and repeated taps must not issue\nanother effect. A non-acknowledged original remains retained. Keep private save\nrecovery separate from publication recovery and native final publishing taps.\n\nUse the already admitted coupon test owner for status-only entry, unknown result,\nexact confirmed retry, cancellation, stale context, enlarged text and disabled\ncapability checks. Host fixtures remain labelled and never injected into OPPO.\nReinspect current-source reachable OPPO and preserve all protected data after\nimplementation. No unrelated redesign, payment, cloud, APK or live operation.\n\nThe admission reconciliation is one exact five-file metadata-only commit. Bind\nall70 current admitted source preimages plus the unchanged existing widget so\nthat this amendment cannot hide or replace unsealed work. Source/evidence seals\nstill require their separate tested checkpoint and exact remote readback.\n"
+    },
+    "preservedRuntime": [
+      {
+        "path": "backend/functions/src/assistant/domain_context_contract.ts",
+        "sha256": "4E4A4496A5DDF41FA5DCDCF111196350BFCD3FA65DB9BF12B44004D159997648"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_contract.test.ts",
+        "sha256": "58517BA82EA4F68437C7011D7F109F09E073A33CF3E2CC4832671117EC7D8152"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context.ts",
+        "sha256": "9C97BECBAF2D24368C1A38AD6459A84AABF4415975AF14DC407AEA46033D70A4"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context.test.ts",
+        "sha256": "BC432A7B98A79AC788167E4A5D8CB99BEEE8044E42BB799BB044949AC86556AE"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_http.ts",
+        "sha256": "6F1FCAFAC94D0A8FDC35BD8C2E878B2D55418D8284A5DC710EB3BEE92855B07B"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_http.test.ts",
+        "sha256": "CD77B75EF8E7EE01980DB7CC200233944C5CA60C88A454BF7F4E4B4242A25598"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_integration.test.ts",
+        "sha256": "094E87BB7C1B81997676D1E3F1D682B9ABD15AC16DC66F2CD2106F63E21B06A4"
+      },
+      {
+        "path": "backend/functions/src/index.ts",
+        "sha256": "C1B30BE79380D4DDAD3BCE24DC57D7D3C0F9C2E8A9895C47E76B612EA4F520BE"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+        "sha256": "8C226BC55774FBDCA8E1B01C8A87ECF327EFE0C1566F0275A4988FA38D1D890C"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/profile_context.dart",
+        "sha256": "C61DAA145A9EDF785897069D217E54CC2CF8FE2F4600925200AFC14FAF0D1E41"
+      },
+      {
+        "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+        "sha256": "F8ABB359ADF4714C9DD330AD17D34DAD5D441D6763D2902B9F0A177F5E4DD6A8"
+      },
+      {
+        "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "sha256": "2570BB48BDFA8F9E9EA0D61348A0F1B3CD778105565FB8784C6FE156F5928342"
+      },
+      {
+        "path": "apps/mobile/lib/app/moolsocial_app.dart",
+        "sha256": "82EEADE801CB2A7C04AF8C95819FA6EC30B138357753F426EB95741EDA101FD6"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+        "sha256": "7228EBEA44098E43C68EB4D788D9E41E2F3392E8B1CA8D0C32C164A1F1CFFC6C"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "sha256": "9A3D5F14C5DE7BAC9853FCB847B6B41172E9406ED5B51786CB312B7F60C23F47"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "sha256": "5D3AAF88764035306EA953C003A3E8FD9CF97AD368C9F759ABB81F81FDEB5C89"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "sha256": "ABAB97AA032F59E8F9FD5AC49C582076590EB2D357C43DFD550243EECF1132E1"
+      },
+      {
+        "path": "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+        "sha256": "0DFEB806BFD0556D339E36A84A2C1BC02369D930142B1E80A91CC11CE8798D8D"
+      },
+      {
+        "path": "apps/mobile/test/assistant_domain_context_guard_test.dart",
+        "sha256": "07FF247E0BD3D5723684EB9D2D964256FF412E8485563F2E86CC93B08018882A"
+      },
+      {
+        "path": "apps/mobile/test/assistant_domain_context_integration_test.dart",
+        "sha256": "62622ECDD2943569A447BBF67A97112238815D82D26A8D6BA41884F0D5BE1542"
+      },
+      {
+        "path": "apps/mobile/test/assistant_profile_context_test.dart",
+        "sha256": "1ECF64F5F5616593D77A9F08056780AF1D2A9A4AFDFD1C9A4456E628E843FD8E"
+      },
+      {
+        "path": "apps/mobile/test/assistant_model_flow_test.dart",
+        "sha256": "B28A93CB0D149BDE6D5F9626FB16A1735CAAFA7A92A85FCF54D2D95ED71DD045"
+      },
+      {
+        "path": "apps/mobile/test/mool_assistant_test.dart",
+        "sha256": "243464A4A4BC28DF08880001EB54DD1305F4AB363359A7589AFF1292641A5F8B"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_contract.ts",
+        "sha256": "7EC95DF6BE7D93D97BC97E27282302244EB0C42581919125B979571ECDB007DE"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_contract.test.ts",
+        "sha256": "18D92CB9E196D1F501B2F85A60875A4C48548EA4135F5952889EC60518EACC44"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_service.ts",
+        "sha256": "F67AEA9155662E9120348FA2425568FF6AB64594CB3295C6BF04D77067131EB5"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_service.test.ts",
+        "sha256": "CFE0386B8FFB2072089381FA5EF5AFD0933516C21B228CD35B172C3069F10F97"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/model_gateway.dart",
+        "sha256": "4A9CD24EF2E358A4E0B0F448E102C1E9FAAFE6B0CBD96B354A169D8AC3A4D8BA"
+      },
+      {
+        "path": "apps/mobile/test/assistant_model_gateway_test.dart",
+        "sha256": "EF8151C941E70B1309E1C3EADCFDE811D16213B44A380DF91DEDC8DC1D36A7C0"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+        "sha256": "19D16C732CD0393893DEBFCDAF3EBF3B3A9F8E89FF397E343D1C156E23A37D32"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+        "sha256": "A0768A986E677D4B6A65B656D6BF17D89A659F2E7C28301EE51724E575765600"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_session.dart",
+        "sha256": "7CA60271F023702207C646933608E2277800259A2A0C500754278AAA30F013E0"
+      },
+      {
+        "path": "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "sha256": "3E552BF67838C25A0A5C14839EBC913FFB3D9F3E00AF9557D44210BBB3889D1A"
+      },
+      {
+        "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "sha256": "57368C6E8B9E715CA3FA3383AE487FAE01F4113597695F0BD2F7BFC9E0AEAE18"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "sha256": "A8FBA26E9357025C951F6CF5904EA8F671AF5D2C19B8BE16F89DE323C1D90567"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_catalogue_service.ts",
+        "sha256": "07F137C8FD2C0003AFC172972F74FBB72CB658EB7DB91913084FADE94127BCD3"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+        "sha256": "AF08A416A6BA5E96AEDD18CD307EBFCDB299A65F69A35D3651279CCFE7DE38B4"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_services.dart",
+        "sha256": "D93F4925B35C9E9CABA431511DEF3F3AB3A9E5BBC9B1984B4DF5904B393335F6"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+        "sha256": "84BE1755B4E2A2BCE00B31B4EE7B39E70A67A0CB73D2CA577DF41E76AAB785B3"
+      },
+      {
+        "path": "apps/mobile/test/work_catalogue_gateway_test.dart",
+        "sha256": "D47442FFD100048BFA85FB01B2F92168A2F230958DCF2366A23EB72FC19F4D6A"
+      },
+      {
+        "path": "apps/mobile/test/store_add_product_sheet_test.dart",
+        "sha256": "68B2513FCC87FD68E70939D657701898AC95C1793440B19CB553858F4FD370DE"
+      },
+      {
+        "path": "apps/mobile/test/work_saved_product_draft_test.dart",
+        "sha256": "1186C9D39107776FD88B4253C61F114C7C4050AB32DD0A5C67C6330D82BABA58"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_entry_service.ts",
+        "sha256": "B00A2FEB67B7D860FF9998D1E2D542E9F175C062C4C0B06298BFA6596FD22665"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_entry_repository.ts",
+        "sha256": "41224490B2B8C15760878AB0316B9E305BAA7E7FE8FB5E0B43449D7139A1C473"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_entry_service.test.ts",
+        "sha256": "997DC49C43F9D7402F4FD30BEFC1FA20E6CF5D3BC33C4ED86E72B933E39A11F7"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_purchase_entry_gateway.dart",
+        "sha256": "A4F538F09F46C63625453ABEEF6C2E5C25BE35F20AC2A6148EF267A93D35E033"
+      },
+      {
+        "path": "apps/mobile/test/work_purchase_entry_gateway_test.dart",
+        "sha256": "5B3866CA06A1CC53AFB64680224604EC6525D67E4A8D441009C4E35196B1A3E6"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_ledger_service.ts",
+        "sha256": "104FF6F5B16C8434500AF519D346B6DA4A71D09C452C3A6CBD1FD50DB3BCC556"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_ledger_repository.ts",
+        "sha256": "C8CC64065187B0FD272C574D1F288EB697F609F6BECAA66E42C39EA8FC284CD8"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_ledger_service.test.ts",
+        "sha256": "94B4D5D7D58F2DB5E10D6C65B95A427CB25B93A9A73233D51D44F187A95F0C9C"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_ledger_gateway.dart",
+        "sha256": "93AFA5BA18AE9B395A1EC3A7AF0CE7EA39D702C7059D88BC633A02C16C33A835"
+      },
+      {
+        "path": "apps/mobile/test/work_ledger_gateway_test.dart",
+        "sha256": "01841ACF92815AC7A3ABB4CEDA76AFE28015154CE7B63FCB1F33EE7929CF60E6"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_models.dart",
+        "sha256": "63A1252AD940E5B6400C98C4AF10ADF826B04FF804D838C389921F5F64A440E7"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_customer_service.ts",
+        "sha256": "67C8F506F58854EDC101DDD2F0F5F845411A240B5EE406ED6EB1A0682FA50EB8"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_customer_repository.ts",
+        "sha256": "79278A56B0D07AF2A0FF0159643B113F5E872D7EDB35C29677C49E0A4046208B"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_customer_service.test.ts",
+        "sha256": "C52888B0134C1C2DC195210674F9C852BB5C70A4E64B76864FF0D9F69ABC0A8E"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_customer_gateway.dart",
+        "sha256": "F9F3DE7C56B4AF8FDA41636894C7D15D6661A45E583260FD3698B1200DD62044"
+      },
+      {
+        "path": "apps/mobile/test/work_customer_gateway_test.dart",
+        "sha256": "10C5C0045EF29CBE4ECA4A25ECBDA26C0190DAB15007BEB0398E61B112C3E65C"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_projection_service.ts",
+        "sha256": "19D3EBDE04C338D3DCDE5514415A6B94DA14E61DBB67AF991FBB04D1DC2BAFA5"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_projection_service.test.ts",
+        "sha256": "356CED692B3BD0F4E115FE51591B04E420D0C4751A2C98D56E29D86ABE790641"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_order_identity_gateway.dart",
+        "sha256": "FD83015B1B8A7E65E32A423D9D9E396D97D64EE05680F4E8ACEAB6A46408DE52"
+      },
+      {
+        "path": "apps/mobile/test/work_order_identity_gateway_test.dart",
+        "sha256": "528657AE577273048EF1578662B4F5FCFD977943803B17314C6A60F9DD1C8A27"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_promotion_service.ts",
+        "sha256": "99F3177DB742DFBA57FC245D6CA74051AE9F8F131F54C93EC18FEA5D1DEB7937"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_promotion_service.test.ts",
+        "sha256": "5047340CDD51AB8F38CDF108A07F084B480C5228C9C6A2098D207B1604543B21"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_coupon_v2_codec.ts",
+        "sha256": "24C9CF2C38E62B238B0FF779EB2334DBC6AC63F5B7138878DDD0F73770B95FC9"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_coupon_v2_codec.test.ts",
+        "sha256": "A506ACC7EB3921F8A0D6C2BB43C12AF5A06330FA8196E3DD6B1F945D90748C87"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_product_promotions.dart",
+        "sha256": "FD013A93089F2B9A4B5C4D7AD8BFCE0C76526FFD0DF6AF24966FA7B6FABB9950"
+      },
+      {
+        "path": "apps/mobile/test/work_product_promotions_test.dart",
+        "sha256": "A183931788178780DA3D463289D26758209D05DD7F339D75E460A46812890B38"
+      },
+      {
+        "path": "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "sha256": "D17A3601C900A4929179E781B50228B018AB5F80EDAD47E2D402C061AFBDE5F6"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart",
+        "sha256": "B6C63D443A91AA2097D88B3FD734E7771E6C9723492EACD9F3C6F64DE14F31C5"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/widgets/store_product_promotions.dart",
+        "sha256": "EC6CCE8988EA6A701790E3D2443859B661473E540800BED533429AC2707D20FC"
+      }
+    ],
+    "admissionCommitSubject": "coordination(ai-domain-batch-20261028): admit existing coupon draft recovery surface",
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "newScope": false,
+    "productionAcceptance": false,
+    "deployment": false,
+    "paymentIntegration": false,
+    "apk": false
   }
 }

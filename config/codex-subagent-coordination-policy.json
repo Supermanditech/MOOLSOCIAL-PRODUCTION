@@ -438,6 +438,7 @@
         "apps/mobile/test/work_product_promotions_test.dart",
         "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart",
+        "apps/mobile/lib/features/work/widgets/store_product_promotions.dart",
         ".gitattributes",
         "config/codex-subagent-coordination-policy.json",
         "config/cross-agent-incremental-ticket-gate.json",

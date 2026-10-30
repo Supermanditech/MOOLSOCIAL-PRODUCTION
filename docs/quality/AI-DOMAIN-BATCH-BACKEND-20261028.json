@@ -235,7 +235,8 @@
       "apps/mobile/lib/features/work/work_product_promotions.dart",
       "apps/mobile/test/work_product_promotions_test.dart",
       "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
-      "apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart"
+      "apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart",
+      "apps/mobile/lib/features/work/widgets/store_product_promotions.dart"
     ],
     "acceptedUiCommit": "7ffe45ca11be6b99cfdb8ac8a7591ef352ff2e67",
     "contractSha256": "9FCD190B22B9725CBE1BF2107708D6D2BE11E226CD606E218FD8B94D3A420382",
