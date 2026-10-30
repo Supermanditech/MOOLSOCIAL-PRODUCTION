@@ -1048,6 +1048,30 @@ Check (!(Test-AiDomainOriginalCouponV2Checkpoint $bad)) 'reject changed qualifie
 $bad=($couponCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendActualSDKPassed=0
 Check (!(Test-AiDomainOriginalCouponV2Checkpoint $bad)) 'reject changed original-coupon-v2 evidence'
 
+$preferenceCheckpoint=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate10PreferenceCheckpoint
+Check (Test-AiDomainOriginalPrivatePreferenceCheckpoint $preferenceCheckpoint) 'exact host-qualified original private-store-preferences source checkpoint'
+Check (!(Test-AiDomainOriginalPrivatePreferenceCheckpoint $null)) 'reject absent original private-store-preferences checkpoint'
+Check (@(Get-AiDomainOriginalPrivatePreferenceStageOwners 0 $preferenceCheckpoint).Count -eq 3) 'three exact existing private-store-preferences checkpoint metadata owners'
+Check (@(Get-AiDomainOriginalPrivatePreferenceStageOwners 1 $preferenceCheckpoint).Count -eq 12) 'twelve exact qualified source owners'
+Check (@(Get-AiDomainOriginalPrivatePreferenceStageOwners 2 $preferenceCheckpoint).Count -eq 1) 'one sanitized evidence owner'
+Check (@(Get-AiDomainOriginalPrivatePreferenceStageOwners 3 $preferenceCheckpoint).Count -eq 0) 'no extra checkpoint stage'
+foreach($property in @('sequence','baseline')) {
+ $bad=($preferenceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainOriginalPrivatePreferenceCheckpoint $bad)) "reject changed private-store-preferences $property"
+}
+$bad=($preferenceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.productionAcceptance=$true
+Check (!(Test-AiDomainOriginalPrivatePreferenceCheckpoint $bad)) 'host qualification is not production acceptance'
+foreach($property in @('wholeAggregateComplete','populatedStoreDeviceQualified','connectedAuthenticRuntimeAuthorityAvailable','syntheticFinanceSnapshot','cloudActivation','financialLivePosting','founderApprovalClaimed','productionAcceptance')) {
+ $bad=($preferenceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainOriginalPrivatePreferenceCheckpoint $bad)) "reject invented private-store-preferences qualification $property"
+}
+$bad=($preferenceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('foreign')
+Check (!(Test-AiDomainOriginalPrivatePreferenceCheckpoint $bad)) 'reject expanded private-store-preferences owners'
+$bad=($preferenceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.owners[0].sha256='foreign'
+Check (!(Test-AiDomainOriginalPrivatePreferenceCheckpoint $bad)) 'reject changed qualified source hash'
+$bad=($preferenceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendActualSDKPassed=0
+Check (!(Test-AiDomainOriginalPrivatePreferenceCheckpoint $bad)) 'reject changed private-store-preferences evidence'
+
 $creditAdmission=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate05CreditDocumentAdmission
 Check (Test-AiDomainCreditDocumentAdmission $creditAdmission) 'exact existing credit model admission under standing authority'
 Check (!(Test-AiDomainCreditDocumentAdmission $null)) 'reject absent credit model admission'
