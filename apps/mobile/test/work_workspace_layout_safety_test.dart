@@ -49461,8 +49461,11 @@ testWidgets('FE-PRODUCT remaining registration uses actual authenticated Store a
         findsOneWidget,
       );
       expect(work.workspaceFinance!.duesMinor, 86000);
+      expect(find.text('Collect dues'), findsOneWidget,
+        reason: 'The route header names Collect dues once; its body starts with the original update and balance.');
       for (final label in ['Collect dues', 'Meena · SALE-1042']) {
-        final text = find.descendant(of: dues, matching: find.text(label));
+        final text = label == 'Collect dues' ? find.text(label)
+          : find.descendant(of: dues, matching: find.text(label));
         final paragraph = find.descendant(
           of: text,
           matching: find.byType(RichText),

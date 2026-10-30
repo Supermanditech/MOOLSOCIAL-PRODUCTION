@@ -13,6 +13,7 @@ import '../shared/social_content_gateway.dart';
 import 'work_publication_data.dart';
 import 'work_purchase_entry_gateway.dart';
 import 'work_ledger_gateway.dart';
+import 'work_customer_gateway.dart';
 import 'work_models.dart' show WorkspaceVariantFamily, WorkspaceVariantMembership, WorkspaceCatalogueItem,
   WorkspaceProductCompliance,
   WorkspaceSavedInventory, WorkspaceStockMode,
@@ -5645,6 +5646,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.purchaseDraftSupported = false,
     this.purchaseOpeningEvidenceSupported = false,
     this.ledgerSourceSupported = false,
+    this.counterOriginalSupported = false,
     this.productMediaSupported = false,
     WorkspaceProductMediaUploadTransport? productMediaTransport,
     this.reviewedProductSubmissionSupported = false,
@@ -5686,7 +5688,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   static const _privateOriginalOperations = {'readStorePurchaseEntryBook', 'readStorePurchaseEntryAttempt',
     'saveStoreSupplierProfile', 'saveStorePurchaseDraft', 'saveStoreSupplierOpeningEvidence',
     'readStoreLedgerSource', 'readStoreLedgerAttempt', 'recordStoreExpense',
-    'confirmStoreSupplierOpening', 'recordStoreMoneyRegisterEntry', 'recordStoreSupplierMoney', 'confirmStoreSupplierBill', 'recordStoreSupplierMoneyAllocation', 'recordStoreSupplierRefund', 'recordStoreSupplierCreditNote'};
+    'confirmStoreSupplierOpening', 'recordStoreMoneyRegisterEntry', 'recordStoreSupplierMoney', 'confirmStoreSupplierBill', 'recordStoreSupplierMoneyAllocation', 'recordStoreSupplierRefund', 'recordStoreSupplierCreditNote',
+    'readStoreCounterDraft', 'saveStoreCounterDraft', 'readStoreCounterDraftAttempt'};
   SocialContentTransport get _privateOriginalTransport {
     if (_privateOriginalTransportOverride case final configured?) return configured;
     final base = transport;
@@ -5752,6 +5755,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool purchaseOpeningEvidenceSupported;
   /// Negotiated original owned-section contract; never a membership grant.
   final bool ledgerSourceSupported;
+  /// Matching Counter recovery contract only; never Store/Stock/sale authority.
+  final bool counterOriginalSupported;
   @override
   final bool productMediaSupported;
   final WorkspaceProductMediaUploadTransport? _productMediaTransportOverride;
@@ -5852,6 +5857,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       purchaseDraftSupported: purchaseDraftSupported,
       purchaseOpeningEvidenceSupported: purchaseOpeningEvidenceSupported,
       ledgerSourceSupported: ledgerSourceSupported,
+      counterOriginalSupported: counterOriginalSupported,
       productMediaSupported: productMediaSupported,
       productMediaTransport: _productMediaTransportOverride,
       reviewedProductSubmissionSupported: reviewedProductSubmissionSupported,
@@ -5986,6 +5992,18 @@ class AuthenticatedWorkspaceCatalogueGateway
       connectionId: _bulkHash([endpoint.toString(), realm, accountId, storeId]),
       request: owner._ownerRequest, current: active, purchaseDraftSupported: owner.purchaseDraftSupported,
       openingEvidenceSupported: owner.purchaseOpeningEvidenceSupported, now: owner.now);
+  }
+
+  WorkspaceCounterOriginalRemoteSource? originalCounterDraftSource({
+    required String accountId, required String storeId, required bool Function() current,
+  }) {
+    _id(accountId); _id(storeId);
+    if (!counterOriginalSupported || procurementContext != null || _publicRestockCatalogue || !current()) return null;
+    final owner = forOwnerAccount(accountId);
+    bool active() => current() && owner.counterOriginalSupported && owner.ownerAccountId == accountId && owner._procurementScopeCurrent;
+    return WorkspaceCounterOriginalRemoteSource(scope: (account: accountId, store: storeId, realm: realm),
+      connectionId: _bulkHash([endpoint.toString(), realm, accountId, storeId]),
+      request: owner._ownerRequest, current: active, now: owner.now);
   }
 
   WorkspaceLedgerRemoteSource? originalLedgerSource({

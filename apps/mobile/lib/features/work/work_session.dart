@@ -353,6 +353,8 @@ class _StoreOperationalData {
   RemoteWorkOwnedLedgerStore? originalLedger;
   Future<bool>? originalLedgerLoad;
   String? originalLedgerError;
+  RemoteWorkCounterDraftStore? originalCounterDraft;
+  Future<bool>? originalCounterDraftLoad;
   bool originalLedgerSelected = false;
   bool originalLedgerCommandBusy = false;
   int? ledgerCheckpointRevision;
@@ -5859,9 +5861,56 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
-  late final WorkCounterDraftStore _counterDraftStorage =
+  late final WorkCounterDraftStore _retainedCounterDraftStorage =
       counterDraftStore ??
       SecureWorkCounterDraftStore(accountScope: () => _contactAccountScope);
+  bool get workspaceOriginalCounterConfigured => counterDraftStore is RemoteWorkCounterDraftStore ||
+    catalogueGateway is AuthenticatedWorkspaceCatalogueGateway &&
+      (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).counterOriginalSupported;
+  WorkCounterDraftStore get _counterDraftStorage {
+    if (counterDraftStore is RemoteWorkCounterDraftStore) return counterDraftStore!;
+    if (!workspaceOriginalCounterConfigured) return _retainedCounterDraftStorage;
+    final original = _storeData.originalCounterDraft;
+    if (original == null || !original.sourceCurrent) {
+      throw const WorkGatewayException('Confirm the original Counter source before continuing. Saved details are kept.');
+    }
+    return original;
+  }
+  Future<bool> loadWorkspaceOriginalCounterDraft() {
+    final data = _storeData, scope = _counterDraftScope, connection = catalogueGateway,
+      context = publicationPreferencesContext, navigation = navigationScopeRevision;
+    if (counterDraftStore case final RemoteWorkCounterDraftStore original) return Future.value(original.sourceCurrent);
+    if (!workspaceOriginalCounterConfigured || scope == null || connection is! AuthenticatedWorkspaceCatalogueGateway ||
+        !hasVerifiedWorkspace || !workspaceRequiresMembershipReadback ||
+        !_currentWorkspaceAccess(scope.store, activeWorkspace?.profileId)) return Future.value(false);
+    if (data.originalCounterDraft?.sourceCurrent == true) return Future.value(true);
+    if (data.originalCounterDraftLoad case final loading?) return loading;
+    bool current() => !_disposed && identical(data, _storeData) && _counterDraftScope == scope &&
+      identical(catalogueGateway, connection) && publicationPreferencesContext == context &&
+      navigationScopeRevision == navigation && hasVerifiedWorkspace &&
+      _currentWorkspaceAccess(scope.store, activeWorkspace?.profileId);
+    final operation = Future<bool>.microtask(() async {
+      try {
+        await (_counterRecovery?.writes ?? Future<void>.value());
+        data.originalCounterDraft?.retire();
+        final source = connection.originalCounterDraftSource(accountId: scope.account, storeId: scope.store, current: current);
+        if (source == null) return false;
+        final original = await RemoteWorkCounterDraftStore.openOriginal(source: source,
+          retainedLocal: _retainedCounterDraftStorage, assertNoPendingLocalOperations: () async {
+            final recovery = _counterRecovery;
+            if (!current() || recovery?.submitting == true || recovery?.record != null ||
+                recovery?.editingId != null || currentWorkspaceOrderId != null ||
+                workspaceOrderCustomer.isNotEmpty || workspaceOrderQuantities.isNotEmpty) {
+              throw const WorkGatewayException('Keep the current bill. Recover it before connecting originals.');
+            }
+          });
+        if (!current()) {original.retire(); return false;}
+        data.originalCounterDraft = original; return true;
+      } on Object {return false;}
+      finally {data.originalCounterDraftLoad = null;}
+    });
+    data.originalCounterDraftLoad = operation; return operation;
+  }
   final _counterDraftRecovery =
       <({String account, String store}), _CounterDraftRecovery>{};
   String? _counterSubmissionOrderId;
@@ -5935,6 +5984,8 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool get counterDraftEditingBlocked =>
+      (workspaceOriginalCounterConfigured &&
+        (counterDraftStore is! RemoteWorkCounterDraftStore && _storeData.originalCounterDraft?.sourceCurrent != true)) ||
       counterDraftLoading ||
       counterDraftSubmitting ||
       counterDraftNeedsReconciliation ||
@@ -6016,7 +6067,13 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
     try {
       await recovery.writes;
-      final record = await _counterDraftStorage.read(
+      if (workspaceOriginalCounterConfigured && !await loadWorkspaceOriginalCounterDraft()) {
+        throw const WorkGatewayException('The original Counter source is unavailable. Saved details are kept.');
+      }
+      final storage = _counterDraftStorage;
+      // retry here means refresh the read. The form also requests a fresh read
+      // on opening; only retryWorkspaceCounterDraft may resend frozen input.
+      final record = await storage.read(
         scope.account,
         scope.store,
       );
@@ -6209,14 +6266,29 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final data = _storeData;
     final task = recovery.writes.then((_) async {
       try {
-        if (_contactAccountScope != scope.account) return false;
+        if (_disposed || _counterDraftScope != scope || !identical(data, _storeData)) return false;
+        final storage = _counterDraftStorage, previous = recovery.record;
+        if (previous?.stage == WorkspaceCounterDraftStage.editing &&
+            jsonEncode(_counterDraftRevision(snapshot, previous!.revision).toJson()) == jsonEncode(previous.toJson())) {
+          // Merely leaving/reopening an unchanged bill must not create another
+          // revision or rewrite encrypted recovery bytes. Re-read its source so
+          // a stale editor cannot acknowledge a different saved bill as its own.
+          final current = await storage.read(scope.account, scope.store);
+          if (_disposed || _counterDraftScope != scope || !identical(data, _storeData) || current == null ||
+              jsonEncode(current.toJson()) != jsonEncode(previous.toJson())) {
+            throw const WorkGatewayException('The saved Counter bill changed. Reopen its original.');
+          }
+          recovery.error = null;
+          return true;
+        }
         final record = _counterDraftRevision(
           snapshot,
           (recovery.record?.revision ?? 0) + 1,
         );
-        await _counterDraftStorage.save(
+        await storage.save(
           record,
           expectedRevision: recovery.record?.revision,
         );
@@ -6356,6 +6428,10 @@ class WorkSession extends ChangeNotifier {
 
   Future<({String orderId, WorkspaceCustomerInvoice? invoice})?>
   submitWorkspaceCounterBill({String? expectedReview}) async {
+    if (workspaceOriginalCounterConfigured) {
+      showError('Original sale and Stock confirmation are not connected. Your bill is kept; no sale or payment was recorded.');
+      return null;
+    }
     if (counterDraftEditingBlocked || !_canEditCounterOrder()) return null;
     final inputContext = publicationPreferencesContext;
     if (publicationPreferencesPersistenceAvailable &&
@@ -6591,6 +6667,27 @@ class WorkSession extends ChangeNotifier {
         recovery.loading ||
         recovery.submitting) {
       return false;
+    }
+    if (workspaceOriginalCounterConfigured) {
+      recovery.loading = true;
+      notifyListeners();
+      try {
+        if (!await loadWorkspaceOriginalCounterDraft()) {
+          throw const WorkGatewayException('The original Counter source is unavailable.');
+        }
+        final storage = _counterDraftStorage;
+        if (storage is! RemoteWorkCounterDraftStore) throw const WorkGatewayException('The original Counter source changed.');
+        await storage.recover(explicitRetry: true);
+      } on Object {
+        recovery.error = 'The earlier Counter save is still unconfirmed. Your details are kept; check its status or retry.';
+        return false;
+      } finally {
+        recovery.loading = false;
+        if (!_disposed && _counterDraftScope == scope) notifyListeners();
+      }
+      if (_disposed || _counterDraftScope != scope) return false;
+      await loadWorkspaceCounterDraft(retry: true, shouldRestore: shouldRestore);
+      return !_disposed && _counterDraftScope == scope && !counterDraftEditingBlocked;
     }
     final unapplied = recovery.record;
     if (unapplied?.stage == WorkspaceCounterDraftStage.submitting &&
@@ -16625,6 +16722,7 @@ class WorkSession extends ChangeNotifier {
     _clearCollection();
     for (final data in {..._storeDataById.values, _storeData}) {
       data.originalLedger?.retire();
+      data.originalCounterDraft?.retire();
       final operations = data.orderOperations;
       if (operations != null && !operations.isDisposed) operations.dispose();
     }

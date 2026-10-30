@@ -45265,7 +45265,9 @@ class _StoreFinanceSurface extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
+              // The native dues route already names this screen in its AppBar.
+              // Keep the source update and balance visible without a second title.
+              if (target != null || section != 'dues') Text(
                 target != null
                     ? (target.payoutId != null
                           ? 'Settlement details'

@@ -169,6 +169,8 @@ import {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, Wor
   bulkSupplierQuoteOperation, requireDefaultPurchaseTenant}
   from "./workspace/workspace_purchase_projection_service.js";
 import {WorkspacePurchaseEntryService, purchaseEntryOperation, workspaceOriginalRequestBodyLimit} from './workspace/workspace_purchase_entry_service.js';
+import {WorkspaceCustomerService, workspaceCustomerOperation} from './workspace/workspace_customer_service.js';
+import {FirestoreCustomerCounterDraftRepository} from './workspace/workspace_customer_repository.js';
 import {FirestorePurchaseEntryRepository} from './workspace/workspace_purchase_entry_repository.js';
 import {WorkspaceLedgerService, workspaceLedgerOperation} from './workspace/workspace_ledger_service.js';
 import {FirestoreWorkspaceLedgerRepository} from './workspace/workspace_ledger_repository.js';
@@ -3196,6 +3198,7 @@ export const moolSocialWorkspace = onRequest(
       const bulkQuoteOperation = bulkQuoteAction !== undefined;
       const storeProcurementRead = operation === 'readStoreProcurementCatalogue';
       const purchaseEntryAction = purchaseEntryOperation(operation);
+      const customerAction = workspaceCustomerOperation(operation);
       const ledgerAction = workspaceLedgerOperation(operation);
       if (storeProcurementRead && process.env.MOOLSOCIAL_STORE_PROCUREMENT_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Store purchasing is not connected.', 503);
@@ -3249,7 +3252,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "finishRetailerSetup" ||
         operation === "setRetailerAvailability" ||
         operation === "saveRetailerProduct" ||
-        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation || purchaseEntryAction === 'saveSupplier' || purchaseEntryAction === 'savePurchaseDraft' || purchaseEntryAction === 'saveOpeningEvidence' || ledgerAction === 'mutation' ||
+        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation || purchaseEntryAction === 'saveSupplier' || purchaseEntryAction === 'savePurchaseDraft' || purchaseEntryAction === 'saveOpeningEvidence' || ledgerAction === 'mutation' || customerAction === 'save' ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || privateProductDraftOperation === 'save' || stockOperation === "save" || stockVisibilityOperation === "save" || stockVisibilityOperation === "close" || catalogueProductionAction !== undefined ||
         ['request', 'offer', 'accept', 'withdraw'].includes(bulkQuoteAction ?? '') ||
@@ -3290,7 +3293,7 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation) || purchaseEntryAction !== undefined || ledgerAction !== undefined || purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
+            if (["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation) || purchaseEntryAction !== undefined || customerAction !== undefined || ledgerAction !== undefined || purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;
@@ -3324,6 +3327,8 @@ export const moolSocialWorkspace = onRequest(
       }
       const result = ledgerAction !== undefined
         ? await workspaceLedgerService().handle({uid: ownerUserId, projectId: publicAuthProjectId()}, operation, {operation, ...catalogueBody})
+        : customerAction !== undefined
+        ? await workspaceCustomerService().handle({uid: ownerUserId, projectId: publicAuthProjectId()}, operation, catalogueBody)
         : purchaseEntryAction !== undefined
         ? await workspacePurchaseEntryService().handle({uid: ownerUserId, projectId: publicAuthProjectId()}, operation, catalogueBody)
         : catalogueProductionAction !== undefined
@@ -3539,6 +3544,14 @@ function workspacePurchaseEntryService(): WorkspacePurchaseEntryService {
   // repository deliberately refuses private IO without it; approved application
   // status, paid entitlement and caller echoes cannot substitute for membership.
   return new WorkspacePurchaseEntryService(new FirestorePurchaseEntryRepository(getFirestore(), realm, publicAuthProjectId()));
+}
+
+function workspaceCustomerService(): WorkspaceCustomerService {
+  const realm = process.env.MOOLSOCIAL_PURCHASE_REALM;
+  if (realm !== 'evaluation' && realm !== 'production') return new WorkspaceCustomerService();
+  // The original transaction-bound membership reader remains a named source
+  // dependency, shared with purchase entry. No review flag/plan grants access.
+  return new WorkspaceCustomerService(new FirestoreCustomerCounterDraftRepository(getFirestore(), realm, publicAuthProjectId()));
 }
 
 function workspaceLedgerService(): WorkspaceLedgerService {

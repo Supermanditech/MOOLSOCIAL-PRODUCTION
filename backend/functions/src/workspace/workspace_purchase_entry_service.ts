@@ -458,7 +458,7 @@ const common = ['schemaVersion', 'purchaseEntryVersion', 'actorAccountId', 'real
  * A draft and its reviewed data copy can both appear in one command. The
  * original persisted purchase book remains bounded at10MiB by its owner. */
 export function workspaceOriginalRequestBodyLimit(operation: string): number {
-  return ['saveStorePurchaseDraft', 'saveStoreSupplierOpeningEvidence', 'confirmStoreSupplierOpening', 'confirmStoreSupplierBill'].includes(operation)
+  return ['saveStorePurchaseDraft', 'saveStoreSupplierOpeningEvidence', 'confirmStoreSupplierOpening', 'confirmStoreSupplierBill', 'saveStoreCounterDraft'].includes(operation)
     ? 24 * 1024 * 1024 : 64 * 1024;
 }
 export function purchaseEntryOperation(operation: string): 'read' | 'saveSupplier' | 'savePurchaseDraft' | 'saveOpeningEvidence' | 'status' | undefined {

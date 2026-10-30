@@ -25,6 +25,7 @@ import '../buy/buy_v2_saved_products_store.dart';
 import 'work_models.dart';
 import 'work_purchase_entry_gateway.dart';
 import 'work_ledger_gateway.dart';
+import 'work_customer_gateway.dart';
 import 'work_document_preview.dart';
 import 'work_customer_feedback.dart';
 import 'work_catalogue_gateway.dart';
@@ -4215,11 +4216,74 @@ abstract interface class WorkCounterDraftStore {
   });
 }
 
+abstract interface class WorkCounterDraftOriginalGuard {
+  Future<T> withPristineCounterOriginal<T>(String account, String store, Future<T> Function() action);
+}
+
+/// The same native Counter draft interface backed by original read/save/status.
+/// Binding refuses retained local bills; it is not a migration or sale gateway.
+class RemoteWorkCounterDraftStore implements WorkCounterDraftStore {
+  RemoteWorkCounterDraftStore._(this.controller);
+  final WorkspaceCounterOriginalController controller;
+  WorkspaceCounterOriginalRemoteSource get source => controller.source;
+  bool get sourceCurrent => source.current;
+  static Future<RemoteWorkCounterDraftStore> openOriginal({required WorkspaceCounterOriginalRemoteSource source,
+    required WorkCounterDraftStore retainedLocal, required Future<void> Function() assertNoPendingLocalOperations,
+    SecureWorkspaceCounterOriginalJournal? journal}) async {
+    final recovery = journal ?? SecureWorkspaceCounterOriginalJournal(scope: source.scope,
+      connectionId: source.connectionId, current: () => source.current);
+    final bound = await recovery.bound;
+    await source.read();
+    if (!bound) {
+      if (retainedLocal is! WorkCounterDraftOriginalGuard) {
+        throw const WorkGatewayException('Original Counter recovery needs its retained-data guard.');
+      }
+      await (retainedLocal as WorkCounterDraftOriginalGuard).withPristineCounterOriginal(source.scope.account, source.scope.store, () async {
+        await assertNoPendingLocalOperations();
+        if (!source.current) throw const WorkGatewayException('The original Store changed.');
+        await recovery.bindConfirmedOriginal();
+      });
+    }
+    if (!source.current) throw const WorkGatewayException('The original Store changed.');
+    return RemoteWorkCounterDraftStore._(WorkspaceCounterOriginalController(source: source, journal: recovery));
+  }
+  void _scope(String account, String store) {
+    if (!source.current || source.scope.account != account || source.scope.store != store) {
+      throw const WorkGatewayException('Return to the original Store to recover this bill.');
+    }
+  }
+  @override Future<WorkspaceCounterDraft?> read(String account, String store) async {
+    _scope(account, store); final result = await controller.read(); _scope(account, store);
+    return result.currentDraft;
+  }
+  Future<WorkspaceCounterDraft?> recover({bool explicitRetry = false}) async {
+    final result = await controller.recover(retry: explicitRetry);
+    if (await controller.journal.pending() != null) {
+      throw const WorkGatewayException('The earlier Counter save is still unconfirmed. Entered details are kept.');
+    }
+    return result.currentDraft;
+  }
+  @override Future<void> save(WorkspaceCounterDraft draft, {required int? expectedRevision}) async {
+    _scope(draft.account, draft.store);
+    final key = 'counter-draft-${workspaceLedgerFingerprint({'scope': {'account': source.scope.account,
+      'store': source.scope.store, 'realm': source.scope.realm}, 'id': draft.id, 'revision': draft.revision.toString(),
+      'inputFingerprint': workspaceLedgerFingerprint(workspaceCounterDraftToOriginalWire(draft, source.scope))})}';
+    final original = WorkspaceCounterOriginalIntent(scope: source.scope, draft: draft,
+      expectedRevision: expectedRevision, idempotencyKey: key);
+    final result = await controller.save(original); _scope(draft.account, draft.store);
+    if (!result.saved || result.currentDraft == null ||
+        jsonEncode(result.currentDraft!.toJson()) != jsonEncode(draft.toJson())) {
+      throw const WorkGatewayException('The saved Counter bill changed. Refresh its original before continuing.');
+    }
+  }
+  void retire() => source.retire();
+}
+
 /// Device-local encrypted recovery, not an order/payment completion journal.
 /// A submitting draft cannot be restored as editable work. Its exact operation
 /// must be reconciled by the caller before retiring it. Keep a revisioned
 /// tombstone after discard/completion so delayed edits cannot revive the sale.
-class SecureWorkCounterDraftStore implements WorkCounterDraftStore {
+class SecureWorkCounterDraftStore implements WorkCounterDraftStore, WorkCounterDraftOriginalGuard {
   SecureWorkCounterDraftStore({
     required this.accountScope,
     FlutterSecureStorage? storage,
@@ -4263,6 +4327,7 @@ class SecureWorkCounterDraftStore implements WorkCounterDraftStore {
 
   Future<WorkspaceCounterDraft?> _read(String account, String store) async {
     _checkAccount(account, store);
+    await _checkNoOriginalBinding(account, store);
     final value = await _storage.read(key: _key(account, store));
     _checkAccount(account, store);
     if (value == null) return null;
@@ -4277,6 +4342,25 @@ class SecureWorkCounterDraftStore implements WorkCounterDraftStore {
     }
     return draft;
   }
+
+  Future<void> _checkNoOriginalBinding(String account, String store) async {
+    for (final realm in ['evaluation', 'production']) {
+      if (await _storage.read(key: workspaceCounterOriginalBindingKey((account: account, store: store, realm: realm))) != null) {
+        throw const WorkGatewayException('Recover this bill from the original Counter source. Saved records are kept.');
+      }
+      _checkAccount(account, store);
+    }
+  }
+  @override Future<T> withPristineCounterOriginal<T>(String account, String store, Future<T> Function() action) =>
+    _exclusive(_key(account, store), () async {
+      _checkAccount(account, store);
+      await _checkNoOriginalBinding(account, store);
+      if (await _storage.read(key: _key(account, store)) != null) {
+        throw const WorkGatewayException('Recover or migrate the saved Counter bill before connecting originals.');
+      }
+      _checkAccount(account, store);
+      return action();
+    });
 
   @override
   Future<WorkspaceCounterDraft?> read(String account, String store) =>
@@ -4336,6 +4420,7 @@ class SecureWorkCounterDraftStore implements WorkCounterDraftStore {
       );
     }
     _checkAccount(draft.account, draft.store);
+    await _checkNoOriginalBinding(draft.account, draft.store);
     await _storage.write(key: _key(draft.account, draft.store), value: value);
     _checkAccount(draft.account, draft.store);
   });

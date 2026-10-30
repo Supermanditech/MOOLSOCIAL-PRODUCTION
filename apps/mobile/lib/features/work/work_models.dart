@@ -1192,6 +1192,47 @@ class WorkspaceCustomerLedgerEntry {
   final WorkspaceCustomerReturn? customerReturn;
   final WorkspaceCustomerRefund? customerRefund;
 
+  /// The existing retained checkpoint format, shared with original readers.
+  /// A decoded event is not proof that an authenticated receiver posted it.
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'operationId': operationId,
+    'invoiceId': invoiceId,
+    'orderId': orderId,
+    'sequence': sequence,
+    'occurredAt': occurredAt.toUtc().toIso8601String(),
+    'kind': kind.name,
+    'state': state.name,
+    'amountMinor': amountMinor,
+    'channel': channel.name,
+    'paymentReference': paymentReference,
+    if (customerRefund != null) 'customerRefund': customerRefund!.toJson(),
+    if (customerReturn != null) 'customerReturn': customerReturn!.toJson(),
+  };
+
+  factory WorkspaceCustomerLedgerEntry.fromJson(Object? value) {
+    if (value is! Map) throw const FormatException('Invalid customer event.');
+    final result = WorkspaceCustomerLedgerEntry(
+      id: value['id'] as String,
+      operationId: value['operationId'] as String,
+      invoiceId: value['invoiceId'] as String,
+      orderId: value['orderId'] as String,
+      sequence: value['sequence'] as int,
+      occurredAt: DateTime.parse(value['occurredAt'] as String),
+      kind: WorkspaceLedgerEntryKind.values.byName(value['kind'] as String),
+      state: WorkspaceLedgerPostingState.values.byName(value['state'] as String),
+      amountMinor: value['amountMinor'] as int,
+      channel: WorkspacePaymentChannel.values.byName(value['channel'] as String),
+      paymentReference: value['paymentReference'] as String?,
+      customerRefund: value.containsKey('customerRefund')
+          ? WorkspaceCustomerRefund.fromJson(value['customerRefund']) : null,
+      customerReturn: value.containsKey('customerReturn')
+          ? WorkspaceCustomerReturn.fromJson(value['customerReturn']) : null,
+    );
+    if (!result.valid) throw const FormatException('Invalid customer event.');
+    return result;
+  }
+
   Object get identityData => (
     id,
     operationId,
@@ -1317,6 +1358,37 @@ class WorkspaceCustomerLedger {
   final int? openingBalanceMinor;
   final bool historyComplete;
   final List<WorkspaceCustomerLedgerEntry> entries;
+
+  /// Reuses the retained customer section without supplying settlement totals.
+  Map<String, Object?> toJson() => {
+    'accountScope': accountScope,
+    'workspaceId': workspaceId,
+    'customerId': customerId,
+    'customerName': customerName,
+    'revision': revision,
+    'asOf': asOf.toUtc().toIso8601String(),
+    'openingBalanceMinor': openingBalanceMinor,
+    'historyComplete': historyComplete,
+    'entries': [for (final entry in entries) entry.toJson()],
+  };
+
+  factory WorkspaceCustomerLedger.fromJson(Object? value) {
+    if (value is! Map) throw const FormatException('Invalid customer account.');
+    final result = WorkspaceCustomerLedger(
+      accountScope: value['accountScope'] as String,
+      workspaceId: value['workspaceId'] as String,
+      customerId: value['customerId'] as String,
+      customerName: value['customerName'] as String,
+      revision: value['revision'] as int,
+      asOf: DateTime.parse(value['asOf'] as String),
+      openingBalanceMinor: value['openingBalanceMinor'] as int?,
+      historyComplete: value['historyComplete'] as bool,
+      entries: [for (final entry in value['entries'] as List)
+        WorkspaceCustomerLedgerEntry.fromJson(entry)],
+    );
+    if (!result.valid) throw const FormatException('Invalid customer account.');
+    return result;
+  }
 
   /// Invoice-local amounts never use another bill's payments or opening balance.
   /// Null means the history cannot authorize a collection, credit or refund.
@@ -2576,39 +2648,7 @@ class WorkspaceLedgerCheckpoint {
             'message': p.message,
           },
       ],
-      'customerLedgers': [
-        for (final l in finance.customerLedgers)
-          {
-            'accountScope': l.accountScope,
-            'workspaceId': l.workspaceId,
-            'customerId': l.customerId,
-            'customerName': l.customerName,
-            'revision': l.revision,
-            'asOf': l.asOf.toUtc().toIso8601String(),
-            'openingBalanceMinor': l.openingBalanceMinor,
-            'historyComplete': l.historyComplete,
-            'entries': [
-              for (final e in l.entries)
-                {
-                  'id': e.id,
-                  'operationId': e.operationId,
-                  'invoiceId': e.invoiceId,
-                  'orderId': e.orderId,
-                  'sequence': e.sequence,
-                  'occurredAt': e.occurredAt.toUtc().toIso8601String(),
-                  'kind': e.kind.name,
-                  'state': e.state.name,
-                  'amountMinor': e.amountMinor,
-                  'channel': e.channel.name,
-                  'paymentReference': e.paymentReference,
-                  if (e.customerRefund != null)
-                    'customerRefund': e.customerRefund!.toJson(),
-                  if (e.customerReturn != null)
-                    'customerReturn': e.customerReturn!.toJson(),
-                },
-            ],
-          },
-      ],
+      'customerLedgers': [for (final ledger in finance.customerLedgers) ledger.toJson()],
     },
     'pending': pending == null
         ? null
@@ -2749,49 +2789,8 @@ class WorkspaceLedgerCheckpoint {
               ),
           ],
           customerLedgers: [
-            for (final l in f['customerLedgers'] as List)
-              WorkspaceCustomerLedger(
-                accountScope: l['accountScope'] as String,
-                workspaceId: l['workspaceId'] as String,
-                customerId: l['customerId'] as String,
-                customerName: l['customerName'] as String,
-                revision: l['revision'] as int,
-                asOf: DateTime.parse(l['asOf'] as String),
-                openingBalanceMinor: l['openingBalanceMinor'] as int?,
-                historyComplete: l['historyComplete'] as bool,
-                entries: [
-                  for (final e in l['entries'] as List)
-                    WorkspaceCustomerLedgerEntry(
-                      id: e['id'] as String,
-                      operationId: e['operationId'] as String,
-                      invoiceId: e['invoiceId'] as String,
-                      orderId: e['orderId'] as String,
-                      sequence: e['sequence'] as int,
-                      occurredAt: DateTime.parse(e['occurredAt'] as String),
-                      kind: WorkspaceLedgerEntryKind.values.byName(
-                        e['kind'] as String,
-                      ),
-                      state: WorkspaceLedgerPostingState.values.byName(
-                        e['state'] as String,
-                      ),
-                      amountMinor: e['amountMinor'] as int,
-                      channel: WorkspacePaymentChannel.values.byName(
-                        e['channel'] as String,
-                      ),
-                      paymentReference: e['paymentReference'] as String?,
-                      customerRefund: e.containsKey('customerRefund')
-                          ? WorkspaceCustomerRefund.fromJson(
-                              e['customerRefund'],
-                            )
-                          : null,
-                      customerReturn: e.containsKey('customerReturn')
-                          ? WorkspaceCustomerReturn.fromJson(
-                              e['customerReturn'],
-                            )
-                          : null,
-                    ),
-                ],
-              ),
+            for (final ledger in f['customerLedgers'] as List)
+              WorkspaceCustomerLedger.fromJson(ledger),
           ],
         ),
       );
