@@ -4564,6 +4564,21 @@ Map<String, dynamic> operationalResponse({String role = 'buyer'}) {
 }
 
 void originalPurchasedDeviceSourceTests() {
+  test('AGG08-DEVICE native trimmed text rejects edge NEL while preserving literal interiors', () {
+    const plain = WorkspacePurchasedUnitRow(id: 'host-unit', serial: 'printed serial');
+    for (final field in ['id', 'serial', 'imei1', 'imei2']) {
+      for (final edge in ['\u0085X', 'X\u0085', '\u0085']) {
+        final fields = {...plain.toJson(), field: edge};
+        final row = WorkspacePurchasedUnitRow(id: fields['id'] as String, serial: fields['serial'] as String,
+          imei1: fields['imei1'] as String, imei2: fields['imei2'] as String);
+        expect(row.ready, isFalse, reason: 'Published $field must follow native trimmed text.');
+      }
+    }
+    const literal = WorkspacePurchasedUnitRow(id: 'unit\u0085middle', serial: '\u180eprinted\u0085serial',
+      imei1: 'printed\ufeffinside');
+    expect(literal.ready, isTrue);
+    expect(WorkspacePurchasedUnitRow.fromJson(literal.toJson()).toJson(), literal.toJson());
+  });
   const capture = String.fromEnvironment('AGG08_DEVICE_WIRE_EXPORT_PATH');
   // This file is emitted by the actual SDK loopback run, not a phone provider.
   Map<String, dynamic> load() => (jsonDecode(File(capture).readAsStringSync()) as Map).cast<String, dynamic>();
@@ -4599,7 +4614,7 @@ void originalPurchasedDeviceSourceTests() {
       final target = WorkspacePurchasedLineTarget(accountUserId: account, role: role, realm: 'evaluation', reference: ref, line: line);
       expect(target.binding, targetData['binding']);
       final read = await gateway.readPurchasedUnits(role: role, realm: 'evaluation', reference: ref, line: line);
-      expect(read, isNotNull); expect(read!.rows.single.serial, 'printed SERIAL-01');
+      expect(read, isNotNull); expect(read!.rows.single.toJson(), data['buyerRead']['record']['rows'].single);
       expect(wire.sent!['target'], targetData);
       if (role == WorkspaceOrderIdentityRole.seller) {
         final grant = read.ownerAccess!;
@@ -4608,7 +4623,7 @@ void originalPurchasedDeviceSourceTests() {
         expect(result?.state, WorkspacePurchasedUnitPublishState.applied); expect(result!.record!.rows, hasLength(1));
         expect(source.ownerAccessCurrent(grant), isTrue, reason: 'An authorized refresh does not retire a still-current permission grant.');
         final inbox = await gateway.readReceivedDeviceReports(realm: 'evaluation', reference: ref, line: line);
-        expect(inbox!.reports.single.note, 'Printed identifier does not match received unit');
+        expect(inbox!.reports.single.note, data['reportCommand']['note']);
         expect(inbox.reports.single.supportCase, isNull);
       } else {
         final result = await gateway.reportPurchasedUnitMismatch(command: WorkspacePurchasedUnitMismatchCommand.fromJson(data['reportCommand']),

@@ -1025,6 +1025,24 @@ for (const action of ['AI-ACT-393', 'AI-ACT-394', 'AI-ACT-395', 'AI-ACT-396', 'A
     assert.throws(() => tool.resolveTarget!({targetId: 'device-' + 'f'.repeat(64), ...supplied}));
   });
 }
+test('AGG08-DEVICE native trimmed text cannot enter a prepared identifier or mismatch note', async () => {
+  for (const action of ['AI-ACT-394', 'AI-ACT-396']) {
+    const f = deviceOriginalFixture(), context = await f.source.read(actor, {...f.input, actionId: action});
+    const tool = context.tools[0]!, entity = context.nativeTargets![0]!.entityId;
+    for (const edge of ['\u0085X', 'X\u0085', '\u0085']) {
+      const fields = action === 'AI-ACT-394' ? {rows: [{id: null, serial: edge, imei1: '', imei2: ''}]} :
+        {selectedIds: ['printed-row-id'], note: edge};
+      assert.throws(() => tool.resolveTarget!({targetId: entity, ...fields}), /invalid_model_result/u);
+    }
+    const literal = '\u180eprinted\u0085identifier\ufeffinside';
+    const fields = action === 'AI-ACT-394' ? {rows: [{id: null, serial: literal, imei1: '', imei2: ''}]} :
+      {selectedIds: ['printed-row-id'], note: literal};
+    const result = tool.resolveTarget!({targetId: entity, ...fields});
+    if (action === 'AI-ACT-394') assert.deepEqual(result.fields, {rows: [{serial: literal, imei1: '', imei2: ''}]});
+    else assert.deepEqual(result.fields, fields);
+  }
+});
+
 test('AGG08-DEVICE pointer excludes warranty documents cases and refuses stale original or authority', async () => {
   for (const action of ['AI-ACT-389', 'AI-ACT-392', 'AI-ACT-400']) {
     const f = deviceOriginalFixture(); await assert.rejects(f.source.read(actor, {...f.input, actionId: action})); assert.equal(f.calls.length, 0);

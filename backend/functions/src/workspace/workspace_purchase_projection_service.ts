@@ -972,7 +972,9 @@ export class WorkspaceOrderOperationsService {
       const r = exact(value, ['id', 'serial', 'imei1', 'imei2']);
       for (const key of ['id', 'serial', 'imei1', 'imei2']) {
         const v = r[key];
-        if (typeof v !== 'string' || v !== v.trim() || v.length > (key === 'id' ? 120 : 240) || /[\x00-\x1f\x7f]/u.test(v)) fail();
+        // Dart's native trim also removes edge NEL; JS trim does not.
+        if (typeof v !== 'string' || v !== v.trim() || v.startsWith('\u0085') || v.endsWith('\u0085') ||
+            v.length > (key === 'id' ? 120 : 240) || /[\x00-\x1f\x7f]/u.test(v)) fail();
       }
       if (!r.id || ![r.serial, r.imei1, r.imei2].some(v => v !== '')) fail();
       return {id: String(r.id), serial: String(r.serial), imei1: String(r.imei1), imei2: String(r.imei2)};
@@ -980,7 +982,8 @@ export class WorkspaceOrderOperationsService {
     unique(rows.map(r => r.id)); return rows;
   }
   private deviceNote(raw: unknown): string {
-    if (typeof raw !== 'string' || !raw || raw !== raw.trim() || raw.length > 2000 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(raw)) fail();
+    if (typeof raw !== 'string' || !raw || raw !== raw.trim() || raw.startsWith('\u0085') || raw.endsWith('\u0085') ||
+        raw.length > 2000 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(raw)) fail();
     return raw;
   }
   private deviceCommand(value: unknown, kind: 'share' | 'report') {

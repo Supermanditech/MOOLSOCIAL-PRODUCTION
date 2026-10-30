@@ -1576,7 +1576,7 @@ export class OriginalStoreDevicePreparationContext implements PreparationContext
     if (until <= this.now() || input.entityId !== null && !second.length) return fail('context_unavailable');
     const revision = 'store-device-context:' + digest([actor.projectId, actor.uid, input.scope.storeId, after.revision, second]);
     const textValid = (v: unknown, max: number, empty = false) => typeof v === 'string' && (empty || v.length > 0) &&
-      v === v.trim() && v.length <= max && !/[\x00-\x1f\x7f]/u.test(v);
+      v === v.trim() && !v.startsWith('\u0085') && !v.endsWith('\u0085') && v.length <= max && !/[\x00-\x1f\x7f]/u.test(v);
     const validate = (action: string, fields: Readonly<Record<string, unknown>>) => {
       if (action === 'AI-ACT-394') return Object.keys(fields).length === 1 && Array.isArray(fields.rows) &&
         fields.rows.length > 0 && fields.rows.length <= 1000 && fields.rows.every(value => {
@@ -1588,7 +1588,8 @@ export class OriginalStoreDevicePreparationContext implements PreparationContext
       if (action === 'AI-ACT-396') return Object.keys(fields).length === 2 && Array.isArray(fields.selectedIds) &&
         fields.selectedIds.length > 0 && fields.selectedIds.length <= 1000 && new Set(fields.selectedIds).size === fields.selectedIds.length &&
         fields.selectedIds.every(v => textValid(v, 120)) && typeof fields.note === 'string' && fields.note.length > 0 &&
-        fields.note === fields.note.trim() && fields.note.length <= 2000 && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(fields.note);
+        fields.note === fields.note.trim() && !fields.note.startsWith('\u0085') && !fields.note.endsWith('\u0085') &&
+        fields.note.length <= 2000 && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(fields.note);
       return Object.keys(fields).length === 0;
     };
     const tools: PreparationTool[] = [], nativeTargets: {actionId: string; entityId: string; sourceRevision: string}[] = [];

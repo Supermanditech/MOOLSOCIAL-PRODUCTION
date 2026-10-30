@@ -2737,3 +2737,75 @@ test('AGG08-DEVICE Store buyer history requires the original current buying Stor
     assert.deepEqual(await originals.readBuyer(input.buyerUserId, {purchaseId: made.purchaseId, buyingStoreId: buyingStore}), before);
   } finally {await db.terminate(); await deleteApp(app);}
 });
+
+test('AGG08-DEVICE native trimmed text rejects edge NEL and preserves original interior characters', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST, timeout: 60000,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: 'demo-agg08-native-trim'}, `native-trim-${randomUUID()}`);
+  const db = purchaseTestFirestore(app), input = receipt(`native-trim-${randomUUID()}`);
+  try {
+    for (const store of input.stores) await db.collection('workspaceProfiles').doc(store.caseId).set({
+      schemaVersion: 1, caseId: store.caseId, workspaceId: store.storeId, ownerUserId: store.ownerUserId,
+      familyId: 'products-trade', profileId: 'retailer-grocery', status: 'live', shopEnabled: true,
+    });
+    const projection = new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => input});
+    const made = await projection.materialize('isolated-native-trim-original');
+    const before = await projection.readBuyer(input.buyerUserId, {purchaseId: made.purchaseId});
+    const order = before.orders[0]!, owner = input.stores[0]!.ownerUserId;
+    const reference = {purchaseId: before.purchaseId, storeId: order.storeId, orderId: order.orderId,
+      originalFingerprint: order.originalFingerprint, sourceRevision: before.sourceRevision};
+    const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex');
+    const canonical = (v: unknown): unknown => Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object'
+      ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical((v as Record<string, unknown>)[k])])) : v;
+    const target = (actor: string, role: 'buyer' | 'seller') => {
+      const value = {role, realm: 'evaluation', buyingStoreId: null, reference, lineFacts: order.original.lines[0]!};
+      return {...value, binding: hash(canonical([actor, role, value.realm, null, reference, value.lineFacts]))};
+    };
+    const seller = target(owner, 'seller'), buyer = target(input.buyerUserId, 'buyer');
+    const service = new WorkspaceOrderOperationsService(db, 'evaluation');
+    const call = async (actor: string, operation: string, target: object, rest: object = {}) =>
+      await service.purchasedDevices(actor, operation, {target, ...rest}) as any;
+    const key = (actor: string, binding: string) => ({account: actor, realm: 'evaluation', store: order.storeId, binding});
+    let sequence = 0;
+    const share = (rows: object[]) => {
+      const k = key(owner, seller.binding), operationId = (++sequence).toString(16).padStart(32, '0');
+      return {version: 1, key: k, operationId, expectedRevision: 0, rows,
+        fingerprint: hash([1, k, operationId, 0, rows])};
+    };
+    const plain = {id: 'host-unit', serial: 'printed serial', imei1: '', imei2: ''};
+    for (const field of ['id', 'serial', 'imei1', 'imei2']) for (const edge of ['\u0085X', 'X\u0085', '\u0085']) {
+      const command = share([{...plain, [field]: edge}]);
+      await assert.rejects(call(owner, 'sharePurchasedUnits', seller, {command}), rejectsCode('invalid_input'), `native ${field} edge`);
+      await assert.rejects(call(owner, 'reconcilePurchasedUnits', seller, {command}), rejectsCode('invalid_input'));
+    }
+    assert.equal((await call(owner, 'readPurchasedUnits', seller)).record.revision, 0);
+    const row = {id: 'unit\u0085middle', serial: '\u180eprinted\u0085serial', imei1: 'printed\ufeffinside', imei2: ''};
+    const command = share([row]), shareResult = await call(owner, 'sharePurchasedUnits', seller, {command});
+    assert.deepEqual(shareResult.record.rows, [row]);
+    const buyerRead = await call(input.buyerUserId, 'readPurchasedUnits', buyer);
+    assert.deepEqual(buyerRead.record.rows, [row]);
+    const mismatch = (note: string) => {
+      const k = key(input.buyerUserId, buyer.binding), operationId = (++sequence).toString(16).padStart(32, '0');
+      const sourceFingerprint = hash(canonical([buyer.binding, 1, [row], true]));
+      return {version: 1, key: k, operationId, sourceRevision: 1, sourceFingerprint, note, rows: [row],
+        fingerprint: hash([1, k, operationId, 1, sourceFingerprint, note, [row]])};
+    };
+    for (const note of ['\u0085note', 'note\u0085', '\u0085']) {
+      const command = mismatch(note);
+      await assert.rejects(call(input.buyerUserId, 'reportPurchasedUnitMismatch', buyer, {command}), rejectsCode('invalid_input'));
+      await assert.rejects(call(input.buyerUserId, 'reconcilePurchasedUnitMismatch', buyer, {command}), rejectsCode('invalid_input'));
+    }
+    const reportCommand = mismatch('\u180eReceived\u0085identifier\ufeffinside');
+    const reportResult = await call(input.buyerUserId, 'reportPurchasedUnitMismatch', buyer, {command: reportCommand});
+    const inbox = await call(owner, 'readReceivedDeviceReports', seller, {cursor: null});
+    assert.equal(inbox.reports.length, 1); assert.equal(inbox.reports[0].note, reportCommand.note);
+    assert.deepEqual(await call(input.buyerUserId, 'reconcilePurchasedUnitMismatch', buyer, {command: reportCommand}), reportResult);
+    assert.deepEqual(await projection.readBuyer(input.buyerUserId, {purchaseId: made.purchaseId}), before);
+    if (process.env.AGG08_NATIVE_TRIM_WIRE_EXPORT_PATH) writeFileSync(process.env.AGG08_NATIVE_TRIM_WIRE_EXPORT_PATH,
+      JSON.stringify({data: 'ISOLATED HOST actual SDK native trim wire; never phone injection', before,
+        sellerProjection: await projection.readStore(owner, {purchaseId: made.purchaseId, storeId: order.storeId, orderId: order.orderId}),
+        seller, buyer, command, reportCommand, shareResult, reportResult,
+        sellerRead: await call(owner, 'readPurchasedUnits', seller), buyerRead, inbox}), 'utf8');
+  } finally {await db.terminate(); await deleteApp(app);}
+});
