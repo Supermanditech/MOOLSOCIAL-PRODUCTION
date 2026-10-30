@@ -2563,3 +2563,177 @@ function reverseMaps(value: unknown): unknown {
   }
   return value;
 }
+
+test('AGG08-DEVICE actual SDK original sharing mismatch recovery and bounded pages', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST, timeout: 180000,
+}, async t => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: 'demo-agg08-private-device'}, `device-${randomUUID()}`);
+  const db = purchaseTestFirestore(app), input = receipt(`device-${randomUUID()}`);
+  const clock = () => new Date();
+  try {
+    for (const store of input.stores) await db.collection('workspaceProfiles').doc(store.caseId).set({
+      schemaVersion: 1, caseId: store.caseId, workspaceId: store.storeId, ownerUserId: store.ownerUserId,
+      familyId: 'products-trade', profileId: 'retailer-grocery', status: 'live', shopEnabled: true,
+    });
+    const projection = new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => input});
+    const made = await projection.materialize('isolated-device-original');
+    for (const store of input.stores) await db.collection('workspaceProfiles').doc(store.caseId).update({shopEnabled: false});
+    const before = await projection.readBuyer(input.buyerUserId, {purchaseId: made.purchaseId});
+    const order = before.orders[0]!, owner = input.stores[0]!.ownerUserId;
+    const reference = {purchaseId: before.purchaseId, storeId: order.storeId, orderId: order.orderId,
+      originalFingerprint: order.originalFingerprint, sourceRevision: before.sourceRevision};
+    const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex');
+    const canonical = (v: unknown): unknown => Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object'
+      ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical((v as Record<string, unknown>)[k])])) : v;
+    const frozenLine = order.original.lines[0]!;
+    const nativeLine = {lineId: frozenLine.lineId, skuId: frozenLine.skuId, canonicalProductId: frozenLine.canonicalProductId,
+      verifiedPackId: frozenLine.verifiedPackId, offerId: frozenLine.offerId, offerRevision: frozenLine.offerRevision,
+      name: frozenLine.name, packLabel: frozenLine.packLabel, quantityMilli: frozenLine.quantityMilli,
+      quantityUnit: frozenLine.quantityUnit, unitPriceMinor: frozenLine.unitPriceMinor, lineTotalMinor: frozenLine.lineTotalMinor};
+    const target = (actor: string, role: 'buyer' | 'seller', change: Record<string, unknown> = {}) => {
+      const target = {role, realm: 'evaluation', buyingStoreId: null, reference, lineFacts: nativeLine, ...change};
+      return {...target, binding: hash(canonical([actor, target.role, target.realm, target.buyingStoreId, target.reference, target.lineFacts]))};
+    };
+    const seller = target(owner, 'seller'), buyer = target(input.buyerUserId, 'buyer');
+    const service = () => new WorkspaceOrderOperationsService(db, 'evaluation', undefined, clock);
+    const call = async (actor: string, operation: string, target: object, rest: object = {}) =>
+      await service().purchasedDevices(actor, operation, {target, ...rest}) as any;
+    const key = (actor: string, target: typeof seller) => ({account: actor, realm: 'evaluation', store: order.storeId, binding: target.binding});
+    const share = (operationId: string, expectedRevision: number, rows: object[]) => {
+      const k = key(owner, seller);
+      return {version: 1, key: k, operationId, expectedRevision, rows, fingerprint: hash([1, k, operationId, expectedRevision, rows])};
+    };
+    const row = {id: 'unit-one', serial: 'printed SERIAL-01', imei1: 'printed IMEI-01', imei2: ''};
+    await t.test('empty authorized original read does not create records or grants for a stranger', async () => {
+      assert.equal((await call(owner, 'readPurchasedUnits', seller)).record.revision, 0);
+      assert.equal((await call(input.buyerUserId, 'readPurchasedUnits', buyer)).record.complete, true);
+      await assert.rejects(call('foreign-user', 'readPurchasedUnits', target('foreign-user', 'buyer')), rejectsCode('not_found'));
+      await assert.rejects(call(input.buyerUserId, 'readPurchasedUnits', {...buyer, binding: seller.binding}), rejectsCode('invalid_input'));
+      await assert.rejects(call(owner, 'readPurchasedUnits', target(owner, 'seller', {buyingStoreId: 'foreign-store'})), rejectsCode('not_found'));
+      await assert.rejects(call(owner, 'readPurchasedUnits', target(owner, 'seller', {lineFacts: {...seller.lineFacts, skuId: 'forged-sku'}})), rejectsCode('conflict'));
+      assert.equal((await db.collection('workspacePurchaseProjections').doc('evaluation').collection('purchasedUnits').get()).size, 0);
+    });
+    const command = share('a'.repeat(32), 0, [row]);
+    await t.test('unknown status is observational and concurrent duplicates apply once', async () => {
+      assert.equal((await call(owner, 'reconcilePurchasedUnits', seller, {command})).state, 'pending');
+      const [a, b] = await Promise.all([call(owner, 'sharePurchasedUnits', seller, {command}), call(owner, 'sharePurchasedUnits', seller, {command})]);
+      assert.deepEqual(a, b); assert.equal(a.record.revision, 1); assert.deepEqual(a.record.rows, [row]);
+      assert.deepEqual(await call(owner, 'reconcilePurchasedUnits', seller, {command}), a);
+      await assert.rejects(call(owner, 'sharePurchasedUnits', seller, {command: share(command.operationId, 0, [{...row, serial: 'different'}])}), rejectsCode('conflict'));
+      await assert.rejects(call(owner, 'sharePurchasedUnits', seller, {command: share('b'.repeat(32), 0, [row])}), rejectsCode('conflict'));
+    });
+    let snapshot = (await call(input.buyerUserId, 'readPurchasedUnits', buyer)).record;
+    const mismatch = (operationId: string, rows = [row], note = 'Printed identifier does not match received unit') => {
+      const k = key(input.buyerUserId, buyer), sourceFingerprint = hash(canonical([buyer.binding, snapshot.revision, snapshot.rows, true]));
+      return {version: 1, key: k, operationId, sourceRevision: snapshot.revision, sourceFingerprint, note, rows,
+        fingerprint: hash([1, k, operationId, snapshot.revision, sourceFingerprint, note, rows])};
+    };
+    const reportCommand = mismatch('c'.repeat(32));
+    await t.test('private buyer observation is exact, idempotent and separate from supplier identifiers', async () => {
+      assert.equal((await call(input.buyerUserId, 'reconcilePurchasedUnitMismatch', buyer, {command: reportCommand})).state, 'pending');
+      const [a, b] = await Promise.all([call(input.buyerUserId, 'reportPurchasedUnitMismatch', buyer, {command: reportCommand}),
+        call(input.buyerUserId, 'reportPurchasedUnitMismatch', buyer, {command: reportCommand})]);
+      assert.deepEqual(a, b); assert.equal(a.state, 'applied');
+      assert.deepEqual(await call(input.buyerUserId, 'reconcilePurchasedUnitMismatch', buyer, {command: reportCommand}), a);
+      await assert.rejects(call(input.buyerUserId, 'reportPurchasedUnitMismatch', buyer,
+        {command: mismatch('d'.repeat(32), [{...row, serial: 'not supplied'}])}), rejectsCode('conflict'));
+      const inbox = await call(owner, 'readReceivedDeviceReports', seller, {cursor: null});
+      assert.equal(inbox.reports.length, 1); assert.equal(inbox.reports[0].id, a.reportId);
+      assert.equal('supportCase' in inbox.reports[0], false); assert.deepEqual(inbox.reports[0].rows, [row]);
+      assert.deepEqual((await call(input.buyerUserId, 'readPurchasedUnits', buyer)).record.rows, [row]);
+      await assert.rejects(call(input.buyerUserId, 'readReceivedDeviceReports', buyer, {cursor: null}), rejectsCode('not_found'));
+      if (process.env.AGG08_DEVICE_WIRE_EXPORT_PATH) writeFileSync(process.env.AGG08_DEVICE_WIRE_EXPORT_PATH,
+        JSON.stringify({data: 'ISOLATED HOST SDK output; never install on phone', before,
+          sellerProjection: {...before, viewerRole: 'seller', viewerUserId: owner, orders: [order]},
+          seller, buyer, command, reportCommand, shareResult: await call(owner, 'reconcilePurchasedUnits', seller, {command}),
+          reportResult: a, sellerRead: await call(owner, 'readPurchasedUnits', seller),
+          buyerRead: await call(input.buyerUserId, 'readPurchasedUnits', buyer), inbox}, null, 2), {flag: 'wx'});
+    });
+    await t.test('1000 Unicode-heavy rows persist below document limits with frozen old receipt recovery', async () => {
+      const rows = Array.from({length: 1000}, (_, i) => ({id: `unit-${i}`, serial: 'क'.repeat(240), imei1: '字'.repeat(240), imei2: 'م'.repeat(240)}));
+      assert.ok(Buffer.byteLength(JSON.stringify(rows), 'utf8') > 1048576);
+      const big = share('e'.repeat(32), 1, rows);
+      const result = await call(owner, 'sharePurchasedUnits', seller, {command: big});
+      assert.equal(result.record.rows.length, 1000); assert.equal(result.record.revision, 2);
+      assert.deepEqual((await call(owner, 'reconcilePurchasedUnits', seller, {command})).record.rows, [row]);
+      const root = db.collection('workspacePurchaseProjections').doc('evaluation').collection('purchasedUnits');
+      const docs = await root.get(); assert.equal(docs.size, 1);
+      assert.equal('rows' in docs.docs[0]!.data(), false);
+      const pages = await docs.docs[0]!.ref.collection('revisions').doc('2').collection('pages').get();
+      assert.equal(pages.size, 10); assert.ok(pages.docs.every(d => Buffer.byteLength(JSON.stringify(d.data()), 'utf8') < 1048576));
+      assert.deepEqual((await call(input.buyerUserId, 'readPurchasedUnits', buyer)).record.rows, rows);
+      await assert.rejects(call(input.buyerUserId, 'reportPurchasedUnitMismatch', buyer, {command: mismatch('f'.repeat(32))}), rejectsCode('conflict'));
+      await call(owner, 'sharePurchasedUnits', seller, {command: share('1'.repeat(32), 2, [row])});
+      snapshot = (await call(input.buyerUserId, 'readPurchasedUnits', buyer)).record;
+    });
+    await t.test('seller inbox is bounded and cursor binds current complete revision', async () => {
+      for (let i = 0; i < 51; i++) await call(input.buyerUserId, 'reportPurchasedUnitMismatch', buyer,
+        {command: mismatch(i.toString(16).padStart(32, '0'), [row], `Received mismatch observation ${i}`)});
+      const first = await call(owner, 'readReceivedDeviceReports', seller, {cursor: null});
+      assert.equal(first.reports.length, 50); assert.equal(first.complete, false); assert.ok(first.nextCursor);
+      const second = await call(owner, 'readReceivedDeviceReports', seller, {cursor: first.nextCursor});
+      assert.equal(second.reports.length, 2); assert.equal(second.complete, true);
+      assert.equal(new Set([...first.reports, ...second.reports].map((r: {id: string}) => r.id)).size, 52);
+      await call(input.buyerUserId, 'reportPurchasedUnitMismatch', buyer, {command: mismatch('2'.repeat(32))});
+      await assert.rejects(call(owner, 'readReceivedDeviceReports', seller, {cursor: first.nextCursor}), rejectsCode('conflict'));
+    });
+    await t.test('revoked current seller access blocks read, mutation and original-status replay', async () => {
+      await db.collection('workspaceProfiles').doc(input.stores[0]!.caseId).update({status: 'suspended'});
+      for (const [operation, rest] of [['readPurchasedUnits', {}], ['reconcilePurchasedUnits', {command}],
+        ['sharePurchasedUnits', {command}], ['readReceivedDeviceReports', {cursor: null}]] as const)
+        await assert.rejects(call(owner, operation, seller, rest), rejectsCode('not_found'));
+      assert.deepEqual(await projection.readBuyer(input.buyerUserId, {purchaseId: made.purchaseId}), before);
+    });
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
+test('AGG08-DEVICE Store buyer history requires the original current buying Store independently of paid access', {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST, timeout: 60000,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: 'demo-agg08-device-store-buyer'}, `device-store-${randomUUID()}`), db = purchaseTestFirestore(app);
+  const input = purchaserReceipt(), buyingStore = input.purchaser.storeId!, caseId = input.purchasingStoreCaseId!;
+  const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex');
+  const canonical = (v: unknown): unknown => Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object'
+    ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical((v as Record<string, unknown>)[k])])) : v;
+  try {
+    for (const s of input.stores) await db.collection('workspaceProfiles').doc(s.caseId).set({schemaVersion: 1,
+      caseId: s.caseId, workspaceId: s.storeId, ownerUserId: s.ownerUserId, familyId: 'products-trade', profileId: 'wholesaler', status: 'live', shopEnabled: true});
+    await db.collection('workspaceProfiles').doc(caseId).set({schemaVersion: 1, caseId, workspaceId: buyingStore,
+      ownerUserId: input.buyerUserId, familyId: 'products-trade', profileId: 'retailer-grocery', status: 'live', shopEnabled: false});
+    const originals = new WorkspacePurchaseProjectionService(db, 'evaluation', {readFinalPlacement: async () => input});
+    const made = await originals.materialize('HOST-device-buying-Store-original');
+    const before = await originals.readBuyer(input.buyerUserId, {purchaseId: made.purchaseId, buyingStoreId: buyingStore});
+    const order = before.orders[0]!, reference = {purchaseId: made.purchaseId, storeId: order.storeId, orderId: order.orderId,
+      originalFingerprint: order.originalFingerprint, sourceRevision: before.sourceRevision};
+    const target = (actor: string, role: 'buyer' | 'seller', buying: string | null) => {
+      const t = {role, realm: 'evaluation', buyingStoreId: buying, reference, lineFacts: order.original.lines[0]!};
+      return {...t, binding: hash(canonical([actor, role, 'evaluation', buying, reference, t.lineFacts]))};
+    };
+    const buyer = target(input.buyerUserId, 'buyer', buyingStore), seller = target(input.stores[0]!.ownerUserId, 'seller', null);
+    const service = new WorkspaceOrderOperationsService(db, 'evaluation');
+    const call = (actor: string, operation: string, target: object, rest: object = {}) => service.purchasedDevices(actor, operation, {target, ...rest}) as Promise<any>;
+    const rows = [{id: 'HOST-device-one', serial: 'Printed device number', imei1: '', imei2: ''}], operationId = 'a'.repeat(32);
+    const key = {account: input.stores[0]!.ownerUserId, realm: 'evaluation', store: order.storeId, binding: seller.binding};
+    const command = {version: 1, key, operationId, expectedRevision: 0, rows, fingerprint: hash([1, key, operationId, 0, rows])};
+    await call(input.stores[0]!.ownerUserId, 'sharePurchasedUnits', seller, {command});
+    assert.equal((await call(input.buyerUserId, 'readPurchasedUnits', buyer)).record.rows[0].serial, rows[0]!.serial);
+    for (const wrong of [target(input.buyerUserId, 'buyer', null), target(input.buyerUserId, 'buyer', 'foreign-store'),
+      target('foreign-buyer', 'buyer', buyingStore)]) await assert.rejects(call(input.buyerUserId, 'readPurchasedUnits', wrong));
+    const malformed = {...buyer, role: ['buyer']}; malformed.binding = hash(canonical([input.buyerUserId, ['buyer'], 'evaluation', buyingStore, reference, buyer.lineFacts]));
+    await assert.rejects(call(input.buyerUserId, 'readPurchasedUnits', malformed), rejectsCode('not_found'));
+    const unknownKey = {account: input.buyerUserId, realm: 'evaluation', store: order.storeId, binding: buyer.binding};
+    const sourceFingerprint = hash(canonical([buyer.binding, 1, rows, true])), note = 'Received unit differs';
+    const unknown = {version: 1, key: unknownKey, operationId, sourceRevision: 1, sourceFingerprint, note, rows,
+      fingerprint: hash([1, unknownKey, operationId, 1, sourceFingerprint, note, rows])};
+    assert.equal((await call(input.buyerUserId, 'reconcilePurchasedUnitMismatch', buyer, {command: unknown})).state, 'pending');
+    await db.collection('workspaceProfiles').doc(caseId).update({status: 'pending'});
+    for (const [operation, rest] of [['readPurchasedUnits', {}], ['reportPurchasedUnitMismatch', {command: unknown}],
+      ['reconcilePurchasedUnitMismatch', {command: unknown}]] as const) await assert.rejects(call(input.buyerUserId, operation, buyer, rest), rejectsCode('not_found'));
+    await db.collection('workspaceProfiles').doc(caseId).update({status: 'live', ownerUserId: 'foreign-owner'});
+    await assert.rejects(call(input.buyerUserId, 'readPurchasedUnits', buyer), rejectsCode('not_found'));
+    await db.collection('workspaceProfiles').doc(caseId).update({ownerUserId: input.buyerUserId});
+    assert.deepEqual(await originals.readBuyer(input.buyerUserId, {purchaseId: made.purchaseId, buyingStoreId: buyingStore}), before);
+  } finally {await db.terminate(); await deleteApp(app);}
+});

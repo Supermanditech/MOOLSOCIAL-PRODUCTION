@@ -2,7 +2,7 @@ import {randomUUID} from "node:crypto";
 import type {AccountProfileActor} from "../account/profile_service.js";
 import type {AccountPlansService, PlansScope} from "../account/plans_service.js";
 import {assertStrictSchema, canonical, digest, fail, id, text, object, nativeTargetSelection, nativeOriginalRequestActions, clarificationToolName, type AssistantCommand, type PreparationContext, type PreparationReply, type PreparationRequest} from "./model_contract.js";
-import {maskedNativeHints, storeProductActions, storeOrderOriginalActions} from "./domain_context_contract.js";
+import {maskedNativeHints, storeProductActions, storeOrderOriginalActions, storeDeviceOriginalActions} from "./domain_context_contract.js";
 import type {PreparationModel} from "./responses_transport.js";
 
 export type PreparationState = {state: "pending" | "uncertain" | "cancelled" | "failed"} | {state: "ready"; reply: PreparationReply};
@@ -47,6 +47,7 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
   targets: readonly {actionId: string; entityId: string | null}[],couponSkus?:ReadonlySet<string>): PreparationContext['modelContext'] {
   const skus = new Set<string>();
   const orders = new Set(targets.filter(target=>storeOrderOriginalActions.has(target.actionId)&&target.entityId!==null).map(target=>target.entityId!));
+  const deviceTargets = new Set(targets.filter(target => storeDeviceOriginalActions.has(target.actionId) && target.entityId !== null).map(target => target.entityId!));
   const operationalOrders=new Set(targets.filter(target=>['AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285'].includes(target.actionId)&&target.entityId!==null).map(target=>target.entityId!));
   const receivingOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-243'&&target.entityId!==null).map(target=>target.entityId!));
   const privateStarsOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-055'&&target.entityId!==null).map(target=>target.entityId!));
@@ -66,6 +67,10 @@ function selectedNativeModelReference(context: PreparationContext, tools: Prepar
   }
   function project(value: PreparationContext['modelContext']): PreparationContext['modelContext'] {
     if (value === undefined) return value;
+    if (value.sourceKind === 'original-store-device-targets-v1') {
+      if (!Array.isArray(value.targets)) return fail('context_unavailable');
+      return {...value, targets: value.targets.filter(raw => deviceTargets.has(id(object(raw).targetId)))};
+    }
     if(value.sourceKind==='original-private-product-stars-v1'){
       if(!Array.isArray(value.orders))return fail('context_unavailable');
       return {...value,orders:value.orders.filter(row=>{

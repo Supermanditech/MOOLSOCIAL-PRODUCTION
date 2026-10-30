@@ -6787,9 +6787,21 @@ bool _nativeProductReady(WorkSession source, String action, String? entity, {Wor
     final buyerReader=procurement?.scopeCurrent==true&&purchase?.procurementScopeCurrent==true&&
       purchase?.procurementContext?.storeId==store?purchase?.purchaseReader:null;
     final navigation=source.navigationScopeRevision;
-    WorkspaceOriginalAssistantTarget? resolve(String entity,bool buyer,[bool preparedOriginal=false]){
+    WorkspaceOriginalAssistantTarget? resolve(String entity,bool buyer,[bool preparedOriginal=false,String? deviceAction]){
       if(!mounted||!hostContext.mounted||!identical(session,source)||source.navigationScopeRevision!=navigation||
         _financeAssistantContext(hostContext)?.binding!=trusted.binding||!_financePermitted(trusted))return null;
+      if (deviceAction != null) {
+        final prepared = source.workspaceAssistantOriginalDeviceTarget(deviceAction, entity), reader = source.originalPurchaseReader;
+        final role = buyer ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller;
+        if (prepared == null || prepared.role != role || reader == null || !reader.isCurrent ||
+            prepared.accountUserId != reader.accountUserId || prepared.realm != source.originalPurchaseRealm ||
+            reader.accountUserId != widget.accountIdentity?.firebasePrincipal?.userId ||
+            (buyer ? prepared.buyingStoreId != store : prepared.reference.storeId != store) ||
+            prepared.lineFacts['lineId'] is! String) return null;
+        return WorkspaceOriginalAssistantTarget(gateway: reader, role: role, realm: prepared.realm,
+          reference: prepared.reference, lineId: prepared.lineFacts['lineId'] as String,
+          buyingStoreId: prepared.buyingStoreId);
+      }
       String orderId=entity;String? lineId;
       if(entity.startsWith('[')){
         try{final parts=jsonDecode(entity);if(parts is! List||parts.length!=2||parts.any((v)=>v is! String)||jsonEncode(parts)!=entity)return null;
@@ -6823,12 +6835,20 @@ bool _nativeProductReady(WorkSession source, String action, String? entity, {Wor
     }
     for(final action in WorkspaceOrderOriginalNativeAdapter.supported){
       final buyer=const {'AI-ACT-396','AI-ACT-399'}.contains(action);
-      if((buyer?buyerReader:sellerReader)==null)continue;
-      WorkspaceOrderOriginalNativeAdapter createOriginal()=>WorkspaceOrderOriginalNativeAdapter(actionId:action,navigator:Navigator.of(hostContext,rootNavigator:true),
+      if((const {'AI-ACT-393','AI-ACT-394','AI-ACT-395','AI-ACT-396','AI-ACT-397','AI-ACT-398','AI-ACT-399'}.contains(action)
+          ? sellerReader : buyer?buyerReader:sellerReader)==null)continue;
+      WorkspaceOrderOriginalNativeAdapter createOriginal({WorkspaceOriginalAssistantTarget? Function(String)? deviceResolve})=>WorkspaceOrderOriginalNativeAdapter(actionId:action,navigator:Navigator.of(hostContext,rootNavigator:true),
         currentContext:()=>_financeAssistantContext(hostContext),
         currentOwner:()=>mounted&&hostContext.mounted&&identical(session,source)&&source.navigationScopeRevision==navigation&&
           _financeAssistantContext(hostContext)?.binding==trusted.binding&&_financePermitted(trusted),
-        ownerChanges:Listenable.merge([source,_financeOwner,?procurement,?purchase]),resolve:(entity)=>resolve(entity,buyer,action=='AI-ACT-274'));
+        ownerChanges:Listenable.merge([source,_financeOwner,?procurement,?purchase]),resolve:deviceResolve??(entity)=>resolve(entity,buyer,action=='AI-ACT-274',
+          const {'AI-ACT-393','AI-ACT-394','AI-ACT-395','AI-ACT-396','AI-ACT-397','AI-ACT-398','AI-ACT-399'}.contains(action)?action:null));
+      if(const {'AI-ACT-393','AI-ACT-394','AI-ACT-395','AI-ACT-396','AI-ACT-397','AI-ACT-398','AI-ACT-399'}.contains(action)){
+        yield _StoreDeviceOriginalAssistantAdapter(actionId:action,
+          createOriginal:(nativeResolve)=>createOriginal(deviceResolve:nativeResolve), currentContext:()=>_financeAssistantContext(hostContext),
+          resolve:(entity)=>resolve(entity,buyer,false,action), ownerChanges:Listenable.merge([source,_financeOwner,?procurement,?purchase]));
+        continue;
+      }
       yield action=='AI-ACT-274' ? _StoreOriginalFactsAssistantAdapter(createOriginal:createOriginal,
         currentContext:()=>_financeAssistantContext(hostContext),resolve:(entity)=>resolve(entity,false,true),
         ownerChanges:Listenable.merge([source,_financeOwner,?procurement,?purchase])) : createOriginal();
@@ -36729,6 +36749,82 @@ class _StoreOriginalFactsAssistantAdapter implements MoolAssistantOwnerAwareNati
     }finally{_opened=false;}
   }
 }
+/// Translate one authenticated opaque line pointer into the existing native
+/// order/line selector. Keep the original adapter's source/draft witness intact.
+class _StoreDeviceOriginalAssistantAdapter implements MoolAssistantOwnerAwareNativeAdapter, MoolAssistantRouteBoundNativeAdapter {
+  _StoreDeviceOriginalAssistantAdapter({required this.actionId, required this.createOriginal,
+    required this.currentContext, required this.resolve, required this.ownerChanges});
+  @override final String actionId;
+  final WorkspaceOrderOriginalNativeAdapter Function(WorkspaceOriginalAssistantTarget? Function(String)) createOriginal;
+  final MoolAssistantContext? Function() currentContext;
+  final WorkspaceOriginalAssistantTarget? Function(String) resolve;
+  final Listenable ownerChanges;
+  late final _shape = createOriginal((_) => null);
+  @override Set<String> get allowedFields => _shape.allowedFields;
+  @override String? validateFields(Map<String, Object?> fields) => _shape.validateFields(fields);
+  Route<void>? _route; NavigatorState? _navigator; bool _opened = false;
+  final _entries = <String, ({Object owner, WorkspaceOrderOriginalNativeAdapter adapter})>{};
+  @override void bindAssistantRoute(Route<void> route, NavigatorState owner) {
+    if (_route != null || !owner.mounted || route.navigator != null && !identical(route.navigator, owner)) throw StateError('Original device route changed');
+    _route = route; _navigator = owner;
+  }
+  Object _owner(WorkspaceOriginalAssistantTarget target) => (target.gateway, target.gateway.lifetime(), target.binding, target.lineId);
+  WorkspaceOriginalAssistantTarget? _target(Object binding, String? entity) {
+    if (entity == null || !RegExp(r'^device-[a-f0-9]{64}$').hasMatch(entity) || _navigator?.mounted != true ||
+        _route?.isActive != true || !identical(_route?.navigator, _navigator) || currentContext()?.binding != binding) return null;
+    final target = resolve(entity);
+    return target != null && target.lineId != null && target.gateway.isCurrent ? target : null;
+  }
+  @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context, String? entityId) async {
+    if (_opened || _route?.isCurrent != true) return null;
+    final target = _target(context.binding, entityId); if (target == null) return null;
+    final owner = _owner(target); var entry = _entries[entityId];
+    if (entry == null || entry.owner != owner) {
+      final adapter = createOriginal((nativeEntity) {
+        final current = _target(context.binding, entityId);
+        return current != null && _owner(current) == owner && current.entityId == nativeEntity ? current : null;
+      });
+      adapter.bindAssistantRoute(_route!, _navigator!);
+      entry = (owner: owner, adapter: adapter); _entries[entityId!] = entry;
+    }
+    final native = await entry.adapter.snapshot(context, target.entityId), fresh = _target(context.binding, entityId);
+    if (native == null || fresh == null || _owner(fresh) != owner || _entries[entityId]?.adapter != entry.adapter) {
+      _entries.remove(entityId); return null;
+    }
+    return MoolAssistantNativeSnapshot(binding: context.binding, entityId: entityId,
+      sourceRevision: native.sourceRevision, permitted: native.permitted);
+  }
+  @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal proposal, bool Function() isCurrent) =>
+    openOwnedReview(proposal, isCurrent: isCurrent, ownerChanges: ownerChanges);
+  @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal proposal,
+      {required bool Function() isCurrent, required Listenable ownerChanges}) async {
+    final target = _target(proposal.binding, proposal.entityId), entry = _entries[proposal.entityId];
+    if (_opened || proposal.recovered || proposal.actionId != actionId || _route?.isCurrent != true ||
+        target == null || entry == null || entry.owner != _owner(target) || validateFields(proposal.fields) != null) {
+      return MoolAssistantReviewResult.stale;
+    }
+    bool current() {
+      final fresh = _target(proposal.binding, proposal.entityId);
+      return isCurrent() && proposal.validUntil.isAfter(DateTime.now()) && fresh != null &&
+        _owner(fresh) == entry.owner && _entries[proposal.entityId]?.adapter == entry.adapter;
+    }
+    final native = await entry.adapter.snapshot(currentContext()!, target.entityId);
+    if (!current() || native == null || native.sourceRevision != proposal.sourceRevision) {
+      _entries.remove(proposal.entityId); return MoolAssistantReviewResult.stale;
+    }
+    final handoff = MoolAssistantProposal(id: proposal.id, actionId: actionId, binding: proposal.binding,
+      requestRevision: proposal.requestRevision, entitlementRevision: proposal.entitlementRevision, entityId: target.entityId,
+      sourceRevision: native.sourceRevision, validUntil: proposal.validUntil, fields: proposal.fields, title: proposal.title,
+      summary: proposal.summary, preparationRequestId: proposal.preparationRequestId,
+      preparationSourceRevision: proposal.preparationSourceRevision, recovered: proposal.recovered);
+    _opened = true;
+    try {
+      return await entry.adapter.openOwnedReview(handoff, isCurrent: current, ownerChanges: ownerChanges);
+    }
+    finally {_opened = false;}
+  }
+}
+
 class _StorePublishedProductAssistantAdapter implements MoolAssistantOwnerAwareNativeAdapter, MoolAssistantRouteBoundNativeAdapter,
     MoolAssistantCanonicalProductIdentityAdapter, MoolAssistantBatchNativeAdapter {
   _StorePublishedProductAssistantAdapter({required this.readSnapshot, required this.open, required this.nativeRoute, required this.navigator,

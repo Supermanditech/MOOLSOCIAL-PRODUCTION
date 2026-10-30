@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 
 import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
@@ -107,9 +108,10 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
     required this.credentials,
     required this.transport,
     this.purchasedWarrantyReader,
-    this.purchasedUnitSource,
+    WorkspacePurchasedUnitSource? purchasedUnitSource,
+    this.enableOriginalDeviceSource = false,
     this.orderDocumentSource,
-  }) : _ownerLifetime = lifetime() {
+  }) : _providedPurchasedUnitSource = purchasedUnitSource, _ownerLifetime = lifetime() {
     if (endpoint.scheme != 'https' ||
         endpoint.host !=
             'asia-south1-moolsocial-dev-503018.cloudfunctions.net' ||
@@ -130,7 +132,10 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
   final SocialContentTransport transport;
   /// Proposed frontend supplement only. No warranty endpoint is configured here.
   final WorkspacePurchasedWarrantyReader? purchasedWarrantyReader;
-  final WorkspacePurchasedUnitSource? purchasedUnitSource;
+  final WorkspacePurchasedUnitSource? _providedPurchasedUnitSource;
+  final bool enableOriginalDeviceSource;
+  late final WorkspacePurchasedUnitSource? purchasedUnitSource = _providedPurchasedUnitSource ??
+    (enableOriginalDeviceSource ? AuthenticatedWorkspacePurchasedUnitSource(this) : null);
   /// Frontend read supplement only; no document endpoint or issuer is installed.
   final WorkspaceOrderDocumentSource? orderDocumentSource;
   bool get isCurrent => _ownerLifetime != null && lifetime() == _ownerLifetime;
@@ -202,7 +207,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
       read: (target, _) => source.read(target), valid: (result, target) => result.validFor(target));
   }
 
-  /// Proposed owner-only publisher boundary. No HTTP operation is implemented.
+  /// Owner-only original publisher boundary; recovered commands are read-only.
   /// A recovered original command is checked; it is never automatically resent.
   Future<WorkspacePurchasedUnitPublishReply?> publishPurchasedUnits({required WorkspacePurchasedUnitPublishCommand command,
     required String realm, required WorkspacePurchaseReference reference, required WorkspacePurchasedSkuLine line,
@@ -923,8 +928,9 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
     String operation,
     Map<String, Object?> body, {
     bool mutation = false,
+    int responseLimit = 512 * 1024,
   }) async {
-    if (!isCurrent) return null;
+    if (!isCurrent || responseLimit < 1 || responseLimit > 4 * 1024 * 1024) return null;
     try {
       final token = await identity.credentials.firebaseIdToken();
       if (!isCurrent) return null;
@@ -954,7 +960,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
           .timeout(const Duration(seconds: 20));
       if (!isCurrent ||
           reply.statusCode != 200 ||
-          utf8.encode(reply.body).length > 512 * 1024) {
+          utf8.encode(reply.body).length > responseLimit) {
         return null;
       }
       final envelope = _map(jsonDecode(reply.body));
@@ -1730,7 +1736,180 @@ class WorkspacePurchasedLineTarget {
 
 typedef WorkspacePurchasedWarrantyTarget = WorkspacePurchasedLineTarget;
 
-/// Proposed private device reader; no network implementation exists here.
+/// Original authenticated private-device service. IDs remain literal supplier
+/// statements. This source never edits a draft, confirms a form or retries a write.
+class AuthenticatedWorkspacePurchasedUnitSource extends ChangeNotifier implements WorkspacePurchasedUnitPublisher,
+    WorkspacePurchasedUnitReporter, WorkspaceReceivedDeviceReportSource {
+  AuthenticatedWorkspacePurchasedUnitSource(this.identity, {this.now = DateTime.now});
+  final AuthenticatedWorkspaceOrderIdentityGateway identity;
+  final DateTime Function() now;
+  final Object _visit = Object();
+  final Map<String, WorkspacePurchasedUnitOwnerAccess> _owners = {};
+  final Map<String, WorkspacePurchasedUnitReportAccess> _buyers = {};
+  final Map<String, String> _versions = {};
+  Timer? _watch;
+  @override String get accountUserId => identity.accountUserId;
+  @override bool get isCurrent => identity.isCurrent;
+  @override Object? get lifetime => isCurrent ? _visit : null;
+  void _expire() {
+    final before = _owners.length + _buyers.length, time = now().toUtc();
+    _owners.removeWhere((_, grant) => !isCurrent || !grant.expiresAt.isAfter(time));
+    _buyers.removeWhere((_, grant) => !isCurrent || !grant.expiresAt.isAfter(time));
+    if (before != _owners.length + _buyers.length) _notify();
+    if (!isCurrent) {_watch?.cancel(); _watch = null;}
+  }
+  void _notify() => notifyListeners();
+  @override void addListener(void Function() listener) {
+    super.addListener(listener);
+    _watch ??= Timer.periodic(const Duration(seconds: 1), (_) => _expire());
+  }
+  @override void removeListener(void Function() listener) {
+    super.removeListener(listener);
+    if (!hasListeners) {_watch?.cancel(); _watch = null;}
+  }
+  @override void dispose() {_watch?.cancel(); _owners.clear(); _buyers.clear(); _versions.clear(); super.dispose();}
+  @override bool ownerAccessCurrent(WorkspacePurchasedUnitOwnerAccess access) {
+    _expire(); return isCurrent && identical(_owners[access.targetBinding], access);
+  }
+  @override bool reportAccessCurrent(WorkspacePurchasedUnitReportAccess access) {
+    _expire(); return isCurrent && identical(_buyers[access.targetBinding], access);
+  }
+  Map<String, Object?> _target(WorkspacePurchasedLineTarget target) => {
+    'role': target.role.name, 'realm': target.realm, 'buyingStoreId': target.buyingStoreId,
+    'reference': target.reference.toJson(), 'lineFacts': target.lineFacts, 'binding': target.binding,
+  };
+  Future<Map<String, dynamic>?> _request(String operation, WorkspacePurchasedLineTarget target,
+    Map<String, Object?> fields, List<String> resultKeys, {bool mutation = false}) async {
+    if (!isCurrent || target.accountUserId != accountUserId || !const ['evaluation', 'production'].contains(target.realm)) return null;
+    final visit = lifetime;
+    final result = await AuthenticatedWorkspaceOrderOperationsGateway(identity)._call(operation,
+      {'target': _target(target), ...fields}, mutation: mutation, responseLimit: 4 * 1024 * 1024);
+    if (!isCurrent || visit == null || lifetime != visit || result == null) return null;
+    final r = _exactMap(result, ['schemaVersion', 'realm', 'viewerUserId', 'targetBinding', ...resultKeys]);
+    if (r['schemaVersion'] != 1 || r['realm'] != target.realm || r['viewerUserId'] != accountUserId || r['targetBinding'] != target.binding) {
+      throw const FormatException('Device details need recovery.');
+    }
+    return r;
+  }
+  DateTime _date(Object? raw) {
+    if (raw is! String || !RegExp(r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$').hasMatch(raw)) throw const FormatException('Invalid source time.');
+    final date = DateTime.parse(raw).toUtc();
+    if (date.toIso8601String() != raw) throw const FormatException('Invalid source time.');
+    return date;
+  }
+  List<WorkspacePurchasedUnitRow> _rows(Object? raw) {
+    if (raw is! List || raw.length > 1000) throw const FormatException('Invalid source rows.');
+    final rows = [for (final row in raw) WorkspacePurchasedUnitRow.fromJson(row)];
+    if (rows.any((r) => !r.ready) || rows.map((r) => r.id).toSet().length != rows.length) throw const FormatException('Invalid source rows.');
+    return rows;
+  }
+  WorkspacePurchasedUnitsRead _record(Object? raw, WorkspacePurchasedLineTarget target, {bool grant = false}) {
+    final r = _exactMap(raw, const ['revision', 'rows', 'observedAt', 'accessExpiresAt', 'complete']);
+    final revision = r['revision'], rows = _rows(r['rows']);
+    if (revision is! int || revision < 0 || revision > 2147483647 || r['complete'] != true || revision == 0 && rows.isNotEmpty) {
+      throw const FormatException('Invalid source revision.');
+    }
+    final observed = _date(r['observedAt']), expires = _date(r['accessExpiresAt']);
+    if (!expires.isAfter(observed) || expires.difference(observed) > const Duration(minutes: 5)) throw const FormatException('Invalid access interval.');
+    WorkspacePurchasedUnitOwnerAccess? owner;
+    WorkspacePurchasedUnitReportAccess? buyer;
+    if (grant) {
+      if (!expires.isAfter(now().toUtc()) || observed.isAfter(now().toUtc().add(const Duration(minutes: 5)))) throw const FormatException('Refresh device access.');
+      if (target.role == WorkspaceOrderIdentityRole.seller) {
+        final existing = _owners[target.binding];
+        owner = existing != null && ownerAccessCurrent(existing) ? existing :
+          WorkspacePurchasedUnitOwnerAccess(ownerAccountId: accountUserId, storeId: target.reference.storeId,
+            targetBinding: target.binding, expiresAt: expires);
+        _owners[target.binding] = owner;
+      } else {
+        final existing = _buyers[target.binding];
+        buyer = existing != null && reportAccessCurrent(existing) ? existing :
+          WorkspacePurchasedUnitReportAccess(accountUserId: accountUserId, targetBinding: target.binding, expiresAt: expires);
+        _buyers[target.binding] = buyer;
+      }
+    }
+    return WorkspacePurchasedUnitsRead(target: target, revision: revision, rows: rows, observedAt: observed,
+      ownerAccess: owner, reportAccess: buyer, complete: true);
+  }
+  @override Future<WorkspacePurchasedUnitsRead?> read(WorkspacePurchasedLineTarget target) async {
+    try {
+      final r = await _request('readPurchasedUnits', target, {}, const ['record']);
+      if (r != null) {
+        final record = _record(r['record'], target, grant: true), previous = _versions[target.binding];
+        _versions[target.binding] = record.fingerprint;
+        if (previous != null && previous != record.fingerprint) _notify();
+        return record;
+      }
+    } on Object {/* Preserve drafts and retire unusable grants. */}
+    final ownerRemoved = _owners.remove(target.binding) != null;
+    final buyerRemoved = _buyers.remove(target.binding) != null;
+    if (ownerRemoved || buyerRemoved) _notify();
+    return null;
+  }
+  @override Future<WorkspacePurchasedUnitPublishReply?> share(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command) =>
+    _share(target, command, false);
+  @override Future<WorkspacePurchasedUnitPublishReply?> checkSharing(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command) =>
+    _share(target, command, true);
+  Future<WorkspacePurchasedUnitPublishReply?> _share(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitPublishCommand command, bool status) async {
+    final access = _owners[target.binding];
+    if (!command.valid || target.role != WorkspaceOrderIdentityRole.seller || access == null || !ownerAccessCurrent(access)) return null;
+    try {
+      final r = await _request(status ? 'reconcilePurchasedUnits' : 'sharePurchasedUnits', target,
+        {'command': command.toJson()}, const ['operationId', 'commandFingerprint', 'state', 'record'], mutation: !status);
+      if (r == null || !ownerAccessCurrent(access)) return null;
+      final state = WorkspacePurchasedUnitPublishState.values.singleWhere((s) => s.name == r['state']);
+      final reply = WorkspacePurchasedUnitPublishReply(operationId: r['operationId'], commandFingerprint: r['commandFingerprint'],
+        targetBinding: target.binding, state: state, record: r['record'] == null ? null : _record(r['record'], target));
+      return reply.validFor(command, target) ? reply : null;
+    } on Object {return null;}
+  }
+  @override Future<WorkspacePurchasedUnitReportReply?> reportMismatch(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitMismatchCommand command) =>
+    _report(target, command, false);
+  @override Future<WorkspacePurchasedUnitReportReply?> checkMismatch(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitMismatchCommand command) =>
+    _report(target, command, true);
+  Future<WorkspacePurchasedUnitReportReply?> _report(WorkspacePurchasedLineTarget target, WorkspacePurchasedUnitMismatchCommand command, bool status) async {
+    final access = _buyers[target.binding];
+    if (!command.valid || target.role != WorkspaceOrderIdentityRole.buyer || access == null || !reportAccessCurrent(access)) return null;
+    try {
+      final r = await _request(status ? 'reconcilePurchasedUnitMismatch' : 'reportPurchasedUnitMismatch', target,
+        {'command': command.toJson()}, const ['operationId', 'commandFingerprint', 'state', 'reportId', 'recordedAt'], mutation: !status);
+      if (r == null || !reportAccessCurrent(access)) return null;
+      final reply = WorkspacePurchasedUnitReportReply(operationId: r['operationId'], commandFingerprint: r['commandFingerprint'],
+        targetBinding: target.binding, state: WorkspacePurchasedUnitPublishState.values.singleWhere((s) => s.name == r['state']),
+        reportId: r['reportId'], recordedAt: r['recordedAt'] == null ? null : _date(r['recordedAt']));
+      return reply.validFor(command, target) ? reply : null;
+    } on Object {return null;}
+  }
+  @override Future<WorkspaceReceivedDeviceReports?> readReceivedReports(WorkspacePurchasedLineTarget target, {String? cursor}) async {
+    final access = _owners[target.binding];
+    if (target.role != WorkspaceOrderIdentityRole.seller || access == null || !ownerAccessCurrent(access)) return null;
+    try {
+      final r = await _request('readReceivedDeviceReports', target, {'cursor': cursor},
+        const ['revision', 'reports', 'nextCursor', 'complete']);
+      if (r == null || !ownerAccessCurrent(access) || r['revision'] is! int || r['revision'] < 0 || r['revision'] > 2147483647 ||
+          r['reports'] is! List || (r['reports'] as List).length > 50 || r['complete'] is! bool ||
+          r['nextCursor'] != null && (r['nextCursor'] is! String || (r['nextCursor'] as String).isEmpty || (r['nextCursor'] as String).length > 512) ||
+          r['complete'] == true && r['nextCursor'] != null) return null;
+      final reports = <WorkspaceReceivedDeviceReport>[];
+      for (final value in r['reports']) {
+        final item = _exactMap(value, const ['id', 'note', 'recordedAt', 'deviceRevision', 'deviceFingerprint', 'commandFingerprint', 'rows']);
+        final rows = _rows(item['rows']);
+        if (item['id'] is! String || !_purchaseText(item['id']) || item['note'] is! String ||
+            (item['note'] as String).length > 2000 || RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]').hasMatch(item['note']) ||
+            (item['note'] as String).isEmpty || item['note'] != (item['note'] as String).trim() ||
+            item['deviceRevision'] is! int || item['deviceRevision'] < 1 || item['deviceRevision'] > 2147483647 || rows.isEmpty ||
+            ![item['deviceFingerprint'], item['commandFingerprint']].every((v) => v is String && RegExp(r'^[a-f0-9]{64}$').hasMatch(v))) return null;
+        reports.add(WorkspaceReceivedDeviceReport(id: item['id'], note: item['note'], recordedAt: _date(item['recordedAt']),
+          deviceRevision: item['deviceRevision'], deviceFingerprint: item['deviceFingerprint'], commandFingerprint: item['commandFingerprint'], rows: rows));
+      }
+      if (reports.map((r) => r.id).toSet().length != reports.length || r['revision'] == 0 && reports.isNotEmpty) return null;
+      return WorkspaceReceivedDeviceReports(target: target, revision: r['revision'], ownerAccess: access,
+        reports: reports, complete: r['complete'], nextCursor: r['nextCursor']);
+    } on Object {return null;}
+  }
+}
+
+/// Private purchased-device reader; implementations preserve original ownership.
 /// Source implementations must verify the authenticated purchase/owner.
 abstract interface class WorkspacePurchasedUnitSource {
   String get accountUserId;
@@ -2153,6 +2332,7 @@ AuthenticatedWorkspaceOrderIdentityGateway? configuredWorkspacePurchaseReader({
     lifetime: lifetime,
     credentials: FirebaseSocialContentCredentials(),
     transport: IoSocialContentTransport(),
+    enableOriginalDeviceSource: true,
   );
 }
 

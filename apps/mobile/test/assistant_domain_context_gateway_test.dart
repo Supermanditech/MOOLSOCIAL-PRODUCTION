@@ -44,6 +44,32 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
+  const deviceExport=String.fromEnvironment('AGG08_DEVICE_CONTEXT_EXPORT_PATH');
+  test('AGG08-DEVICE actual SDK typed line metadata preserves role-bound native proofs',()async{
+    final saved=jsonDecode(File(deviceExport).readAsStringSync()) as Map;
+    expect(saved['kind'],'ISOLATED HOST original device pointer; never a phone provider');
+    final actor=saved['actor'] as Map,store=saved['storeId'] as String;
+    final owner=(environment:'firebase-service',projectId:actor['projectId'] as String,tenantId:null as String?,userId:actor['uid'] as String);
+    final context=MoolAssistantContext(accountScope:owner,authenticationRevision:1).withWorkspace(
+      MoolAssistantWorkspace(id:store,name:'HOST original Store',profile:'retailer-grocery',revision:1,
+        isStore:true,approved:true,approvalAccountScope:owner));
+    final source=AssistantDomainContextGateway(owner:owner,isCurrent:()=>true,credentials:_Credentials(),
+      transport:_CapacityWire(Map<String,dynamic>.from(saved['metadata'] as Map)),
+      clock:()=>DateTime.parse(saved['now'] as String),compactStoreSelection:true);
+    addTearDown(source.dispose);
+    final result=await source.read(context,()=>true);
+    for(final action in ['AI-ACT-393','AI-ACT-394','AI-ACT-395','AI-ACT-397','AI-ACT-398']){
+      expect(result.revisions.keys.where((key)=>key.$1==action),hasLength(13));
+    }
+    for(final raw in saved['deviceTargets'] as List){
+      final target=raw as Map;
+      expect(result.revisions[('AI-ACT-393',target['entityId'] as String)],target['sourceRevision']);
+    }
+    expect(result.revisions.keys.where((key)=>const {'AI-ACT-389','AI-ACT-392','AI-ACT-396','AI-ACT-399','AI-ACT-400'}.contains(key.$1)),isEmpty);
+    expect(jsonEncode(saved['metadata']),isNot(contains('operationId')));
+    expect(jsonEncode(saved['metadata']),isNot(contains('commandFingerprint')));
+  },skip:deviceExport.isEmpty?'Requires explicit current actual SDK original-line capture; never a phone fixture':false);
+
   const orderStatusExport=String.fromEnvironment('AI_DOMAIN_ORDER_STATUS_EXPORT_PATH');
   test('AGG07 actual SDK original status metadata preserves typed order ownership and proof',()async{
     final saved=jsonDecode(File(orderStatusExport).readAsStringSync()) as Map;

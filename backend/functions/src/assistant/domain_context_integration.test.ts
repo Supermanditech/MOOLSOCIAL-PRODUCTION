@@ -4,7 +4,7 @@ import {AccountPlansService} from "../account/plans_service.js";
 import {AccountProfileService} from "../account/profile_service.js";
 import {ProfileWorkspacePreparationContext} from "./profile_context.js";
 import {WorkspaceCatalogueService, type WorkspaceCatalogueRepository, type StorePublicDetailsRecord} from "../workspace/workspace_catalogue_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext,OriginalStoreOperationalPreparationContext,OriginalPurchasedStarsPreparationContext,OriginalStoreReceivingPreparationContext,OriginalStoreCouponPreparationContext} from "./domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext,OriginalStoreDevicePreparationContext,OriginalStoreOperationalPreparationContext,OriginalPurchasedStarsPreparationContext,OriginalStoreReceivingPreparationContext,OriginalStoreCouponPreparationContext} from "./domain_context.js";
 import {digest,assertStrictSchema} from './model_contract.js';
 import {FirestorePromotionRepository,WorkspacePromotionService} from '../workspace/workspace_promotion_service.js';
 import {initializeApp, deleteApp} from 'firebase-admin/app';
@@ -656,6 +656,41 @@ test('Order originals actual loopback SDK projection service to authorised AI me
     }
     assert.deepEqual(await preparation.handle(owner,{operation:'prepare',payload:statusPayload}),statusResult);
     assert.equal(modelCalls,2);assert.equal(reservations,2);
+    // Existing device preparation carries an authenticated exact line pointer,
+    // not private identifiers, a draft, a publication or a pending operation ID.
+    const devices=new OriginalStoreDevicePreparationContext({projectId:owner.projectId,authority,purchases,now:()=>at});
+    const deviceContext=new CompositePreparationContext({original:authority,storeDevices:devices});
+    const deviceInput={...payload,actionId:'AI-ACT-393',entityId:null};
+    const deviceSource=await devices.read(owner,deviceInput);
+    assert.equal(deviceSource.nativeTargets!.length,13);
+    assertStrictSchema(deviceSource.tools[0]!.parameters);
+    const chosenOriginal=projections.find(p=>p.orders[0]!.orderId===chosen.orderId)!,chosenLine=chosenOriginal.orders[0]!.original.lines[0]!;
+    const deviceId='device-'+digest(['seller',chosen.orderId,chosenLine.lineId]);
+    const deviceProof='store-device-original:evaluation:'+digest([owner.uid,'seller','evaluation',null,chosen,chosenLine]);
+    assert.equal(deviceSource.nativeTargets!.find(t=>t.entityId===deviceId)!.sourceRevision,deviceProof);
+    const deviceMeta=await handleAssistantCanonicalContextRequest(input,{projectId:owner.projectId,enabled:true,context:deviceContext,now:()=>at,
+      async verifyIdToken(){return owner;},async verifyAppCheck(){return {};}});
+    assert.equal(deviceMeta.status,200);assert(deviceMeta.body.ok);
+    const deviceRequests=new HostRequests();let deviceCalls=0;
+    const deviceService=new AssistantPreparationService({projectId:owner.projectId,plans,context:deviceContext,requests:deviceRequests,now:()=>at,
+      usage:{async reserve(){return{id:'HOST-device-permit',validUntil:'2026-10-28T08:01:00.000Z'};},async settle(){}},
+      model:{async prepare(_input,tools,_signal,modelContext){
+        deviceCalls++;assert.equal(tools.length,1);assert.equal(tools[0]!.actionId,'AI-ACT-393');
+        assert(JSON.stringify(modelContext).includes(deviceId));
+        for(const other of references.filter(r=>r.orderId!==chosen.orderId))assert(!JSON.stringify(modelContext).includes(other.orderId));
+        return{kind:'tool' as const,name:tools[0]!.name,arguments:{targetId:deviceId}};
+      }}});
+    const devicePayload={...payload,requestId:'HOST-device-source-preparation',actionId:'AI-ACT-393',
+      nativeTargets:[{actionId:'AI-ACT-393',entityId:deviceId}]};
+    const deviceResult=await deviceService.handle(owner,{operation:'prepare',payload:devicePayload});
+    assert.equal(deviceResult.state,'ready');
+    if(deviceResult.state!=='ready'||deviceResult.reply.outcome.kind!=='proposal')assert.fail('Expected original-line pointer preparation');
+    assert.equal(deviceResult.reply.outcome.entityId,deviceId);assert.equal(deviceResult.reply.outcome.sourceRevision,deviceProof);
+    assert.deepEqual(deviceResult.reply.outcome.fields,{});
+    assert.deepEqual(await deviceService.handle(owner,{operation:'prepare',payload:devicePayload}),deviceResult);assert.equal(deviceCalls,1);
+    if(process.env.AGG08_DEVICE_CONTEXT_EXPORT_PATH){const path=process.env.AGG08_DEVICE_CONTEXT_EXPORT_PATH;assert(isAbsolute(path));
+      writeFileSync(path,JSON.stringify({kind:'ISOLATED HOST original device pointer; never a phone provider',actor:owner,storeId,
+        now:at.toISOString(),metadata:deviceMeta.body,references,projections,deviceTargets:deviceSource.nativeTargets},null,2)+'\n',{flag:'wx'});}
     const countBefore=(await db.collection('workspacePurchaseProjections').doc('evaluation').collection('purchases').get()).size;
     await assert.rejects(purchases.listStore('HOST-foreign-owner',{storeId,limit:5,cursor:null}));
     paid=false;await assert.rejects(orders.read(owner,{scope:{audience:'workspace',storeId},requestId:'HOST-order-source',requestRevision:1,

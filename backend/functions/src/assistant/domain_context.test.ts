@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {WorkspaceProfileError} from '../workspace/workspace_profile_service.js';
 import {AccountPlansService} from "../account/plans_service.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext, OriginalStoreOperationalPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext,OriginalStoreCouponPreparationContext} from "./domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext, OriginalStoreDevicePreparationContext, OriginalStoreOperationalPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext,OriginalStoreCouponPreparationContext} from "./domain_context.js";
 import type {PurchaseReferencePage,PurchaseProjection,ProductFeedbackTarget,ProductFeedbackTargetPage,OperationalOrderSnapshot} from "../workspace/workspace_purchase_projection_service.js";
 import {AssistantModelError, assertStrictSchema, digest, type PreparationContext, type PreparationRequest} from "./model_contract.js";
 import {canonicalContextProjection, storeProductActions} from "./domain_context_contract.js";
@@ -954,4 +954,86 @@ test("Missing expired duplicate cross-Store or prescription family does not fabr
     assert.equal(c.tools.some(tool => tool.actionId === "AI-ACT-006"), true, kind);
     await assert.rejects(f.context.read(actor, {...input, actionId: "AI-ACT-007"}), /context_unavailable/u);
   }
+});
+
+/** Isolated original-reader ports. No issuer, device/provider or phone data. */
+function deviceOriginalFixture() {
+  const store = 'HOST-device-store'; let denied = false, authorityRevision = 1, reads = 0, time = new Date(at);
+  let change = (_r: PurchaseProjection, _count: number) => {};
+  const calls: string[] = [];
+  const authority = {async read() {
+    if (denied) throw new AssistantModelError('workspace_access_unavailable', 403);
+    return {revision: `HOST-owner-${authorityRevision}`, validUntil: '2026-10-28T08:01:00.000Z',
+      modelContext: {audience: 'workspace', current: {id: store}}, tools: [{name: 'HOST-member', actionId: 'AI-ACT-317',
+        entityId: store, sourceRevision: 'HOST-owner', description: 'Host authority only', parameters: {}, validate: () => true}]};
+  }};
+  const refs = (role: 'buyer' | 'seller') => Array.from({length: 13}, (_, i) => ({purchaseId: `HOST-device-${role}-${i}`,
+    storeId: role === 'buyer' ? 'HOST-supplier-store' : store, orderId: `HOST-device-${role}-order-${i}`,
+    originalFingerprint: 'a'.repeat(64), sourceRevision: 'HOST-device-original-v1'}));
+  const page = async (role: 'buyer' | 'seller', uid: string, body: Readonly<Record<string, unknown>>): Promise<PurchaseReferencePage> => {
+    calls.push(`list-${role}`); assert.equal(uid, actor.uid);
+    assert.equal(role === 'buyer' ? body.buyingStoreId : body.storeId, store);
+    const start = body.cursor === null ? 0 : Number(body.cursor);
+    return {schemaVersion: role === 'buyer' ? 3 : 2, realm: 'evaluation', authNamespace: 'firebase-default', viewerRole: role,
+      viewerUserId: uid, storeId: role === 'buyer' ? null : store, ...(role === 'buyer' ? {buyingStoreId: store} : {}),
+      coverage: role === 'buyer' ? 'saved_original_facts' : 'indexed_original_facts', references: refs(role).slice(start, start + 5),
+      nextCursor: start + 5 < 13 ? String(start + 5) : null};
+  };
+  const read = async (role: 'buyer' | 'seller', uid: string, body: Readonly<Record<string, unknown>>): Promise<PurchaseProjection> => {
+    calls.push(`read-${role}`); assert.equal(uid, actor.uid);
+    if (role === 'buyer') assert.equal(body.buyingStoreId, store);
+    const ref = refs(role).find(r => r.purchaseId === body.purchaseId)!;
+    const projection: PurchaseProjection = {schemaVersion: 11, realm: 'evaluation', authNamespace: 'firebase-default', viewerRole: role,
+      viewerUserId: uid, purchaseId: ref.purchaseId, buyerId: 'HOST-buyer', sourceRevision: ref.sourceRevision, state: 'original_facts',
+      orders: [{factsVersion: 11, storeId: ref.storeId, orderId: ref.orderId, originalFingerprint: ref.originalFingerprint,
+        original: {currency: 'INR', purchaser: role === 'buyer' ? {schemaVersion: 1, kind: 'store', storeId: store,
+          name: 'HOST buying Store', purpose: 'restock'} : {schemaVersion: 1, kind: 'personal'},
+        lines: [{lineId: 'HOST-device-line', skuId: 'HOST-sku', canonicalProductId: 'HOST-product', verifiedPackId: 'HOST-pack',
+          offerId: 'HOST-offer', offerRevision: 'HOST-price-v1', name: 'HOST printed-device product', packLabel: '1 unit',
+          quantityMilli: 1000, quantityUnit: 'pack', unitPriceMinor: 100, lineTotalMinor: 100}],
+        totals: {itemsMinor: 100, discountMinor: 0, taxMinor: 0, deliveryMinor: 0, freightMinor: 0, paymentFeeMinor: 0, tipMinor: 0, totalMinor: 100}}}]};
+    change(projection, ++reads); return projection;
+  };
+  const source = new OriginalStoreDevicePreparationContext({projectId: actor.projectId, authority, now: () => time,
+    purchases: {listStore: (uid, body) => page('seller', uid, body), listBuyer: (uid, body) => page('buyer', uid, body),
+      readStore: (uid, body) => read('seller', uid, body), readBuyer: (uid, body) => read('buyer', uid, body)}});
+  const input: PreparationRequest = {...request, scope: {audience: 'workspace', storeId: store}, actionId: 'AI-ACT-393'};
+  return {source, input, calls, refs, deny: () => {denied = true;}, bump: () => {authorityRevision++;},
+    change: (fn: typeof change) => {change = fn;}, advance: () => {time = new Date(at.getTime() + 60_001);}};
+}
+for (const action of ['AI-ACT-393', 'AI-ACT-394', 'AI-ACT-395', 'AI-ACT-396', 'AI-ACT-397', 'AI-ACT-398', 'AI-ACT-399']) {
+  test(`AGG08-DEVICE typed ${action} pointer preserves exact role line and native confirmation boundary`, async () => {
+    const f = deviceOriginalFixture(), input = {...f.input, actionId: action}, context = await f.source.read(actor, input);
+    const buyer = ['AI-ACT-396', 'AI-ACT-399'].includes(action), role = buyer ? 'buyer' : 'seller';
+    assert.equal(context.tools.length, 1); assert.equal(context.nativeTargets!.length, 13);
+    assert.equal(f.calls.filter(c => c === `list-${role}`).length, 6);
+    assert(!f.calls.some(c => c.includes(buyer ? 'seller' : 'buyer')));
+    const tool = context.tools[0]!; assertStrictSchema(tool.parameters);
+    const entity = 'device-' + digest([role, f.refs(role)[12]!.orderId, 'HOST-device-line']);
+    const supplied = action === 'AI-ACT-394' ? {rows: [{id: null, serial: 'printed SERIAL-2', imei1: '', imei2: ''}]} :
+      action === 'AI-ACT-396' ? {selectedIds: ['printed-row-id'], note: 'Received identifier differs'} : {};
+    const selected = tool.resolveTarget!({targetId: entity, ...supplied});
+    assert.equal(selected.entityId, entity); assert.match(selected.sourceRevision, /^store-device-original:evaluation:[a-f0-9]{64}$/u);
+    if (action === 'AI-ACT-394') assert.deepEqual(selected.fields, {rows: [{serial: 'printed SERIAL-2', imei1: '', imei2: ''}]});
+    else assert.deepEqual(selected.fields, supplied);
+    const proposal = {kind: 'proposal' as const, id: 'HOST-device-proposal', actionId: action, ...selected, title: 'Review', summary: 'Host only'};
+    await f.source.readPrepared(actor, {...input, entityId: entity}, proposal);
+    for (const field of ['operationId', 'retry', 'verified', 'publish', 'refund']) {
+      assert.equal(tool.validate({...selected.fields, [field]: true}), false);
+      assert.throws(() => tool.resolveTarget!({targetId: entity, ...supplied, [field]: true}));
+    }
+    assert.throws(() => tool.resolveTarget!({targetId: 'device-' + 'f'.repeat(64), ...supplied}));
+  });
+}
+test('AGG08-DEVICE pointer excludes warranty documents cases and refuses stale original or authority', async () => {
+  for (const action of ['AI-ACT-389', 'AI-ACT-392', 'AI-ACT-400']) {
+    const f = deviceOriginalFixture(); await assert.rejects(f.source.read(actor, {...f.input, actionId: action})); assert.equal(f.calls.length, 0);
+  }
+  const denied = deviceOriginalFixture(); denied.deny(); await assert.rejects(denied.source.read(actor, denied.input)); assert.equal(denied.calls.length, 0);
+  const changed = deviceOriginalFixture(); changed.change((p, count) => {if (count > 13) p.orders[0]!.original.lines[0]!.name = 'Changed original';});
+  await assert.rejects(changed.source.read(actor, changed.input), /stale_preparation/u);
+  const owner = deviceOriginalFixture(); owner.change(() => owner.bump()); await assert.rejects(owner.source.read(actor, owner.input), /stale_preparation/u);
+  const expired = deviceOriginalFixture(); expired.change(() => expired.advance()); await assert.rejects(expired.source.read(actor, expired.input));
+  const foreign = deviceOriginalFixture(); await assert.rejects(foreign.source.read({...actor, uid: 'foreign-actor', projectId: 'foreign-project'}, foreign.input));
+  assert.equal(foreign.calls.length, 0);
 });

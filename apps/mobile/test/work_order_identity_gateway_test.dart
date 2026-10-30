@@ -493,6 +493,7 @@ Map<String, dynamic> restockClosureResponse(WorkspaceGoodsArrivalCommand command
 }
 
 void main() {
+  originalPurchasedDeviceSourceTests();
   test('F2CHANGE immutable printed particulars bind full history', () {
     final source = OrderDocumentSourceFixture();
     final target = WorkspaceOrderDocumentTarget(accountUserId: 'buyer-1', role: WorkspaceOrderIdentityRole.buyer,
@@ -4560,4 +4561,121 @@ Map<String, dynamic> operationalResponse({String role = 'buyer'}) {
     if (role == 'seller') 'customerLabel': 'Evaluation buyer',
     if (role == 'seller') 'address': 'Evaluation address',
   };
+}
+
+void originalPurchasedDeviceSourceTests() {
+  const capture = String.fromEnvironment('AGG08_DEVICE_WIRE_EXPORT_PATH');
+  // This file is emitted by the actual SDK loopback run, not a phone provider.
+  Map<String, dynamic> load() => (jsonDecode(File(capture).readAsStringSync()) as Map).cast<String, dynamic>();
+  for (final role in WorkspaceOrderIdentityRole.values) {
+    test('AGG08-DEVICE actual SDK wire native ${role.name} read and original status recovery', () async {
+      final data = load(), targetData = (data[role.name] as Map).cast<String, dynamic>();
+      final account = (role == WorkspaceOrderIdentityRole.seller ? data['sellerProjection'] : data['before'])['viewerUserId'] as String;
+      final reference = targetData['reference'] as Map;
+      final credentials = Credentials(); var visit = Object();
+      final wire = Transport()..respond = (body) {
+        switch (body['operation']) {
+          case 'readBuyerPurchaseProjection': return Map<String, dynamic>.from(data['before']);
+          case 'readStorePurchaseProjection': return Map<String, dynamic>.from(data['sellerProjection']);
+          case 'readPurchasedUnits': return Map<String, dynamic>.from(data[role == WorkspaceOrderIdentityRole.seller ? 'sellerRead' : 'buyerRead']);
+          case 'reconcilePurchasedUnits': return Map<String, dynamic>.from(data['shareResult']);
+          case 'reconcilePurchasedUnitMismatch': return Map<String, dynamic>.from(data['reportResult']);
+          case 'readReceivedDeviceReports': return Map<String, dynamic>.from(data['inbox']);
+          default: throw StateError('Unexpected original-device operation');
+        }
+      };
+      final base = AuthenticatedWorkspaceOrderIdentityGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        accountUserId: account, lifetime: () => visit, credentials: credentials, transport: wire);
+      final source = AuthenticatedWorkspacePurchasedUnitSource(base, now: DateTime.now);
+      final gateway = AuthenticatedWorkspaceOrderIdentityGateway(endpoint: base.endpoint, accountUserId: account,
+        lifetime: () => visit, credentials: credentials, transport: wire, purchasedUnitSource: source);
+      final projection = await gateway.readPurchaseProjection(role: role, realm: 'evaluation', purchaseId: reference['purchaseId'],
+        storeId: role == WorkspaceOrderIdentityRole.seller ? reference['storeId'] : null,
+        orderId: role == WorkspaceOrderIdentityRole.seller ? reference['orderId'] : null);
+      expect(projection, isNotNull);
+      final ref = WorkspacePurchaseReference(purchaseId: reference['purchaseId'], storeId: reference['storeId'], orderId: reference['orderId'],
+        originalFingerprint: reference['originalFingerprint'], sourceRevision: reference['sourceRevision']);
+      final line = projection!.orders.first.lines.first;
+      final target = WorkspacePurchasedLineTarget(accountUserId: account, role: role, realm: 'evaluation', reference: ref, line: line);
+      expect(target.binding, targetData['binding']);
+      final read = await gateway.readPurchasedUnits(role: role, realm: 'evaluation', reference: ref, line: line);
+      expect(read, isNotNull); expect(read!.rows.single.serial, 'printed SERIAL-01');
+      expect(wire.sent!['target'], targetData);
+      if (role == WorkspaceOrderIdentityRole.seller) {
+        final grant = read.ownerAccess!;
+        final result = await gateway.publishPurchasedUnits(command: WorkspacePurchasedUnitPublishCommand.fromJson(data['command']),
+          realm: 'evaluation', reference: ref, line: line, reconcile: true);
+        expect(result?.state, WorkspacePurchasedUnitPublishState.applied); expect(result!.record!.rows, hasLength(1));
+        expect(source.ownerAccessCurrent(grant), isTrue, reason: 'An authorized refresh does not retire a still-current permission grant.');
+        final inbox = await gateway.readReceivedDeviceReports(realm: 'evaluation', reference: ref, line: line);
+        expect(inbox!.reports.single.note, 'Printed identifier does not match received unit');
+        expect(inbox.reports.single.supportCase, isNull);
+      } else {
+        final result = await gateway.reportPurchasedUnitMismatch(command: WorkspacePurchasedUnitMismatchCommand.fromJson(data['reportCommand']),
+          realm: 'evaluation', reference: ref, line: line, reconcile: true);
+        expect(result?.state, WorkspacePurchasedUnitPublishState.applied); expect(result?.reportId, data['reportResult']['reportId']);
+      }
+      expect(wire.requests.where((r) => ['sharePurchasedUnits', 'reportPurchasedUnitMismatch'].contains(r['operation'])), isEmpty);
+      expect(credentials.modes, everyElement(SocialAppCheckTokenMode.standard));
+      final calls = wire.calls; visit = Object();
+      expect(source.isCurrent, isFalse);
+      expect(await source.read(target), isNull); expect(wire.calls, calls);
+    }, skip: capture.isEmpty ? 'Requires explicit actual SDK host capture; never inject on OPPO.' : false);
+  }
+  test('AGG08-DEVICE configured source opt-in keeps review and unavailable construction unchanged', () {
+    final gateway = projectionGateway(Transport());
+    expect(gateway.purchasedUnitSource, isNull);
+    final configured = AuthenticatedWorkspaceOrderIdentityGateway(endpoint: gateway.endpoint, accountUserId: gateway.accountUserId,
+      lifetime: () => 'isolated-native-visit', credentials: Credentials(), transport: Transport(), enableOriginalDeviceSource: true);
+    expect(configured.purchasedUnitSource, isA<AuthenticatedWorkspacePurchasedUnitSource>());
+    expect(identical(configured.purchasedUnitSource, configured.purchasedUnitSource), isTrue);
+  });
+  for (final fault in ['account', 'binding', 'realm', 'extra', 'duplicate', 'expired', 'invalid-time', 'incomplete']) {
+    test('AGG08-DEVICE native rejects $fault without granting access', () async {
+      final wire = Transport()..data = purchaseResponse(role: 'seller');
+      final gateway = projectionGateway(wire, account: 'owner-1');
+      final original = await gateway.readPurchaseProjection(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation',
+        purchaseId: 'purchase-v2', storeId: 'store-one', orderId: 'order-v2');
+      final line = original!.orders.first.lines.first;
+      final target = WorkspacePurchasedLineTarget(accountUserId: 'owner-1', role: WorkspaceOrderIdentityRole.seller,
+        realm: 'evaluation', reference: WorkspacePurchaseReference(purchaseId: original.purchaseId,
+          storeId: original.orders.first.storeId, orderId: original.orders.first.orderId,
+          originalFingerprint: original.orders.first.originalFingerprint, sourceRevision: original.sourceRevision), line: line);
+      final r = <String, dynamic>{'schemaVersion': 1, 'realm': 'evaluation', 'viewerUserId': 'owner-1', 'targetBinding': target.binding,
+        'record': {'revision': 1, 'rows': [{'id': 'device-one', 'serial': 'literal', 'imei1': '', 'imei2': ''}],
+          'observedAt': '2026-10-16T12:00:00.000Z', 'accessExpiresAt': '2026-10-16T12:05:00.000Z', 'complete': true}};
+      switch (fault) {
+        case 'account': r['viewerUserId'] = 'another-account';
+        case 'binding': r['targetBinding'] = 'a' * 64;
+        case 'realm': r['realm'] = 'production';
+        case 'extra': r['permission'] = true;
+        case 'duplicate': r['record']['rows'] = [r['record']['rows'].first, r['record']['rows'].first];
+        case 'expired': r['record']['accessExpiresAt'] = '2026-10-16T12:00:00.000Z';
+        case 'invalid-time': r['record']['observedAt'] = '2026-10-16';
+        case 'incomplete': r['record']['complete'] = false;
+      }
+      wire.data = r;
+      final source = AuthenticatedWorkspacePurchasedUnitSource(gateway, now: () => DateTime.utc(2026, 10, 16, 12));
+      expect(await source.read(target), isNull);
+    });
+  }
+  test('AGG08-DEVICE expired grant cannot revive after refresh or clock correction', () async {
+    final wire = Transport()..data = purchaseResponse(role: 'seller'), gateway = projectionGateway(wire, account: 'owner-1');
+    final original = (await gateway.readPurchaseProjection(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation',
+      purchaseId: 'purchase-v2', storeId: 'store-one', orderId: 'order-v2'))!;
+    final target = WorkspacePurchasedLineTarget(accountUserId: 'owner-1', role: WorkspaceOrderIdentityRole.seller,
+      realm: 'evaluation', reference: WorkspacePurchaseReference(purchaseId: original.purchaseId,
+        storeId: original.orders.first.storeId, orderId: original.orders.first.orderId,
+        originalFingerprint: original.orders.first.originalFingerprint, sourceRevision: original.sourceRevision), line: original.orders.first.lines.first);
+    var time = DateTime.utc(2026, 10, 16, 12);
+    wire.data = {'schemaVersion': 1, 'realm': 'evaluation', 'viewerUserId': 'owner-1', 'targetBinding': target.binding,
+      'record': {'revision': 0, 'rows': [], 'observedAt': '2026-10-16T12:00:00.000Z', 'accessExpiresAt': '2026-10-16T12:05:00.000Z', 'complete': true}};
+    final source = AuthenticatedWorkspacePurchasedUnitSource(gateway, now: () => time);
+    final old = (await source.read(target))!.ownerAccess!;
+    expect(source.ownerAccessCurrent(old), isTrue);
+    time = time.add(const Duration(minutes: 6)); expect(source.ownerAccessCurrent(old), isFalse);
+    time = DateTime.utc(2026, 10, 16, 12);
+    final next = (await source.read(target))!.ownerAccess!;
+    expect(identical(old, next), isFalse); expect(source.ownerAccessCurrent(old), isFalse); expect(source.ownerAccessCurrent(next), isTrue);
+  });
 }

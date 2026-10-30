@@ -1,9 +1,10 @@
 import {createHash, randomUUID} from "node:crypto";
-import {FieldPath, type Firestore, type Transaction} from "firebase-admin/firestore";
+import {FieldPath, type Firestore, type Transaction, type DocumentReference} from "firebase-admin/firestore";
 import {WorkspaceProfileError} from "./workspace_profile_service.js";
 import type {WorkspaceCatalogueService} from "./workspace_catalogue_service.js";
 
 type Realm = "evaluation" | "production";
+type DeviceRow = {id: string; serial: string; imei1: string; imei2: string};
 export type PurchaseFactsVersion = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 /** Accepted purchasing entity, not a current buying grant. Internal account,
  * profile-case and navigation IDs stay outside supplier-visible originals. */
@@ -823,6 +824,224 @@ export class WorkspaceOrderOperationsService {
     private readonly completionSource?: OrderCompletionSource) {
     if (!["evaluation", "production"].includes(realm)) fail("service_unavailable", 503);
   }
+  /** Existing private printed-device intent. Never verifies hardware, changes
+   * purchase facts, decides a claim or produces a support case. */
+  async purchasedDevices(actor: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    id(actor);
+    const kind = operation === 'readPurchasedUnits' ? 'read' :
+      operation === 'sharePurchasedUnits' || operation === 'reconcilePurchasedUnits' ? 'share' :
+      operation === 'reportPurchasedUnitMismatch' || operation === 'reconcilePurchasedUnitMismatch' ? 'report' :
+      operation === 'readReceivedDeviceReports' ? 'inbox' : fail();
+    const status = operation.startsWith('reconcile');
+    exact(body, kind === 'read' ? ['target'] : kind === 'inbox' ? ['target', 'cursor'] : ['target', 'command']);
+    const target = exact(body.target, ['role', 'realm', 'buyingStoreId', 'reference', 'lineFacts', 'binding']);
+    const reference = exact(target.reference, ['purchaseId', 'storeId', 'orderId', 'originalFingerprint', 'sourceRevision']);
+    const scope = operationalScope(reference);
+    if (target.realm !== this.realm || target.role !== 'buyer' && target.role !== 'seller' ||
+        (kind === 'share' || kind === 'inbox') && target.role !== 'seller' || kind === 'report' && target.role !== 'buyer') fail('not_found', 404);
+    const buyingStoreId = target.buyingStoreId === null ? null : id(target.buyingStoreId);
+    const lineFacts = obj(target.lineFacts);
+    const canonicalReference = {...scope, originalFingerprint: reference.originalFingerprint, sourceRevision: reference.sourceRevision};
+    const binding = integrityHash([actor, target.role, this.realm, buyingStoreId, canonicalReference, lineFacts]);
+    if (target.binding !== binding) fail('invalid_input', 400);
+    return this.db.runTransaction(async tx => {
+      const {aggregate, order} = await this.original(tx, scope);
+      if (target.role === 'seller') {
+        if (buyingStoreId !== null) fail('not_found', 404);
+        await this.seller(tx, order, actor);
+      } else {
+        const purchaser = aggregatePurchaser(aggregate);
+        if (buyingStoreId ? purchaser?.kind !== 'store' || purchaser.storeId !== buyingStoreId : purchaser?.kind === 'store') fail('not_found', 404);
+        await requirePurchasingBuyer(this.db, tx, aggregate, actor);
+      }
+      const line = order.original.lines.find(l => l.lineId === lineFacts.lineId);
+      if (!line || integrityHash(lineFacts) !== integrityHash(line) || reference.sourceRevision !== aggregate.sourceRevision ||
+          reference.originalFingerprint !== order.originalFingerprint) fail('conflict', 409);
+      const originalKey = digest([1, this.realm, scope.purchaseId, scope.storeId, scope.orderId,
+        order.originalFingerprint, aggregate.sourceRevision, line.lineId]);
+      const path = this.root().collection('purchasedUnits').doc(originalKey);
+      const stored = await tx.get(path);
+      const state = stored.exists ? await this.deviceState(tx, path, stored.data(), originalKey) :
+        {schemaVersion: 1, originalKey, revision: 0, rows: [] as DeviceRow[], reportRevision: 0};
+      const observedAt = this.now().toISOString();
+      const record = (revision = state.revision, rows = state.rows) => ({revision, rows, observedAt,
+        accessExpiresAt: new Date(Date.parse(observedAt) + 5 * 60 * 1000).toISOString(), complete: true});
+      const envelope = {schemaVersion: 1, realm: this.realm, viewerUserId: actor, targetBinding: binding};
+      if (kind === 'read') return {...envelope, record: record()};
+      if (kind === 'inbox') {
+        let after = 0;
+        if (body.cursor !== null) {
+          try {
+            const cursor = text(body.cursor, 512);
+            const saved = exact(JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')), ['binding', 'revision', 'after']);
+            if (saved.binding !== binding || saved.revision !== state.reportRevision) fail('conflict', 409);
+            after = integer(saved.after, state.reportRevision, 1);
+          } catch {return fail('conflict', 409);}
+        }
+        const docs = await tx.get(path.collection('reports').where('sequence', '>', after).orderBy('sequence').limit(50));
+        const reports: {sequence: number; report: Record<string, unknown>}[] = [];
+        let bytes = 0;
+        for (const doc of docs.docs) {
+          const raw = obj(doc.data()), {integrity, ...saved} = raw;
+          exact(saved, ['schemaVersion', 'originalKey', 'sequence', 'report']);
+          const report = exact(saved.report, ['id', 'note', 'recordedAt', 'deviceRevision', 'deviceFingerprint', 'commandFingerprint', 'rowCount', 'rowsHash']);
+          if (saved.schemaVersion !== 1 || saved.originalKey !== originalKey || integrity !== integrityHash(saved) ||
+              report.id !== doc.id) fail('invalid_state', 409);
+          if (integer(saved.sequence, state.reportRevision, after + 1) !== after + reports.length + 1) fail('invalid_state', 409);
+          integer(report.deviceRevision, 2147483647, 1); timestamp(report.recordedAt);
+          this.deviceNote(report.note);
+          const rows = await this.deviceReadRows(tx, doc.ref, report.rowCount, report.rowsHash, originalKey);
+          if (!rows.length) fail('invalid_state', 409);
+          if (![report.deviceFingerprint, report.commandFingerprint].every(v => typeof v === 'string' && /^[a-f0-9]{64}$/u.test(v))) fail('invalid_state', 409);
+          const {rowCount: _count, rowsHash: _hash, ...fields} = report;
+          const item = {...fields, rows};
+          const size = Buffer.byteLength(JSON.stringify(item), 'utf8');
+          if (reports.length && bytes + size > 3 * 1024 * 1024) break;
+          bytes += size; reports.push({sequence: saved.sequence as number, report: item});
+        }
+        if (docs.size < 50 && reports.length === docs.size &&
+            (reports.at(-1)?.sequence ?? after) !== state.reportRevision) fail('invalid_state', 409);
+        const next = reports.length > 0 && reports.at(-1)!.sequence < state.reportRevision
+          ? Buffer.from(JSON.stringify({binding, revision: state.reportRevision, after: reports.at(-1)!.sequence})).toString('base64url') : null;
+        return {...envelope, revision: state.reportRevision, reports: reports.map(r => r.report),
+          nextCursor: next, complete: next === null};
+      }
+      const command = this.deviceCommand(body.command, kind);
+      if (command.key.account !== actor || command.key.realm !== this.realm || command.key.store !== scope.storeId || command.key.binding !== binding) fail('not_found', 404);
+      const receiptPath = path.collection('commands').doc(digest([actor, kind, command.operationId]));
+      const receipt = await tx.get(receiptPath);
+      if (receipt.exists) {
+        const raw = obj(receipt.data()), {integrity, ...saved} = raw;
+        exact(saved, ['schemaVersion', 'actor', 'kind', 'originalKey', 'commandFingerprint', 'result']);
+        if (saved.schemaVersion !== 1 || saved.actor !== actor || saved.kind !== kind || saved.originalKey !== originalKey ||
+            integrity !== integrityHash(saved)) fail('invalid_state', 409);
+        if (saved.commandFingerprint !== command.fingerprint) fail('conflict', 409);
+        const result = obj(saved.result);
+        if (kind === 'share') {
+          const frozen = obj(result.record), {rowCount, rowsHash, ...fields} = frozen;
+          const revision = integer(fields.revision, state.revision, 1);
+          const rows = await this.deviceReadRows(tx, path.collection('revisions').doc(String(revision)), rowCount, rowsHash, originalKey);
+          return {...envelope, ...result, record: {...fields, rows}};
+        }
+        return {...envelope, ...result};
+      }
+      const resultBase = {operationId: command.operationId, commandFingerprint: command.fingerprint};
+      if (status) return {...envelope, ...resultBase, state: 'pending', ...(kind === 'share' ? {record: null} : {reportId: null, recordedAt: null})};
+      let result: object;
+      const writeState = (value: typeof state) => {
+        const {rows, ...fields} = value;
+        const stored = {...fields, rowCount: rows.length, rowsHash: digest(rows)};
+        tx.set(path, {...stored, integrity: integrityHash(stored)});
+      };
+      if (kind === 'share') {
+        if (command.expectedRevision !== state.revision) fail('conflict', 409);
+        const revision = integer(state.revision + 1, 2147483647, 1);
+        result = {...resultBase, state: 'applied', record: record(revision, command.rows)};
+        this.deviceWriteRows(tx, path.collection('revisions').doc(String(revision)), command.rows, originalKey);
+        writeState({...state, revision, rows: command.rows});
+      } else {
+        if (command.sourceRevision !== state.revision || state.revision === 0 ||
+            command.sourceFingerprint !== integrityHash([binding, state.revision, state.rows, true]) ||
+            !command.rows.every(row => state.rows.some(original => integrityHash(row) === integrityHash(original)))) fail('conflict', 409);
+        const reportId = `device-report-${digest([actor, command.operationId])}`;
+        const report = {id: reportId, note: command.note!, recordedAt: observedAt, deviceRevision: state.revision,
+          deviceFingerprint: command.sourceFingerprint!, commandFingerprint: command.fingerprint, rows: command.rows};
+        const sequence = integer(state.reportRevision + 1, 2147483647, 1);
+        const {rows: reportRows, ...reportFields} = report;
+        const saved = {schemaVersion: 1, originalKey, sequence, report: {...reportFields, rowCount: reportRows.length, rowsHash: digest(reportRows)}};
+        const reportPath = path.collection('reports').doc(reportId);
+        this.deviceWriteRows(tx, reportPath, reportRows, originalKey);
+        tx.create(reportPath, {...saved, integrity: integrityHash(saved)});
+        writeState({...state, reportRevision: sequence});
+        result = {...resultBase, state: 'applied', reportId, recordedAt: observedAt};
+      }
+      let receiptResult = result;
+      if (kind === 'share') {
+        const wire = result as {record: Record<string, unknown>};
+        const {rows: _rows, ...fields} = wire.record;
+        receiptResult = {...result, record: {...fields, rowCount: command.rows.length, rowsHash: digest(command.rows)}};
+      }
+      const saved = {schemaVersion: 1, actor, kind, originalKey, commandFingerprint: command.fingerprint, result: receiptResult};
+      tx.create(receiptPath, {...saved, integrity: integrityHash(saved)});
+      return {...envelope, ...result};
+    });
+  }
+  private deviceRows(raw: unknown, nonempty = false): DeviceRow[] {
+    if (!Array.isArray(raw) || raw.length > 1000 || nonempty && raw.length === 0) fail();
+    const rows = raw.map(value => {
+      const r = exact(value, ['id', 'serial', 'imei1', 'imei2']);
+      for (const key of ['id', 'serial', 'imei1', 'imei2']) {
+        const v = r[key];
+        if (typeof v !== 'string' || v !== v.trim() || v.length > (key === 'id' ? 120 : 240) || /[\x00-\x1f\x7f]/u.test(v)) fail();
+      }
+      if (!r.id || ![r.serial, r.imei1, r.imei2].some(v => v !== '')) fail();
+      return {id: String(r.id), serial: String(r.serial), imei1: String(r.imei1), imei2: String(r.imei2)};
+    });
+    unique(rows.map(r => r.id)); return rows;
+  }
+  private deviceNote(raw: unknown): string {
+    if (typeof raw !== 'string' || !raw || raw !== raw.trim() || raw.length > 2000 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(raw)) fail();
+    return raw;
+  }
+  private deviceCommand(value: unknown, kind: 'share' | 'report') {
+    const raw = exact(value, kind === 'share' ? ['version', 'key', 'operationId', 'expectedRevision', 'rows', 'fingerprint'] :
+      ['version', 'key', 'operationId', 'sourceRevision', 'sourceFingerprint', 'note', 'rows', 'fingerprint']);
+    const k = exact(raw.key, ['account', 'realm', 'store', 'binding']);
+    if (typeof k.binding !== 'string') fail();
+    const key = {account: id(k.account), realm: this.realm, store: id(k.store), binding: k.binding};
+    if (k.realm !== this.realm || !/^[a-f0-9]{64}$/u.test(key.binding) || raw.version !== 1 ||
+        typeof raw.operationId !== 'string' || !/^[a-f0-9]{32}$/u.test(raw.operationId)) fail();
+    const rows = this.deviceRows(raw.rows, kind === 'report'), operationId = raw.operationId;
+    const expectedRevision = kind === 'share' ? integer(raw.expectedRevision, 2147483646) : undefined;
+    const sourceRevision = kind === 'report' ? integer(raw.sourceRevision, 2147483647, 1) : undefined;
+    if (kind === 'report' && typeof raw.sourceFingerprint !== 'string') fail();
+    const sourceFingerprint = kind === 'report' ? raw.sourceFingerprint as string : undefined;
+    const note = kind === 'report' ? this.deviceNote(raw.note) : undefined;
+    if (kind === 'report' && !/^[a-f0-9]{64}$/u.test(sourceFingerprint!)) fail();
+    const fingerprint = digest(kind === 'share' ? [1, key, operationId, expectedRevision, rows] :
+      [1, key, operationId, sourceRevision, sourceFingerprint, note, rows]);
+    if (raw.fingerprint !== fingerprint) fail();
+    return {key, operationId, rows, expectedRevision, sourceRevision, sourceFingerprint, note, fingerprint};
+  }
+  private async deviceState(tx: Transaction, path: DocumentReference, value: unknown, originalKey: string) {
+    try {
+      const raw = obj(value), {integrity, ...r} = raw;
+      exact(r, ['schemaVersion', 'originalKey', 'revision', 'rowCount', 'rowsHash', 'reportRevision']);
+      if (r.schemaVersion !== 1 || r.originalKey !== originalKey || integrity !== integrityHash(r)) fail();
+      const revision = integer(r.revision, 2147483647), reportRevision = integer(r.reportRevision, 2147483647);
+      const rows = await this.deviceReadRows(tx, path.collection('revisions').doc(String(revision)), r.rowCount, r.rowsHash, originalKey);
+      if (revision === 0 && (rows.length || reportRevision)) fail();
+      return {schemaVersion: 1, originalKey, revision, rows, reportRevision};
+    } catch {return fail('invalid_state', 409);}
+  }
+
+  private deviceWriteRows(tx: Transaction, path: DocumentReference, rows: DeviceRow[], originalKey: string) {
+    // A maximum-size native row set exceeds one Firestore document. Frozen pages
+    // are created atomically with their revision/receipt; never overwrite a page.
+    for (let offset = 0; offset < rows.length; offset += 100) {
+      const body = {schemaVersion: 1, originalKey, index: offset / 100, rows: rows.slice(offset, offset + 100)};
+      tx.create(path.collection('pages').doc(String(offset / 100)), {...body, integrity: integrityHash(body)});
+    }
+  }
+  private async deviceReadRows(tx: Transaction, path: DocumentReference, count: unknown, hash: unknown,
+    originalKey: string): Promise<DeviceRow[]> {
+    const length = integer(count, 1000), rows: DeviceRow[] = [];
+    if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/u.test(hash)) fail('invalid_state', 409);
+    for (let offset = 0; offset < length; offset += 100) {
+      const doc = await tx.get(path.collection('pages').doc(String(offset / 100)));
+      if (!doc.exists) fail('invalid_state', 409);
+      const raw = obj(doc.data()), {integrity, ...body} = raw;
+      exact(body, ['schemaVersion', 'originalKey', 'index', 'rows']);
+      const page = this.deviceRows(body.rows, true);
+      if (body.schemaVersion !== 1 || body.originalKey !== originalKey || body.index !== offset / 100 ||
+          integrity !== integrityHash(body) || page.length !== Math.min(100, length - offset)) fail('invalid_state', 409);
+      rows.push(...page);
+    }
+    unique(rows.map(r => r.id));
+    if (digest(rows) !== hash) fail('invalid_state', 409);
+    return rows;
+  }
+
   private root() {return this.db.collection("workspacePurchaseProjections").doc(this.realm);}
   private path(scope: OperationalScope) {return this.root().collection("operationalOrders").doc(scope.orderId);}
   private completionPath(scope: OperationalScope) {return this.root().collection("orderCompletions").doc(scope.orderId);}

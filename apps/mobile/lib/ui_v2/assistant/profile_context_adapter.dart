@@ -140,6 +140,11 @@ class AssistantOriginalContextReader {
         }
         final originalOrders = await work.readWorkspaceAssistantOriginalReferences(originalOrderProofs,
           inputCurrent:alive,validUntil:domain.validUntil);
+        final originalDevices = await work.readWorkspaceAssistantOriginalDeviceTargets({
+          for (final entry in domain.revisions.entries.where((entry) =>
+            assistantStoreDeviceOriginalContextActions.contains(entry.key.$1) && entry.key.$2 != null))
+              (entry.key.$1, entry.key.$2!): entry.value,
+        }, inputCurrent: alive, validUntil: domain.validUntil);
         final originalReceiving = await work.readWorkspaceAssistantReceivingOriginals({
           for (final entry in domain.revisions.entries.where((entry) =>
             assistantStoreReceivingOriginalContextActions.contains(entry.key.$1) && entry.key.$2 != null)) entry.key.$2!: entry.value,
@@ -179,6 +184,8 @@ class AssistantOriginalContextReader {
           if (assistantDomainAddressContextActions.contains(entry.key.$1) &&
               !addressSourceReady(entry.value)) continue;
           if(assistantStoreOrderOriginalContextActions.contains(entry.key.$1)&&!originalOrders.contains(entry.key.$2))continue;
+          if (assistantStoreDeviceOriginalContextActions.contains(entry.key.$1) &&
+              (entry.key.$2 == null || !originalDevices.contains((entry.key.$1, entry.key.$2!)))) continue;
           if(entry.key.$1=='AI-ACT-286'&&(entry.key.$2==null||
             !work.workspaceAssistantOriginalOrderRecoveryReady(entry.key.$2!)))continue;
           if(assistantStoreOperationalContextActions.contains(entry.key.$1)&&

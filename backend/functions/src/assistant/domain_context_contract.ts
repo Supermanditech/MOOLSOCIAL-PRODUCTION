@@ -22,6 +22,7 @@ export const storeProductOwnerActions = new Set([...storeProductDefaultActions, 
 export const storeStockOwnerActions=new Set(['AI-ACT-231','AI-ACT-232','AI-ACT-233','AI-ACT-407','AI-ACT-408']);
 export const storeRestockOwnerActions=new Set(['AI-ACT-234']);
 export const storeOrderOriginalActions=new Set(['AI-ACT-274','AI-ACT-286']);
+export const storeDeviceOriginalActions=new Set(['AI-ACT-393','AI-ACT-394','AI-ACT-395','AI-ACT-396','AI-ACT-397','AI-ACT-398','AI-ACT-399']);
 export const storeOperationalActions=new Set(['AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285']);
 export const storeOrderBoardActions=new Set(['AI-ACT-273']);
 export const storeSupplierDraftActions=new Set(['AI-ACT-235','AI-ACT-236']);
@@ -32,7 +33,7 @@ export const storeReceivingOriginalActions=new Set(['AI-ACT-243']);
 export const storeCouponActions=new Set(['AI-ACT-308','AI-ACT-309','AI-ACT-310']);
 export const storeReportOwnerActions=new Set(['AI-ACT-312','AI-ACT-313','AI-ACT-314','AI-ACT-411']);
 export const storePublicDetailsActions=new Set(['AI-ACT-320','AI-ACT-321']);
-export const storeNativeMaskActions = new Set([...storeProductActions, ...storeProductOwnerActions,...storeStockOwnerActions,...storeRestockOwnerActions,...storeOrderOriginalActions,...storeOperationalActions,...storeOrderBoardActions,...storeSupplierDraftActions,...storeSupplierOriginalActions,...storeLedgerOriginalActions,...storePurchaseRootActions,...storeReceivingOriginalActions,...storeCouponActions,...storeReportOwnerActions,...storePublicDetailsActions]);
+export const storeNativeMaskActions = new Set([...storeProductActions, ...storeProductOwnerActions,...storeStockOwnerActions,...storeRestockOwnerActions,...storeOrderOriginalActions,...storeDeviceOriginalActions,...storeOperationalActions,...storeOrderBoardActions,...storeSupplierDraftActions,...storeSupplierOriginalActions,...storeLedgerOriginalActions,...storePurchaseRootActions,...storeReceivingOriginalActions,...storeCouponActions,...storeReportOwnerActions,...storePublicDetailsActions]);
 export const cataloguePriceRefreshActions = new Set(["AI-ACT-060", "AI-ACT-352"]);
 export const catalogueSearchActions = new Set(["AI-ACT-001", "AI-ACT-002", "AI-ACT-003", "AI-ACT-004", "AI-ACT-005", ...catalogueProductActions, ...cataloguePriceRefreshActions]);
 export function canonicalContextRequest(value: unknown): {scope: PlansScope; catalogueListingIds?: readonly string[]; retainedSupplierQuoteIds?: readonly string[]; nativeSelectionVersion?: 1; nativeProductPreviewVersion?: 1} {

@@ -804,6 +804,11 @@ class WorkSession extends ChangeNotifier {
         productBindings: read.productBindings, current: () => bindingCurrent() && read.current());
     } on Object {return null;}
   }
+  Map<(String, String), WorkspacePurchasedLineTarget> _assistantDeviceTargets = const {};
+  bool Function()? _assistantDeviceTargetsCurrent;
+  int _assistantDeviceTargetsGeneration = 0;
+  WorkspacePurchasedLineTarget? workspaceAssistantOriginalDeviceTarget(String action, String entity) =>
+    _assistantDeviceTargetsCurrent?.call() == true ? _assistantDeviceTargets[(action, entity)] : null;
   Map<String, WorkspacePurchaseReference> _assistantOriginalReferences = const {};
   bool Function()? _assistantOriginalReferencesCurrent;
   int _assistantOriginalReferencesGeneration = 0;
@@ -968,8 +973,65 @@ class WorkSession extends ChangeNotifier {
       return Set.unmodifiable(references.keys);
     }on Object{return const {};}
   }
+  /// Opaque AI IDs are resolved exclusively from authenticated original lines.
+  /// This reads no private device draft, report or pending command.
+  Future<Set<(String, String)>> readWorkspaceAssistantOriginalDeviceTargets(Map<(String, String), String> expected,
+      {required bool Function() inputCurrent, required DateTime validUntil}) async {
+    final reader = originalPurchaseReader, realm = originalPurchaseRealm, account = _contactAccountScope,
+      store = activeWorkspace?.id, data = _storeData, navigation = navigationScopeRevision, owner = publicationPreferencesContext;
+    final generation = ++_assistantDeviceTargetsGeneration;
+    _assistantDeviceTargets = const {}; _assistantDeviceTargetsCurrent = null;
+    bool current() => inputCurrent() && DateTime.now().toUtc().isBefore(validUntil.toUtc()) && !_disposed &&
+      generation == _assistantDeviceTargetsGeneration && reader != null && identical(reader, originalPurchaseReader) &&
+      reader.isCurrent && reader.accountUserId == account && originalPurchaseRealm == realm && _contactAccountScope == account &&
+      activeWorkspace?.id == store && identical(data, _storeData) && navigationScopeRevision == navigation && publicationPreferencesContext == owner &&
+      workspaceOperationalFeedAvailable && !workspaceAccountRecoveryPending && !workspaceAccountRecoveryFailed &&
+      store != null && workspaceRequiresMembershipReadback && _currentWorkspaceAccess(store, activeWorkspace?.profileId);
+    if (expected.isEmpty || expected.length > 30000 || !current()) return const {};
+    const actions = {'AI-ACT-393', 'AI-ACT-394', 'AI-ACT-395', 'AI-ACT-396', 'AI-ACT-397', 'AI-ACT-398', 'AI-ACT-399'};
+    if (expected.entries.any((e) => !actions.contains(e.key.$1) || !RegExp(r'^device-[a-f0-9]{64}$').hasMatch(e.key.$2) ||
+        !RegExp('^store-device-original:$realm:[a-f0-9]{64}\$').hasMatch(e.value))) return const {};
+    final targets = <(String, String), WorkspacePurchasedLineTarget>{};
+    try {
+      for (final role in WorkspaceOrderIdentityRole.values) {
+        bool belongs(String action) => const {'AI-ACT-396', 'AI-ACT-399'}.contains(action) == (role == WorkspaceOrderIdentityRole.buyer);
+        final wanted = expected.keys.where((key) => belongs(key.$1)).toSet();
+        if (wanted.isEmpty) continue;
+        final seen = <String>{}, cursors = <String>{}; String? cursor;
+        do {
+          final page = await reader!.listPurchaseReferences(role: role, realm: realm,
+            storeId: role == WorkspaceOrderIdentityRole.seller ? store : null,
+            buyingStoreId: role == WorkspaceOrderIdentityRole.buyer ? store : null, cursor: cursor);
+          if (!current() || page == null || page.coverage != (role == WorkspaceOrderIdentityRole.seller ? 'indexed_original_facts' : 'saved_original_facts')) return const {};
+          for (final ref in page.references) {
+            if (!ref.valid || !seen.add(ref.orderId) || role == WorkspaceOrderIdentityRole.seller && ref.storeId != store) return const {};
+            final original = await reader.readReferencedOrder(role: role, realm: realm, reference: ref,
+              buyingStoreId: role == WorkspaceOrderIdentityRole.buyer ? store : null, inputCurrent: current);
+            if (!current() || original == null) return const {};
+            for (final line in original.lines) {
+              final entity = 'device-${crypto.sha256.convert(utf8.encode(jsonEncode([role.name, original.orderId, line.lineId])))}';
+              final matches = wanted.where((key) => key.$2 == entity).toList();
+              if (matches.isEmpty) continue;
+              final target = WorkspacePurchasedLineTarget(accountUserId: account!, role: role, realm: realm,
+                reference: ref, line: line, buyingStoreId: role == WorkspaceOrderIdentityRole.buyer ? store : null);
+              final proof = 'store-device-original:$realm:${target.binding}';
+              for (final key in matches) {if (expected[key] == proof) targets[key] = target;}
+            }
+          }
+          if (seen.length > 30000) return const {};
+          cursor = page.nextCursor;
+          if (cursor != null && !cursors.add(cursor)) return const {};
+        } while (cursor != null && !wanted.every(targets.containsKey));
+      }
+      if (!current()) return const {};
+      _assistantDeviceTargets = Map.unmodifiable(targets); _assistantDeviceTargetsCurrent = current;
+      return Set.unmodifiable(targets.keys);
+    } on Object {return const {};}
+  }
   void bindOriginalPurchaseReader(AuthenticatedWorkspaceOrderIdentityGateway? reader, String realm) {
     if (_disposed || identical(reader, _originalPurchaseReader) && realm == originalPurchaseRealm) return;
+    _assistantDeviceTargetsGeneration++;
+    _assistantDeviceTargets = const {}; _assistantDeviceTargetsCurrent = null;
     _assistantOriginalReferencesGeneration++;
     _assistantOriginalReferences=const {};_assistantOriginalReferencesCurrent=null;
     _assistantReceivingOriginalsGeneration++;

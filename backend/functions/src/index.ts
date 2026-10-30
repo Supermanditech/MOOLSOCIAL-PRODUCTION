@@ -25,7 +25,7 @@ import {handleAssistantModelRequest} from "./assistant/model_http.js";
 import {AssistantHistoryService} from "./assistant/history_service.js";
 import {DataConnectHistoryRepository} from "./assistant/history_dataconnect_store.js";
 import {handleAssistantHistoryRequest} from "./assistant/history_http.js";
-import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreProductPreparationContext, OriginalStoreOrderPreparationContext, OriginalStoreOperationalPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext, OriginalStoreCouponPreparationContext, OriginalStoreLedgerPreparationContext} from "./assistant/domain_context.js";
+import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreProductPreparationContext, OriginalStoreOrderPreparationContext, OriginalStoreDevicePreparationContext, OriginalStoreOperationalPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext, OriginalStoreCouponPreparationContext, OriginalStoreLedgerPreparationContext} from "./assistant/domain_context.js";
 import {handleAssistantCanonicalContextRequest} from "./assistant/domain_context_http.js";
 
 import {
@@ -2663,6 +2663,7 @@ function assistantOriginalContextSource(projectId: string) {
     ...(original && ['evaluation','production'].includes(process.env.MOOLSOCIAL_PURCHASE_REALM ?? '') ? {
       nativeOrderBoardEnabled: true,
       storeOrders: new OriginalStoreOrderPreparationContext({projectId,authority:original,purchases:workspacePurchaseProjectionService()}),
+      storeDevices: new OriginalStoreDevicePreparationContext({projectId,authority:original,purchases:workspacePurchaseProjectionService()}),
       storeOperational: new OriginalStoreOperationalPreparationContext({projectId,authority:original,purchases:workspacePurchaseProjectionService(),operations:workspaceOrderOperationsService()}),
       storeReceiving: new OriginalStoreReceivingPreparationContext({projectId,authority:original,purchases:workspacePurchaseProjectionService()}),
       privateStars: new OriginalPurchasedStarsPreparationContext({projectId,authority:original,operations:workspaceOrderOperationsService()})} : {}),
@@ -3283,6 +3284,8 @@ export const moolSocialWorkspace = onRequest(
       const operationalCommand = operation === "submitStoreOrderCommand";
       const operationalReconcile = operation === "reconcileStoreOrderCommand";
       const goodsArrivalOperation = ['recordBuyerGoodsArrival', 'reconcileBuyerGoodsArrival', 'readBuyerGoodsReceiving', 'closeBuyerGoodsArrival'].includes(operation);
+      const purchasedDeviceOperation = ['readPurchasedUnits', 'sharePurchasedUnits', 'reconcilePurchasedUnits',
+        'reportPurchasedUnitMismatch', 'reconcilePurchasedUnitMismatch', 'readReceivedDeviceReports'].includes(operation);
       const ownerUserId = await verifySocialInvocation(
         request.headers,
         {
@@ -3293,14 +3296,15 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation) || purchaseEntryAction !== undefined || customerAction !== undefined || ledgerAction !== undefined || purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
+            if (["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation) || purchaseEntryAction !== undefined || customerAction !== undefined || ledgerAction !== undefined || purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || purchasedDeviceOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;
           },
         },
         mutation || orderMutation || operationalCommand || operation === "submitBuyerProductStars" ||
-          operation === 'recordBuyerGoodsArrival' || operation === 'closeBuyerGoodsArrival',
+          operation === 'recordBuyerGoodsArrival' || operation === 'closeBuyerGoodsArrival' ||
+          operation === 'sharePurchasedUnits' || operation === 'reportPurchasedUnitMismatch',
         true,
       );
       if (!ownerUserId) {
@@ -3395,6 +3399,8 @@ export const moolSocialWorkspace = onRequest(
           operation === "readBuyerOperationalOrder" ? "buyer" : "seller", catalogueBody)
         : operationalCommand || operationalReconcile
           ? await workspaceOrderOperationsService().command(ownerUserId, catalogueBody, operationalReconcile)
+        : purchasedDeviceOperation
+          ? await workspaceOrderOperationsService().purchasedDevices(ownerUserId, operation, catalogueBody)
         : operation === 'recordBuyerGoodsArrival'
         ? await workspacePurchaseProjectionService().recordBuyerGoodsArrival(ownerUserId, catalogueBody)
         : operation === 'reconcileBuyerGoodsArrival'

@@ -8,12 +8,12 @@ import {checkedLedgerSupplierCreditDocumentInput, ledgerSupplierAvailableCreditS
 import type {WorkspaceCatalogueService, StoreSkuRecord} from "../workspace/workspace_catalogue_service.js";
 import {normalizeStorePublicDetails, cataloguePayloadHash, checkedStoreProductPreviewOriginal,
   type StoreProductPreviewReference, type StoreProductPreviewKind} from "../workspace/workspace_catalogue_service.js";
-import type {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, WorkspaceBulkQuoteService, PurchaseReference, ProductFeedbackTarget} from "../workspace/workspace_purchase_projection_service.js";
+import type {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, WorkspaceBulkQuoteService, PurchaseReference, PurchaseReferencePage, ProductFeedbackTarget} from "../workspace/workspace_purchase_projection_service.js";
 import type {WorkspacePromotionService,StoreCouponRecord} from '../workspace/workspace_promotion_service.js';
 import type {PreparationContextSource} from "./model_service.js";
 import {AssistantModelError, canonical, digest, fail, id, object,
   catalogueListingSelection, preparationNativeTargetLimit, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
-import {canonicalContextProjection, catalogueProductActions, cataloguePriceRefreshActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, buyerRetainedQuoteActions, retainedSupplierQuoteSelection, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeOperationalActions,storeOrderBoardActions,storeSupplierDraftActions,storeLedgerOriginalActions,storePurchaseRootActions,storeReceivingOriginalActions,storeCouponActions,storeReportOwnerActions,storePublicDetailsActions, searchSuggestion} from "./domain_context_contract.js";
+import {canonicalContextProjection, catalogueProductActions, cataloguePriceRefreshActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, buyerRetainedQuoteActions, retainedSupplierQuoteSelection, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeDeviceOriginalActions,storeOperationalActions,storeOrderBoardActions,storeSupplierDraftActions,storeLedgerOriginalActions,storePurchaseRootActions,storeReceivingOriginalActions,storeCouponActions,storeReportOwnerActions,storePublicDetailsActions, searchSuggestion} from "./domain_context_contract.js";
 
 const paidRevision = (p: PlansReadback) => canonical([p.owner, p.scope, p.catalogueRevision, p.subscriptionRevision]);
 const searchSchema = {type: "object", properties: {query: {type: "string"}},
@@ -1495,6 +1495,135 @@ export class OriginalStoreOrderPreparationContext implements PreparationContextS
         orders:second.references.map(row=>({orderId:row.orderId,sourceRevision:row.sourceRevision}))}};
   }
 }
+/** Authenticated order+line pointers only. Native device reads, private drafts
+ * and original pending commands still decide action readiness and confirmation. */
+export class OriginalStoreDevicePreparationContext implements PreparationContextSource {
+  constructor(private readonly deps: {projectId: string; authority: PreparationContextSource;
+    purchases: Pick<WorkspacePurchaseProjectionService, 'listStore' | 'readStore' | 'listBuyer' | 'readBuyer'>;
+    now?: () => Date}) {}
+  private now() {return (this.deps.now?.() ?? new Date()).getTime();}
+  private async snapshot(actor: AccountProfileActor, store: string, actions: string[], entity: string | null, deadline: number) {
+    const selected = entity;
+    if (selected !== null && !/^device-[a-f0-9]{64}$/u.test(selected)) return fail('context_unavailable');
+    const rows: {entity: string; role: 'buyer' | 'seller'; proof: string; orderId: string; lineId: string; label: string}[] = [];
+    for (const role of ['seller', 'buyer'] as const) {
+      if (!actions.some(a => (a === 'AI-ACT-396' || a === 'AI-ACT-399') === (role === 'buyer'))) continue;
+      let cursor: string | null = null;
+      const seen = new Set<string>(), cursors = new Set<string>();
+      do {
+        if (this.now() >= deadline) return fail('stale_preparation', 409);
+        const page: PurchaseReferencePage = role === 'seller' ? await this.deps.purchases.listStore(actor.uid, {storeId: store, limit: 5, cursor}) :
+          await this.deps.purchases.listBuyer(actor.uid, {buyingStoreId: store, limit: 5, cursor});
+        if (page.authNamespace !== 'firebase-default' || page.viewerUserId !== actor.uid || page.viewerRole !== role ||
+            !['evaluation', 'production'].includes(page.realm) || page.references.length > 5 ||
+            (role === 'seller' ? page.schemaVersion !== 2 || page.storeId !== store || page.coverage !== 'indexed_original_facts' :
+              page.schemaVersion !== 3 || page.buyingStoreId !== store || page.coverage !== 'saved_original_facts')) return fail('context_unavailable');
+        for (const reference of page.references) {
+          if (seen.has(reference.orderId) || seen.size >= preparationNativeTargetLimit) return fail('context_unavailable');
+          seen.add(reference.orderId);
+          if (this.now() >= deadline) return fail('stale_preparation', 409);
+          const projection = role === 'seller' ? await this.deps.purchases.readStore(actor.uid,
+            {purchaseId: reference.purchaseId, storeId: store, orderId: reference.orderId}) :
+            await this.deps.purchases.readBuyer(actor.uid, {purchaseId: reference.purchaseId, buyingStoreId: store});
+          const order = projection.orders.find(o => o.orderId === reference.orderId && o.storeId === reference.storeId);
+          if (projection.realm !== page.realm || projection.authNamespace !== 'firebase-default' || projection.viewerRole !== role ||
+              projection.viewerUserId !== actor.uid || projection.purchaseId !== reference.purchaseId ||
+              projection.sourceRevision !== reference.sourceRevision || projection.state !== 'original_facts' ||
+              !order || order.originalFingerprint !== reference.originalFingerprint ||
+              role === 'seller' && order.storeId !== store || role === 'buyer' &&
+                (order.original.purchaser?.kind !== 'store' || order.original.purchaser.storeId !== store)) return fail('context_unavailable');
+          const unique = new Set<string>();
+          for (const line of order.original.lines) {
+            const lineId = id(line.lineId);
+            if (unique.has(lineId)) return fail('context_unavailable'); unique.add(lineId);
+            const target = 'device-' + digest([role, order.orderId, lineId]);
+            if (selected !== null && selected !== target) continue;
+            const binding = digest([actor.uid, role, page.realm, role === 'buyer' ? store : null, reference, line]);
+            rows.push({entity: target, role, proof: `store-device-original:${page.realm}:${binding}`,
+              orderId: order.orderId, lineId, label: line.name});
+            if (rows.length > preparationNativeTargetLimit) return fail('context_unavailable');
+          }
+        }
+        cursor = page.nextCursor;
+        if (cursor !== null && (typeof cursor !== 'string' || !cursor || cursor.length > 512 || cursors.has(cursor))) return fail('context_unavailable');
+        if (cursor !== null) cursors.add(cursor);
+      } while (cursor !== null && (selected === null || !rows.some(r => r.entity === selected)));
+    }
+    return rows.sort((a, b) => a.role.localeCompare(b.role) || a.entity.localeCompare(b.entity));
+  }
+  async readPrepared(actor: AccountProfileActor, input: PreparationRequest,
+    proposal: Extract<PreparationReply['outcome'], {kind: 'proposal'}>): Promise<PreparationContext> {
+    if (!storeDeviceOriginalActions.has(proposal.actionId) || input.actionId !== proposal.actionId || input.entityId !== proposal.entityId) return fail('stale_preparation', 409);
+    const value = await this.read(actor, input);
+    if (!value.tools.some(t => t.sourceRevision === proposal.sourceRevision && t.validate(proposal.fields))) return fail('stale_preparation', 409);
+    return value;
+  }
+  async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
+    if (actor.projectId !== this.deps.projectId || !actor.uid || actor.tenantId !== undefined) return fail('account_scope_mismatch', 403);
+    if (input.scope.audience !== 'workspace' || !input.scope.storeId || input.catalogueListingIds !== undefined ||
+        input.actionId !== null && !storeDeviceOriginalActions.has(input.actionId) || input.actionId === null && input.entityId !== null) return fail('context_unavailable');
+    const actions = input.actionId === null ? [...storeDeviceOriginalActions] : [input.actionId];
+    const started = this.now(), before = await approvedWorkspacePreparationAuthority(this.deps.authority, actor, input, started);
+    const deadline = Math.min(started + 60_000, Date.parse(before.validUntil));
+    const capture = async () => {
+      try {return await this.snapshot(actor, input.scope.storeId!, actions, input.entityId, deadline);}
+      catch (error) {if (error instanceof AssistantModelError) throw error; return fail('context_unavailable');}
+    };
+    const first = await capture(), second = await capture();
+    const after = await approvedWorkspacePreparationAuthority(this.deps.authority, actor, input, this.now());
+    if (before.revision !== after.revision || canonical(first) !== canonical(second)) return fail('stale_preparation', 409);
+    const until = Math.min(deadline, Date.parse(after.validUntil));
+    if (until <= this.now() || input.entityId !== null && !second.length) return fail('context_unavailable');
+    const revision = 'store-device-context:' + digest([actor.projectId, actor.uid, input.scope.storeId, after.revision, second]);
+    const textValid = (v: unknown, max: number, empty = false) => typeof v === 'string' && (empty || v.length > 0) &&
+      v === v.trim() && v.length <= max && !/[\x00-\x1f\x7f]/u.test(v);
+    const validate = (action: string, fields: Readonly<Record<string, unknown>>) => {
+      if (action === 'AI-ACT-394') return Object.keys(fields).length === 1 && Array.isArray(fields.rows) &&
+        fields.rows.length > 0 && fields.rows.length <= 1000 && fields.rows.every(value => {
+          if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+          const r = value as Record<string, unknown>;
+          return Object.keys(r).length > 0 && Object.keys(r).every(k => ['id', 'serial', 'imei1', 'imei2'].includes(k)) &&
+            Object.entries(r).every(([k, v]) => textValid(v, k === 'id' ? 120 : 240, k !== 'id'));
+        });
+      if (action === 'AI-ACT-396') return Object.keys(fields).length === 2 && Array.isArray(fields.selectedIds) &&
+        fields.selectedIds.length > 0 && fields.selectedIds.length <= 1000 && new Set(fields.selectedIds).size === fields.selectedIds.length &&
+        fields.selectedIds.every(v => textValid(v, 120)) && typeof fields.note === 'string' && fields.note.length > 0 &&
+        fields.note === fields.note.trim() && fields.note.length <= 2000 && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(fields.note);
+      return Object.keys(fields).length === 0;
+    };
+    const tools: PreparationTool[] = [], nativeTargets: {actionId: string; entityId: string; sourceRevision: string}[] = [];
+    for (const action of actions) {
+      const buyer = action === 'AI-ACT-396' || action === 'AI-ACT-399';
+      const targets = second.filter(r => (r.role === 'buyer') === buyer);
+      if (!targets.length) continue;
+      const dynamic = input.entityId === null;
+      const fields = action === 'AI-ACT-394' ? {rows: {type: 'array', minItems: 1, maxItems: 1000, items: {
+        type: 'object', additionalProperties: false, properties: {id: {type: ['string', 'null']}, serial: {type: 'string'}, imei1: {type: 'string'}, imei2: {type: 'string'}},
+        required: ['id', 'serial', 'imei1', 'imei2']}}} : action === 'AI-ACT-396' ? {
+        selectedIds: {type: 'array', minItems: 1, maxItems: 1000, items: {type: 'string'}}, note: {type: 'string'}} : {};
+      tools.push({name: `store_review_device_${action.slice(-3)}`, actionId: action, entityId: input.entityId,
+        sourceRevision: dynamic ? revision : targets[0]!.proof,
+        description: 'Review the exact purchased line in the existing private device form. Use only literal identifiers or affected IDs supplied by the user; ask when missing, never invent. Private Save, Share, Report and pending-command Check status remain separate native actions. Do not create operation IDs, claim hardware verification, warranty, refunds or outcomes.',
+        parameters: {type: 'object', additionalProperties: false, properties: {...(dynamic ? {targetId: {type: 'string', enum: targets.map(t => t.entity)}} : {}), ...fields},
+          required: [...(dynamic ? ['targetId'] : []), ...Object.keys(fields)]},
+        validate: f => validate(action, f), ...(dynamic ? {targetSelector: 'targetId' as const} : {}),
+        resolveTarget: args => {
+          const chosen = dynamic ? targets.find(t => t.entity === args.targetId) : targets[0];
+          if (!chosen || Object.keys(args).length !== Object.keys(fields).length + (dynamic ? 1 : 0)) return fail('invalid_model_result');
+          const {targetId: _target, ...raw} = args;
+          const prepared = action === 'AI-ACT-394' && Array.isArray(raw.rows) ? {...raw,
+            rows: raw.rows.map(value => {const r = object(value); const {id: rowId, ...identifiers} = r; return rowId === null ? identifiers : {id: rowId, ...identifiers};})} : raw;
+          if (!validate(action, prepared)) return fail('invalid_model_result');
+          return {entityId: chosen.entity, sourceRevision: chosen.proof, fields: prepared};
+        }});
+      nativeTargets.push(...targets.map(t => ({actionId: action, entityId: t.entity, sourceRevision: t.proof})));
+    }
+    return {revision, validUntil: new Date(until).toISOString(), tools, nativeTargets,
+      modelContext: {sourceKind: 'original-store-device-targets-v1', coverage: 'immutable_purchase_lines_only',
+        targets: second.map(t => ({targetId: t.entity, orderId: t.orderId, lineId: t.lineId, label: t.label, role: t.role}))}};
+  }
+}
+
 /** Existing private purchased-item stars only; never public review eligibility. */
 /** Read-only operational preparation over the existing original order service. */
 export class OriginalStoreOperationalPreparationContext extends OriginalStoreOrderPreparationContext {
@@ -2232,6 +2361,7 @@ export class CompositePreparationContext implements PreparationContextSource {
   constructor(private readonly deps: {original?: PreparationContextSource;
     catalogue?: OriginalCataloguePreparationContext; storeProducts?: OriginalStoreProductPreparationContext;
     storeOrders?: OriginalStoreOrderPreparationContext;
+    storeDevices?: OriginalStoreDevicePreparationContext;
     storeOperational?: OriginalStoreOperationalPreparationContext;
     storeCoupons?: OriginalStoreCouponPreparationContext;
     storeReceiving?: OriginalStoreReceivingPreparationContext;
@@ -2758,6 +2888,10 @@ export class CompositePreparationContext implements PreparationContextSource {
       if(!this.deps.storeOperational)return fail('context_unavailable');
       return this.deps.storeOperational.readPrepared(actor,input,proposal);
     }
+    if(storeDeviceOriginalActions.has(proposal.actionId)){
+      if(!this.deps.storeDevices)return fail('context_unavailable');
+      return this.deps.storeDevices.readPrepared(actor,input,proposal);
+    }
     if(storeOrderOriginalActions.has(proposal.actionId)){
       if(!this.deps.storeOrders)return fail('context_unavailable');
       return this.deps.storeOrders.readPrepared(actor,input,proposal);
@@ -2813,6 +2947,10 @@ export class CompositePreparationContext implements PreparationContextSource {
       if(storeOperationalActions.has(input.actionId)){
         if(!this.deps.storeOperational)return fail('context_unavailable');
         return this.deps.storeOperational.read(actor,input);
+      }
+      if(storeDeviceOriginalActions.has(input.actionId)){
+        if(!this.deps.storeDevices)return fail('context_unavailable');
+        return this.deps.storeDevices.read(actor,input);
       }
       if(storeOrderOriginalActions.has(input.actionId)){
         if(!this.deps.storeOrders)return fail('context_unavailable');
@@ -2954,6 +3092,11 @@ export class CompositePreparationContext implements PreparationContextSource {
     if(retainedOrderStatus){
       try{canonicalContextProjection(actor,input.scope,this.combine([...values,retainedOrderStatus]),1);values.push(retainedOrderStatus);}
       catch(error){if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;}
+    }
+    if(this.deps.storeDevices&&input.scope.audience==='workspace'){
+      try{const devices=await this.deps.storeDevices.read(actor,input);
+        canonicalContextProjection(actor,input.scope,this.combine([...values,devices]),1);values.push(devices);
+      }catch(error){if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;}
     }
     if (!values.length) return fail("context_unavailable");
     return this.combine(values);

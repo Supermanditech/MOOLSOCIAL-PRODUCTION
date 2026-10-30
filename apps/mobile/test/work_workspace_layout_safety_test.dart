@@ -9349,6 +9349,8 @@ class _OriginalFacts09Host {
 }
 
 void main() {
+  originalDeviceTargetHandoffTests();
+  buyingStoreDeviceTargetTests();
 
   for(final phase in ['before-open','before-check','complete-check'])
   testWidgets('AGG07 original status $phase binds the retained uncertain command without a preparation write', (tester) async {
@@ -101475,5 +101477,137 @@ void registerOrderFollowupNativeTests(){
       h.operations.addListener(replace);tester.widget<TextButton>(find.byKey(Key('work-order-operation-retry-${h.original.id}'))).onPressed!();await tester.pumpAndSettle();h.operations.removeListener(replace);
       expect(replaced,isTrue);expect(observed,isTrue);expect(h.gateway.reconciled,isEmpty);expect(h.gateway.submitted,hasLength(1));expect(h.operations.pending(h.original.id),same(original));expect(h.journal.command,same(original));await _closeFollowupRetired(tester);await opened.result;
     }finally{await h.dispose(tester);}
+  });
+}
+
+void originalDeviceTargetHandoffTests() {
+  for (final phase in ['read', 'prefill', 'source-change', 'retired', 'recovered']) {
+    testWidgets('AGG08-DEVICE original typed line $phase uses the existing native review without a write', (tester) async {
+      final h = _OriginalFacts09Host();
+      final units = purchase_fixture.DeviceSourceFixture(accountUserId: 'host-native-scope-user')
+        ..revision = 1 ..rows = const [WorkspacePurchasedUnitRow(id: 'HOST-device-unit', serial: 'AGG08 PRINTED SERIAL')];
+      try {
+      await h.ready(tester);
+      h.reader = purchase_fixture.projectionGateway(h.wire, account: 'host-native-scope-user', purchasedUnitSource: units,
+        lifetime: () => h.active ? 'HOST-device-visit' : null);
+      final work = h.product.native.work;
+      work.bindOriginalPurchaseReader(h.reader, 'evaluation'); await tester.pumpAndSettle();
+      final ref = h.references.last;
+      final original = (await h.reader.readReferencedOrder(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: ref))!;
+      final line = original.lines.single, action = phase == 'prefill' ? 'AI-ACT-394' : 'AI-ACT-393';
+      final target = WorkspacePurchasedLineTarget(accountUserId: 'host-native-scope-user', role: WorkspaceOrderIdentityRole.seller,
+        realm: 'evaluation', reference: ref, line: line);
+      final entity = 'device-${crypto.sha256.convert(utf8.encode(jsonEncode(['seller', ref.orderId, line.lineId])))}';
+      final expected = {(action, entity): 'store-device-original:evaluation:${target.binding}'};
+      final sourceRequests = units.requests.length;
+      expect(await work.readWorkspaceAssistantOriginalDeviceTargets(expected, inputCurrent: () => h.active,
+        validUntil: DateTime.now().add(const Duration(minutes: 1))), expected.keys.toSet());
+      expect(work.workspaceAssistantOriginalDeviceTarget(action, entity)?.binding, target.binding);
+      expect(units.requests.length, sourceRequests, reason: 'Canonical pointer capture does not read private device data or a journal.');
+      expect(work.workspaceAssistantOriginalDeviceTarget(action, 'device-${'f' * 64}'), isNull);
+      final ownerContext = tester.element(find.text('Store overview'));
+      final nativeScope = ownerContext.getInheritedWidgetOfExactType<MoolAssistantNativeScope>()!;
+      final adapter = nativeScope.readAdapters(ownerContext).singleWhere((a) => a.actionId == action);
+      final navigator = Navigator.of(ownerContext, rootNavigator: true);
+      final assistant = MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('HOST device AI owner')));
+      (adapter as MoolAssistantRouteBoundNativeAdapter).bindAssistantRoute(assistant, navigator);
+      unawaited(navigator.push<void>(assistant)); await tester.pumpAndSettle();
+      final context = h.product.native.readContext(), captured = await adapter.snapshot(h.product.native.readContext(), entity);
+      expect(captured, isNotNull); expect(captured!.entityId, entity);
+      final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-device-source', actionId: action, entityId: entity,
+        binding: context.binding, requestRevision: 1, entitlementRevision: 'HOST-paid-only', sourceRevision: captured.sourceRevision,
+        validUntil: DateTime.now().add(const Duration(minutes: 1)), title: 'Review device details', summary: 'Isolated original target',
+        recovered: phase == 'recovered', fields: phase == 'prefill' ? {'rows': [{'serial': 'USER PRINTED SERIAL'}]} : const {});
+      final saved = h.product.saved, mutations = List.of(h.product.operations);
+      if (phase == 'source-change') {units.revision++; units.rows = const [WorkspacePurchasedUnitRow(id: 'HOST-device-unit', serial: 'CHANGED SOURCE')];}
+      if (phase == 'retired') h.active = false;
+      if (const ['source-change', 'retired', 'recovered'].contains(phase)) {
+        expect(await adapter.openReview(proposal, () => true), MoolAssistantReviewResult.stale);
+        expect(find.text('HOST device AI owner'), findsOneWidget);
+      } else {
+        final opened = adapter.openReview(proposal, () => true); await tester.pumpAndSettle();
+        expect(find.text('Review device details'), findsOneWidget);
+        if (phase == 'prefill') {
+          expect(find.text('Your kept edits'), findsOneWidget);
+          expect(find.textContaining('USER PRINTED SERIAL'), findsWidgets,
+            reason: 'The actual existing native candidate review must contain the supplied values before Save.');
+          expect(find.text('Save kept edits'), findsOneWidget);
+        } else {expect(find.textContaining('AGG08 PRINTED SERIAL'), findsWidgets);}
+        navigator.pop(); await tester.pumpAndSettle(); expect(await opened, MoolAssistantReviewResult.opened);
+      }
+      expect(h.product.saved, saved);
+      expect(h.product.operations.where((operation) => operation != 'listWorkspaces').toList(),
+        mutations.where((operation) => operation != 'listWorkspaces').toList(),
+        reason: 'The existing current-membership read is observational; every other unexpected operation still fails.');
+      expect(h.wire.requests.any((r) => ['sharePurchasedUnits', 'reportPurchasedUnitMismatch', 'submitStoreOrderCommand'].contains(r['operation'])), isFalse);
+      } finally {await h.dispose(tester); units.dispose();}
+    });
+  }
+}
+
+void buyingStoreDeviceTargetTests() {
+  testWidgets('AGG08-DEVICE buying Store mismatch keeps supplier original separate and only prefills native review', (tester) async {
+    final h = _OriginalFacts09Host(), reports = purchase_fixture.DeviceReporterFixture(accountUserId: 'host-native-scope-user');
+    try {
+      await h.ready(tester);
+      final wireData = purchase_fixture.purchaserPurchaseResponse(role: 'buyer');
+      wireData['viewerUserId'] = 'host-native-scope-user';
+      final order = wireData['orders'][0] as Map<String, dynamic>;
+      order['original']['purchaser']['storeId'] = h.product.store;
+      purchase_fixture.rehashPurchaseOrder(order);
+      final reference = WorkspacePurchaseReference(purchaseId: wireData['purchaseId'] as String, storeId: order['storeId'] as String,
+        orderId: order['orderId'] as String, originalFingerprint: order['originalFingerprint'] as String, sourceRevision: wireData['sourceRevision'] as String);
+      final previous = h.wire.respond!;
+      h.wire.respond = (body) {
+        if (body['operation'] == 'listBuyerPurchaseReferences') {
+          if (body['buyingStoreId'] != h.product.store) throw StateError('HOST original buying Store changed');
+          return {'schemaVersion': 3, 'realm': 'evaluation', 'authNamespace': 'firebase-default', 'viewerRole': 'buyer',
+            'viewerUserId': 'host-native-scope-user', 'storeId': null, 'buyingStoreId': h.product.store,
+            'coverage': 'saved_original_facts', 'references': [reference.toJson()], 'nextCursor': null};
+        }
+        if (body['operation'] == 'readBuyerPurchaseProjection') {
+          if (body['buyingStoreId'] != h.product.store) throw StateError('HOST original buying Store changed');
+          return wireData;
+        }
+        return previous(body);
+      };
+      h.reader = purchase_fixture.projectionGateway(h.wire, account: 'host-native-scope-user', purchasedUnitSource: reports,
+        lifetime: () => h.active ? 'HOST-buying-Store-device' : null);
+      final work = h.product.native.work; work.bindOriginalPurchaseReader(h.reader, 'evaluation'); await tester.pumpAndSettle();
+      final original = (await h.reader.readReferencedOrder(role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation',
+        reference: reference, buyingStoreId: h.product.store))!;
+      final line = original.lines.first;
+      final target = WorkspacePurchasedLineTarget(accountUserId: 'host-native-scope-user', role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', reference: reference, line: line, buyingStoreId: h.product.store);
+      final entity = 'device-${crypto.sha256.convert(utf8.encode(jsonEncode(['buyer', reference.orderId, line.lineId])))}';
+      final expected = {('AI-ACT-396', entity): 'store-device-original:evaluation:${target.binding}'};
+      expect(await work.readWorkspaceAssistantOriginalDeviceTargets(expected, inputCurrent: () => h.active,
+        validUntil: DateTime.now().add(const Duration(minutes: 1))), expected.keys.toSet());
+      expect(reference.storeId, isNot(h.product.store));
+      expect(work.workspaceAssistantOriginalDeviceTarget('AI-ACT-396', entity)!.buyingStoreId, h.product.store);
+      expect(work.workspaceAssistantOriginalDeviceTarget('AI-ACT-393', entity), isNull);
+      final ownerContext = tester.element(find.text('Store overview'));
+      final scope = ownerContext.getInheritedWidgetOfExactType<MoolAssistantNativeScope>()!;
+      final adapter = scope.readAdapters(ownerContext).singleWhere((a) => a.actionId == 'AI-ACT-396');
+      final nav = Navigator.of(ownerContext, rootNavigator: true), context = h.product.native.readContext();
+      final route = MaterialPageRoute<void>(builder: (_) => const Scaffold(body: Text('HOST Store mismatch owner')));
+      (adapter as MoolAssistantRouteBoundNativeAdapter).bindAssistantRoute(route, nav); unawaited(nav.push<void>(route)); await tester.pumpAndSettle();
+      final snapshot = await adapter.snapshot(context, entity); expect(snapshot, isNotNull);
+      final repeated = await adapter.snapshot(context, entity);
+      expect(repeated?.sourceRevision, snapshot!.sourceRevision,
+        reason: 'Unchanged original/source/draft must keep the same native witness.');
+      final proposal = scope_contract.MoolAssistantProposal(id: 'HOST-Store-device-report', actionId: 'AI-ACT-396', entityId: entity,
+        binding: context.binding, requestRevision: 1, entitlementRevision: 'HOST-paid-only', sourceRevision: snapshot.sourceRevision,
+        validUntil: DateTime.now().add(const Duration(minutes: 1)), title: 'Review device mismatch', summary: 'Isolated original Store purchase',
+        fields: {'selectedIds': [reports.rows.first.id], 'note': 'HOST received device identifier differs'});
+      MoolAssistantReviewResult? outcome;
+      final opened = adapter.openReview(proposal, () => true).then((result) {outcome = result; return result;}); await tester.pumpAndSettle();
+      expect(outcome, isNull, reason: 'The exact buying-Store native candidate must remain open for review.');
+      expect(find.text('Review device mismatch'), findsOneWidget);
+      expect(find.textContaining('HOST received device identifier differs'), findsWidgets);
+      expect(find.text('Save kept edits'), findsOneWidget);
+      expect(reports.reports, isEmpty); expect(reports.checks, isEmpty);
+      nav.pop(); await tester.pumpAndSettle(); expect(await opened, MoolAssistantReviewResult.opened);
+    } finally {await h.dispose(tester); reports.dispose();}
   });
 }
