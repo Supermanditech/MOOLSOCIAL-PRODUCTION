@@ -937,6 +937,30 @@ Check (!(Test-AiDomainPrivateOriginalDeviceCheckpoint $bad)) 'reject changed qua
 $bad=($privateDeviceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendActualSDKPassed=0
 Check (!(Test-AiDomainPrivateOriginalDeviceCheckpoint $bad)) 'reject changed private-original-device evidence'
 
+$nativeTextParityCheckpoint=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate08NativeTextParityCheckpoint
+Check (Test-AiDomainNativeDeviceTextParityCheckpoint $nativeTextParityCheckpoint) 'exact host-qualified original native-device-text-parity source checkpoint'
+Check (!(Test-AiDomainNativeDeviceTextParityCheckpoint $null)) 'reject absent original native-device-text-parity checkpoint'
+Check (@(Get-AiDomainNativeDeviceTextParityStageOwners 0 $nativeTextParityCheckpoint).Count -eq 3) 'three exact existing native-device-text-parity checkpoint metadata owners'
+Check (@(Get-AiDomainNativeDeviceTextParityStageOwners 1 $nativeTextParityCheckpoint).Count -eq 5) 'five exact qualified source owners'
+Check (@(Get-AiDomainNativeDeviceTextParityStageOwners 2 $nativeTextParityCheckpoint).Count -eq 1) 'one sanitized evidence owner'
+Check (@(Get-AiDomainNativeDeviceTextParityStageOwners 3 $nativeTextParityCheckpoint).Count -eq 0) 'no extra checkpoint stage'
+foreach($property in @('sequence','baseline')) {
+ $bad=($nativeTextParityCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainNativeDeviceTextParityCheckpoint $bad)) "reject changed native-device-text-parity $property"
+}
+$bad=($nativeTextParityCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.productionAcceptance=$true
+Check (!(Test-AiDomainNativeDeviceTextParityCheckpoint $bad)) 'host qualification is not production acceptance'
+foreach($property in @('wholeAggregateComplete','populatedStoreDeviceQualified','originalRuntimeAuthorityAvailable','syntheticFinanceSnapshot','cloudActivation','financialLivePosting','founderApprovalClaimed','productionAcceptance')) {
+ $bad=($nativeTextParityCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainNativeDeviceTextParityCheckpoint $bad)) "reject invented native-device-text-parity qualification $property"
+}
+$bad=($nativeTextParityCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('foreign')
+Check (!(Test-AiDomainNativeDeviceTextParityCheckpoint $bad)) 'reject expanded native-device-text-parity owners'
+$bad=($nativeTextParityCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.owners[0].sha256='foreign'
+Check (!(Test-AiDomainNativeDeviceTextParityCheckpoint $bad)) 'reject changed qualified source hash'
+$bad=($nativeTextParityCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendActualSDKPassed=0
+Check (!(Test-AiDomainNativeDeviceTextParityCheckpoint $bad)) 'reject changed native-device-text-parity evidence'
+
 $creditAdmission=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate05CreditDocumentAdmission
 Check (Test-AiDomainCreditDocumentAdmission $creditAdmission) 'exact existing credit model admission under standing authority'
 Check (!(Test-AiDomainCreditDocumentAdmission $null)) 'reject absent credit model admission'
