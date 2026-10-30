@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 48,
+  "localMetadataCommits": 49,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -14501,5 +14501,535 @@
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
     "sourceCommit": "561b1f98546ed7dd4d15eb7c103e52d62c6b18ad"
+  },
+  "postCloseoutReproducer": {
+    "schemaVersion": 1,
+    "baseline": "00be54aa28c62df3ee323e2df29bd5b481ce8fbb",
+    "authority": "Founder requested local/Git omission audit and necessary reconciliation; existing narrow standing approval. No new feature or service activation.",
+    "scope": "Exact existing HOST-only private-preference test reproducer retained as data in the existing Git evidence owner. No runtime/test source owner is added.",
+    "finding": "The latest actual native HTTP/service/SDK qualification depended on local runner/bridge/wire files that were neither tracked nor embedded in Git. Application/test source75 and176 retained evidence references themselves have no omission or hash failure.",
+    "files": [
+      {
+        "name": "run_aggregate10_preferences_sdk_v7.py",
+        "sha256": "D8A0D583164DF737FD21BD5FB14C63BB409BFE150D806DBA5B6A0308F1870E19",
+        "bytes": 3285,
+        "utf8": "\"\"\"Serial actual-SDK private preference qualification against a private loopback emulator.\"\"\"\r\nfrom pathlib import Path\r\nimport json, os, socket, subprocess, time\r\n\r\nbase = Path(__file__).parent\r\nout = base / 'aggregate10-private-preference-sdk-v7'\r\nout.mkdir(exist_ok=False)\r\nport = 19189\r\nwith socket.socket() as probe:\r\n    probe.bind(('127.0.0.1', port))\r\nroot = Path('C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-domain-batch-20261028')\r\ncompiled = base / 'aggregate10-source-compiled-v8'\r\nassert (compiled / 'workspace/workspace_store_preferences_service.test.js').is_file()\r\nargs = ['C:/Program Files/Android/Android Studio/jbr/bin/java.exe', '-jar',\r\n    'C:/Users/jisal/.cache/firebase/emulators/cloud-firestore-emulator-v1.20.2.jar',\r\n    '--host', '127.0.0.1', '--port', str(port), '--project_id', 'host-private-pref-agg10', '--single_project_mode=false']\r\nwith (out / 'emulator.log').open('wb') as log:\r\n    child = subprocess.Popen(args, cwd=out, stdout=log, stderr=subprocess.STDOUT,\r\n        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))\r\n    (out / 'ACTIVE.json').write_text(json.dumps({'pid': child.pid, 'port': port, 'loopbackOnly': True}), encoding='utf-8')\r\n    try:\r\n        for _ in range(200):\r\n            if child.poll() is not None:\r\n                raise RuntimeError('Own loopback emulator stopped')\r\n            try:\r\n                with socket.create_connection(('127.0.0.1', port), timeout=.2):\r\n                    break\r\n            except OSError:\r\n                time.sleep(.1)\r\n        else:\r\n            raise TimeoutError('Own loopback emulator unavailable')\r\n        env = os.environ.copy()\r\n        env['FIRESTORE_EMULATOR_HOST'] = f'127.0.0.1:{port}'\r\n        env['NODE_PATH'] = str(root / 'backend/functions/node_modules')\r\n        env['AGG10_PRIVATE_PREFERENCE_SDK'] = 'true'\r\n        env.pop('AGG10_BACKEND_PRIVATE_PREFERENCE_HTTP_WIRE', None)\r\n        env.pop('AGG10_BACKEND_PRIVATE_PREFERENCE_WIRE', None)\r\n        with (out / 'tests.log').open('wb') as output:\r\n            result = subprocess.run(['C:/Program Files/nodejs/node.exe', '--test', '--test-concurrency=1',\r\n                str(compiled / 'workspace/workspace_store_preferences_service.test.js'),\r\n                *[str(compiled/'assistant'/name) for name in ['domain_context_integration.test.js','domain_context_contract.test.js','domain_context_http.test.js','domain_context.test.js','profile_context.test.js','model_service.test.js']]],\r\n                cwd=root / 'backend/functions', env=env, stdout=output, stderr=subprocess.STDOUT,\r\n                timeout=600, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))\r\n        (out / 'RESULT.json').write_text(json.dumps({'exitCode': result.returncode,\r\n            'cloudAccess': False, 'phoneDataInjected': False,\r\n            'data': 'ISOLATED HOST native serializer and original-input fixtures'}) + '\\n', encoding='utf-8')\r\n        print(json.dumps({'exitCode': result.returncode, 'log': str(out / 'tests.log')}))\r\n    finally:\r\n        if child.poll() is None:\r\n            child.terminate()\r\n        child.wait(timeout=20)\r\n        (out / 'STOPPED.json').write_text(json.dumps({'pid': child.pid, 'exitCode': child.returncode}) + '\\n', encoding='utf-8')\r\nraise SystemExit(result.returncode)\r\n"
+      },
+      {
+        "name": "run_aggregate10_native_http_join_v9.py",
+        "sha256": "B74DA65C7AEC77C9A2825D497A840E21A6492EAD8E0EAF9F55CF11CEDE97607B",
+        "bytes": 4900,
+        "utf8": "\"\"\"Actual native WorkSession -> loopback service -> real SDK, HOST inputs only.\"\"\"\r\nfrom pathlib import Path\r\nimport json, os, socket, subprocess, time, urllib.request\r\nbase=Path(__file__).parent\r\nroot=Path('C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-domain-batch-20261028')\r\nout=base/'aggregate10-native-http-join-v9';out.mkdir(exist_ok=False)\r\nfor port in [19189,5001]:\r\n    with socket.socket() as probe:probe.bind(('127.0.0.1',port))\r\nenv=os.environ.copy();env['FIRESTORE_EMULATOR_HOST']='127.0.0.1:19189'\r\nenv['NODE_PATH']=str(root/'backend/functions/node_modules')\r\nenv['AGG10_PRIVATE_FORM_CAPTURE']=str(out)\r\n\r\nenv['AGG10_BRIDGE_READY']=str(out/'BRIDGE-READY.json');env['AGG10_BRIDGE_STOPPED']=str(out/'BRIDGE-STOPPED.json')\r\nenv['AGG10_NATIVE_PRIVATE_PREFERENCE_HTTP_JOIN']='http://127.0.0.1:5001'\r\nenv['AGG10_BACKEND_PRIVATE_PREFERENCE_WIRE_INPUT']=str(base/'aggregate10-backend-preference-wire-v2.json')\r\nenv['AGG10_BACKEND_PRIVATE_PREFERENCE_HTTP_WIRE_INPUT']=str(base/'aggregate10-backend-preference-http-wire-v1.json')\r\nenv.pop('AGG10_NATIVE_PRIVATE_PREFERENCE_WIRE',None)\r\ncreation=getattr(subprocess,'CREATE_NO_WINDOW',0)\r\ndef wait_port(child,port):\r\n    for _ in range(300):\r\n        if child.poll() is not None:raise RuntimeError('Owned test process stopped during startup')\r\n        try:\r\n            with socket.create_connection(('127.0.0.1',port),timeout=.2):return\r\n        except OSError:time.sleep(.1)\r\n    raise TimeoutError('Owned loopback process unavailable')\r\njava=None;bridge=None;result=None\r\nwith (out/'emulator.log').open('wb') as emulator_log,(out/'bridge.log').open('wb') as bridge_log:\r\n    try:\r\n        java=subprocess.Popen(['C:/Program Files/Android/Android Studio/jbr/bin/java.exe','-jar',\r\n          'C:/Users/jisal/.cache/firebase/emulators/cloud-firestore-emulator-v1.20.2.jar','--host','127.0.0.1',\r\n          '--port','19189','--project_id','demo-moolsocial-local','--single_project_mode=false'],\r\n          cwd=out,stdout=emulator_log,stderr=subprocess.STDOUT,creationflags=creation)\r\n        wait_port(java,19189)\r\n        bridge=subprocess.Popen(['C:/Program Files/nodejs/node.exe',str(base/'aggregate10_local_private_preferences_bridge_v2.cjs')],\r\n          cwd=out,env=env,stdout=bridge_log,stderr=subprocess.STDOUT,creationflags=creation)\r\n        wait_port(bridge,5001)\r\n        assert bridge.poll() is None and java.poll() is None\r\n        (out/'ACTIVE.json').write_text(json.dumps({'javaPid':java.pid,'bridgePid':bridge.pid,'loopbackOnly':True}),encoding='utf-8')\r\n        args=['C:/Users/jisal/develop/flutter/bin/cache/dart-sdk/bin/dart.exe',\r\n          'C:/Users/jisal/develop/flutter/bin/cache/flutter_tools.snapshot','test','--no-pub','--concurrency=1','--reporter','expanded',\r\n          '--dart-define=MOOLSOCIAL_UI_REVIEW_ONLY=true','--dart-define=MOOLSOCIAL_DEVICE_REVIEW=true',\r\n          '--dart-define=MOOLSOCIAL_USE_EMULATORS=true','--dart-define=MOOLSOCIAL_CANDIDATE_ID=UAW-PROFILE-AI-INCREMENTAL-R67.5-20261027',\r\n          '--dart-define=MOOLSOCIAL_CART_LOCAL_EMULATOR=true',\r\n          '--dart-define=MOOLSOCIAL_WORKSPACE_URL=http://127.0.0.1:5001/demo-moolsocial-local/asia-south1/moolSocialWorkspace',\r\n          'test/work_store_preferences_test.dart']\r\n        with (out/'tests.log').open('wb') as log:\r\n            result=subprocess.run(args,cwd=root/'apps/mobile',env=env,stdout=log,stderr=subprocess.STDOUT,timeout=600,creationflags=creation)\r\n        (out/'RESULT.json').write_text(json.dumps({'exitCode':result.returncode,'actualNativeHttpServiceSdk':True,\r\n          'authentication':'ISOLATED HOST labelled fixtures; not live Firebase authentication/AppCheck',\r\n          'phoneDataInjected':False,'cloudAccess':False,'productionAcceptance':False})+'\\n',encoding='utf-8')\r\n        print(json.dumps({'exitCode':result.returncode,'log':str(out/'tests.log')}))\r\n    finally:\r\n        if bridge is not None:\r\n            if bridge.poll() is None:\r\n                try:\r\n                    req=urllib.request.Request('http://127.0.0.1:5001/HOST_ONLY',data=b'{\"action\":\"shutdown\"}',\r\n                      headers={'content-type':'application/json','x-host-test-token':'HOST_ONLY_PRIVATE_PREF_AGG10'})\r\n                    with urllib.request.urlopen(req,timeout=5) as reply:reply.read()\r\n                    bridge.wait(timeout=15)\r\n                except Exception:\r\n                    if bridge.poll() is None:bridge.terminate()\r\n            bridge.wait(timeout=20)\r\n        if java is not None:\r\n            if java.poll() is None:java.terminate()\r\n            java.wait(timeout=20)\r\n        (out/'STOPPED.json').write_text(json.dumps({'javaExit':None if java is None else java.returncode,\r\n          'bridgeExit':None if bridge is None else bridge.returncode,'bothStopped':True})+'\\n',encoding='utf-8')\r\nif result is None:raise RuntimeError('Native test did not start')\r\nraise SystemExit(result.returncode)\r\n"
+      },
+      {
+        "name": "run_aggregate10_existing_settings_v1.py",
+        "sha256": "DFF6847E22ABEC0FA513A7924C86D79894B73744C6ACC44DAA5122C14CC0D8DA",
+        "bytes": 1175,
+        "utf8": "from pathlib import Path\r\nimport subprocess,json\r\nbase=Path(__file__).parent\r\nroot=Path('C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-domain-batch-20261028/apps/mobile')\r\ncommand=['C:/Users/jisal/develop/flutter/bin/cache/dart-sdk/bin/dart.exe','C:/Users/jisal/develop/flutter/bin/cache/flutter_tools.snapshot','test','--no-pub','--concurrency=1','--reporter=expanded','--dart-define=MOOLSOCIAL_UI_REVIEW_ONLY=true','--dart-define=MOOLSOCIAL_DEVICE_REVIEW=true','--dart-define=MOOLSOCIAL_USE_EMULATORS=true','--dart-define=MOOLSOCIAL_CANDIDATE_ID=UAW-PROFILE-AI-INCREMENTAL-R67.5-20261027']\r\nfor name,args in [('manual-settings-v1',['test/work_workspace_layout_safety_test.dart','--name=^AI-SETTINGS']),('shared-settings-v1',['test/store_settings_widgets_test.dart'])]:\r\n path=base/('aggregate10-'+name+'.log');assert not path.exists()\r\n with path.open('wb') as log:result=subprocess.run([*command,*args],cwd=root,stdout=log,stderr=subprocess.STDOUT,timeout=600,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))\r\n print(json.dumps({'name':name,'exitCode':result.returncode,'log':str(path)}),flush=True)\r\n if result.returncode:raise SystemExit(result.returncode)\r\n"
+      },
+      {
+        "name": "aggregate10_local_private_preferences_bridge_v2.cjs",
+        "sha256": "CF5D70EDD90CB27F732232AD148EE7247C634A691B5FB163F6278FCC77004AB2",
+        "bytes": 5310,
+        "utf8": "// Isolated HOST adapter for actual native -> service -> Firestore SDK tests.\r\n// Auth/AppCheck/membership inputs are labelled fixtures, not deployed authority.\r\nconst http = require('node:http');\r\nconst fs = require('node:fs');\r\nconst {initializeApp,deleteApp}=require('firebase-admin/app');\r\nconst {getFirestore}=require('firebase-admin/firestore');\r\nconst path=require('node:path');\r\nconst base=__dirname;\r\nif(process.env.FIRESTORE_EMULATOR_HOST!=='127.0.0.1:19189') throw Error('Loopback emulator required');\r\nconst {FirestoreStorePrivatePreferenceRepository,WorkspaceStorePrivatePreferenceService,\r\n storePrivatePreferenceCommandFingerprint}=require(path.join(base,'aggregate10-source-compiled-v5/workspace/workspace_store_preferences_service.js'));\r\nconst projectId='demo-moolsocial-local',scope={account:'HOST-private-preference-owner',store:'HOST-private-preference-store',realm:'evaluation'};\r\nconst actor={uid:scope.account,projectId};\r\nconst app=initializeApp({projectId},`agg10-native-host-${process.pid}`),db=getFirestore(app);\r\nconst member=db.collection('HOST_ONLY_original_membership_fixture').doc(scope.account);\r\nconst authority={async assertCurrent(tx,principal,requested){\r\n const original=await tx.get(member);\r\n if(principal.uid!==actor.uid||principal.projectId!==projectId||requested.store!==scope.store||original.get('active')!==true)\r\n  throw Object.assign(Error('HOST original authority unavailable'),{code:'permission_denied',statusCode:403});\r\n}};\r\nconst repository=new FirestoreStorePrivatePreferenceRepository(db,'evaluation',projectId,authority);\r\nconst service=new WorkspaceStorePrivatePreferenceService(repository,true);\r\nconst modes={status:{acceptingOrders:false,visibleToCustomers:false,fulfilmentMode:'Pickup only',busyMinutes:'4',reopensAt:'',\r\n openingTime:'9:00 AM',closingTime:'21:30',maximumActiveOrders:'0',alertSound:true,alertVibration:false},\r\n pickup:{city:'HOST city',area:'HOST area',pincode:'560001',pickupEnabled:true},invoice:{mode:'off'},staff:{staffAccessEnabled:false,counterCount:'1'}};\r\nconst counts={},drops=new Set();let closing=false;\r\nasync function readBody(request){\r\n const chunks=[];let size=0;\r\n for await(const chunk of request){size+=chunk.length;if(size>8*1024*1024)throw Error('HOST request too large');chunks.push(chunk);}\r\n return JSON.parse(Buffer.concat(chunks).toString('utf8'));\r\n}\r\nfunction respond(response,status,data){response.writeHead(status,{'content-type':'application/json'});response.end(JSON.stringify(data));}\r\nconst server=http.createServer(async(request,response)=>{\r\n try{\r\n  if(request.url==='/HOST_ONLY'&&request.headers['x-host-test-token']==='HOST_ONLY_PRIVATE_PREF_AGG10'){\r\n   const body=await readBody(request);\r\n   if(body.action==='shutdown'){\r\n    respond(response,200,{stopping:true});setImmediate(()=>{close().catch(()=>process.exit(1));});return;\r\n   }\r\n   if(body.action==='drop_next_save_ack')drops.add(body.kind);\r\n   else if(body.action==='membership')await member.set({active:body.active===true,label:'ISOLATED HOST original authority fixture'});\r\n   else if(body.action!=='metrics')throw Error('Unsupported HOST control');\r\n   respond(response,200,{counts,label:'ISOLATED HOST; no live authentication or phone data'});return;\r\n  }\r\n  if(request.method!=='POST'||request.url!=='/demo-moolsocial-local/asia-south1/moolSocialWorkspace'){\r\n   respond(response,404,{ok:false});return;\r\n  }\r\n  if(request.headers.authorization!=='Bearer HOST_ONLY_NOT_AN_AUTH_TOKEN'){respond(response,401,{ok:false});return;}\r\n  const body=await readBody(request),mutation=body.operation==='saveStorePrivatePreferences';\r\n  const expected=mutation?'HOST_ONLY_LIMITED_USE_APPCHECK':'HOST_ONLY_STANDARD_APPCHECK';\r\n  if(request.headers['x-firebase-appcheck']!==expected){respond(response,403,{ok:false});return;}\r\n  const {operation,...payload}=body;\r\n  counts[operation]=(counts[operation]??0)+1;\r\n  const result=await service.handle(actor,operation,payload);\r\n  if(mutation&&drops.delete(payload.kind)){request.socket.destroy();return;}\r\n  respond(response,200,{ok:true,data:result});\r\n }catch(error){respond(response,error.status??error.statusCode??500,{ok:false,error:{code:error.code??'host_failure'}});}\r\n});\r\nasync function close(){\r\n if(closing)return;closing=true;\r\n server.close();await db.terminate();await deleteApp(app);\r\n fs.writeFileSync(process.env.AGG10_BRIDGE_STOPPED,JSON.stringify({pid:process.pid,counts,stopped:true})+'\\n',{flag:'wx'});\r\n process.exit(0);\r\n}\r\nprocess.on('SIGTERM',()=>{close().catch(()=>process.exit(1));});\r\nprocess.on('SIGINT',()=>{close().catch(()=>process.exit(1));});\r\n(async()=>{\r\n await member.set({active:true,label:'ISOLATED HOST original authority fixture'});\r\n for(const[kind,fields]of Object.entries(modes)){\r\n  const command={version:1,projectId,scope,kind,fields,expectedRevision:'0',idempotencyKey:`HOST-seed-${kind}`};\r\n  await repository.save(actor,{...command,fingerprint:storePrivatePreferenceCommandFingerprint(command)});\r\n }\r\n server.listen(5001,'127.0.0.1',()=>fs.writeFileSync(process.env.AGG10_BRIDGE_READY,\r\n  JSON.stringify({pid:process.pid,port:5001,label:'ISOLATED HOST original private input fixtures',projectId,scope})+'\\n',{flag:'wx'}));\r\n})().catch(error=>{console.error(error.code??'HOST initialization failed');close().catch(()=>process.exit(1));});\r\n"
+      },
+      {
+        "name": "aggregate10-backend-preference-wire-v2.json",
+        "sha256": "9DE06B8C3712FE672A4539550BFD430059962D74A850D651D24F48C44B716959",
+        "bytes": 2145,
+        "utf8": "{\"label\":\"ISOLATED HOST actual Firestore SDK original\",\"command\":{\"version\":1,\"projectId\":\"host-private-pref-agg10\",\"scope\":{\"account\":\"HOST-private-preference-owner\",\"store\":\"HOST-private-preference-store\",\"realm\":\"evaluation\"},\"kind\":\"status\",\"fields\":{\"acceptingOrders\":true,\"visibleToCustomers\":false,\"fulfilmentMode\":\"Delivery and pickup\",\"busyMinutes\":\"0\",\"reopensAt\":\"\",\"openingTime\":\"9:00 AM\",\"closingTime\":\"21:30\",\"maximumActiveOrders\":\"0\",\"alertSound\":true,\"alertVibration\":false},\"expectedRevision\":\"0\",\"idempotencyKey\":\"HOST-save-1\",\"fingerprint\":\"14c2d4a633a5fa4423794e8376b0faac59fe01955d6fc328e86f452a1586c171\"},\"result\":{\"receipt\":{\"version\":1,\"projectId\":\"host-private-pref-agg10\",\"scope\":{\"account\":\"HOST-private-preference-owner\",\"store\":\"HOST-private-preference-store\",\"realm\":\"evaluation\"},\"kind\":\"status\",\"idempotencyKey\":\"HOST-save-1\",\"fingerprint\":\"14c2d4a633a5fa4423794e8376b0faac59fe01955d6fc328e86f452a1586c171\",\"expectedRevision\":\"0\",\"status\":\"saved\",\"reason\":null,\"input\":{\"id\":\"4935ecc1ce072d3461f78adee995135776152ce6338f4399030d8d65789be648\",\"fingerprint\":\"5d1ca90ce7eb388c21df2834a645b36f1b56e14e293ac09bb11615b49db99116\",\"revision\":\"1\",\"byteLength\":441,\"parts\":1},\"recordedAt\":\"2026-10-30T07:56:00.593Z\"},\"original\":{\"version\":1,\"projectId\":\"host-private-pref-agg10\",\"scope\":{\"account\":\"HOST-private-preference-owner\",\"store\":\"HOST-private-preference-store\",\"realm\":\"evaluation\"},\"kind\":\"status\",\"revision\":\"1\",\"fields\":{\"acceptingOrders\":true,\"alertSound\":true,\"alertVibration\":false,\"busyMinutes\":\"0\",\"closingTime\":\"21:30\",\"fulfilmentMode\":\"Delivery and pickup\",\"maximumActiveOrders\":\"0\",\"openingTime\":\"9:00 AM\",\"reopensAt\":\"\",\"visibleToCustomers\":false}},\"current\":{\"version\":1,\"projectId\":\"host-private-pref-agg10\",\"scope\":{\"account\":\"HOST-private-preference-owner\",\"store\":\"HOST-private-preference-store\",\"realm\":\"evaluation\"},\"kind\":\"status\",\"revision\":\"1\",\"fields\":{\"acceptingOrders\":true,\"alertSound\":true,\"alertVibration\":false,\"busyMinutes\":\"0\",\"closingTime\":\"21:30\",\"fulfilmentMode\":\"Delivery and pickup\",\"maximumActiveOrders\":\"0\",\"openingTime\":\"9:00 AM\",\"reopensAt\":\"\",\"visibleToCustomers\":false}}}}"
+      },
+      {
+        "name": "aggregate10-backend-preference-http-wire-v1.json",
+        "sha256": "1450668B643E6AF660312B37D203304084524D6A13C364FBD5710BB78E2A461A",
+        "bytes": 3616,
+        "utf8": "{\"label\":\"ISOLATED HOST actual SDK HTTP contract\",\"command\":{\"version\":1,\"projectId\":\"host-private-pref-agg10\",\"scope\":{\"account\":\"HOST-private-preference-owner\",\"store\":\"HOST-private-preference-store\",\"realm\":\"evaluation\"},\"kind\":\"invoice\",\"fields\":{\"mode\":\"automatic\"},\"expectedRevision\":\"0\",\"idempotencyKey\":\"HOST-invoice-native-save\",\"fingerprint\":\"c20ea7423f5f95b98a8eb094669bd9ecdd536bbefc2f52eb7693ffe7a43dba00\"},\"empty\":{\"ok\":true,\"data\":{\"schemaVersion\":1,\"storePrivatePreferencesVersion\":1,\"actorAccountId\":\"HOST-private-preference-owner\",\"projectId\":\"host-private-pref-agg10\",\"realm\":\"evaluation\",\"storeId\":\"HOST-private-preference-store\",\"kind\":\"invoice\",\"record\":null}},\"saved\":{\"ok\":true,\"data\":{\"schemaVersion\":1,\"storePrivatePreferencesVersion\":1,\"actorAccountId\":\"HOST-private-preference-owner\",\"projectId\":\"host-private-pref-agg10\",\"realm\":\"evaluation\",\"storeId\":\"HOST-private-preference-store\",\"kind\":\"invoice\",\"result\":{\"receipt\":{\"version\":1,\"projectId\":\"host-private-pref-agg10\",\"scope\":{\"account\":\"HOST-private-preference-owner\",\"store\":\"HOST-private-preference-store\",\"realm\":\"evaluation\"},\"kind\":\"invoice\",\"idempotencyKey\":\"HOST-invoice-native-save\",\"fingerprint\":\"c20ea7423f5f95b98a8eb094669bd9ecdd536bbefc2f52eb7693ffe7a43dba00\",\"expectedRevision\":\"0\",\"status\":\"saved\",\"reason\":null,\"input\":{\"id\":\"bab1268cd02900cd08083c4de71c3d7b2af893b3f2b6e9211a266bca0d7dc19d\",\"fingerprint\":\"7b5f5d8b981f19627127db130f834369b3d1272c72b94bea06d0e383b0cb3ead\",\"revision\":\"1\",\"byteLength\":226,\"parts\":1},\"recordedAt\":\"2026-10-30T07:56:09.317Z\"},\"original\":{\"version\":1,\"projectId\":\"host-private-pref-agg10\",\"scope\":{\"account\":\"HOST-private-preference-owner\",\"store\":\"HOST-private-preference-store\",\"realm\":\"evaluation\"},\"kind\":\"invoice\",\"revision\":\"1\",\"fields\":{\"mode\":\"automatic\"}},\"currentRevision\":\"1\",\"currentFingerprint\":\"7b5f5d8b981f19627127db130f834369b3d1272c72b94bea06d0e383b0cb3ead\"}}},\"status\":{\"ok\":true,\"data\":{\"schemaVersion\":1,\"storePrivatePreferencesVersion\":1,\"actorAccountId\":\"HOST-private-preference-owner\",\"projectId\":\"host-private-pref-agg10\",\"realm\":\"evaluation\",\"storeId\":\"HOST-private-preference-store\",\"kind\":\"invoice\",\"result\":{\"receipt\":{\"version\":1,\"projectId\":\"host-private-pref-agg10\",\"scope\":{\"account\":\"HOST-private-preference-owner\",\"store\":\"HOST-private-preference-store\",\"realm\":\"evaluation\"},\"kind\":\"invoice\",\"idempotencyKey\":\"HOST-invoice-native-save\",\"fingerprint\":\"c20ea7423f5f95b98a8eb094669bd9ecdd536bbefc2f52eb7693ffe7a43dba00\",\"expectedRevision\":\"0\",\"status\":\"saved\",\"reason\":null,\"input\":{\"id\":\"bab1268cd02900cd08083c4de71c3d7b2af893b3f2b6e9211a266bca0d7dc19d\",\"fingerprint\":\"7b5f5d8b981f19627127db130f834369b3d1272c72b94bea06d0e383b0cb3ead\",\"revision\":\"1\",\"byteLength\":226,\"parts\":1},\"recordedAt\":\"2026-10-30T07:56:09.317Z\"},\"original\":{\"version\":1,\"projectId\":\"host-private-pref-agg10\",\"scope\":{\"account\":\"HOST-private-preference-owner\",\"store\":\"HOST-private-preference-store\",\"realm\":\"evaluation\"},\"kind\":\"invoice\",\"revision\":\"1\",\"fields\":{\"mode\":\"automatic\"}},\"currentRevision\":\"1\",\"currentFingerprint\":\"7b5f5d8b981f19627127db130f834369b3d1272c72b94bea06d0e383b0cb3ead\"}}},\"read\":{\"ok\":true,\"data\":{\"schemaVersion\":1,\"storePrivatePreferencesVersion\":1,\"actorAccountId\":\"HOST-private-preference-owner\",\"projectId\":\"host-private-pref-agg10\",\"realm\":\"evaluation\",\"storeId\":\"HOST-private-preference-store\",\"kind\":\"invoice\",\"record\":{\"version\":1,\"projectId\":\"host-private-pref-agg10\",\"scope\":{\"account\":\"HOST-private-preference-owner\",\"store\":\"HOST-private-preference-store\",\"realm\":\"evaluation\"},\"kind\":\"invoice\",\"revision\":\"1\",\"fields\":{\"mode\":\"automatic\"}}}}}"
+      }
+    ],
+    "recordedEnvironment": {
+      "platform": "Windows recorded project/toolchain paths; this is not cross-platform CI qualification",
+      "root": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-ai-domain-batch-20261028",
+      "requiresAlreadyInstalled": [
+        "Node and backend node_modules",
+        "Python312",
+        "Flutter SDK and resolved app packages",
+        "Java and cached Firestore emulator1.20.2"
+      ],
+      "loopbackPorts": [
+        19189,
+        5001
+      ],
+      "cloudOrApiCredentialsRequired": false
+    },
+    "reconstruction": [
+      "Restore each utf8 value to its exact basename in a NEW external directory, verifying bytes/SHA. Never overwrite retained qualification evidence.",
+      "Compile existing backend/functions source with its tracked tsconfig into NEW_DIR/aggregate10-source-compiled-v5 using --sourceMap false, and NEW_DIR/aggregate10-source-compiled-v8 using --sourceMap true. No dependency install, provisioning or deployment.",
+      "Run restored run_aggregate10_preferences_sdk_v7.py, then run_aggregate10_native_http_join_v9.py, then run_aggregate10_existing_settings_v1.py. They refuse occupied loopback ports and preserve new outputs. Never run or inject these HOST fixtures on OPPO."
+    ],
+    "sourceManifest": [
+      {
+        "path": "backend/functions/src/assistant/domain_context_contract.ts",
+        "sha256": "D96BAA9E14E7952409EA7994D16D7D6A396AD41A206631D8520499675DA6F28E",
+        "gitBlobOid": "102d259a2bb23a46d6e1801665a77e0f3a148ccc"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_contract.test.ts",
+        "sha256": "58517BA82EA4F68437C7011D7F109F09E073A33CF3E2CC4832671117EC7D8152",
+        "gitBlobOid": "8fa120c7a73697d966f2a09a30685b872bf45e37"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context.ts",
+        "sha256": "530B5B6BE35D4F51A96765A1D33A48B8D6C69A5D8FC3D3970920F50E00655829",
+        "gitBlobOid": "6584ea043f0c4bf185eb6e7b69f74a7cbeb91f43"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context.test.ts",
+        "sha256": "FEB3C56DA02D9038C3AC1A02B8B578AC46EE9C46DF526DDB0D258E58FE19CF82",
+        "gitBlobOid": "6c59164e57a0d23f9607af5ca0ce21da0b50598e"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_http.ts",
+        "sha256": "6F1FCAFAC94D0A8FDC35BD8C2E878B2D55418D8284A5DC710EB3BEE92855B07B",
+        "gitBlobOid": "9ca060984db51c54a93d3069d9ed96e7936cb435"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_http.test.ts",
+        "sha256": "CD77B75EF8E7EE01980DB7CC200233944C5CA60C88A454BF7F4E4B4242A25598",
+        "gitBlobOid": "aaec24000807da73e92fa7563fefa7a897ccfd57"
+      },
+      {
+        "path": "backend/functions/src/assistant/domain_context_integration.test.ts",
+        "sha256": "42CF4D39682A6F6D9346C5636A5EA6458EE344E1076ED6D19280872238D8FEB7",
+        "gitBlobOid": "c3cba9ba939d0f6561d0273c852606e1db250d74"
+      },
+      {
+        "path": "backend/functions/src/index.ts",
+        "sha256": "7A8C94035F057180BC810A9F150B42CFA98FB7A3FE254A301D946E4AEB6C4AD3",
+        "gitBlobOid": "896605c0d908ec3a084cf5ee06e18d3db6ffae2f"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+        "sha256": "8C226BC55774FBDCA8E1B01C8A87ECF327EFE0C1566F0275A4988FA38D1D890C",
+        "gitBlobOid": "11cf3afb771f8f6d8dd1f9bd3e7f2e1221f7fa6d"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/profile_context.dart",
+        "sha256": "C61DAA145A9EDF785897069D217E54CC2CF8FE2F4600925200AFC14FAF0D1E41",
+        "gitBlobOid": "4b27303aa0a19f4078f89f73a3f170a8b2f562c6"
+      },
+      {
+        "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+        "sha256": "F8ABB359ADF4714C9DD330AD17D34DAD5D441D6763D2902B9F0A177F5E4DD6A8",
+        "gitBlobOid": "0a1b8f3f814fbf517e8cd43e9b29563acdd99215"
+      },
+      {
+        "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+        "sha256": "2570BB48BDFA8F9E9EA0D61348A0F1B3CD778105565FB8784C6FE156F5928342",
+        "gitBlobOid": "624089b250cb5cee594dbc7377302ed72ab6ecf3"
+      },
+      {
+        "path": "apps/mobile/lib/app/moolsocial_app.dart",
+        "sha256": "82EEADE801CB2A7C04AF8C95819FA6EC30B138357753F426EB95741EDA101FD6",
+        "gitBlobOid": "48928f20d1f30bfe9c417c037e3a13d334806a7d"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+        "sha256": "7228EBEA44098E43C68EB4D788D9E41E2F3392E8B1CA8D0C32C164A1F1CFFC6C",
+        "gitBlobOid": "0a3049b9af7b29f7c9f10a7ff95f29bcad895f03"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "sha256": "2101247B6CE295D5FA0A6FBA609D517F11F40228C382A52C003D95F5C3689936",
+        "gitBlobOid": "d8df2938f65c0a4ca10c2fdecd99446b9bec21a7"
+      },
+      {
+        "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "sha256": "5D3AAF88764035306EA953C003A3E8FD9CF97AD368C9F759ABB81F81FDEB5C89",
+        "gitBlobOid": "4bcecc4240109fd15eb3792e83a8b42bd44d75f8"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "sha256": "F1F060701497B50A6F59952F02C528F6E049F2C3526B68585568BAA4575F84F3",
+        "gitBlobOid": "247a183da80400c48fdf0fcae52a4fb39d8d74ab"
+      },
+      {
+        "path": "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+        "sha256": "0DFEB806BFD0556D339E36A84A2C1BC02369D930142B1E80A91CC11CE8798D8D",
+        "gitBlobOid": "77818fccdb45ff84fba08644d311a0146aba990a"
+      },
+      {
+        "path": "apps/mobile/test/assistant_domain_context_guard_test.dart",
+        "sha256": "07FF247E0BD3D5723684EB9D2D964256FF412E8485563F2E86CC93B08018882A",
+        "gitBlobOid": "ba6eefe5ce1cd7ca1e4a258da52129ccd3cdb0bf"
+      },
+      {
+        "path": "apps/mobile/test/assistant_domain_context_integration_test.dart",
+        "sha256": "62622ECDD2943569A447BBF67A97112238815D82D26A8D6BA41884F0D5BE1542",
+        "gitBlobOid": "ab63ef38408936a2af290c3aebc9e71d53fcb7da"
+      },
+      {
+        "path": "apps/mobile/test/assistant_profile_context_test.dart",
+        "sha256": "1ECF64F5F5616593D77A9F08056780AF1D2A9A4AFDFD1C9A4456E628E843FD8E",
+        "gitBlobOid": "c92a9cfd087af7007bcfdf64330dd2b586ab3f42"
+      },
+      {
+        "path": "apps/mobile/test/assistant_model_flow_test.dart",
+        "sha256": "B28A93CB0D149BDE6D5F9626FB16A1735CAAFA7A92A85FCF54D2D95ED71DD045",
+        "gitBlobOid": "f10032c3246ec403981fa5e08caa9b406de4ba29"
+      },
+      {
+        "path": "apps/mobile/test/mool_assistant_test.dart",
+        "sha256": "243464A4A4BC28DF08880001EB54DD1305F4AB363359A7589AFF1292641A5F8B",
+        "gitBlobOid": "047997523bc4f1b5d1eb29be01791301ed527980"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_contract.ts",
+        "sha256": "7EC95DF6BE7D93D97BC97E27282302244EB0C42581919125B979571ECDB007DE",
+        "gitBlobOid": "f5bdac2c5b88f765fd6a26fa4dcced6508f14119"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_contract.test.ts",
+        "sha256": "18D92CB9E196D1F501B2F85A60875A4C48548EA4135F5952889EC60518EACC44",
+        "gitBlobOid": "cb55eec4c1059396702bc35740cb7de543668229"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_service.ts",
+        "sha256": "F67AEA9155662E9120348FA2425568FF6AB64594CB3295C6BF04D77067131EB5",
+        "gitBlobOid": "8f7ab8ba82ef48fbba30ae513ae31dfda2647067"
+      },
+      {
+        "path": "backend/functions/src/assistant/model_service.test.ts",
+        "sha256": "CFE0386B8FFB2072089381FA5EF5AFD0933516C21B228CD35B172C3069F10F97",
+        "gitBlobOid": "cf09fe0a6095a6bb17cd2477dd39db97c1179fbf"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/model_gateway.dart",
+        "sha256": "4A9CD24EF2E358A4E0B0F448E102C1E9FAAFE6B0CBD96B354A169D8AC3A4D8BA",
+        "gitBlobOid": "aa3d4a5348f5a138bf0a6aa15f252142d032cb35"
+      },
+      {
+        "path": "apps/mobile/test/assistant_model_gateway_test.dart",
+        "sha256": "EF8151C941E70B1309E1C3EADCFDE811D16213B44A380DF91DEDC8DC1D36A7C0",
+        "gitBlobOid": "ae8cb1b4359d2f159356f3b7b3374b7d72e1d17b"
+      },
+      {
+        "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+        "sha256": "19D16C732CD0393893DEBFCDAF3EBF3B3A9F8E89FF397E343D1C156E23A37D32",
+        "gitBlobOid": "bb133d828d23fb78a32496f8bb74bc39fd950e71"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+        "sha256": "A0768A986E677D4B6A65B656D6BF17D89A659F2E7C28301EE51724E575765600",
+        "gitBlobOid": "51c5b3a9fa0b15b49850304cd4c423a402cee2eb"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_session.dart",
+        "sha256": "3CA4B6306BAE8D415D283CC605199A91672F825C67E9B52BF6795B5E7473F9FA",
+        "gitBlobOid": "619ac9004da0bdc73c283dec69a4543060cb3fa5"
+      },
+      {
+        "path": "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "sha256": "3E552BF67838C25A0A5C14839EBC913FFB3D9F3E00AF9557D44210BBB3889D1A",
+        "gitBlobOid": "cc52bd2f2019d6a4b37ed5aafe0e962408f7e0ce"
+      },
+      {
+        "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "sha256": "20A44A435133BEB96D13B5ACD3FA6EFFC3B06F6EF3654D87C51CAF7CA423C3C5",
+        "gitBlobOid": "47b1f54950179f0f9acb6fa03fad7f8b480f4e9f"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "sha256": "A8FBA26E9357025C951F6CF5904EA8F671AF5D2C19B8BE16F89DE323C1D90567",
+        "gitBlobOid": "00a2a79d20ba56c4d016af575c53aed838e7ab9d"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_catalogue_service.ts",
+        "sha256": "9F58E4D839AC0A1388BDD6E28B5B0FF8D122C592DCE9712BEB8F1071706E2034",
+        "gitBlobOid": "9633b7d652e9ec7911cbc1fde430c7d23c450ecc"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+        "sha256": "8A373CFB2C31E09CC5AC9CA6D7CF0743AFA9E0F53C2A55976A50719D6C60B086",
+        "gitBlobOid": "9c035ea67f2d398bcb7275b3abd216357ac0dd2e"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_services.dart",
+        "sha256": "9CF7999FA7D9A9C85BC8A855B84F6891C00A8AE0FFDA9B8B2536BCCCDE193C1B",
+        "gitBlobOid": "a730cd410075daf1d9faa7927c2acabf7bd6576e"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+        "sha256": "84BE1755B4E2A2BCE00B31B4EE7B39E70A67A0CB73D2CA577DF41E76AAB785B3",
+        "gitBlobOid": "9f1c8ca8e01404bd9247d845ff0ef0cfa121e26e"
+      },
+      {
+        "path": "apps/mobile/test/work_catalogue_gateway_test.dart",
+        "sha256": "D47442FFD100048BFA85FB01B2F92168A2F230958DCF2366A23EB72FC19F4D6A",
+        "gitBlobOid": "19da0eefa892b15793fb58e9c0d153d396e66342"
+      },
+      {
+        "path": "apps/mobile/test/store_add_product_sheet_test.dart",
+        "sha256": "68B2513FCC87FD68E70939D657701898AC95C1793440B19CB553858F4FD370DE",
+        "gitBlobOid": "89bd95cf1cbe62396c14bb2086c35c55d52bd386"
+      },
+      {
+        "path": "apps/mobile/test/work_saved_product_draft_test.dart",
+        "sha256": "1186C9D39107776FD88B4253C61F114C7C4050AB32DD0A5C67C6330D82BABA58",
+        "gitBlobOid": "7eaf0a479beac2f23be9d2240b28ef9afaae2922"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_entry_service.ts",
+        "sha256": "B061CBBB6876361A4E9C4C426E00705516C00CEA58589D328B1CFF35B07BC1F0",
+        "gitBlobOid": "d45939b9a3d8c858d136f8be515b87e93cef947a"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_entry_repository.ts",
+        "sha256": "41224490B2B8C15760878AB0316B9E305BAA7E7FE8FB5E0B43449D7139A1C473",
+        "gitBlobOid": "f859d6e3e4cc17deb386d03d5c46abd64ae7c9d1"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_entry_service.test.ts",
+        "sha256": "997DC49C43F9D7402F4FD30BEFC1FA20E6CF5D3BC33C4ED86E72B933E39A11F7",
+        "gitBlobOid": "88c1e4a2f01c62d2955e6d439f438dc1b7c91395"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_purchase_entry_gateway.dart",
+        "sha256": "A4F538F09F46C63625453ABEEF6C2E5C25BE35F20AC2A6148EF267A93D35E033",
+        "gitBlobOid": "13966bf7f0930f5769b8aa796af7c85c11d3eb48"
+      },
+      {
+        "path": "apps/mobile/test/work_purchase_entry_gateway_test.dart",
+        "sha256": "5B3866CA06A1CC53AFB64680224604EC6525D67E4A8D441009C4E35196B1A3E6",
+        "gitBlobOid": "9d10cb6a844ad8cd616456e00b3fd18d6e784a45"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_ledger_service.ts",
+        "sha256": "104FF6F5B16C8434500AF519D346B6DA4A71D09C452C3A6CBD1FD50DB3BCC556",
+        "gitBlobOid": "1edca9a4efcc95be07c18752866a3f573083809f"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_ledger_repository.ts",
+        "sha256": "C8CC64065187B0FD272C574D1F288EB697F609F6BECAA66E42C39EA8FC284CD8",
+        "gitBlobOid": "2c69448fe52599aa63df69e359ee9541a86cc8aa"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_ledger_service.test.ts",
+        "sha256": "94B4D5D7D58F2DB5E10D6C65B95A427CB25B93A9A73233D51D44F187A95F0C9C",
+        "gitBlobOid": "70621aab33ad7b2ec96bba63ebce8fa247f6d6ae"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_ledger_gateway.dart",
+        "sha256": "93AFA5BA18AE9B395A1EC3A7AF0CE7EA39D702C7059D88BC633A02C16C33A835",
+        "gitBlobOid": "add8d7107f0ba4814d12b6a2934fd4f1f5f4531e"
+      },
+      {
+        "path": "apps/mobile/test/work_ledger_gateway_test.dart",
+        "sha256": "01841ACF92815AC7A3ABB4CEDA76AFE28015154CE7B63FCB1F33EE7929CF60E6",
+        "gitBlobOid": "3b7a049d70eb9d6a823eebf414e41a318f34b019"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_models.dart",
+        "sha256": "63A1252AD940E5B6400C98C4AF10ADF826B04FF804D838C389921F5F64A440E7",
+        "gitBlobOid": "be88c0651ead3e8508e21d7071466b34294d2786"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_customer_service.ts",
+        "sha256": "67C8F506F58854EDC101DDD2F0F5F845411A240B5EE406ED6EB1A0682FA50EB8",
+        "gitBlobOid": "dacb11574d29fdc26a6e87d8f3020a9574c3f962"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_customer_repository.ts",
+        "sha256": "79278A56B0D07AF2A0FF0159643B113F5E872D7EDB35C29677C49E0A4046208B",
+        "gitBlobOid": "5e882a9040c9a3ac7d07ad2f245b3ddc7af53a73"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_customer_service.test.ts",
+        "sha256": "C52888B0134C1C2DC195210674F9C852BB5C70A4E64B76864FF0D9F69ABC0A8E",
+        "gitBlobOid": "bed5fd44a98baeb4878223f750b3b19ec6a53374"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_customer_gateway.dart",
+        "sha256": "F9F3DE7C56B4AF8FDA41636894C7D15D6661A45E583260FD3698B1200DD62044",
+        "gitBlobOid": "e914abe22f1e7f07c6587861ba27cfd8db60eb65"
+      },
+      {
+        "path": "apps/mobile/test/work_customer_gateway_test.dart",
+        "sha256": "10C5C0045EF29CBE4ECA4A25ECBDA26C0190DAB15007BEB0398E61B112C3E65C",
+        "gitBlobOid": "ee202818a1d6bef391b6f654c7e54912a08db6c5"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_projection_service.ts",
+        "sha256": "19D3EBDE04C338D3DCDE5514415A6B94DA14E61DBB67AF991FBB04D1DC2BAFA5",
+        "gitBlobOid": "ef8d30a915216c74fa495503af272ceb520b9a48"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_projection_service.test.ts",
+        "sha256": "356CED692B3BD0F4E115FE51591B04E420D0C4751A2C98D56E29D86ABE790641",
+        "gitBlobOid": "b1ceba9bb28cc5d1c40f3d1a1504c25245e2053f"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_order_identity_gateway.dart",
+        "sha256": "FD83015B1B8A7E65E32A423D9D9E396D97D64EE05680F4E8ACEAB6A46408DE52",
+        "gitBlobOid": "659b8954cedd740c1fa4f4c128f29fc2ae43d731"
+      },
+      {
+        "path": "apps/mobile/test/work_order_identity_gateway_test.dart",
+        "sha256": "528657AE577273048EF1578662B4F5FCFD977943803B17314C6A60F9DD1C8A27",
+        "gitBlobOid": "f5b01a2928209f03457c73b1ea5e7fd2978e5e63"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_promotion_service.ts",
+        "sha256": "9A639333FBD5481F8289BBFA2EF6F98F379C34D37A90755E48DB799EF0E61C18",
+        "gitBlobOid": "a4878e03e966edf131f83f79c274cad944a428a2"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_promotion_service.test.ts",
+        "sha256": "700586C25587E8875089A0F19AC66A923CEDF4F613DAC7274A41D49480EEBC61",
+        "gitBlobOid": "43be0ae9f67a6212ee05597d381f6800ac694c67"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_coupon_v2_codec.ts",
+        "sha256": "24C9CF2C38E62B238B0FF779EB2334DBC6AC63F5B7138878DDD0F73770B95FC9",
+        "gitBlobOid": "89e042bc25d4b4f7139c7ed41d38cf3199f130be"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_coupon_v2_codec.test.ts",
+        "sha256": "A506ACC7EB3921F8A0D6C2BB43C12AF5A06330FA8196E3DD6B1F945D90748C87",
+        "gitBlobOid": "6057914770824ca667df7498ed83518d88da85f5"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_product_promotions.dart",
+        "sha256": "FD013A93089F2B9A4B5C4D7AD8BFCE0C76526FFD0DF6AF24966FA7B6FABB9950",
+        "gitBlobOid": "911004e73170c71b1760697ee12ba7f5e21167e1"
+      },
+      {
+        "path": "apps/mobile/test/work_product_promotions_test.dart",
+        "sha256": "5558AC079D6CE89895F190538D9C9F3FD5F2A1D85FC320C00E79F001BBD61162",
+        "gitBlobOid": "d699a2ea3bd4a4b455962a784f81a8c51de683ad"
+      },
+      {
+        "path": "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "sha256": "A49007DCD2F8919CD7DBD529D00257DF3DD0E4062E05A1AC9BCC3C2C1879F964",
+        "gitBlobOid": "f01b0de2f1a9958c31e4ad7c025796719c190120"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart",
+        "sha256": "971A9952376AD82226E9CFD31B7B45AFAAC68D2CFC1EEE3DE6401B6D2C315D1D",
+        "gitBlobOid": "bc9e224ccf17d60de4f83917203a374dd1f33d77"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/widgets/store_product_promotions.dart",
+        "sha256": "4DC656859D7C7FB9DC54F8C55194A391446F1CB069811D7A12115E0B07B84D68",
+        "gitBlobOid": "651507d61bbe90399e1b29e844ff6bc2251441f3"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_store_preferences_service.ts",
+        "sha256": "1CDADFD6466E68EF491497C1D4669653FB6A73DF6D2BC47AD477F1CF78C35042",
+        "gitBlobOid": "c61dcec2cd31860cbe87516323c3762d8f3f5a54"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_store_preferences_service.test.ts",
+        "sha256": "692CFF13532BAEE0110CBB960809AC372F2D1D5D84D77E09B2F2DDEEBF19B030",
+        "gitBlobOid": "29a49bdf796f30d5725c9ab057bf38c1f16b0d42"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_store_preferences.dart",
+        "sha256": "642CD2251F28C6BAD4B0B6491260EEE4FA0718F9FE52E443E9648D94CE894E80",
+        "gitBlobOid": "a7a0b54c3d535079adced041a70242689c3063b6"
+      },
+      {
+        "path": "apps/mobile/test/work_store_preferences_test.dart",
+        "sha256": "7EC5AB1FD4FBB219CFCB3F3DB12A508E35F79A7DD7F50AD2B15EE1408F708D30",
+        "gitBlobOid": "d994bf48223bd53b20ce4d78c2ad01275a5ae80c"
+      }
+    ],
+    "qualification": {
+      "passed": true,
+      "atUtc": "2026-10-30T10:41:57.579994+00:00",
+      "reconstructedFromExactEmbeddedBytes": true,
+      "backendPassed": 309,
+      "backendSkipped": 1,
+      "nativeHttpJoinedPassed": 58,
+      "nativeManualPassed": 42,
+      "nativeManualSkipped": 5,
+      "sharedSettingsPassed": 18,
+      "cohortsOverlapDoNotSum": true,
+      "skipReasonsUnchanged": true,
+      "bothBackendCompilationsPassed": true,
+      "records": [
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\post-closeout-reproducer-check-v1\\aggregate10-private-preference-sdk-v7\\tests.log",
+          "sha256": "7DFE929FEDF04AB475BB464B15EBAD70A26E70A403A5F61040677716B3A4555C",
+          "bytes": 30542
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\post-closeout-reproducer-check-v1\\aggregate10-native-http-join-v9\\tests.log",
+          "sha256": "E1A5E869227EF2D183BFD256661D7C87E4F0542B21AEA8179D2DB490ED491E44",
+          "bytes": 5455
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\post-closeout-reproducer-check-v1\\aggregate10-manual-settings-v1.log",
+          "sha256": "0CC18BE49534A510B538E41B314B237D4060705A1A687A651228BB98D485858F",
+          "bytes": 6058
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\post-closeout-reproducer-check-v1\\aggregate10-shared-settings-v1.log",
+          "sha256": "AD7FBC0E3BC1E9E91956FE48ED176E2748302BDFCA9880F8E8E788B0F796B8F6",
+          "bytes": 1434
+        }
+      ],
+      "hostOnly": true,
+      "deviceOrDeployedQualificationClaimed": false
+    },
+    "runtimeSourceChanges": false,
+    "productionAcceptance": false,
+    "metadataOwners": [
+      "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "scripts/ai-domain-batch-admission.ps1",
+      "scripts/test-ai-domain-batch-admission.ps1"
+    ],
+    "admissionCommitSubject": "coordination(ai-domain-batch-20261028): retain tested private preference reproducibility sources",
+    "localGitAudit": {
+      "qualifiedApplicationTestFiles": 75,
+      "missingQualifiedGitFiles": 0,
+      "ignoredApplicationSourceFiles": 0,
+      "retainedEvidenceReferences": 176,
+      "evidenceHashFailures": 0,
+      "registeredWorktrees": 18,
+      "cleanWorktreesAtAudit": 16,
+      "preservedHistoricalDirtyDonors": 2,
+      "branchDifferences": [
+        {
+          "branch": "remediation/prototype-conformance-2026-07-20",
+          "disposition": "Protected production coordination branch; latest local commit745664fc changes AGENTS.md only. No automatic promotion or push permitted by this task."
+        },
+        {
+          "branch": "work/codex-ui/last-frontend-lf01-20261015",
+          "disposition": "Local c9d03bb is already contained in the published current branch; its old remote branch is an ancestor, not missing source."
+        },
+        {
+          "branch": "work/codex-backend/profile-b01-20261027",
+          "disposition": "Exact historical preserved donor input. Status and19 original source hashes match PRESERVE-B01; integrated combined checkpoint955f793d is contained in published current branch."
+        },
+        {
+          "branch": "work/codex-backend/profile-b03-20261027",
+          "disposition": "Exact historical preserved donor input. Status and10 original source hashes match PRESERVE-B03; integrated combined checkpoint955f793d is contained in published current branch."
+        },
+        {
+          "branch": "work/cursor-ui/shop-chat-v1-child9-20260829",
+          "disposition": "Actual UI source commit e5720cb8 is already an ancestor of current published source; unmatched tip5e0d7644 is coordination metadata. Current shared Shop Chat source and tests retained and subsequently updated."
+        },
+        {
+          "branch": "work/integration-repair/store-buy-combined-20261008",
+          "disposition": "Whole commit22df0d27 is already contained in the published current branch; missing obsolete branch ref is not lost implementation."
+        }
+      ],
+      "foreignWorktreeMutation": false,
+      "mainOrProtectedBranchMutation": false,
+      "auditEvidence": {
+        "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\POST-CLOSEOUT-LOCAL-GIT-AUDIT-v1.json",
+        "sha256": "C603B940A39D1B90480C66A91315BF0742AC20EF2849762DB0CD90445B0E6A57"
+      }
+    }
   }
 }

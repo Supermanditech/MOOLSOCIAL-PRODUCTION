@@ -1072,6 +1072,23 @@ Check (!(Test-AiDomainOriginalPrivatePreferenceCheckpoint $bad)) 'reject changed
 $bad=($preferenceCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendActualSDKPassed=0
 Check (!(Test-AiDomainOriginalPrivatePreferenceCheckpoint $bad)) 'reject changed private-store-preferences evidence'
 
+
+$postCloseout=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).postCloseoutReproducer
+Check (Test-AiDomainPostCloseoutReproducer $postCloseout) 'exact reconstructed HOST reproducer and preserved source'
+Check (!(Test-AiDomainPostCloseoutReproducer $null)) 'reject missing reproducibility record'
+foreach($property in @('baseline','authority','scope','admissionCommitSubject')){
+ $bad=($postCloseout|ConvertTo-Json -Depth 80)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainPostCloseoutReproducer $bad)) "reject changed reproducer $property"
+}
+$bad=($postCloseout|ConvertTo-Json -Depth 80)|ConvertFrom-Json;$bad.files[0].utf8+='foreign'
+Check (!(Test-AiDomainPostCloseoutReproducer $bad)) 'reject modified runner source'
+$bad=($postCloseout|ConvertTo-Json -Depth 80)|ConvertFrom-Json;$bad.metadataOwners+=@('foreign')
+Check (!(Test-AiDomainPostCloseoutReproducer $bad)) 'reject widened metadata scope'
+$bad=($postCloseout|ConvertTo-Json -Depth 80)|ConvertFrom-Json;$bad.productionAcceptance=$true
+Check (!(Test-AiDomainPostCloseoutReproducer $bad)) 'local reconstruction is not production acceptance'
+$bad=($postCloseout|ConvertTo-Json -Depth 80)|ConvertFrom-Json;$bad.qualification.passed=$false
+Check (!(Test-AiDomainPostCloseoutReproducer $bad)) 'reject unqualified reconstruction'
+
 $creditAdmission=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate05CreditDocumentAdmission
 Check (Test-AiDomainCreditDocumentAdmission $creditAdmission) 'exact existing credit model admission under standing authority'
 Check (!(Test-AiDomainCreditDocumentAdmission $null)) 'reject absent credit model admission'
