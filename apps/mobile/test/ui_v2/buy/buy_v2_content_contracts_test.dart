@@ -1,4 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
@@ -30,9 +33,17 @@ class _SponsoredFixtureAdapter implements BuyV2SponsoredContentAdapter {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  // Isolated host persistence only; never a runtime catalogue or account source.
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+    SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+  });
+  tearDown(() => SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty());
   group('Buy V2 content boundaries', () {
     test('default product facts remain truthful catalogue facts', () {
-      final session = BuyV2Session(core: BuySession());
+      final core = BuySession(); addTearDown(core.dispose);
+      final session = BuyV2Session(core: core); addTearDown(session.dispose);
       final product = BuyV2Catalogue.products.first;
       final facts = session.productFactsFor(product);
 
@@ -103,10 +114,12 @@ void main() {
           sourceId: 'catalogue-test-adapter',
         ),
       );
+      final core = BuySession(); addTearDown(core.dispose);
       final session = BuyV2Session(
-        core: BuySession(),
+        core: core,
         productFactsAdapter: adapter,
       );
+      addTearDown(session.dispose);
       expect(session.productFactsFor(product).isLive, isFalse);
 
       final observedAt = DateTime.utc(2026, 7, 31, 6, 45);
@@ -137,15 +150,22 @@ void main() {
           sourceId: 'invalid-test-adapter',
         ),
       );
+      final core = BuySession(); addTearDown(core.dispose);
       final session = BuyV2Session(
-        core: BuySession(),
+        core: core,
         productFactsAdapter: adapter,
       );
+      addTearDown(session.dispose);
 
       final initial = session.productFactsFor(product);
       expect(initial.productId, product.id);
       expect(initial.price, product.price);
-      expect(initial.sourceId, 'approved-buy-catalogue');
+      // The sealed fallback is descriptive only after an invalid adapter. It
+      // must not restore the review catalogue's operational readiness.
+      expect(initial.sourceId, 'catalogue-information-only');
+      expect(initial.stale, isTrue);
+      expect(initial.isLive, isFalse);
+      expect(initial.eligibility, isNull);
       expect(session.refreshProductFacts(product.id), isFalse);
       expect(session.notice, 'Product information could not be refreshed.');
       expect(session.product(product.id), same(product));
@@ -165,10 +185,12 @@ void main() {
     });
 
     test('unapproved sponsored adapters stay fail closed', () {
+      final core = BuySession(); addTearDown(core.dispose);
       final session = BuyV2Session(
-        core: BuySession(),
+        core: core,
         sponsoredContentAdapter: const _SponsoredFixtureAdapter(),
       );
+      addTearDown(session.dispose);
 
       expect(BuyV2Session.sponsoredContentActivationApproved, isFalse);
       for (final placement in BuyV2SponsoredPlacement.values) {

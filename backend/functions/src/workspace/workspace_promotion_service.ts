@@ -1,7 +1,11 @@
-import {FieldPath, type Firestore, type Transaction} from "firebase-admin/firestore";
+import {FieldPath, type DocumentReference, type Firestore, type Transaction} from "firebase-admin/firestore";
 import type {PurchaseCouponTransactionContext, BulkPurchaseReference, BulkCouponPrices, WorkspaceBulkQuoteService} from "./workspace_purchase_projection_service.js";
-import {cataloguePayloadHash, type WorkspaceCatalogueService} from "./workspace_catalogue_service.js";
+import {cataloguePayloadHash, checkedPublicCatalogueListingBinding, type WorkspaceCatalogueService} from "./workspace_catalogue_service.js";
 import {WorkspaceProfileError, type WorkspaceProfileRecord} from "./workspace_profile_service.js";
+import {checkedStoreCouponV2Input, checkedStoreCouponV2Record, validateStoreCouponV2ForSave,
+  checkedStoreCouponDraftCampaign, checkedStoreCouponDraftId, type StoreCouponDraftCampaign,
+  publicStoreOfferV2Terms, checkedStoreOfferV2Terms, storeCouponV2UtcMicros,
+  type StoreOfferV2Sku, type StoreCouponV2Input, type StoreCouponV2Record} from './workspace_coupon_v2_codec.js';
 
 /** Owner-advertised terms only; never evaluated/applied savings or redemption. */
 export interface PromotionBenefitTerms {
@@ -44,11 +48,75 @@ export interface StoreCouponCommand {
   coupon: StoreCouponInput; fundingAcknowledged: true; fingerprint: string; observedAt: string;
 }
 export interface StoreCouponReceipt {fingerprint: string; record: StoreCouponRecord}
+export interface StoreCouponV2Command {
+  ownerUserId: string; realm: PromotionRecord['realm']; storeId: string;
+  couponId: string; expectedRevision: number; idempotencyKey: string;
+  coupon: StoreCouponV2Input; fundingAcknowledged: true; fingerprint: string; observedAt: string;
+}
+export type VersionedStoreCouponRecord = StoreCouponRecord | StoreCouponV2Record;
+export interface VersionedStoreCouponPage {records: VersionedStoreCouponRecord[]; nextCursor: string | null}
+export interface StoreCouponDraftRecord {
+  schemaVersion: 1; storeCouponDraftVersion: 1; accountId: string; realm: PromotionRecord['realm'];
+  storeId: string; couponId: string; sourceRevision: number; observedAt: string; campaign: StoreCouponDraftCampaign;
+}
+export interface StoreCouponDraftCommand {
+  ownerUserId: string; realm: PromotionRecord['realm']; storeId: string; couponId: string;
+  expectedSourceRevision: number; idempotencyKey: string; campaign: StoreCouponDraftCampaign;
+  observedAt: string; fingerprint: string;
+}
+export interface StoreCouponDraftPage {records: StoreCouponDraftRecord[]; nextCursor: string | null}
+const couponDraftOperations = ['saveStoreCouponDraft', 'readStoreCouponDraft', 'listStoreCouponDrafts', 'reconcileStoreCouponDraft'];
+function couponDraftRequest(userId: string, realm: PromotionRecord['realm'], raw: unknown, now: string): StoreCouponDraftCommand {
+  const row = exact(raw, ['storeId', 'couponId', 'expectedSourceRevision', 'idempotencyKey', 'campaign']);
+  if (!['evaluation', 'production'].includes(realm)) fail();
+  const storeId = id(row.storeId), couponId = checkedStoreCouponDraftId(row.couponId), ownerUserId = id(userId);
+  const facts = {storeId, couponId, expectedSourceRevision: integer(row.expectedSourceRevision, 0, 999999999),
+    idempotencyKey: id(row.idempotencyKey), campaign: checkedStoreCouponDraftCampaign(row.campaign, storeId, couponId)};
+  return {...facts, ownerUserId, realm, observedAt: time(now), fingerprint: cataloguePayloadHash({operation: 'saveStoreCouponDraft',
+    storeCouponDraftVersion: 1, ownerUserId, realm, ...facts})};
+}
+function checkedCouponDraftCommand(command: StoreCouponDraftCommand): StoreCouponDraftCommand {
+  const checked = couponDraftRequest(command.ownerUserId, command.realm, {storeId: command.storeId, couponId: command.couponId,
+    expectedSourceRevision: command.expectedSourceRevision, idempotencyKey: command.idempotencyKey, campaign: command.campaign}, command.observedAt);
+  if (checked.fingerprint !== command.fingerprint) fail();
+  return checked;
+}
+export function couponDraftRecord(raw: unknown, accountId: string, realm: PromotionRecord['realm'], storeId: string, now: string): StoreCouponDraftRecord {
+  const row = exact(raw, ['schemaVersion', 'storeCouponDraftVersion', 'accountId', 'realm', 'storeId',
+    'couponId', 'sourceRevision', 'observedAt', 'campaign']);
+  if (row.schemaVersion !== 1 || row.storeCouponDraftVersion !== 1 || row.accountId !== accountId || row.realm !== realm ||
+      row.storeId !== storeId || time(row.observedAt) > now) fail('invalid_state', 409);
+  const couponId = checkedStoreCouponDraftId(row.couponId);
+  integer(row.sourceRevision, 1, 1_000_000_000);
+  checkedStoreCouponDraftCampaign(row.campaign, storeId, couponId);
+  return structuredClone(row) as unknown as StoreCouponDraftRecord;
+}
+function structuredCouponRequest(userId: string, realm: PromotionRecord['realm'], raw: unknown, observedAt: string): StoreCouponV2Command {
+  const input = exact(raw, ['storeId', 'couponId', 'expectedRevision', 'idempotencyKey', 'coupon', 'fundingAcknowledged']);
+  if (input.fundingAcknowledged !== true || !['evaluation', 'production'].includes(realm)) fail();
+  const storeId = id(input.storeId), facts = {storeId, couponId: id(input.couponId),
+    expectedRevision: integer(input.expectedRevision, 0, 999999999), idempotencyKey: id(input.idempotencyKey),
+    coupon: checkedStoreCouponV2Input(input.coupon, storeId), fundingAcknowledged: true as const};
+  const ownerUserId = id(userId);
+  return {...facts, ownerUserId, realm, observedAt: time(observedAt), fingerprint: cataloguePayloadHash({operation: 'saveStoreCoupon',
+    storeCouponTermsVersion: 2, ownerUserId, realm, ...facts})};
+}
+function checkedStructuredCouponCommand(command: StoreCouponV2Command): StoreCouponV2Command {
+  const checked = structuredCouponRequest(command.ownerUserId, command.realm, {storeId: command.storeId,
+    couponId: command.couponId, expectedRevision: command.expectedRevision, idempotencyKey: command.idempotencyKey,
+    coupon: command.coupon, fundingAcknowledged: command.fundingAcknowledged}, command.observedAt);
+  if (checked.fingerprint !== command.fingerprint) fail();
+  return checked;
+}
 export interface StoreCouponSnapshot {
   profile: WorkspaceProfileRecord; records: StoreCouponRecord[]; observedAt: string;
 }
+export interface VersionedStoreCouponSnapshot {
+  profile: WorkspaceProfileRecord; records: VersionedStoreCouponRecord[]; observedAt: string; nextCursor: string | null;
+}
 export interface StoreCouponEligibilityQuery {
   storeId: string; couponId: string; couponRevision: number;
+  storeCouponTermsVersion?: 2;
   supplierQuote?: BulkPurchaseReference;
   commodityPriceReadbackVersion?: 1;
   selectionPolicy: "exclusive_store_basket";
@@ -70,9 +138,10 @@ function couponSupplierQuote(raw: unknown): BulkPurchaseReference {
     agreementFingerprint: r.agreementFingerprint, lines};
 }
 function couponEligibilityQuery(body: Readonly<Record<string, unknown>>, realm: PromotionRecord["realm"]): StoreCouponEligibilityQuery {
+  const structured=body.storeCouponTermsVersion===2;
   const mixed = body.storeCouponEligibilityVersion === 3;
   const v2 = body.storeCouponEligibilityVersion === 2 || mixed;
-  const row = exact(body, ["storeCouponEligibilityVersion", "storeId", "couponId", "couponRevision", "selectionPolicy", "lines", ...(v2 ? ['supplierQuote'] : []), ...(mixed ? ['commodityPriceReadbackVersion'] : [])]);
+  const row = exact(body, ["storeCouponEligibilityVersion", "storeId", "couponId", "couponRevision", "selectionPolicy", "lines", ...(v2 ? ['supplierQuote'] : []), ...(mixed ? ['commodityPriceReadbackVersion'] : []),...(structured?['storeCouponTermsVersion']:[])]);
   if (mixed && row.commodityPriceReadbackVersion !== 1) fail();
   if ((!v2 && row.storeCouponEligibilityVersion !== 1) || row.selectionPolicy !== "exclusive_store_basket" ||
       !Array.isArray(row.lines) || !row.lines.length || row.lines.length > 100) fail();
@@ -96,7 +165,8 @@ function couponEligibilityQuery(body: Readonly<Record<string, unknown>>, realm: 
   if (supplierQuote && (!mixed && supplierQuote.lines.length !== bulk.length ||
       supplierQuote.lines.some(b => !bulk.some(l => l.lineId === b.lineId)))) fail();
   return {storeId, couponId: id(row.couponId), couponRevision: integer(row.couponRevision, 1),
-    selectionPolicy: "exclusive_store_basket", lines, ...(supplierQuote ? {supplierQuote} : {}), ...(mixed ? {commodityPriceReadbackVersion: 1 as const} : {})};
+    selectionPolicy: "exclusive_store_basket", lines, ...(supplierQuote ? {supplierQuote} : {}), ...(mixed ? {commodityPriceReadbackVersion: 1 as const} : {}),
+    ...(structured?{storeCouponTermsVersion:2 as const}:{})};
 }
 
 function couponBasketFromPrices(query: StoreCouponEligibilityQuery, pages: object[], realm: PromotionRecord["realm"],
@@ -293,7 +363,28 @@ export function planStoreCouponUseEvent(current: StoreCouponUse, event: StoreCou
 /** Pure calculation, not a use/hold/redemption or an authoritative quote.
  * Trusted caller must resolve prices/tiers/revisions and usage eligibility.
  * Floor once per Store, then apportion exact paise in stable line-ID order. */
-export function evaluateStoreCouponBasket(rawCoupon: StoreCouponRecord,
+function couponMoneyConfiguration(raw:VersionedStoreCouponRecord,realm:PromotionRecord['realm'],storeId:string,accountId:string,now:string){
+  const original=raw.schemaVersion===2?checkedStoreCouponV2Record(raw,{account:accountId,realm,store:storeId},now):couponRecord(raw,realm,storeId);
+  if(original.schemaVersion!==2)return {original,coupon:original,terms:null};
+  const input=original.coupon,terms=input.structuredTerms;
+  if(terms.kind!=='billDiscount'&&terms.kind!=='productDiscount')fail('unavailable',503);
+  return {original,terms,coupon:{couponId:original.couponId,revision:original.revision,observedAt:original.observedAt,
+    name:input.name,active:input.active,startsAt:input.startsAt,endsAt:input.endsAt,totalUses:input.totalUses,
+    usesPerCustomer:input.usesPerCustomer,percentage:terms.discountKind==='percentage',discount:terms.discountValue!,
+    minimumSpendMinor:terms.minimumSpendMinor,maximumSavingMinor:terms.maximumSavingMinor!}};
+}
+function couponMoneyActive(configuration:ReturnType<typeof couponMoneyConfiguration>,now:string){
+  const coupon=configuration.coupon;
+  return coupon.active&&(configuration.terms===null?coupon.startsAt<=now&&coupon.endsAt>now:
+    storeCouponV2UtcMicros(coupon.startsAt)<=storeCouponV2UtcMicros(now)&&storeCouponV2UtcMicros(coupon.endsAt)>storeCouponV2UtcMicros(now));
+}
+function couponMoneyLine(configuration:ReturnType<typeof couponMoneyConfiguration>,storeId:string,
+    line:{storeId:string;skuId:string;channel:unknown;otherCouponApplied:boolean}){
+  const terms=configuration.terms;
+  return line.storeId===storeId&&!line.otherCouponApplied&&(terms===null||
+    terms.channels.includes(line.channel as 'retail'|'wholesale'|'bulk')&&(!terms.skus.length||terms.skus.some(sku=>sku.skuId===line.skuId)));
+}
+export function evaluateStoreCouponBasket(rawCoupon: VersionedStoreCouponRecord,
   profile: WorkspaceProfileRecord | undefined, rawBasket: StoreCouponBasket,
   evaluatedAt: string): StoreCouponEvaluation {
   const now = time(evaluatedAt), row = exact(rawBasket, ["schemaVersion", "realm", "storeId", "buyerUserId",
@@ -302,11 +393,10 @@ export function evaluateStoreCouponBasket(rawCoupon: StoreCouponRecord,
   const supplierQuote = row.schemaVersion === 2 ? couponSupplierQuote(row.supplierQuote) : undefined;
   const realm = row.realm as PromotionRecord["realm"], storeId = id(row.storeId), buyerUserId = id(row.buyerUserId);
   owner(profile, storeId);
-  const coupon = couponRecord(rawCoupon, realm, storeId);
+  const configuration=couponMoneyConfiguration(rawCoupon,realm,storeId,profile!.ownerUserId,now),coupon=configuration.coupon;
   const revision = integer(row.couponRevision, 1), sourceId = id(row.sourceId), sourceRevision = integer(row.sourceRevision, 1);
   const observedAt = time(row.observedAt), validUntil = time(row.validUntil);
-  if (revision !== coupon.revision || !coupon.active || coupon.observedAt > now ||
-      coupon.startsAt > now || coupon.endsAt <= now || observedAt > now ||
+  if (revision !== coupon.revision || !couponMoneyActive(configuration,now) || coupon.observedAt > now || observedAt > now ||
       observedAt >= validUntil || validUntil <= now || !Array.isArray(row.lines) ||
       row.lines.length === 0 || row.lines.length > 500) fail("invalid_state", 409);
   const seen = new Set<string>();
@@ -331,7 +421,7 @@ export function evaluateStoreCouponBasket(rawCoupon: StoreCouponRecord,
     if (bulk.length !== supplierQuote.lines.length || bulk.some(l =>
         !supplierQuote.lines.some(b => b.lineId === l.lineId) || l.priceSourceId !== cataloguePayloadHash(supplierQuote))) fail();
   }
-  const eligible = lines.filter(line => line.storeId === storeId && !line.otherCouponApplied && line.subtotalMinor > 0);
+  const eligible = lines.filter(line => couponMoneyLine(configuration,storeId,line) && line.subtotalMinor > 0);
   const subtotal = eligible.reduce((sum, line) => sum + BigInt(line.subtotalMinor), 0n);
   if (subtotal <= 0n || subtotal > BigInt(Number.MAX_SAFE_INTEGER) || subtotal < BigInt(coupon.minimumSpendMinor)) {
     fail("invalid_state", 409);
@@ -352,8 +442,8 @@ export function evaluateStoreCouponBasket(rawCoupon: StoreCouponRecord,
   return {schemaVersion: 1, realm, storeId, buyerUserId, couponId: coupon.couponId,
     couponRevision: coupon.revision, name: coupon.name, basketSourceId: sourceId,
     basketSourceRevision: sourceRevision,
-    basketFingerprint: cataloguePayloadHash({operation: "storeCouponBasketV1", realm, storeId, buyerUserId,
-      sourceId, sourceRevision, observedAt, validUntil, coupon, lines: lines.filter(line => line.storeId === storeId)}),
+    basketFingerprint: cataloguePayloadHash({operation: configuration.terms===null?"storeCouponBasketV1":"storeCouponBasketV2", realm, storeId, buyerUserId,
+      sourceId, sourceRevision, observedAt, validUntil, coupon:configuration.original, lines: lines.filter(line => line.storeId === storeId)}),
     eligibleSubtotalMinor: Number(subtotal), savingMinor: Number(bounded), allocations};
 }
 export interface PromotionRepository {
@@ -368,6 +458,15 @@ export interface PromotionRepository {
   pageCoupons?(storeId: string, after: string | undefined, limit: number, userId?: string): Promise<StoreCouponRecord[]>;
   reconcileCoupon?(command: StoreCouponCommand): Promise<StoreCouponRecord | undefined>;
   publicCouponSnapshot?(storeId: string, after: string | undefined, limit: number): Promise<StoreCouponSnapshot>;
+  publicCouponSnapshotV2?(storeId: string, after: string | undefined, limit: number): Promise<VersionedStoreCouponSnapshot>;
+  saveCouponV2?(command: StoreCouponV2Command): Promise<StoreCouponV2Record>;
+  readCouponV2?(storeId: string, couponId: string, userId: string): Promise<VersionedStoreCouponRecord | undefined>;
+  pageCouponsV2?(storeId: string, after: string | undefined, limit: number, userId: string): Promise<VersionedStoreCouponPage>;
+  reconcileCouponV2?(command: StoreCouponV2Command): Promise<StoreCouponV2Record | undefined>;
+  saveCouponDraft?(command: StoreCouponDraftCommand): Promise<StoreCouponDraftRecord>;
+  readCouponDraft?(storeId: string, couponId: string, userId: string): Promise<StoreCouponDraftRecord | undefined>;
+  pageCouponDrafts?(storeId: string, after: string | undefined, limit: number, userId: string): Promise<StoreCouponDraftPage>;
+  reconcileCouponDraft?(command: StoreCouponDraftCommand): Promise<StoreCouponDraftRecord | undefined>;
   evaluateStoreCouponEligibility?(actor: string, query: StoreCouponEligibilityQuery, prices: CouponPriceSnapshot): Promise<object>;
 }
 interface PublicSku extends Record<string, unknown> {skuId: string; channels: Record<string, unknown>[]}
@@ -574,7 +673,8 @@ export class WorkspacePromotionService {
   constructor(private readonly repository: PromotionRepository,
     private readonly catalogue: Pick<WorkspaceCatalogueService, "publicCatalogue"> & Partial<Pick<WorkspaceCatalogueService, "publicDiscovery" | "couponPriceSnapshot">>,
     private readonly now: () => Date = () => new Date(),
-    private readonly options: {benefitTermsSupported?: boolean; storeCouponTermsSupported?: boolean; storeCouponEligibilitySupported?: boolean} = {}) {}
+    private readonly options: {benefitTermsSupported?: boolean; storeCouponTermsSupported?: boolean;
+      storeCouponTermsV2Supported?: boolean; storeCouponDraftsSupported?: boolean; storeCouponEligibilitySupported?: boolean} = {}) {}
   private negotiation(body: Readonly<Record<string, unknown>>) {
     const {promotionTermsVersion, supplierPublishersVersion, commodityPriceReadbackVersion, ...plain} = body;
     if (Object.hasOwn(body, "promotionTermsVersion") && promotionTermsVersion !== 1) fail();
@@ -587,9 +687,14 @@ export class WorkspacePromotionService {
   /** Endpoint still performs Firebase/default-tenant/AppCheck verification. */
   async handleOperation(userId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     id(userId); body = structuredClone(body);
-    if (Buffer.byteLength(JSON.stringify({operation, ...body}), "utf8") > 60000) fail();
+    const structuredCoupon = body.storeCouponTermsVersion === 2 &&
+      ['saveStoreCoupon', 'readStoreCoupon', 'reconcileStoreCoupon', 'listStoreCoupons','evaluateStoreCouponEligibility'].includes(operation);
+    const privateDraft = body.storeCouponDraftVersion === 1 && couponDraftOperations.includes(operation);
+    if (Buffer.byteLength(JSON.stringify({operation, ...body}), "utf8") > (structuredCoupon || privateDraft ? 8 * 1024 * 1024 : 60000)) fail();
+    if (couponDraftOperations.includes(operation)) return this.couponDraftOperation(userId, operation, body);
     if (operation === "evaluateStoreCouponEligibility") {
-      if (!this.options.storeCouponEligibilitySupported || !this.options.storeCouponTermsSupported ||
+      if (!this.options.storeCouponEligibilitySupported ||
+          (body.storeCouponTermsVersion===2?!this.options.storeCouponTermsV2Supported:!this.options.storeCouponTermsSupported) ||
           !this.repository.evaluateStoreCouponEligibility || !this.catalogue.couponPriceSnapshot) fail("unavailable", 503);
       return this.repository.evaluateStoreCouponEligibility(userId, couponEligibilityQuery(body, this.repository.realm),
         this.catalogue.couponPriceSnapshot.bind(this.catalogue));
@@ -621,6 +726,7 @@ export class WorkspacePromotionService {
   }
   private async storeCouponOperation(userId: string, operation: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
     const {storeCouponTermsVersion, ...body} = raw;
+    if (storeCouponTermsVersion === 2) return this.structuredCouponOperation(userId, operation, body);
     if (storeCouponTermsVersion !== 1 || !this.options.storeCouponTermsSupported) fail("unavailable", 503);
     const storeId = id(body.storeId), repo = this.repository;
     const envelope = () => ({schemaVersion: 1, storeCouponTermsVersion: 1, realm: repo.realm,
@@ -684,6 +790,171 @@ export class WorkspacePromotionService {
       return {...envelope(), state: "unavailable", coverage: "published_store_coupon_terms_only",
         observedAt: this.now().toISOString(), items: [], ...(completeSnapshot ? {storeCouponSnapshotVersion: 1, complete: false} : {nextCursor: null})};
     }
+  }
+  private async structuredCouponOperation(userId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    if (!this.options.storeCouponTermsV2Supported) fail('unavailable', 503);
+    if(operation==='readPublicStoreCoupons'||operation==='readPublicStoreCouponSnapshot')return this.structuredCouponPublicPage(operation,body);
+    const repo = this.repository, storeId = id(body.storeId);
+    owner(await repo.store(storeId), storeId, userId);
+    const envelope = {schemaVersion: 1, storeCouponTermsVersion: 2, realm: repo.realm, storeId,
+      orderingAvailable: false, redemptionAvailable: false, publicationConfirmed: false};
+    if (operation === 'listStoreCoupons') {
+      const query = exact(body, ['storeId', 'limit'], ['after']), limit = integer(query.limit, 1, 20);
+      const after = query.after === undefined ? undefined : id(query.after);
+      if (!repo.pageCouponsV2) fail('unavailable', 503);
+      const page = await repo.pageCouponsV2(storeId, after, limit, userId);
+      if (!Array.isArray(page.records) || page.records.length > limit) fail();
+      const records = page.records.map(raw => raw.schemaVersion === 2 ? checkedStoreCouponV2Record(raw,
+        {account: userId, realm: repo.realm, store: storeId}, this.now().toISOString()) : couponRecord(raw, repo.realm, storeId));
+      let previous = after;
+      for (const record of records) {if (previous !== undefined && record.couponId <= previous) fail(); previous = record.couponId;}
+      if (page.nextCursor !== null && (!records.length || page.nextCursor !== previous)) fail();
+      const response = {...envelope, items: records, nextCursor: page.nextCursor};
+      if (Buffer.byteLength(JSON.stringify(response), 'utf8') > 8 * 1024 * 1024) fail('unavailable', 503);
+      return response;
+    }
+    if (operation === 'readStoreCoupon') {
+      const query = exact(body, ['storeId', 'couponId']);
+      if (!repo.readCouponV2) fail('unavailable', 503);
+      const result = await repo.readCouponV2(storeId, id(query.couponId), userId);
+      const record = result && (result.schemaVersion === 2 ? checkedStoreCouponV2Record(result,
+        {account: userId, realm: repo.realm, store: storeId}, this.now().toISOString()) : couponRecord(result, repo.realm, storeId));
+      if (record && record.couponId !== query.couponId) fail();
+      return {...envelope, record: record ?? null};
+    }
+    if (operation !== 'saveStoreCoupon' && operation !== 'reconcileStoreCoupon') fail('unavailable', 503);
+    const command = structuredCouponRequest(userId, repo.realm, body, this.now().toISOString());
+    const action = operation === 'saveStoreCoupon' ? repo.saveCouponV2 : repo.reconcileCouponV2;
+    if (!action) fail('unavailable', 503);
+    const result = await action.call(repo, command);
+    if (!result && operation === 'saveStoreCoupon') fail('unavailable', 503);
+    const record = result && checkedStoreCouponV2Record(result, {account: userId, realm: repo.realm, store: storeId}, this.now().toISOString());
+    if (record && (record.couponId !== command.couponId || record.revision !== command.expectedRevision + 1 ||
+        JSON.stringify(record.coupon) !== JSON.stringify(command.coupon))) fail('invalid_state', 409);
+    return {...envelope, record: record ?? null};
+  }
+  private async structuredCouponPublicPage(operation:string,body:Readonly<Record<string,unknown>>):Promise<object>{
+    const storeId=id(body.storeId),complete=operation==='readPublicStoreCouponSnapshot',
+      query=complete?exact(body,['storeId','storeCouponSnapshotVersion']):exact(body,['storeId','limit'],['after']);
+    if(complete&&query.storeCouponSnapshotVersion!==1)fail('unavailable',503);
+    const limit=complete?401:integer(query.limit,1,20),after=complete||query.after===undefined?undefined:id(query.after),repo=this.repository,
+      envelope=(observedAt:string)=>({schemaVersion:1,storeCouponTermsVersion:2,realm:repo.realm,storeId,orderingAvailable:false,
+        redemptionAvailable:false,coverage:'published_store_coupon_terms_only',observedAt,...(complete?{storeCouponSnapshotVersion:1}:{})});
+    try{
+      if(!repo.publicCouponSnapshotV2)fail('unavailable',503);
+      const deadline=this.now().getTime()+20_000,snapshot=await repo.publicCouponSnapshotV2(storeId,after,limit),
+        profile=owner(snapshot.profile,storeId),observedAt=time(snapshot.observedAt),
+        stable=(value:VersionedStoreCouponSnapshot)=>cataloguePayloadHash([value.profile,value.records,value.nextCursor]);
+      if(observedAt>this.now().toISOString()||snapshot.records.length>limit||complete&&
+        (snapshot.records.length>400||snapshot.nextCursor!==null))fail('incomplete_snapshot',503);
+      let previous=after;
+      const rows=snapshot.records.map(raw=>{
+        const row=raw.schemaVersion===2?checkedStoreCouponV2Record(raw,{account:profile.ownerUserId,realm:repo.realm,store:storeId},this.now().toISOString()):couponRecord(raw,repo.realm,storeId);
+        if(previous!==undefined&&row.couponId<=previous)fail('invalid_state',409);previous=row.couponId;return row;
+      });
+      if(snapshot.nextCursor!==null&&(!rows.length||snapshot.nextCursor!==previous))fail('invalid_state',409);
+      const inputs=rows.map(row=>row.schemaVersion===2?row.coupon:couponFromRecord(row as unknown as Record<string,unknown>)),
+        active=(input:StoreCouponV2Input|ReturnType<typeof couponFromRecord>,when:string)=>input.active&&
+          storeCouponV2UtcMicros(input.startsAt)<=storeCouponV2UtcMicros(when)&&storeCouponV2UtcMicros(input.endsAt)>storeCouponV2UtcMicros(when);
+      const readSku=async(skuId:string)=>{
+        if(this.now().getTime()>=deadline)fail('unavailable',503);
+        const data=object(await this.catalogue.publicCatalogue({storeId,skuId,listingReadbackVersion:1,
+          mediaReadbackVersion:1,policyReadbackVersion:1,productFactsReadbackVersion:1,unbrandedProduceReadbackVersion:1,
+          supplierPublishersVersion:1,supplierTaxReadbackVersion:1,commodityPriceReadbackVersion:1}));
+        if(data.schemaVersion!==1||data.realm!==repo.realm||data.storeId!==storeId||data.state!=='ready'||
+          data.coverage!=='verified_public_only'||data.orderingAvailable!==false||data.listingReadbackVersion!==1||
+          data.listingCoverage!=='complete'||data.nextCursor!==null||time(data.observedAt)>this.now().toISOString()||
+          !Array.isArray(data.items)||data.items.length!==1)fail('unavailable',503);
+        const row=object(data.items[0]),content=object(row.content),pack=object(row.pack);
+        if(row.skuId!==skuId||!Array.isArray(row.channels)||!Array.isArray(row.listings)||!row.listings.length||row.listings.length>3)fail('unavailable',503);
+        const bindings=row.listings.map(value=>checkedPublicCatalogueListingBinding(value,repo.realm)),channels=row.channels.map(object);
+        if(new Set(bindings.map(value=>value.channel)).size!==bindings.length||bindings.some(value=>value.storeId!==storeId||value.skuId!==skuId||
+          value.canonicalProductId!==row.canonicalProductId||value.verifiedPackId!==row.verifiedPackId)||
+          channels.some(value=>bindings.filter(binding=>binding.channel===value.kind).length!==1))fail('invalid_state',409);
+        return {skuId,revision:integer(row.revision,1),title:text(content.title,240),variant:content.variant??'',
+          sellUnit:text(pack.label,240),bindings,channels};
+      };
+      const sources=new Map<string,Awaited<ReturnType<typeof readSku>>>();
+      const bindSku=async(sku:StoreOfferV2Sku,channels:readonly string[])=>{
+        const source=sources.get(sku.skuId)??await readSku(sku.skuId);sources.set(sku.skuId,source);
+        const title=source.variant===''?source.title:`${source.title} · ${text(source.variant,240)}`;
+        if(sku.storeId!==storeId||sku.sellUnit!==source.sellUnit||sku.title!==title||sku.listings.some(retained=>
+          !source.bindings.some(binding=>cataloguePayloadHash(binding)===cataloguePayloadHash(retained))))fail('unavailable',503);
+        const listings=source.bindings.filter(binding=>channels.includes(binding.channel));
+        if(!listings.length||listings.some(binding=>{
+          const matches=source.channels.filter(channel=>channel.kind===binding.channel);
+          return matches.length!==1||matches[0]!.priceState==='expired'||time(matches[0]!.validUntil)<=this.now().toISOString();
+        }))fail('unavailable',503);
+        return {...sku,listings};
+      };
+      const items:object[]=[];let bytes=4096;
+      const add=(item:object)=>{bytes+=Buffer.byteLength(JSON.stringify(item),'utf8')+1;if(bytes>8*1024*1024)fail('unavailable',503);items.push(item);};
+      for(const [index,row] of rows.entries()){
+        if(row.observedAt>observedAt)fail('stale_snapshot',409);
+        const input=inputs[index]!;
+        if(!active(input,observedAt))continue;
+        if(row.schemaVersion!==2){add({couponId:row.couponId,revision:row.revision,scope:'store_basket',storeId,
+          publisherType:profilePublisher(profile.profileId)!,publisherName:text(profile.name,240),terms:input,
+          sourceId:`store-coupon:${repo.realm}:${storeId}:${row.couponId}:${row.revision}`});continue;}
+        const original=publicStoreOfferV2Terms(row.coupon,storeId);
+        // A private customer record is not an authenticated buyer identity.
+        if(original.kind==='buyerDiscount')fail('unavailable',503);
+        const skus:StoreOfferV2Sku[]=[];for(const sku of original.skus)skus.push(await bindSku(sku,original.channels));
+        const rewardSku=original.rewardSku===null?null:await bindSku(original.rewardSku,original.channels),
+          structuredTerms=checkedStoreOfferV2Terms({...original,skus,rewardSku},storeId);
+        add({schemaVersion:2,currency:'INR',realm:repo.realm,storeId,couponId:row.couponId,revision:row.revision,
+          name:row.coupon.name,publisherName:text(profile.name,240),publisherType:profilePublisher(profile.profileId)!,
+          sourceId:`store-offer-v2:${repo.realm}:${storeId}:${row.couponId}:${row.revision}`,observedAt,
+          validFrom:row.coupon.startsAt,validUntil:row.coupon.endsAt,structuredTerms,
+          configuredTotalUses:row.coupon.totalUses,configuredUsesPerCustomer:row.coupon.usesPerCustomer,viewerAccountId:null});
+      }
+      for(const [skuId,source] of sources)if(cataloguePayloadHash(await readSku(skuId))!==cataloguePayloadHash(source))fail('stale_snapshot',409);
+      const fresh=await repo.publicCouponSnapshotV2(storeId,after,limit),now=this.now().toISOString();
+      if(this.now().getTime()>=deadline||time(fresh.observedAt)>now||stable(fresh)!==stable(snapshot)||
+        inputs.some(input=>active(input,observedAt)!==active(input,now)))fail('stale_snapshot',409);
+      const result={...envelope(observedAt),state:'ready',items,...(complete?{complete:true}:{nextCursor:snapshot.nextCursor})};
+      if(Buffer.byteLength(JSON.stringify(result),'utf8')>8*1024*1024)fail('unavailable',503);
+      return result;
+    }catch{return {...envelope(this.now().toISOString()),state:'unavailable',items:[],...(complete?{complete:false}:{nextCursor:null})};}
+  }
+  private async couponDraftOperation(userId: string, operation: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
+    const {storeCouponDraftVersion, ...body} = raw;
+    if (storeCouponDraftVersion !== 1 || !this.options.storeCouponDraftsSupported) fail('unavailable', 503);
+    const storeId = id(body.storeId), repo = this.repository;
+    owner(await repo.store(storeId), storeId, userId);
+    const envelope = {schemaVersion: 1, storeCouponDraftVersion: 1, accountId: userId,
+      realm: repo.realm, storeId, observedAt: this.now().toISOString(), publicationConfirmed: false};
+    const checked = (record: unknown) => couponDraftRecord(record, userId, repo.realm, storeId, this.now().toISOString());
+    if (operation === 'readStoreCouponDraft') {
+      const query = exact(body, ['storeId', 'couponId']), couponId = checkedStoreCouponDraftId(query.couponId);
+      if (!repo.readCouponDraft) fail('unavailable', 503);
+      const original = await repo.readCouponDraft(storeId, couponId, userId), record = original && checked(original);
+      if (record && record.couponId !== couponId) fail('invalid_state', 409);
+      return {...envelope, record: record ?? null};
+    }
+    if (operation === 'listStoreCouponDrafts') {
+      const query = exact(body, ['storeId', 'limit'], ['after']), limit = integer(query.limit, 1, 20);
+      const after = query.after === undefined ? undefined : text(query.after, 64);
+      if (after !== undefined && !/^[a-f0-9]{64}$/u.test(after)) fail();
+      if (!repo.pageCouponDrafts) fail('unavailable', 503);
+      const page = await repo.pageCouponDrafts(storeId, after, limit, userId);
+      if (!Array.isArray(page.records) || page.records.length > limit) fail();
+      const records = page.records.map(checked);
+      let prior = after;
+      for (const record of records) {const key = cataloguePayloadHash([userId, record.couponId]).toLowerCase(); if (prior !== undefined && key <= prior) fail(); prior = key;}
+      if (page.nextCursor !== null && (!records.length || page.nextCursor !== prior)) fail();
+      const result = {...envelope, items: records, nextCursor: page.nextCursor};
+      if (Buffer.byteLength(JSON.stringify(result), 'utf8') > 8 * 1024 * 1024) fail('unavailable', 503);
+      return result;
+    }
+    const command = couponDraftRequest(userId, repo.realm, body, this.now().toISOString());
+    const method = operation === 'saveStoreCouponDraft' ? repo.saveCouponDraft : repo.reconcileCouponDraft;
+    if (!method) fail('unavailable', 503);
+    const original = await method.call(repo, command), record = original && checked(original);
+    if (operation === 'saveStoreCouponDraft' && !record) fail('unavailable', 503);
+    if (record && (record.couponId !== command.couponId || record.sourceRevision !== command.expectedSourceRevision + 1 ||
+        JSON.stringify(record.campaign) !== JSON.stringify(command.campaign))) fail('invalid_state', 409);
+    return {...envelope, record: record ?? null};
   }
   private async command(userId: string, body: Readonly<Record<string, unknown>>): Promise<PromotionCommand> {
     const n = this.negotiation(body);
@@ -954,11 +1225,26 @@ export class FirestorePromotionRepository implements PromotionRepository {
         typeof origin.receiptId !== "string" || !/^[A-F0-9]{64}$/u.test(origin.receiptId)) fail("invalid_state", 409);
     const receipt = (await tx.get(this.root(storeId).collection("storeCouponReceipts").doc(origin.receiptId))).data();
     if (!receipt || receipt.fingerprint !== origin.requestFingerprint) fail("invalid_state", 409);
-    const original = couponRecord(receipt.record, this.realm, storeId);
+    if(receipt.schemaVersion===2)exact(receipt,['schemaVersion','fingerprint','manifest']);
+    const original = receipt.schemaVersion===2?await this.structuredCouponRecord(tx,receipt.manifest,storeId,couponId,origin.ownerUserId as string):
+      couponRecord(receipt.record, this.realm, storeId);
     if (original.couponId !== couponId || original.revision !== 1 || original.observedAt !== origin.observedAt) fail("invalid_state", 409);
   }
   /** Authenticated standalone replacement evaluation. Read-only: browsing must
    * neither initialize historical usage nor reserve/consume a customer's use. */
+  private couponMoneySourceBindings(configuration:ReturnType<typeof couponMoneyConfiguration>,query:StoreCouponEligibilityQuery,pages:object[]){
+    const terms=configuration.terms;if(terms===null)return;
+    for(const line of query.lines){
+      if(!terms.channels.includes(line.listing.channel))continue;
+      const selected=terms.skus.find(sku=>sku.skuId===line.listing.skuId);if(!selected)continue;
+      const matches=pages.flatMap(page=>object(page).items as unknown[]).map(object).filter(row=>row.skuId===selected.skuId);
+      if(matches.length!==1)fail('unavailable',503);
+      const source=matches[0]!,pack=object(source.pack),content=object(source.content),variant=content.variant??'',
+        title=variant===''?content.title:`${text(content.title,240)} · ${text(variant,240)}`;
+      if(pack.label!==selected.sellUnit||title!==selected.title||selected.listings.length&&
+        !selected.listings.some(binding=>cataloguePayloadHash(binding)===cataloguePayloadHash(line.listing)))fail('conflict',409);
+    }
+  }
   async evaluateStoreCouponEligibility(actor: string, query: StoreCouponEligibilityQuery, prices: CouponPriceSnapshot): Promise<object> {
     actor = id(actor); query = structuredClone(query);
     return this.firestore.runTransaction(async tx => {
@@ -968,9 +1254,11 @@ export class FirestorePromotionRepository implements PromotionRepository {
         tx.get(this.profiles(query.storeId)), tx.get(root.collection("storeCoupons").doc(query.couponId)),
         tx.get(headRef), tx.get(buyerRef), prices(query.storeId, [...new Set(query.lines.map(line => line.listing.skuId))].sort(), tx)]);
       const profile = profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId") ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined;
-      owner(profile, query.storeId);
-      const campaign = couponRecord(campaignDoc.data(), this.realm, query.storeId);
-      if (campaign.couponId !== query.couponId || campaign.revision !== query.couponRevision) fail("conflict", 409);
+      const currentProfile=owner(profile, query.storeId),original=campaignDoc.get('schemaVersion')===2?
+        await this.structuredCouponRecord(tx,campaignDoc.data(),query.storeId,query.couponId,currentProfile.ownerUserId):
+        couponRecord(campaignDoc.data(), this.realm, query.storeId);
+      if((original.schemaVersion===2)!==(query.storeCouponTermsVersion===2))fail('unavailable',503);
+      if (original.couponId !== query.couponId || original.revision !== query.couponRevision) fail("conflict", 409);
       const usage = this.couponCounts(usageDoc.data(), query.storeId, query.couponId);
       await this.couponOrigin(tx, query.storeId, query.couponId, usage);
       let customerHeld = 0, customerRedeemed = 0;
@@ -982,18 +1270,25 @@ export class FirestorePromotionRepository implements PromotionRepository {
       const negotiated = query.supplierQuote ? await this.bulkQuotes!.readCouponPrices(tx, actor, query.storeId,
         query.supplierQuote, query.lines.filter(l => l.listing.channel === 'bulk' &&
           (query.commodityPriceReadbackVersion !== 1 || query.supplierQuote!.lines.some(b => b.lineId === l.lineId)))) : undefined;
-      const now = this.now().toISOString(), basket = couponBasketFromPrices(query, pages, this.realm, actor, now, negotiated);
+      const now = this.now().toISOString(), basket = couponBasketFromPrices(query, pages, this.realm, actor, now, negotiated),
+        configuration=couponMoneyConfiguration(original,this.realm,query.storeId,currentProfile.ownerUserId,now),campaign=configuration.coupon;
+      this.couponMoneySourceBindings(configuration,query,pages);
       if (campaign.observedAt > now) fail("unavailable", 503);
-      const subtotal = basket.lines.reduce((sum, line) => sum + BigInt(line.quantity) * BigInt(line.unitPriceMinor), 0n);
-      const reason = !campaign.active || campaign.startsAt > now || campaign.endsAt <= now ? "inactive" :
+      const subtotal = basket.lines.filter(line=>couponMoneyLine(configuration,query.storeId,line))
+        .reduce((sum, line) => sum + BigInt(line.quantity) * BigInt(line.unitPriceMinor), 0n);
+      const reason = !couponMoneyActive(configuration,now) ? "inactive" :
         (usage.heldUses as number) + (usage.redeemedUses as number) >= campaign.totalUses ||
           customerHeld + customerRedeemed >= campaign.usesPerCustomer ? "usage_limit" :
           subtotal < BigInt(campaign.minimumSpendMinor) ? "minimum_spend" :
             subtotal === 0n || campaign.percentage && subtotal * BigInt(campaign.discount) / 10000n === 0n ? "zero_saving" : null;
       // This is a replacement scenario, not an assertion about the client's
       // currently selected platform/Store coupons. Apply/quote must enforce it.
-      const evaluation = reason === null ? evaluateStoreCouponBasket(campaign, profile, basket, now) : null;
-      const expires = reason === null && campaign.endsAt < basket.validUntil ? campaign.endsAt : basket.validUntil;
+      const evaluation = reason === null ? evaluateStoreCouponBasket(original, profile, basket, now) : null;
+      // The existing price-context protocol has millisecond TTLs. Clip its
+      // derived authorisation conservatively; retain literal v2 terms intact.
+      const end=reason!==null?basket.validUntil:configuration.terms===null?campaign.endsAt:new Date(Date.parse(campaign.endsAt)).toISOString(),
+        expires = reason === null && end < basket.validUntil ? end : basket.validUntil;
+      if(expires<=now)fail('conflict',409);
       return {schemaVersion: 1, storeCouponEligibilityVersion: query.commodityPriceReadbackVersion === 1 ? 3 : query.supplierQuote ? 2 : 1, realm: this.realm,
         viewerUserId: actor, storeId: query.storeId, selectionPolicy: query.selectionPolicy,
         exclusiveSelectionRequired: true, state: "ready", eligible: evaluation !== null, reason,
@@ -1001,6 +1296,7 @@ export class FirestorePromotionRepository implements PromotionRepository {
         requestFingerprint: cataloguePayloadHash({operation: query.commodityPriceReadbackVersion === 1 ? "storeCouponEligibilityV3" : query.supplierQuote ? "storeCouponEligibilityV2" : "storeCouponEligibilityV1", realm: this.realm, actor,
           query, exclusiveSelectionRequired: true}),
         orderingAvailable: false, reservationCreated: false, evaluation,
+        ...(query.storeCouponTermsVersion===2?{storeCouponTermsVersion:2}:{}),
         attribution: evaluation ? storeCouponAttributionReferences(this.realm, query.storeId, campaign.couponId, campaign.revision) : null,
         ...(query.supplierQuote ? {supplierQuote: structuredClone(query.supplierQuote)} : {})};
     });
@@ -1031,7 +1327,11 @@ export class FirestorePromotionRepository implements PromotionRepository {
         customer = {schemaVersion: 1, realm: this.realm, storeId: store.storeId, couponId: selection.couponId,
           buyerUserId: receipt.buyerUserId, usageRevision: 0, heldUses: 0, redeemedUses: 0};
       }
-      const campaign = couponRecord(campaignDoc.data(), this.realm, store.storeId);
+      const profile = profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId") ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined;
+      const original=campaignDoc.get('schemaVersion')===2?await this.structuredCouponRecord(tx,campaignDoc.data(),store.storeId,selection.couponId,
+        owner(profile,store.storeId).ownerUserId):couponRecord(campaignDoc.data(),this.realm,store.storeId),
+        now=this.now().toISOString(),configuration=couponMoneyConfiguration(original,this.realm,store.storeId,profile?.ownerUserId??'',now),
+        campaign=configuration.coupon;
       const basket = selection.basket as unknown as StoreCouponBasket;
       if (basket.schemaVersion === 2) {
         const binding = couponSupplierQuote(basket.supplierQuote), agreed = store.supplierQuote;
@@ -1057,9 +1357,14 @@ export class FirestorePromotionRepository implements PromotionRepository {
             line.channel !== placed.publicListing.channel || line.quantity * 1000 !== placed.quantityMilli ||
             line.unitPriceMinor !== placed.unitPriceMinor || line.quantity * line.unitPriceMinor !== placed.lineTotalMinor ||
             line.otherCouponApplied !== otherCoupon) fail("invalid_state", 409);
+        if(configuration.terms!==null&&couponMoneyLine(configuration,store.storeId,line)){
+          const selected=configuration.terms.skus.find(sku=>sku.skuId===line.skuId),
+            title=placed.variant?`${placed.name} · ${placed.variant}`:placed.name;
+          if(selected&&(selected.sellUnit!==placed.packLabel||selected.title!==title||selected.listings.length&&
+            !selected.listings.some(binding=>cataloguePayloadHash(binding)===cataloguePayloadHash(placed.publicListing))))fail('invalid_state',409);
+        }
       }
-      const profile = profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId") ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined;
-      const now = this.now().toISOString(), evaluation = evaluateStoreCouponBasket(campaign, profile, basket, now);
+      const evaluation = evaluateStoreCouponBasket(original, profile, basket, now);
       if (evaluation.savingMinor !== component.amountMinor || component.allocations.length !== evaluation.allocations.filter(a => a.savingMinor > 0).length ||
           evaluation.allocations.some(a => a.savingMinor > 0 && !component.allocations.some(p => p.lineId === a.lineId && p.amountMinor === a.savingMinor))) fail("invalid_state", 409);
       if ((usage.heldUses as number) + (usage.redeemedUses as number) >= campaign.totalUses ||
@@ -1073,7 +1378,7 @@ export class FirestorePromotionRepository implements PromotionRepository {
         lifecycleSourceId: id(selection.lifecycleSourceId), lastSourceRevision: 0, lastObservedAt: now, fulfilmentStarted: false};
       const mapped = evaluation.allocations.map(a => ({...a, lineId: allocated.lines.find(l => l.sourceLineId === a.lineId)!.lineId}));
       finalChecks.push(finalNow => {
-        evaluateStoreCouponBasket(campaign, profile, basket, finalNow);
+        evaluateStoreCouponBasket(original, profile, basket, finalNow);
         if (holdUntil <= finalNow) fail("invalid_state", 409);
         current.heldAt = finalNow; current.lastObservedAt = finalNow;
       });
@@ -1256,6 +1561,261 @@ export class FirestorePromotionRepository implements PromotionRepository {
       owner(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId") ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined,
         command.storeId, command.ownerUserId);
       return receipt.exists ? originalCoupon(command, receipt.data() as StoreCouponReceipt) : undefined;
+    });
+  }
+  /** Literal input pages preserve native pending fingerprints across Firestore's
+   * map-key ordering. Immutable revision pages and the receipt commit atomically. */
+  private couponPayload(value: unknown) {
+    const literal = JSON.stringify(value);
+    if (typeof literal !== 'string') fail();
+    const payloadBytes = Buffer.byteLength(literal, 'utf8');
+    if (payloadBytes > 8 * 1024 * 1024) fail();
+    const pages: string[] = [];
+    for (let start = 0; start < literal.length;) {
+      let end = Math.min(start + 65536, literal.length);
+      if (end < literal.length && /[\uD800-\uDBFF]/u.test(literal[end - 1]!)) end--;
+      pages.push(literal.slice(start, end)); start = end;
+    }
+    if (!pages.length || pages.length > 128) fail();
+    return {pages, payloadBytes, payloadHash: cataloguePayloadHash(literal)};
+  }
+  private async couponLiteral(tx: Transaction, revisionRef: DocumentReference, manifest: Record<string, unknown>): Promise<unknown> {
+    const original = await tx.get(revisionRef);
+    if (!original.exists || cataloguePayloadHash(original.data()) !== cataloguePayloadHash(manifest)) fail('invalid_state', 409);
+    const pages = await Promise.all(Array.from({length: manifest.pageCount as number}, (_, index) =>
+      tx.get(revisionRef.collection('payloadPages').doc(String(index)))));
+    let literal = '';
+    for (const [index, page] of pages.entries()) {
+      if (!page.exists) fail('invalid_state', 409);
+      const row = exact(page.data(), ['schemaVersion', 'index', 'text']);
+      if (row.schemaVersion !== 1 || row.index !== index || typeof row.text !== 'string' || row.text.length > 65536) fail('invalid_state', 409);
+      literal += row.text;
+    }
+    if (Buffer.byteLength(literal, 'utf8') !== manifest.payloadBytes || cataloguePayloadHash(literal) !== manifest.payloadHash) fail('invalid_state', 409);
+    try {return JSON.parse(literal);} catch {fail('invalid_state', 409);}
+  }
+  private structuredCouponManifest(raw: unknown, storeId: string, couponId: string) {
+    const row = exact(raw, ['schemaVersion', 'storeCouponTermsVersion', 'realm', 'storeId', 'couponId',
+      'revision', 'observedAt', 'payloadHash', 'payloadBytes', 'pageCount']);
+    if (row.schemaVersion !== 2 || row.storeCouponTermsVersion !== 2 || row.realm !== this.realm ||
+        row.storeId !== storeId || row.couponId !== couponId || typeof row.payloadHash !== 'string' ||
+        !/^[a-f0-9]{64}$/iu.test(row.payloadHash)) fail('invalid_state', 409);
+    integer(row.revision, 1, 1_000_000_000); integer(row.payloadBytes, 1, 8 * 1024 * 1024);
+    integer(row.pageCount, 1, 128);
+    if (time(row.observedAt) > this.now().toISOString()) fail('invalid_state', 409);
+    return row;
+  }
+  private async structuredCouponRecord(tx: Transaction, raw: unknown, storeId: string, couponId: string,
+    userId: string): Promise<StoreCouponV2Record> {
+    const manifest = this.structuredCouponManifest(raw, storeId, couponId);
+    const revisionRef = this.root(storeId).collection('storeCoupons').doc(couponId)
+      .collection('revisions').doc(String(manifest.revision));
+    const input = await this.couponLiteral(tx, revisionRef, manifest);
+    return checkedStoreCouponV2Record({schemaVersion: 2, storeCouponTermsVersion: 2,
+      accountId: userId, realm: this.realm, storeId, couponId, revision: manifest.revision,
+      observedAt: manifest.observedAt, coupon: checkedStoreCouponV2Input(input, storeId)},
+    {account: userId, realm: this.realm, store: storeId}, this.now().toISOString());
+  }
+  private async originalStructuredCoupon(tx: Transaction, command: StoreCouponV2Command, raw: unknown) {
+    const receipt = exact(raw, ['schemaVersion', 'fingerprint', 'manifest']);
+    if (receipt.schemaVersion !== 2 || receipt.fingerprint !== command.fingerprint) fail('conflict', 409);
+    const record = await this.structuredCouponRecord(tx, receipt.manifest, command.storeId, command.couponId, command.ownerUserId);
+    if (record.revision !== command.expectedRevision + 1 || JSON.stringify(record.coupon) !== JSON.stringify(command.coupon)) fail('invalid_state', 409);
+    return record;
+  }
+  async saveCouponV2(command: StoreCouponV2Command): Promise<StoreCouponV2Record> {
+    command = checkedStructuredCouponCommand(structuredClone(command));
+    if (command.realm !== this.realm) fail();
+    checkedStoreCouponV2Input(command.coupon, command.storeId);
+    const root = this.root(command.storeId), head = root.collection('storeCoupons').doc(id(command.couponId));
+    const receiptRef = root.collection('storeCouponReceipts').doc(cataloguePayloadHash([id(command.ownerUserId), id(command.idempotencyKey)]));
+    const usageRef = root.collection('storeCouponUsage').doc(command.couponId);
+    return this.firestore.runTransaction(async tx => {
+      const [profiles, current, receipt, usage] = await Promise.all([tx.get(this.profiles(command.storeId)),
+        tx.get(head), tx.get(receiptRef), tx.get(usageRef)]);
+      owner(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get('caseId') ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined,
+        command.storeId, command.ownerUserId);
+      if (receipt.exists) return this.originalStructuredCoupon(tx, command, receipt.data());
+      const previous = current.exists ? current.get('schemaVersion') === 2 ?
+        await this.structuredCouponRecord(tx, current.data(), command.storeId, command.couponId, command.ownerUserId) :
+        couponRecord(current.data(), this.realm, command.storeId) : undefined;
+      if (previous && previous.couponId !== command.couponId || (previous?.revision ?? 0) !== command.expectedRevision) fail('conflict', 409);
+      const observedAt = this.now().toISOString();
+      if (command.observedAt > observedAt) fail();
+      if (!command.coupon.active && (!previous || previous.schemaVersion !== 2 ||
+          cataloguePayloadHash({...previous.coupon, active: false}) !== cataloguePayloadHash(command.coupon))) fail('invalid_state', 409);
+      validateStoreCouponV2ForSave(command.coupon, observedAt);
+      const {pages, payloadBytes, payloadHash} = this.couponPayload(command.coupon);
+      const manifest = {schemaVersion: 2, storeCouponTermsVersion: 2, realm: this.realm, storeId: command.storeId,
+        couponId: command.couponId, revision: command.expectedRevision + 1, observedAt,
+        payloadHash, payloadBytes, pageCount: pages.length};
+      const version = head.collection('revisions').doc(String(manifest.revision));
+      if (!current.exists) {
+        if (usage.exists) fail('invalid_state', 409);
+        tx.create(usageRef, {schemaVersion: 1, realm: this.realm, storeId: command.storeId, couponId: command.couponId,
+          usageRevision: 0, heldUses: 0, redeemedUses: 0, origin: {couponRevision: 1, ownerUserId: command.ownerUserId,
+            receiptId: receiptRef.id, requestFingerprint: command.fingerprint, observedAt}});
+      }
+      tx.set(head, manifest); tx.create(version, manifest);
+      for (const [index, text] of pages.entries()) tx.create(version.collection('payloadPages').doc(String(index)), {schemaVersion: 1, index, text});
+      tx.create(receiptRef, {schemaVersion: 2, fingerprint: command.fingerprint, manifest});
+      return checkedStoreCouponV2Record({schemaVersion: 2, storeCouponTermsVersion: 2, accountId: command.ownerUserId,
+        realm: this.realm, storeId: command.storeId, couponId: command.couponId, revision: manifest.revision,
+        observedAt, coupon: command.coupon}, {account: command.ownerUserId, realm: this.realm, store: command.storeId}, observedAt);
+    });
+  }
+  async readCouponV2(storeId: string, couponId: string, userId: string): Promise<VersionedStoreCouponRecord | undefined> {
+    id(couponId); id(userId);
+    return this.firestore.runTransaction(async tx => {
+      const profiles = await tx.get(this.profiles(storeId));
+      owner(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get('caseId') ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined, storeId, userId);
+      const snapshot = await tx.get(this.root(storeId).collection('storeCoupons').doc(couponId));
+      if (!snapshot.exists) return undefined;
+      const record = snapshot.get('schemaVersion') === 2 ? await this.structuredCouponRecord(tx, snapshot.data(), storeId, couponId, userId) : couponRecord(snapshot.data(), this.realm, storeId);
+      if (record.couponId !== couponId) fail('invalid_state', 409);
+      return record;
+    });
+  }
+  async pageCouponsV2(storeId: string, after: string | undefined, limit: number, userId: string): Promise<VersionedStoreCouponPage> {
+    id(userId); integer(limit, 1, 20); if (after !== undefined) id(after);
+    return this.firestore.runTransaction(async tx => {
+      const profiles = await tx.get(this.profiles(storeId));
+      owner(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get('caseId') ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined, storeId, userId);
+      let query = this.root(storeId).collection('storeCoupons').orderBy(FieldPath.documentId()).limit(limit + 1);
+      if (after !== undefined) query = query.startAfter(after);
+      const snapshot = await tx.get(query), records: VersionedStoreCouponRecord[] = [];
+      let bytes = 4096; // Envelope/cursor allowance; includes every returned record.
+      for (const doc of snapshot.docs.slice(0, limit)) {
+        const record = doc.get('schemaVersion') === 2 ? await this.structuredCouponRecord(tx, doc.data(), storeId, doc.id, userId) : couponRecord(doc.data(), this.realm, storeId);
+        if (record.couponId !== doc.id) fail('invalid_state', 409);
+        const size = Buffer.byteLength(JSON.stringify(record), 'utf8') + 1;
+        if (bytes + size > 8 * 1024 * 1024) {if (!records.length) fail('unavailable', 503); break;}
+        records.push(record); bytes += size;
+      }
+      return {records, nextCursor: snapshot.docs.length > records.length ? records.at(-1)!.couponId : null};
+    });
+  }
+  async publicCouponSnapshotV2(storeId: string, after: string | undefined, limit: number): Promise<VersionedStoreCouponSnapshot> {
+    integer(limit,1,401);if(after!==undefined)id(after);
+    return this.firestore.runTransaction(async tx=>{
+      const profiles=await tx.get(this.profiles(storeId)),profile=owner(profiles.size===1&&profiles.docs[0]!.id===profiles.docs[0]!.get('caseId')?
+        profiles.docs[0]!.data() as WorkspaceProfileRecord:undefined,storeId);
+      let query=this.root(storeId).collection('storeCoupons').orderBy(FieldPath.documentId()).limit(limit+1);
+      if(after!==undefined)query=query.startAfter(after);
+      const snapshot=await tx.get(query),records:VersionedStoreCouponRecord[]=[];let bytes=4096;
+      for(const doc of snapshot.docs.slice(0,limit)){
+        const record=doc.get('schemaVersion')===2?await this.structuredCouponRecord(tx,doc.data(),storeId,doc.id,profile.ownerUserId):
+          couponRecord(doc.data(),this.realm,storeId);
+        if(record.couponId!==doc.id)fail('invalid_state',409);
+        bytes+=Buffer.byteLength(JSON.stringify(record),'utf8')+1;
+        if(bytes>8*1024*1024)fail('unavailable',503);
+        records.push(record);
+      }
+      return {profile:structuredClone(profile),records,observedAt:this.now().toISOString(),
+        nextCursor:snapshot.docs.length>records.length?records.at(-1)!.couponId:null};
+    });
+  }
+  async reconcileCouponV2(command: StoreCouponV2Command): Promise<StoreCouponV2Record | undefined> {
+    command = checkedStructuredCouponCommand(structuredClone(command));
+    if (command.realm !== this.realm) fail();
+    return this.firestore.runTransaction(async tx => {
+      const [profiles, receipt] = await Promise.all([tx.get(this.profiles(command.storeId)),
+        tx.get(this.root(command.storeId).collection('storeCouponReceipts').doc(cataloguePayloadHash([id(command.ownerUserId), id(command.idempotencyKey)])))]);
+      owner(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get('caseId') ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined,
+        command.storeId, command.ownerUserId);
+      return receipt.exists ? this.originalStructuredCoupon(tx, command, receipt.data()) : undefined;
+    });
+  }
+  private couponDraftRoot(storeId: string, accountId: string) {
+    return this.root(storeId).collection('storeCouponDraftOwners').doc(cataloguePayloadHash(id(accountId)).toLowerCase());
+  }
+  private couponDraftHead(storeId: string, accountId: string, couponId: string) {
+    return this.couponDraftRoot(storeId, accountId).collection('campaigns')
+      .doc(cataloguePayloadHash([accountId, checkedStoreCouponDraftId(couponId)]).toLowerCase());
+  }
+  private async readDraftManifest(tx: Transaction, raw: unknown, accountId: string, storeId: string, expectedCouponId?: string): Promise<StoreCouponDraftRecord> {
+    const manifest = exact(raw, ['schemaVersion', 'storeCouponDraftVersion', 'accountId', 'realm', 'storeId', 'couponId',
+      'sourceRevision', 'observedAt', 'payloadHash', 'payloadBytes', 'pageCount']);
+    const couponId = checkedStoreCouponDraftId(manifest.couponId);
+    if (manifest.schemaVersion !== 1 || manifest.storeCouponDraftVersion !== 1 || manifest.accountId !== accountId ||
+        manifest.realm !== this.realm || manifest.storeId !== storeId || expectedCouponId !== undefined && couponId !== expectedCouponId ||
+        typeof manifest.payloadHash !== 'string' || !/^[a-f0-9]{64}$/iu.test(manifest.payloadHash)) fail('invalid_state', 409);
+    integer(manifest.sourceRevision, 1, 1_000_000_000); integer(manifest.payloadBytes, 1, 8 * 1024 * 1024); integer(manifest.pageCount, 1, 128);
+    const version = this.couponDraftHead(storeId, accountId, couponId).collection('revisions').doc(String(manifest.sourceRevision));
+    const campaign = await this.couponLiteral(tx, version, manifest);
+    return couponDraftRecord({schemaVersion: 1, storeCouponDraftVersion: 1, accountId, realm: this.realm, storeId, couponId,
+      sourceRevision: manifest.sourceRevision, observedAt: manifest.observedAt, campaign}, accountId, this.realm, storeId, this.now().toISOString());
+  }
+  private async originalCouponDraft(tx: Transaction, command: StoreCouponDraftCommand, raw: unknown): Promise<StoreCouponDraftRecord> {
+    const receipt = exact(raw, ['schemaVersion', 'fingerprint', 'manifest']);
+    if (receipt.schemaVersion !== 1 || receipt.fingerprint !== command.fingerprint) fail('conflict', 409);
+    const record = await this.readDraftManifest(tx, receipt.manifest, command.ownerUserId, command.storeId, command.couponId);
+    if (record.sourceRevision !== command.expectedSourceRevision + 1 || JSON.stringify(record.campaign) !== JSON.stringify(command.campaign)) fail('invalid_state', 409);
+    return record;
+  }
+  async saveCouponDraft(command: StoreCouponDraftCommand): Promise<StoreCouponDraftRecord> {
+    command = checkedCouponDraftCommand(structuredClone(command));
+    if (command.realm !== this.realm) fail();
+    const head = this.couponDraftHead(command.storeId, command.ownerUserId, command.couponId);
+    const receiptRef = this.couponDraftRoot(command.storeId, command.ownerUserId).collection('receipts').doc(cataloguePayloadHash(command.idempotencyKey));
+    return this.firestore.runTransaction(async tx => {
+      const [profiles, current, receipt] = await Promise.all([tx.get(this.profiles(command.storeId)), tx.get(head), tx.get(receiptRef)]);
+      owner(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get('caseId') ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined,
+        command.storeId, command.ownerUserId);
+      if (receipt.exists) return this.originalCouponDraft(tx, command, receipt.data());
+      const previous = current.exists ? await this.readDraftManifest(tx, current.data(), command.ownerUserId, command.storeId, command.couponId) : undefined;
+      if ((previous?.sourceRevision ?? 0) !== command.expectedSourceRevision || previous && previous.campaign.revision >= command.campaign.revision) fail('conflict', 409);
+      const observedAt = this.now().toISOString(); if (command.observedAt > observedAt) fail();
+      const {pages, payloadBytes, payloadHash} = this.couponPayload(command.campaign);
+      const manifest = {schemaVersion: 1, storeCouponDraftVersion: 1, accountId: command.ownerUserId, realm: this.realm,
+        storeId: command.storeId, couponId: command.couponId, sourceRevision: command.expectedSourceRevision + 1,
+        observedAt, payloadHash, payloadBytes, pageCount: pages.length};
+      const version = head.collection('revisions').doc(String(manifest.sourceRevision));
+      tx.set(head, manifest); tx.create(version, manifest);
+      for (const [index, text] of pages.entries()) tx.create(version.collection('payloadPages').doc(String(index)), {schemaVersion: 1, index, text});
+      tx.create(receiptRef, {schemaVersion: 1, fingerprint: command.fingerprint, manifest});
+      return couponDraftRecord({schemaVersion: 1, storeCouponDraftVersion: 1, accountId: command.ownerUserId,
+        realm: this.realm, storeId: command.storeId, couponId: command.couponId, sourceRevision: manifest.sourceRevision,
+        observedAt, campaign: command.campaign}, command.ownerUserId, this.realm, command.storeId, observedAt);
+    });
+  }
+  async readCouponDraft(storeId: string, couponId: string, userId: string): Promise<StoreCouponDraftRecord | undefined> {
+    const head = this.couponDraftHead(storeId, userId, couponId);
+    return this.firestore.runTransaction(async tx => {
+      const profiles = await tx.get(this.profiles(storeId));
+      owner(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get('caseId') ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined, storeId, userId);
+      const current = await tx.get(head);
+      return current.exists ? this.readDraftManifest(tx, current.data(), userId, storeId, couponId) : undefined;
+    });
+  }
+  async pageCouponDrafts(storeId: string, after: string | undefined, limit: number, userId: string): Promise<StoreCouponDraftPage> {
+    integer(limit, 1, 20); if (after !== undefined && !/^[a-f0-9]{64}$/u.test(after)) fail();
+    return this.firestore.runTransaction(async tx => {
+      const profiles = await tx.get(this.profiles(storeId));
+      owner(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get('caseId') ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined, storeId, userId);
+      let query = this.couponDraftRoot(storeId, userId).collection('campaigns').orderBy(FieldPath.documentId()).limit(limit + 1);
+      if (after !== undefined) query = query.startAfter(after);
+      const snapshot = await tx.get(query), records: StoreCouponDraftRecord[] = [];
+      let bytes = 4096, last: string | null = null;
+      for (const doc of snapshot.docs.slice(0, limit)) {
+        const record = await this.readDraftManifest(tx, doc.data(), userId, storeId);
+        if (doc.id !== cataloguePayloadHash([userId, record.couponId]).toLowerCase()) fail('invalid_state', 409);
+        const size = Buffer.byteLength(JSON.stringify(record), 'utf8') + 1;
+        if (bytes + size > 8 * 1024 * 1024) {if (!records.length) fail('unavailable', 503); break;}
+        records.push(record); bytes += size; last = doc.id;
+      }
+      return {records, nextCursor: snapshot.size > records.length ? last : null};
+    });
+  }
+  async reconcileCouponDraft(command: StoreCouponDraftCommand): Promise<StoreCouponDraftRecord | undefined> {
+    command = checkedCouponDraftCommand(structuredClone(command));
+    if (command.realm !== this.realm) fail();
+    return this.firestore.runTransaction(async tx => {
+      const [profiles, receipt] = await Promise.all([tx.get(this.profiles(command.storeId)), tx.get(
+        this.couponDraftRoot(command.storeId, command.ownerUserId).collection('receipts').doc(cataloguePayloadHash(command.idempotencyKey)))]);
+      owner(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get('caseId') ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined,
+        command.storeId, command.ownerUserId);
+      return receipt.exists ? this.originalCouponDraft(tx, command, receipt.data()) : undefined;
     });
   }
 }

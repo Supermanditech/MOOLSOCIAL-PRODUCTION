@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
@@ -18,6 +21,24 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 
 // Isolated host records/transport only; never native Store or published offers.
+class _HostCouponWorkspaceGateway extends UnavailableWorkGateway {
+  _HostCouponWorkspaceGateway(this.profile);
+  final String profile;
+  WorkReviewResult _record() {
+    final checked = DateTime.now().toUtc().subtract(const Duration(seconds: 1));
+    return WorkReviewResult(caseId: 'host-coupon-case', status: WorkRemoteReviewStatus.approved,
+      plan: 'free', workspaceId: 'store-one', profileId: profile, name: 'HOST supplier', area: 'Jaipur',
+      access: WorkWorkspaceAccess(accountId: 'owner-one', caseId: 'host-coupon-case', workspaceId: 'store-one',
+        profileId: profile, version: 1, membershipId: 'host-coupon-member', applicationUpdatedAt: checked,
+        checkedAt: checked, effectiveFrom: checked, expiresAt: checked.add(const Duration(minutes: 10))));
+  }
+  @override Future<List<WorkReviewResult>> loadFeed() async => [_record()];
+  @override Future<WorkReviewResult> checkReview(String caseId) async {
+    if (caseId != 'host-coupon-case') throw StateError('Foreign HOST application');
+    return _record();
+  }
+}
+
 class _RichOfferMemory extends catalogue.ListingAccount {
   final values = <String, Map<String, Object?>>{};
   bool unknownSave = false;
@@ -184,6 +205,60 @@ class CouponPending implements StoreCouponPendingStore {
     if (failClear) throw StateError('Host clear failed');
     if (original != null && original!.fingerprint != value.fingerprint) throw const FormatException();
     original = null;
+  }
+}
+// Isolated HOST lifecycle fakes. Actual DTOs are qualified separately above.
+class _PrivateDraftPending implements StoreCouponDraftPendingStore {
+  StoreCouponDraftIntent? original;
+  bool failBeforeSave = false, failAfterSave = false, failClear = false;
+  Future<void> Function()? afterSave;
+  @override Future<StoreCouponDraftIntent?> read(StorePromotionScope scope) async => original;
+  @override Future<void> save(StoreCouponDraftIntent intent) async {
+    if (failBeforeSave) throw StateError('HOST journal did not save');
+    if (original != null && original!.fingerprint != intent.fingerprint) throw const FormatException();
+    original ??= intent;
+    await afterSave?.call();
+    if (failAfterSave) throw StateError('HOST journal acknowledgement lost');
+  }
+  @override Future<void> clear(StoreCouponDraftIntent intent) async {
+    if (failClear) throw StateError('HOST clear failed');
+    if (original != null && original!.fingerprint != intent.fingerprint) throw const FormatException();
+    original = null;
+  }
+}
+class _PrivateDraftGateway implements StoreCouponDraftGateway {
+  @override bool storeCouponDraftsSupported = true;
+  StoreCouponDraftRecord? head;
+  final receipts = <String, StoreCouponDraftRecord>{};
+  final writes = <StoreCouponDraftIntent>[], checks = <StoreCouponDraftIntent>[];
+  int reads = 0, effects = 0;
+  bool unknownWrite = false;
+  StorePromotionResultState? writeState, recoveryState;
+  Future<void> Function()? beforeRead, afterWrite;
+  StoreCouponDraftRecord acknowledge(StoreCouponDraftIntent intent) => StoreCouponDraftRecord.decode({
+    'schemaVersion': 1, 'storeCouponDraftVersion': 1, 'accountId': intent.scope.account, 'realm': intent.scope.realm,
+    'storeId': intent.scope.store, 'couponId': intent.couponId, 'sourceRevision': intent.expectedSourceRevision + 1,
+    'observedAt': at.toIso8601String(), 'campaign': intent.campaign.toJson()}, intent.scope, at);
+  @override Future<StoreCouponDraftRecord?> readCouponDraft(StorePromotionScope scope, String couponId, bool Function() current) async {
+    reads++; await beforeRead?.call(); return head;
+  }
+  @override Future<StoreCouponDraftPage> listCouponDrafts(StorePromotionScope scope, bool Function() current, {String? after, int limit = 20}) async => StoreCouponDraftPage([], null);
+  @override Future<StoreCouponDraftResult> saveCouponDraft(StoreCouponDraftIntent intent, bool Function() current) async {
+    writes.add(intent);
+    if (!current()) return const StoreCouponDraftResult(StorePromotionResultState.notSent);
+    if (writeState != null) return StoreCouponDraftResult(writeState!);
+    final receipt = receipts[intent.fingerprint];
+    if (receipt == null) {effects++; receipts[intent.fingerprint] = head = acknowledge(intent);}
+    await afterWrite?.call();
+    return unknownWrite ? const StoreCouponDraftResult(StorePromotionResultState.unknown) :
+      StoreCouponDraftResult(StorePromotionResultState.saved, record: receipts[intent.fingerprint]);
+  }
+  @override Future<StoreCouponDraftResult> reconcileCouponDraft(StoreCouponDraftIntent intent, bool Function() current) async {
+    checks.add(intent);
+    if (recoveryState != null) return StoreCouponDraftResult(recoveryState!);
+    final original = receipts[intent.fingerprint];
+    return original == null ? const StoreCouponDraftResult(StorePromotionResultState.unknown) :
+      StoreCouponDraftResult(StorePromotionResultState.saved, record: original);
   }
 }
 class CouponProvider implements StoreCouponGateway {
@@ -359,6 +434,569 @@ void main() {
       name: 'Host Holi savings', structuredTerms: offerTerms(kind: kind),
       buyerReferences: kind == BuyV2StoreOfferKind.buyerDiscount ? const ['customer-one'] : const [],
       startsAt: at, endsAt: at.add(const Duration(days: 2)), totalUses: 20, usesPerCustomer: 1);
+
+  test('AGG09 native structured inputs and original fingerprints preserve all seven kinds and large selections', () {
+    final inputs = [for (final kind in BuyV2StoreOfferKind.values)
+      StoreCouponIntent(scope: scope, couponId: 'coupon-${kind.name}', expectedRevision: 0,
+        idempotencyKey: 'request-${kind.name}', input: StoreCouponInput.fromCampaign(richDraft(kind: kind), active: true),
+        fundingAcknowledged: true)];
+    final large = StoreCouponCampaign.offer(id: 'coupon-large', storeId: scope.store, revision: 1,
+      name: 'HOST large native terms', structuredTerms: BuyV2StoreOfferTerms(storeId: scope.store,
+        kind: BuyV2StoreOfferKind.productDiscount, channels: const {'retail', 'wholesale', 'bulk'},
+        skus: [for (var i = 0; i < 1000; i++) BuyV2StoreOfferSku(storeId: scope.store, skuId: 'sku-$i',
+          title: List.filled(40, 'हिंदी').join(), sellUnit: List.filled(40, 'पैक').join(),
+          listings: [for (final channel in BuyV2OfferClass.values) BuyV2PublicListingIdentity(
+            listingId: 'listing-${List.filled(64, 'a').join()}', realm: scope.realm, storeId: scope.store,
+            skuId: 'sku-$i', canonicalProductId: 'product-$i', verifiedPackId: 'pack-$i', channel: channel)])],
+        discountKind: 'flat', discountValue: 100, maximumSavingMinor: 100),
+      startsAt: at, endsAt: at.add(const Duration(days: 2)), totalUses: 100, usesPerCustomer: 1);
+    inputs.add(StoreCouponIntent(scope: scope, couponId: large.id, expectedRevision: 0,
+      idempotencyKey: 'request-large', input: StoreCouponInput.fromCampaign(large, active: true), fundingAcknowledged: true));
+    expect(utf8.encode(jsonEncode(inputs.last.body)).length, greaterThan(1024 * 1024));
+    for (final intent in inputs) {
+      expect(StoreCouponIntent.fromJson(intent.toJson()).fingerprint, intent.fingerprint);
+      expect(intent.input.toJson()['structuredTerms']['schemaVersion'], 1);
+    }
+    final campaigns = {for (final intent in inputs) intent.couponId:
+      StoreCouponCampaign.fromJson({...(intent.input.toJson()..remove('active')),
+        'id': intent.couponId, 'storeId': scope.store, 'revision': 1}, scope.store).toJson()};
+    final legacyCampaign = StoreCouponCampaign(id: 'A', storeId: scope.store, revision: 12,
+      name: 'HOST existing private draft', percentage: false, discount: 100, minimumSpendMinor: 0,
+      maximumSavingMinor: 100, startsAt: at, endsAt: at.add(const Duration(days: 2)), totalUses: 20, usesPerCustomer: 1);
+    final path = Platform.environment['AGG09_NATIVE_COUPON_WIRE_EXPORT_PATH'];
+    if (path != null) File(path).writeAsStringSync(jsonEncode({'fixture': 'ISOLATED HOST native serializers; never phone authority',
+      'scope': {'account': scope.account, 'store': scope.store, 'realm': scope.realm}, 'now': at.toIso8601String(),
+      'legacyCampaign': legacyCampaign.toJson(),
+      'intents': [for (final intent in inputs) {'input': intent.input.toJson(), 'body': intent.body,
+        'campaign': campaigns[intent.couponId], 'nativeFingerprint': intent.fingerprint}]}));
+  });
+
+  final sdkCouponWire = Platform.environment['AGG09_BACKEND_COUPON_WIRE_EXPORT_PATH'];
+  test('AGG09 structured transport remains explicitly configured through owner rebinding', () {
+    AuthenticatedWorkspaceCatalogueGateway source(bool enabled) => AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: Transport(), realm: scope.realm, ownerAccountId: scope.account,
+      storeCouponTermsV2Supported: enabled);
+    expect(source(false).forOwnerAccount('another-owner').storeCouponTermsV2Supported, isFalse);
+    expect(source(true).forOwnerAccount('another-owner').storeCouponTermsV2Supported, isTrue);
+    expect(source(true).storeCouponTermsSupported, isFalse);
+    expect(source(true).storeCouponEligibilitySupported, isFalse);
+  });
+  test('AGG09 authenticated native v2 gateway decodes actual SDK originals without losing pending fingerprints', () async {
+    final exported = jsonDecode(File(sdkCouponWire!).readAsStringSync()) as Map;
+    expect(exported['fixture'], 'ISOLATED HOST actual SDK original responses; never phone authority');
+    for (final row in exported['rows'] as List) {
+      final original = StoreCouponIntent.fromJson(jsonDecode(row['nativeFingerprint'] as String));
+      final credentials = Credentials(), transport = Transport();
+      transport.reply = (_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': row['response']}));
+      final subject = AuthenticatedStructuredStorePromotionGateway(
+        endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: credentials, transport: transport, ownerAccountId: scope.account, realm: scope.realm,
+        storeCouponTermsSupported: true, now: () => at);
+      expect(subject, isA<StoreStructuredCouponGateway>());
+      expect((await subject.readCoupon(scope, original.couponId, () => true))!.input.fingerprint, original.input.fingerprint);
+      expect((await subject.saveCoupon(original, () => true)).record!.acknowledges(original), isTrue);
+      expect((await subject.reconcileCoupon(original, () => true)).record!.acknowledges(original), isTrue);
+      expect(transport.bodies.map((body) => body['storeCouponTermsVersion']), everyElement(2));
+      expect(credentials.modes, [SocialAppCheckTokenMode.standard, SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.standard]);
+      transport.reply = (_) async => SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': {...row['response'] as Map, 'storeCouponTermsVersion': 1}}));
+      await expectLater(subject.readCoupon(scope, original.couponId, () => true), throwsFormatException);
+      expect((await subject.reconcileCoupon(original, () => true)).state, StorePromotionResultState.unknown);
+    }
+    final pageTransport = Transport();
+    pageTransport.reply = (_) async => SocialContentResponse(statusCode: 200,
+      body: jsonEncode({'ok': true, 'data': exported['byteBoundPage']}));
+    final pageSource = AuthenticatedStructuredStorePromotionGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: pageTransport, ownerAccountId: scope.account, realm: scope.realm,
+      storeCouponTermsSupported: true, now: () => at);
+    final page = await pageSource.listCoupons(scope, () => true);
+    expect(page.records.length, lessThan(20)); expect(page.records, isNotEmpty);
+    expect(page.nextCursor, page.records.last.couponId);
+  }, skip: sdkCouponWire == null ? 'Actual SDK native wire is produced by the explicit local qualification run' : false);
+
+  final sdkDraftWire = Platform.environment['AGG09_BACKEND_COUPON_DRAFT_WIRE_EXPORT_PATH'];
+  test('AGG09 native private draft gateway preserves actual SDK originals and never negotiates publication', () async {
+    final exported = jsonDecode(File(sdkDraftWire!).readAsStringSync()) as Map;
+    expect(exported['fixture'], 'ISOLATED HOST actual SDK private draft originals; never phone authority');
+    for (final row in exported['drafts'] as List) {
+      final campaign = StoreCouponCampaign.fromJson(row['body']['campaign'], scope.store);
+      final intent = StoreCouponDraftIntent(scope: scope, expectedSourceRevision: row['body']['expectedSourceRevision'] as int,
+        idempotencyKey: row['body']['idempotencyKey'] as String, campaign: campaign);
+      expect(StoreCouponDraftIntent.fromJson(intent.toJson()).fingerprint, intent.fingerprint);
+      expect(intent.campaignFingerprint, row['nativeCampaignJson']);
+      final record = StoreCouponDraftRecord.decode(row['record'], scope, at);
+      expect(record.acknowledges(intent), isTrue);
+      if (campaign.id == 'A') {expect(record.sourceRevision, 1); expect(record.campaign.revision, 12);}
+      final credentials = Credentials(), transport = Transport();
+      transport.reply = (_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': row['response']}));
+      final source = AuthenticatedStorePromotionGateway(endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: credentials, transport: transport, ownerAccountId: scope.account, realm: scope.realm,
+        benefitTermsSupported: true, storeCouponDraftsSupported: true, now: () => at);
+      expect(source.storeCouponTermsSupported, isFalse);
+      expect((await source.readCouponDraft(scope, campaign.id, () => true))!.campaignFingerprint, intent.campaignFingerprint);
+      expect((await source.saveCouponDraft(intent, () => true)).record!.acknowledges(intent), isTrue);
+      expect((await source.reconcileCouponDraft(intent, () => true)).record!.acknowledges(intent), isTrue);
+      expect(credentials.modes, [SocialAppCheckTokenMode.standard, SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.standard]);
+      for (final body in transport.bodies) {
+        expect(body['storeCouponDraftVersion'], 1); expect(body.containsKey('storeCouponTermsVersion'), isFalse);
+        expect(body.containsKey('promotionTermsVersion'), isFalse);
+      }
+      transport.reply = (_) async => SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': {...row['response'] as Map, 'publicationConfirmed': true}}));
+      expect((await source.reconcileCouponDraft(intent, () => true)).state, StorePromotionResultState.unknown);
+      expect(() => StoreCouponDraftRecord.decode({...row['record'] as Map, 'accountId': 'foreign-owner'}, scope, at), throwsFormatException);
+    }
+  }, skip: sdkDraftWire == null ? 'Requires explicit actual SDK private draft wire' : false);
+
+  test('AGG09 secure private draft original remains separate from publication and cannot be replaced', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final draft = StoreCouponDraftIntent(scope: scope, expectedSourceRevision: 0, idempotencyKey: 'private-original', campaign: richDraft());
+    final changed = StoreCouponDraftIntent(scope: scope, expectedSourceRevision: 0, idempotencyKey: 'private-changed', campaign: richDraft());
+    final storage = SecureStoreCouponDraftPendingStore(currentAccount: () => scope.account);
+    final publication = SecureStoreCouponPendingStore(currentAccount: () => scope.account);
+    final publicIntent = StoreCouponIntent(scope: scope, couponId: 'publication-one', expectedRevision: 0,
+      idempotencyKey: 'publication-original', input: StoreCouponInput.fromCampaign(richDraft(), active: true), fundingAcknowledged: true);
+    await publication.save(publicIntent); await storage.save(draft);
+    expect((await SecureStoreCouponDraftPendingStore(currentAccount: () => scope.account).read(scope))!.fingerprint, draft.fingerprint);
+    await expectLater(storage.save(changed), throwsFormatException);
+    await expectLater(storage.clear(changed), throwsFormatException);
+    expect((await publication.read(scope))!.fingerprint, publicIntent.fingerprint);
+    await storage.clear(draft); expect(await storage.read(scope), isNull);
+    expect((await publication.read(scope))!.fingerprint, publicIntent.fingerprint);
+    await publication.clear(publicIntent);
+  });
+
+  test('AGG09 secure private draft journal serializes competing instances and rejects a retired account', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    String? account = scope.account;
+    final one = SecureStoreCouponDraftPendingStore(currentAccount: () => account);
+    final two = SecureStoreCouponDraftPendingStore(currentAccount: () => account);
+    StoreCouponDraftIntent command(String key) => StoreCouponDraftIntent(scope: scope, expectedSourceRevision: 0,
+      idempotencyKey: key, campaign: richDraft());
+    final results = await Future.wait([one.save(command('private-first')), two.save(command('private-second'))]
+      .map((future) => future.then((_) => true, onError: (Object _) => false)));
+    expect(results.where((value) => value), hasLength(1));
+    final original = await one.read(scope); expect(original, isNotNull);
+    account = 'foreign-owner';
+    await expectLater(one.read(scope), throwsA(isA<WorkGatewayException>()));
+    await expectLater(two.clear(original!), throwsA(isA<WorkGatewayException>()));
+    account = scope.account;
+    expect((await two.read(scope))!.fingerprint, original.fingerprint);
+    await one.clear(original); expect(await two.read(scope), isNull);
+  });
+
+  StoreCouponDraftSyncController privateController(_PrivateDraftGateway gateway, _PrivateDraftPending journal,
+    {Object? Function()? context}) => StoreCouponDraftSyncController(scope: scope, gateway: gateway,
+      pendingStore: journal, context: context ?? () => 1);
+  test('AGG09 private sync persists the original before dispatch and separates source CAS from native revision', () async {
+    final gateway = _PrivateDraftGateway(), journal = _PrivateDraftPending();
+    gateway.afterWrite = () async {expect(journal.original, isNotNull); expect(journal.original!.fingerprint, gateway.writes.single.fingerprint);};
+    final controller = privateController(gateway, journal); addTearDown(controller.dispose);
+    final draft = StoreCouponCampaign.fromJson({...richDraft().toJson(), 'revision': 27}, scope.store);
+    expect((await controller.sync(draft, inputCurrent: () => true)).state, StorePromotionResultState.saved);
+    expect(gateway.writes.single.expectedSourceRevision, 0); expect(gateway.writes.single.campaign.revision, 27);
+    expect(gateway.effects, 1); expect(journal.original, isNull);
+    expect(controller.lastAcknowledged!.sourceRevision, 1); expect(controller.lastAcknowledged!.campaign.revision, 27);
+    expect(gateway.writes.single.body.containsKey('fundingAcknowledged'), isFalse);
+  });
+  for (final afterCommit in [false, true]) {
+    test('AGG09 private journal failure blocks dispatch and reloads actual retained state afterCommit=$afterCommit', () async {
+      final gateway = _PrivateDraftGateway(), journal = _PrivateDraftPending()
+        ..failBeforeSave = !afterCommit ..failAfterSave = afterCommit;
+      final controller = privateController(gateway, journal); addTearDown(controller.dispose);
+      expect((await controller.sync(richDraft(), inputCurrent: () => true)).state, StorePromotionResultState.unknown);
+      expect(gateway.writes, isEmpty); expect(controller.ready, isFalse);
+      journal.failBeforeSave = false; journal.failAfterSave = false;
+      expect(await controller.restore(), isTrue);
+      expect(controller.pending != null, afterCommit);
+      if (afterCommit) {
+        expect((await controller.retryOriginal(confirmedOriginal: false)).state, StorePromotionResultState.unknown);
+        expect(gateway.writes, isEmpty);
+        expect((await controller.retryOriginal(confirmedOriginal: true)).state, StorePromotionResultState.saved);
+      } else {
+        expect((await controller.sync(richDraft(), inputCurrent: () => true)).state, StorePromotionResultState.saved);
+      }
+      expect(gateway.effects, 1); expect(journal.original, isNull);
+    });
+  }
+  test('AGG09 private original recovery returns the immutable result rather than a later current head', () async {
+    final gateway = _PrivateDraftGateway()..unknownWrite = true, journal = _PrivateDraftPending();
+    final first = privateController(gateway, journal);
+    expect((await first.sync(richDraft(), inputCurrent: () => true)).state, StorePromotionResultState.unknown);
+    final original = journal.original!; first.dispose();
+    gateway.head = gateway.acknowledge(StoreCouponDraftIntent(scope: scope, expectedSourceRevision: 1, idempotencyKey: 'later-host-save',
+      campaign: StoreCouponCampaign.fromJson({...richDraft().toJson(), 'revision': 2, 'name': 'HOST later terms'}, scope.store)));
+    final restarted = privateController(gateway, journal); addTearDown(restarted.dispose);
+    expect(await restarted.restore(), isTrue); expect(restarted.pending!.fingerprint, original.fingerprint);
+    expect((await restarted.reconcile()).state, StorePromotionResultState.saved);
+    expect(restarted.lastAcknowledged!.sourceRevision, 1); expect(gateway.head!.sourceRevision, 2);
+    expect(restarted.lastAcknowledged!.campaign.name, richDraft().name);
+    expect(gateway.checks.single.fingerprint, original.fingerprint); expect(gateway.effects, 1); expect(journal.original, isNull);
+  });
+  for (final state in [StorePromotionResultState.notSent, StorePromotionResultState.rejected, StorePromotionResultState.unknown]) {
+    test('AGG09 private unacknowledged recovery/retry cannot erase the original $state', () async {
+      final gateway = _PrivateDraftGateway()..unknownWrite = true, journal = _PrivateDraftPending();
+      final controller = privateController(gateway, journal); addTearDown(controller.dispose);
+      await controller.sync(richDraft(), inputCurrent: () => true);
+      final original = journal.original!;
+      gateway.recoveryState = state; gateway.writeState = state;
+      expect((await controller.reconcile()).state, StorePromotionResultState.unknown);
+      expect((await controller.retryOriginal(confirmedOriginal: true)).state, StorePromotionResultState.unknown);
+      expect(journal.original!.fingerprint, original.fingerprint);
+      expect(gateway.writes.last.fingerprint, original.fingerprint); expect(gateway.effects, 1);
+    });
+  }
+  test('AGG09 private busy/current-input fences prevent a second or stale dispatch', () async {
+    final gateway = _PrivateDraftGateway(), journal = _PrivateDraftPending(), gate = Completer<void>(), entered = Completer<void>();
+    gateway.beforeRead = () async {entered.complete(); await gate.future;};
+    var current = true;
+    final controller = privateController(gateway, journal); addTearDown(controller.dispose);
+    final first = controller.sync(richDraft(), inputCurrent: () => current);
+    await entered.future;
+    expect((await controller.sync(richDraft(), inputCurrent: () => true)).state, StorePromotionResultState.notSent);
+    current = false; gate.complete();
+    expect((await first).state, StorePromotionResultState.notSent); expect(gateway.writes, isEmpty); expect(journal.original, isNull);
+  });
+  test('AGG09 private retained original survives retirement and failed durable clear without another effect', () async {
+    final gateway = _PrivateDraftGateway(), journal = _PrivateDraftPending();
+    Object? lifetime = Object();
+    final controller = privateController(gateway, journal, context: () => lifetime);
+    gateway.afterWrite = () async {lifetime = null;};
+    expect((await controller.sync(richDraft(), inputCurrent: () => true)).state, StorePromotionResultState.unknown);
+    expect(journal.original, isNotNull); controller.dispose();
+    final restarted = privateController(gateway, journal); addTearDown(restarted.dispose);
+    journal.failClear = true;
+    expect((await restarted.reconcile()).state, StorePromotionResultState.unknown); expect(journal.original, isNotNull);
+    journal.failClear = false;
+    expect((await restarted.reconcile()).state, StorePromotionResultState.saved); expect(journal.original, isNull); expect(gateway.effects, 1);
+  });
+  test('AGG09 private expired campaign may sync as a draft but cannot authorize active publication', () async {
+    final gateway = _PrivateDraftGateway(), journal = _PrivateDraftPending();
+    final controller = privateController(gateway, journal); addTearDown(controller.dispose);
+    final draft = StoreCouponCampaign.fromJson({...richDraft().toJson(), 'startsAt': DateTime.utc(2020).toIso8601String(),
+      'endsAt': DateTime.utc(2020, 2).toIso8601String()}, scope.store);
+    expect((await controller.sync(draft, inputCurrent: () => true)).state, StorePromotionResultState.saved);
+    expect(() => StoreCouponInput.fromCampaign(draft, active: true).validateForSave(at), throwsFormatException);
+  });
+
+  WorkSession privateDraftOwner(Transport transport, _PrivateDraftPending journal, _RichOfferMemory book,
+      {bool enabled = true, bool structured = false}) => WorkSession(gateway: _HostCouponWorkspaceGateway('retailer-grocery'),
+    contactDraftStore: catalogue.ListingAccount(), offerDraftStoreFactory: (_) => book,
+    storeCouponDraftPendingStoreFactory: (_) => journal,
+    storeCouponPendingStoreFactory: (_) => CouponPending(),
+    catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, ownerAccountId: scope.account, realm: scope.realm,
+      storeCouponDraftsSupported: enabled, storeCouponTermsV2Supported: structured))
+    ..activeWorkspace = WorkWorkspace(id: scope.store, name: 'HOST private draft owner',
+      profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+  for (final enabled in [false, true]) {
+    test('AGG09 explicit native Save alone may queue configured private backing enabled=$enabled', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final transport = Transport(), journal = _PrivateDraftPending(), book = _RichOfferMemory();
+      Map<String, Object?>? head;
+      transport.reply = (body) async {
+        expect(body['storeCouponDraftVersion'], 1);
+        expect(body.containsKey('storeCouponTermsVersion'), isFalse);
+        if (body['operation'] == 'saveStoreCouponDraft') {
+          head = {'schemaVersion': 1, 'storeCouponDraftVersion': 1, 'accountId': scope.account,
+            'realm': scope.realm, 'storeId': scope.store, 'couponId': body['couponId'],
+            'sourceRevision': (body['expectedSourceRevision'] as int) + 1,
+            'observedAt': DateTime.now().toUtc().toIso8601String(), 'campaign': body['campaign']};
+        }
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+          'schemaVersion': 1, 'storeCouponDraftVersion': 1, 'accountId': scope.account,
+          'realm': scope.realm, 'storeId': scope.store, 'observedAt': DateTime.now().toUtc().toIso8601String(),
+          'publicationConfirmed': false, 'record': head}}));
+      };
+      final owner = privateDraftOwner(transport, journal, book, enabled: enabled); addTearDown(owner.dispose);
+      expect(await owner.recoverWorkspaceAccount(accountReady: true), isTrue); await owner.refreshFeed();
+      expect(owner.workspaceStoreAuthoringAvailable, isTrue);
+      expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: scope.store), isTrue);
+      expect(owner.workspaceAssistantLoadedCouponDraftSync, isNull);
+      expect(transport.bodies, isEmpty); expect(journal.original, isNull);
+      final campaign = StoreCouponCampaign.fromJson({...richDraft().toJson(), 'revision': 1}, scope.store);
+      expect(await owner.saveWorkspaceStoreCouponCampaign(campaign, expectedStoreId: scope.store), isTrue);
+      await owner.waitForWorkspaceCouponDraftSync();
+      expect(owner.workspaceStoreCouponCampaigns.single.toJson(), campaign.toJson());
+      expect(transport.bodies.where((body) => body['operation'] == 'saveStoreCouponDraft'), hasLength(enabled ? 1 : 0));
+      expect(transport.bodies.where((body) => body['operation'] == 'saveStoreCoupon'), isEmpty);
+      expect(journal.original, isNull);
+      expect(owner.workspaceAssistantLoadedCouponDraftSync?.lastAcknowledged?.sourceRevision, enabled ? 1 : null);
+      final before = transport.bodies.length;
+      expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: scope.store), isTrue);
+      await owner.waitForWorkspaceCouponDraftSync();
+      expect(transport.bodies, hasLength(before));
+    });
+  }
+  test('AGG09 a later local Save cannot replace an unresolved private original', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final transport = Transport(), journal = _PrivateDraftPending(), book = _RichOfferMemory();
+    transport.reply = (body) async => body['operation'] == 'readStoreCouponDraft'
+      ? SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+          'schemaVersion': 1, 'storeCouponDraftVersion': 1, 'accountId': scope.account,
+          'realm': scope.realm, 'storeId': scope.store, 'observedAt': DateTime.now().toUtc().toIso8601String(),
+          'publicationConfirmed': false, 'record': null}}))
+      : SocialContentResponse(statusCode: 503, body: '{}');
+    final owner = privateDraftOwner(transport, journal, book); addTearDown(owner.dispose);
+    expect(await owner.recoverWorkspaceAccount(accountReady: true), isTrue); await owner.refreshFeed();
+    expect(await owner.loadWorkspaceOfferDraft(expectedStoreId: scope.store), isTrue);
+    final first = StoreCouponCampaign.fromJson({...richDraft().toJson(), 'revision': 1}, scope.store);
+    expect(await owner.saveWorkspaceStoreCouponCampaign(first, expectedStoreId: scope.store), isTrue);
+    await owner.waitForWorkspaceCouponDraftSync(); final original = journal.original!;
+    final next = StoreCouponCampaign.fromJson({...first.toJson(), 'revision': 2, 'name': 'HOST later private edit'}, scope.store);
+    expect(await owner.saveWorkspaceStoreCouponCampaign(next, expectedStoreId: scope.store), isTrue);
+    await owner.waitForWorkspaceCouponDraftSync();
+    expect(owner.workspaceStoreCouponCampaigns.single.toJson(), next.toJson());
+    expect(journal.original!.fingerprint, original.fingerprint);
+    expect(transport.bodies.where((body) => body['operation'] == 'saveStoreCouponDraft'), hasLength(1));
+    expect(transport.bodies.where((body) => body['operation'] == 'reconcileStoreCouponDraft'), hasLength(1));
+    expect(transport.bodies.where((body) => body['operation'] == 'saveStoreCoupon'), isEmpty);
+  });
+
+  final privateProofWire = Platform.environment['AGG09_COUPON_PRIVATE_CONTEXT_EXPORT_PATH'];
+  test('AGG09 a legacy coupon ID resembling an opaque selector remains valid when private backing is off', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final transport = Transport(), journal = _PrivateDraftPending(), book = _RichOfferMemory(),
+      campaign = StoreCouponCampaign.fromJson({...richDraft().toJson(), 'id': 'coupon-draft:${'a' * 64}'}, scope.store);
+    final owner = privateDraftOwner(transport, journal, book, enabled: false); addTearDown(owner.dispose);
+    expect(await owner.recoverWorkspaceAccount(accountReady: true), isTrue); await owner.refreshFeed();
+    expect(owner.workspaceAssistantCouponEntityMatches(campaign, campaign.id), isTrue);
+    expect(owner.workspaceAssistantCouponEntityMatches(campaign, null), isFalse);
+    expect(transport.bodies, isEmpty);
+  });
+  test('AGG09 native selectors and source proofs match backend context for actual SDK originals', () {
+    final wire = jsonDecode(File(privateProofWire!).readAsStringSync()) as Map;
+    expect(wire['fixture'], 'ISOLATED HOST actual SDK originals and backend context proofs; never phone authority');
+    for (final row in wire['drafts'] as List) {
+      final record = StoreCouponDraftRecord.decode(row['record'], scope, at);
+      expect(WorkSession.workspaceAssistantCouponDraftSelector(scope, record.couponId), row['selector']);
+      expect(WorkSession.workspaceAssistantPrivateCouponSourceProof(record,
+        publishedAvailable: row['publishedAvailable'] as bool, published: null), row['proof']);
+    }
+  }, skip: privateProofWire == null ? 'Requires actual SDK original/backend context qualification' : false);
+  for (final mode in ['absent', 'unavailable', 'forbidden', 'malformed']) {
+    test('AGG09 AI private capture is observational and separates original publication states $mode', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final transport = Transport(), journal = _PrivateDraftPending(), book = _RichOfferMemory(),
+        campaign = StoreCouponCampaign.fromJson({...richDraft().toJson(), 'revision': 1}, scope.store),
+        observed = DateTime.now().toUtc(), record = StoreCouponDraftRecord.decode({
+          'schemaVersion': 1, 'storeCouponDraftVersion': 1, 'accountId': scope.account, 'realm': scope.realm,
+          'storeId': scope.store, 'couponId': campaign.id, 'sourceRevision': 4,
+          'observedAt': observed.toIso8601String(), 'campaign': campaign.toJson()}, scope, observed);
+      book.values[scope.account] = {'schemaVersion': 1, 'storeId': scope.store,
+        'fields': {'storeCouponCampaignsV1': encodeStoreCouponCampaigns([campaign])}};
+      transport.reply = (body) async {
+        if (body['operation'] == 'readStoreCouponDraft') return SocialContentResponse(statusCode: 200,
+          body: jsonEncode({'ok': true, 'data': {'schemaVersion': 1, 'storeCouponDraftVersion': 1,
+            'accountId': scope.account, 'realm': scope.realm, 'storeId': scope.store,
+            'observedAt': observed.toIso8601String(), 'publicationConfirmed': false, 'record': {
+              'schemaVersion': 1, 'storeCouponDraftVersion': 1, 'accountId': scope.account, 'realm': scope.realm,
+              'storeId': scope.store, 'couponId': campaign.id, 'sourceRevision': 4,
+              'observedAt': observed.toIso8601String(), 'campaign': campaign.toJson()}}}));
+        expect(body['operation'], 'readStoreCoupon'); expect(body['storeCouponTermsVersion'], 2);
+        if (mode != 'absent') return SocialContentResponse(statusCode: mode == 'unavailable' ? 503 : mode == 'forbidden' ? 403 : 200, body: '{}');
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+          'schemaVersion': 1, 'storeCouponTermsVersion': 2, 'realm': scope.realm, 'storeId': scope.store,
+          'orderingAvailable': false, 'redemptionAvailable': false, 'publicationConfirmed': false, 'record': null}}));
+      };
+      final owner = privateDraftOwner(transport, journal, book, structured: true); addTearDown(owner.dispose);
+      expect(await owner.recoverWorkspaceAccount(accountReady: true), isTrue); await owner.refreshFeed();
+      final selector = WorkSession.workspaceAssistantCouponDraftSelector(scope, campaign.id),
+        proof = WorkSession.workspaceAssistantPrivateCouponSourceProof(record, publishedAvailable: mode == 'absent', published: null),
+        expected = {('AI-ACT-309', selector): proof, ('AI-ACT-310', selector): proof},
+        before = jsonEncode(book.values);
+      expect(owner.workspaceAssistantLoadedCouponDraftSync, isNull); expect(owner.workspaceAssistantLoadedCouponController, isNull);
+      final ready = await owner.readWorkspaceAssistantOriginalCoupons(expected, accountUserId: scope.account,
+        inputCurrent: () => true, validUntil: DateTime.now().add(const Duration(minutes: 1)));
+      expect(ready, mode == 'absent' ? expected.keys.toSet() : mode == 'unavailable' ? {('AI-ACT-309', selector)} : isEmpty);
+      expect(owner.workspaceAssistantLoadedCouponDraftSync, isNull); expect(owner.workspaceAssistantLoadedCouponController, isNull);
+      expect(journal.original, isNull); expect(jsonEncode(book.values), before);
+      expect(transport.bodies.every((body) => ['readStoreCouponDraft', 'readStoreCoupon'].contains(body['operation'])), isTrue);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    for (final outcome in ['cancel', 'confirm', 'retire']) {
+      testWidgets('AGG09 private manager checks status and retries only the confirmed retained original $outcome text$scale', (tester) async {
+        FlutterSecureStorage.setMockInitialValues({});
+        tester.view.physicalSize = const Size(360, 800); tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final transport = Transport(), journal = _PrivateDraftPending(), book = _RichOfferMemory(),
+          campaign = StoreCouponCampaign.fromJson({...richDraft().toJson(), 'revision': 1}, scope.store),
+          later = StoreCouponCampaign.fromJson({...campaign.toJson(), 'revision': 2, 'name': 'HOST later private edits'}, scope.store),
+          original = StoreCouponDraftIntent(scope: scope, expectedSourceRevision: 0,
+            idempotencyKey: 'HOST-original-private-retry', campaign: campaign);
+        journal.original = original;
+        book.values[scope.account] = {'schemaVersion': 1, 'storeId': scope.store,
+          'fields': {'storeCouponCampaignsV1': encodeStoreCouponCampaigns([later])}};
+        transport.reply = (body) async {
+          expect(body['storeCouponDraftVersion'], 1);
+          if (body['operation'] == 'reconcileStoreCouponDraft') return SocialContentResponse(statusCode: 503, body: '{}');
+          expect(body['operation'], 'saveStoreCouponDraft'); expect(body['campaign'], campaign.toJson());
+          expect(body['idempotencyKey'], original.idempotencyKey); expect(body['expectedSourceRevision'], 0);
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+            'schemaVersion': 1, 'storeCouponDraftVersion': 1, 'accountId': scope.account, 'realm': scope.realm,
+            'storeId': scope.store, 'observedAt': DateTime.now().toUtc().toIso8601String(), 'publicationConfirmed': false,
+            'record': {'schemaVersion': 1, 'storeCouponDraftVersion': 1, 'accountId': scope.account, 'realm': scope.realm,
+              'storeId': scope.store, 'couponId': campaign.id, 'sourceRevision': 1,
+              'observedAt': DateTime.now().toUtc().toIso8601String(), 'campaign': body['campaign']}}}));
+        };
+        final owner = privateDraftOwner(transport, journal, book);
+        var closed = false;
+        void closeFixture() {if (!closed) {closed = true; owner.dispose();}}
+        addTearDown(closeFixture);
+        expect(await owner.recoverWorkspaceAccount(accountReady: true), isTrue); await owner.refreshFeed();
+        final before = jsonEncode(book.values);
+        await tester.pumpWidget(MaterialApp(home: Scaffold(body: ListView(children: [StoreCouponCampaignPanel(session: owner)]))));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-coupon-draft-save-status')), findsOneWidget);
+        expect(transport.bodies, isEmpty); expect(journal.original!.fingerprint, original.fingerprint);
+        final check = find.widgetWithText(TextButton, 'Check draft save');
+        await tester.ensureVisible(check); await tester.pumpAndSettle(); await tester.tap(check); await tester.pumpAndSettle();
+        expect(transport.bodies.map((body) => body['operation']), ['reconcileStoreCouponDraft']);
+        expect(journal.original!.fingerprint, original.fingerprint);
+        final retry = find.widgetWithText(TextButton, 'Retry original save');
+        await tester.ensureVisible(retry); await tester.pumpAndSettle(); await tester.tap(retry); await tester.pumpAndSettle();
+        expect(find.text('Retry saved draft?'), findsOneWidget);
+        expect(find.textContaining(campaign.name), findsOneWidget);
+        final confirm = find.widgetWithText(FilledButton, 'Retry original save');
+        if (outcome == 'retire') {
+          owner.activeWorkspace = WorkWorkspace(id: 'HOST-other-store', name: 'HOST other Store',
+            profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true);
+          owner.notifyListeners(); await tester.pumpAndSettle();
+          expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+        }
+        final action = outcome == 'confirm' ? confirm : find.widgetWithText(TextButton, 'Cancel');
+        await tester.ensureVisible(action); await tester.pumpAndSettle(); await tester.tap(action); await tester.pumpAndSettle();
+        expect(transport.bodies.where((body) => body['operation'] == 'saveStoreCouponDraft'), hasLength(outcome == 'confirm' ? 1 : 0));
+        expect(journal.original?.fingerprint, outcome == 'confirm' ? null : original.fingerprint);
+        expect(jsonEncode(book.values), before);
+        if (outcome != 'retire') expect(owner.workspaceStoreCouponCampaigns.single.toJson(), later.toJson());
+        expect(transport.bodies.where((body) => body['operation'] == 'saveStoreCoupon'), isEmpty);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink()); closeFixture(); await tester.pump();
+      });
+    }
+  }
+
+  final publicCouponWire = Platform.environment['AGG09_PUBLIC_COUPON_WIRE_EXPORT_PATH'];
+  Map<String, dynamic> sdkPublicCouponWire() {
+    final wire = Map<String, dynamic>.from(jsonDecode(File(publicCouponWire!).readAsStringSync()) as Map);
+    expect(wire['fixture'], 'ISOLATED HOST actual SDK coupon originals with isolated original catalogue read ports; never phone authority');
+    return wire;
+  }
+  AuthenticatedWorkspaceCatalogueGateway publicCouponConnection(Transport transport, DateTime clock,
+      {bool rich = true, bool legacy = false}) => AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, ownerAccountId: 'buyer-one', realm: scope.realm,
+      storeCouponTermsV2Supported: rich, storeCouponTermsSupported: legacy, storeCouponEligibilitySupported: true, now: () => clock);
+  final moneyCouponWire = Platform.environment['AGG09_MONEY_COUPON_WIRE_EXPORT_PATH'];
+  test('AGG09 actual SDK structured money response crosses native decoding with original version and allocations', () {
+    final wire=Map<String,dynamic>.from(jsonDecode(File(moneyCouponWire!).readAsStringSync()) as Map);
+    expect(wire['fixture'],'ISOLATED HOST actual SDK v2 original coupon and usage with isolated original price port; never phone authority');
+    final clock=DateTime.parse(wire['now'] as String),coupon=BuyV2PublishedStoreCoupon.decodeOfferDisplay(wire['offer'],now:clock),
+      query=Map<String,Object?>.from(wire['query'] as Map)..remove('storeCouponEligibilityVersion'),
+      items=(wire['page'] as Map)['items'] as List;
+    final lines=[for(final raw in query['lines'] as List) () {
+      final row=Map<String,dynamic>.from(raw as Map),identity=BuyV2PublicListingIdentity.fromJson(row['listing'])!,
+        source=items.cast<Map>().singleWhere((item)=>item['skuId']==identity.skuId),channel=(source['channels'] as List).single as Map,
+        template=catalogue.product;
+      return BuyV2CartLine(product:BuyV2Product(id:row['lineId'] as String,canonicalId:identity.canonicalProductId,
+        storeId:identity.storeId,publicListingIdentity:identity,offerClass:identity.channel,
+        destination:identity.channel==BuyV2OfferClass.retail?BuyV2Destination.shop:BuyV2Destination.wholesale,
+        categoryId:template.categoryId,brand:template.brand,title:(source['content'] as Map)['title'] as String,
+        variant:'',pack:(source['pack'] as Map)['label'] as String,priceMinor:channel['priceMinor'] as int,
+        unitPrice:template.unitPrice,badge:template.badge,seller:template.seller,sellerType:template.sellerType,
+        deliveryPromise:template.deliveryPromise,origin:template.origin,confirmedOn:template.confirmedOn,
+        visualLabel:template.visualLabel,visualKind:template.visualKind),quantity:row['quantity'] as int);
+    }()];
+    BuyV2StoreCouponEligibility decode(Object? data,{Map<String,Object?>? request,String? buyer}) =>
+      BuyV2StoreCouponEligibility.decode(data,coupon:coupon,accountId:buyer??wire['buyer'] as String,
+        query:request??query,lines:lines,now:clock);
+    final result=decode(wire['result']);
+    expect(result.eligible,isTrue);expect(result.savingMinor,1050);expect(result.subtotalMinor,20003);
+    expect(result.allocations.values.reduce((a,b)=>a+b),1050);expect(result.matches(lines,clock),isTrue);
+    expect(()=>decode(wire['result'],buyer:'foreign-buyer'),throwsFormatException);
+    expect(()=>decode(wire['result'],request:Map<String,Object?>.from(query)..remove('storeCouponTermsVersion')),throwsFormatException);
+    final missing=Map<String,dynamic>.from(wire['result'] as Map)..remove('storeCouponTermsVersion');
+    expect(()=>decode(missing),throwsFormatException);
+  },skip:moneyCouponWire==null?'Requires explicit actual SDK original structured money wire':false);
+  test('AGG09 actual SDK mixed public coupon wire reaches the native original reader without granting eligibility', () async {
+    final wire = sdkPublicCouponWire(), data = Map<String, dynamic>.from(wire['response'] as Map),
+      clock = DateTime.parse(wire['now'] as String), transport = Transport();
+    transport.reply = (body) async {
+      expect(body, {'operation': 'readPublicStoreCouponSnapshot', 'storeId': scope.store,
+        'storeCouponTermsVersion': 2, 'storeCouponSnapshotVersion': 1});
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    };
+    final connection = publicCouponConnection(transport, clock), source = WorkspaceStoreCatalogueSource(
+      gateway: connection, storeId: scope.store, current: () => true);
+    expect(source.storeCouponsActive, isTrue); expect(source.storeCouponEligibilityActive, isTrue);
+    final rows = await source.loadStoreCoupons(storeId: scope.store);
+    expect(rows, hasLength(7)); expect(rows.where((row) => row.structuredTerms != null), hasLength(6));
+    expect(rows.where((row) => row.terms != null), hasLength(1));
+    for (final row in rows.where((row) => row.structuredTerms != null)) {
+      expect(row.viewerAccountId, isNull); expect(row.isCurrent(clock), isTrue);
+      expect(BuyV2PublishedStoreCoupon.decodeOfferDisplay(row.toOfferDisplayJson(), now: clock).termsFingerprint, row.termsFingerprint);
+      expect(jsonEncode(row.toOfferDisplayJson()).contains('buyerReferences'), isFalse);
+    }
+    expect(connection.forOwnerAccount('another-owner').storeCouponTermsV2Supported, isTrue);
+    // Capability is not a saving: unsupported reward/history-dependent kinds
+    // fail before any product or eligibility read, even on a v2 connection.
+    final calls = transport.bodies.length;
+    for (final row in rows.where((row) => row.structuredTerms != null &&
+        !{BuyV2StoreOfferKind.billDiscount, BuyV2StoreOfferKind.productDiscount}.contains(row.structuredTerms!.kind))) {
+      await expectLater(connection.evaluateStoreCoupon(coupon: row, lines: const [], current: () => true), throwsFormatException);
+    }
+    expect(transport.bodies.length, calls);
+  }, skip: publicCouponWire == null ? 'Requires explicit actual SDK public projection wire' : false);
+  for (final fault in ['private-field', 'digest', 'foreign-store', 'duplicate', 'incomplete']) {
+    test('AGG09 native public structured read rejects incompatible source $fault', () async {
+      final wire = sdkPublicCouponWire(), data = Map<String, dynamic>.from(wire['response'] as Map),
+        clock = DateTime.parse(wire['now'] as String), transport = Transport(), items = data['items'] as List,
+        rich = items.firstWhere((value) => (value as Map)['schemaVersion'] == 2) as Map;
+      if (fault == 'private-field') rich['buyerReferences'] = ['HOST-private-record'];
+      if (fault == 'foreign-store') rich['storeId'] = 'foreign-store';
+      if (fault == 'duplicate') items.add(jsonDecode(jsonEncode(rich)));
+      if (fault == 'incomplete') data['complete'] = false;
+      if (fault == 'digest') {
+        final selected = items.cast<Map>().firstWhere((row) => row['schemaVersion'] == 2 &&
+          ((row['structuredTerms'] as Map)['skus'] as List).isNotEmpty);
+        ((((selected['structuredTerms'] as Map)['skus'] as List).first as Map)['listings'] as List).first['listingId'] = 'listing-${'a' * 64}';
+      }
+      transport.reply = (_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      final source = WorkspaceStoreCatalogueSource(gateway: publicCouponConnection(transport, clock), storeId: scope.store, current: () => true);
+      await expectLater(source.loadStoreCoupons(storeId: scope.store), throwsA(anything));
+      expect(transport.bodies.every((body) => body['operation'] == 'readPublicStoreCouponSnapshot'), isTrue);
+    }, skip: publicCouponWire == null ? 'Requires explicit actual SDK public projection wire' : false);
+  }
+  test('AGG09 native public high-water cannot resurrect a same-revision changed rich copy', () async {
+    final wire = sdkPublicCouponWire(), clock = DateTime.parse(wire['now'] as String), transport = Transport();
+    var data = Map<String, dynamic>.from(wire['response'] as Map);
+    transport.reply = (_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    final source = WorkspaceStoreCatalogueSource(gateway: publicCouponConnection(transport, clock), storeId: scope.store, current: () => true);
+    expect(await source.loadStoreCoupons(storeId: scope.store), hasLength(7));
+    final rich = (data['items'] as List).cast<Map>().firstWhere((row) => row['schemaVersion'] == 2);
+    rich['name'] = 'HOST changed without revision';
+    await expectLater(source.loadStoreCoupons(storeId: scope.store), throwsFormatException);
+    data = Map<String, dynamic>.from(sdkPublicCouponWire()['response'] as Map);
+    await expectLater(source.loadStoreCoupons(storeId: scope.store), throwsFormatException);
+  }, skip: publicCouponWire == null ? 'Requires explicit actual SDK public projection wire' : false);
+  test('AGG09 native public reader never infers v2 capability from a server response', () async {
+    final wire = sdkPublicCouponWire(), clock = DateTime.parse(wire['now'] as String), transport = Transport();
+    transport.reply = (_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': wire['response']}));
+    final legacy = WorkspaceStoreCatalogueSource(gateway: publicCouponConnection(transport, clock, rich: false, legacy: true), storeId: scope.store, current: () => true);
+    await expectLater(legacy.loadStoreCoupons(storeId: scope.store), throwsFormatException);
+    final before = transport.bodies.length,
+      disabled = WorkspaceStoreCatalogueSource(gateway: publicCouponConnection(transport, clock, rich: false), storeId: scope.store, current: () => true);
+    await expectLater(disabled.loadStoreCoupons(storeId: scope.store), throwsFormatException);
+    expect(transport.bodies, hasLength(before));
+  }, skip: publicCouponWire == null ? 'Requires explicit actual SDK public projection wire' : false);
 
   test('STRUCTUREDOFFER01 immutable exact SKU terms round trip without buyer leakage', () {
     final terms = offerTerms(kind: BuyV2StoreOfferKind.buyerDiscount);
@@ -995,7 +1633,7 @@ void main() {
         }
         return couponResponse(head);
       };
-      final owner = WorkSession(gateway: const UnavailableWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
+      final owner = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
         catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
           'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
           credentials: catalogue.Credentials(), transport: catalogue.OwnerTransport((_) async => throw StateError('No SKU lookup')),
@@ -1032,7 +1670,7 @@ void main() {
     final creds = Credentials(), transport = Transport(), journal = CouponPending();
     final original = couponIntent(name: 'Original recovered campaign'); journal.original = original;
     transport.reply = (_) async => couponResponse(couponRecord(original));
-    final owner = WorkSession(gateway: const UnavailableWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
+    final owner = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
       catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
         'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
         credentials: catalogue.Credentials(), transport: catalogue.OwnerTransport((_) async => throw StateError('No SKU lookup')),
@@ -1065,7 +1703,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
   WorkSession supplierOwner(String profile, {bool supported = true, bool review = false}) => WorkSession(
-    gateway: review ? ReviewWorkGateway() : const UnavailableWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
+    gateway: review ? ReviewWorkGateway() : _HostCouponWorkspaceGateway(profile), contactDraftStore: catalogue.ListingAccount(),
     catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
       'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: catalogue.Credentials(), transport: catalogue.OwnerTransport((_) async => throw StateError('No host publication')),
@@ -1085,12 +1723,18 @@ void main() {
   for (final profile in ['wholesaler', 'manufacturer']) {
     testWidgets('LF04 PUBLISHERS $profile uses existing Store and Stock navigation', (tester) async {
       FlutterSecureStorage.setMockInitialValues({});
+      SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty());
       tester.view.physicalSize = const Size(430, 932); tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
       final owner = supplierOwner(profile), core = BuySession();
       final buyer = BuyV2Session(core: core);
-      addTearDown(owner.dispose); addTearDown(core.dispose); addTearDown(buyer.dispose);
+      var closed = false;
+      void closeFixture() {if (closed) return; closed = true; buyer.dispose(); core.dispose(); owner.dispose();}
+      addTearDown(closeFixture);
       expect(await owner.recoverWorkspaceAccount(accountReady: true), isTrue);
+      await owner.refreshFeed();
+      expect(owner.hasVerifiedWorkspace, isTrue);
       await tester.pumpWidget(MaterialApp(home: WorkWorkspaceDashboardScreen(session: owner,
         procurementSession: buyer, accountRecoveryReady: true)));
       await tester.pumpAndSettle();
@@ -1102,21 +1746,27 @@ void main() {
       await tester.tap(find.byKey(const Key('work-store-home'))); await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-store-full-name')), findsOneWidget);
       expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      closeFixture();
+      await tester.pump();
     });
   }
   for (final profile in ['wholesaler', 'manufacturer']) {
-    test('LF04 PUBLISHERS supplier owner reaches existing authoring controllers $profile', () {
+    test('LF04 PUBLISHERS supplier owner reaches existing authoring controllers $profile', () async {
       TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
       final connection = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
         'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
         credentials: catalogue.Credentials(), transport: catalogue.OwnerTransport((_) async => throw StateError('No host publication')),
         ownerAccountId: 'owner-one', supplierPublishersVersionSupported: true);
-      final owner = WorkSession(gateway: const UnavailableWorkGateway(), contactDraftStore: catalogue.ListingAccount(),
+      final owner = WorkSession(gateway: _HostCouponWorkspaceGateway(profile), contactDraftStore: catalogue.ListingAccount(),
         catalogueGateway: connection, productPromotionGateway: Provider(), productPromotionRealm: 'production',
         productPromotionPendingStoreFactory: (_) => Pending())
         ..activeWorkspace = WorkWorkspace(id: 'store-one', name: 'Host supplier', profileLabel: profile,
           profileId: profile, area: 'Jaipur', verified: true);
       addTearDown(owner.dispose);
+      expect(await owner.recoverWorkspaceAccount(accountReady: true), isTrue);
+      await owner.refreshFeed();
+      expect(owner.hasVerifiedWorkspace, isTrue);
       expect(owner.workspaceProductPromotions, isNotNull);
       expect(owner.workspacePublicDetailsPublisher, isNotNull);
     });

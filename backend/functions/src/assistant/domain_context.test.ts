@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {readFileSync,writeFileSync} from 'node:fs';
 import {WorkspaceProfileError} from '../workspace/workspace_profile_service.js';
 import {AccountPlansService} from "../account/plans_service.js";
 import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext, OriginalStoreDevicePreparationContext, OriginalStoreOperationalPreparationContext, OriginalPurchasedStarsPreparationContext, OriginalStoreReceivingPreparationContext,OriginalStoreCouponPreparationContext} from "./domain_context.js";
@@ -276,6 +277,129 @@ test('Coupon original malformed scope, source versions, forward cursor and chang
   const owner=couponOriginalFixture();owner.change(page=>{owner.changeOwner();return page;});await assert.rejects(owner.source.read(actor,owner.input),/stale_preparation/u);
   const expired=couponOriginalFixture();expired.change(page=>{expired.advance(61_000);return page;});await assert.rejects(expired.source.read(actor,expired.input),/stale_preparation/u);
   const denied=couponOriginalFixture();denied.deny();await assert.rejects(denied.source.read(actor,denied.input),/workspace_access_unavailable/u);
+});
+
+/** Isolated private original ports. No command, upload or publication occurs. */
+function privateCouponOriginalFixture(){
+  const store='HOST-private-coupon-store',calls:string[]=[];
+  let authorityRevision=1,denied=false,publicationUnavailable=false,draftUnavailable=false,clock=new Date(at),read=0;
+  const campaign={schemaVersion:2,id:'HOST-private-coupon',storeId:store,revision:27,name:'HOST private offer',
+    structuredTerms:{schemaVersion:1,storeId:store,kind:'billDiscount',skus:[],channels:['retail'],
+      discountKind:'flat',discountValue:100,minimumSpendMinor:0,maximumSavingMinor:100,tiers:[],
+      buyQuantity:null,rewardSku:null,rewardQuantity:null,nextPurchaseDays:null},buyerReferences:[],
+    startsAt:'2026-10-27T08:00:00.000Z',endsAt:'2026-11-27T08:00:00.000Z',totalUses:100,usesPerCustomer:1};
+  const rows=[campaign,{...structuredClone(campaign),id:'निजी draft',buyerReferences:[]}].map(value=>({
+    schemaVersion:1,storeCouponDraftVersion:1,accountId:actor.uid,realm:'evaluation',storeId:store,
+    couponId:value.id,sourceRevision:4,observedAt:at.toISOString(),campaign:value}));
+  rows.sort((a,b)=>digest([actor.uid,a.couponId]).localeCompare(digest([actor.uid,b.couponId])));
+  let published:Record<string,unknown>|null=null;
+  let change=(operation:string,page:Record<string,unknown>,_read:number)=>page;
+  const source=new OriginalStoreCouponPreparationContext({projectId:actor.projectId,realm:'evaluation',
+    draftReadsEnabled:true,couponReadsEnabled:true,now:()=>clock,authority:{async read(){
+      if(denied)throw new AssistantModelError('workspace_access_unavailable',403);
+      return {revision:`HOST-private-authority-${authorityRevision}`,validUntil:'2026-10-28T08:01:00.000Z',tools:[{
+        name:'HOST-private-owner',actionId:'AI-ACT-317',entityId:store,sourceRevision:'HOST-approved-member',
+        description:'Host',parameters:{},validate:()=>true}],modelContext:{audience:'workspace',current:{id:store}}};}},
+    promotions:{async handleOperation(uid,operation,body){
+      assert.equal(uid,actor.uid);assert.equal(body.storeId,store);
+      assert(['listStoreCouponDrafts','readStoreCoupon'].includes(operation),'Read-only preparation cannot save or reconcile');
+      calls.push(operation);
+      if(operation==='readStoreCoupon'){
+        assert.equal(body.storeCouponTermsVersion,2);assert.equal(body.couponId,campaign.id);
+        if(publicationUnavailable)throw Object.assign(new Error('HOST original head unavailable'),{httpStatus:503});
+        return change(operation,{schemaVersion:1,storeCouponTermsVersion:2,realm:'evaluation',storeId:store,
+          observedAt:at.toISOString(),orderingAvailable:false,redemptionAvailable:false,publicationConfirmed:false,
+          record:structuredClone(published)},++read);
+      }
+      assert.equal(body.storeCouponDraftVersion,1);assert.equal(body.limit,20);
+      if(draftUnavailable)throw Object.assign(new Error('HOST private source unavailable'),{httpStatus:503});
+      // A byte-bounded page may contain fewer than20 rows and still continue.
+      const found=rows.filter(row=>body.after===undefined||digest([actor.uid,row.couponId])>(body.after as string)).slice(0,1),
+        last=found.at(-1),cursor=last?digest([actor.uid,last.couponId]):null;
+      return change(operation,{schemaVersion:1,storeCouponDraftVersion:1,accountId:uid,realm:'evaluation',storeId:store,
+        observedAt:at.toISOString(),publicationConfirmed:false,items:structuredClone(found),
+        nextCursor:cursor!==null&&rows.some(row=>digest([actor.uid,row.couponId])>cursor)?cursor:null},++read);
+    }}});
+  return {source,campaign,rows,calls,input:{...request,scope:{audience:'workspace' as const,storeId:store},actionId:null},
+    change:(value:typeof change)=>{change=value;},publish:(value:Record<string,unknown>|null)=>{published=value;},
+    noPublication:()=>{publicationUnavailable=true;},noDrafts:()=>{draftUnavailable=true;},
+    deny:()=>{denied=true;},bump:()=>{authorityRevision++;},advance:()=>{clock=new Date(clock.getTime()+60_001);}};
+}
+test('Private coupon preparation uses opaque actor-bound selectors, every byte page and no writes',async()=>{
+  const f=privateCouponOriginalFixture(),context=await f.source.read(actor,f.input);
+  assert.equal(context.modelContext!.sourceKind,'original-store-coupon-drafts-v1');
+  assert.equal(f.calls.filter(value=>value==='listStoreCouponDrafts').length,4);
+  const drafts=context.tools.find(tool=>tool.actionId==='AI-ACT-309')!,publication=context.tools.find(tool=>tool.actionId==='AI-ACT-310')!;
+  const selector='coupon-draft:'+digest(['evaluation',actor.uid,f.campaign.storeId,f.campaign.id]);
+  const target=drafts.resolveTarget!({couponId:selector,apply:['name'],name:'HOST supplied rename',discount:'999'});
+  assert.equal(target.entityId,selector);assert.deepEqual(target.fields,{name:'HOST supplied rename'});
+  assert.equal(publication.resolveTarget!({couponId:selector,operation:'publish'}).sourceRevision,target.sourceRevision);
+  assert.throws(()=>publication.resolveTarget!({couponId:selector,operation:'pause'}),/invalid_model_result/u);
+  assert.throws(()=>drafts.resolveTarget!({couponId:f.campaign.id,apply:['name'],name:'HOST'}),/invalid_model_result/u);
+  assert(!JSON.stringify(context.modelContext).includes('buyerReferences'));
+  assert(!JSON.stringify(context.modelContext).includes('निजी draft'));
+  for(const tool of context.tools)assert.doesNotThrow(()=>assertStrictSchema(tool.parameters));
+});
+test('Private coupon Review rechecks exact private source and genuinely absent first published head',async()=>{
+  const f=privateCouponOriginalFixture(),context=await f.source.read(actor,f.input),tool=context.tools.find(t=>t.actionId==='AI-ACT-310')!,
+    selector='coupon-draft:'+digest(['evaluation',actor.uid,f.campaign.storeId,f.campaign.id]),
+    target=tool.resolveTarget!({couponId:selector,operation:'publish'}),proposal={kind:'proposal' as const,
+      id:'HOST-private-review',actionId:'AI-ACT-310',...target,title:'Review',summary:'Host'};
+  await f.source.readPrepared(actor,{...f.input,actionId:'AI-ACT-310',entityId:selector},proposal);
+  f.rows.find(row=>row.couponId===f.campaign.id)!.sourceRevision++;
+  await assert.rejects(f.source.readPrepared(actor,{...f.input,actionId:'AI-ACT-310',entityId:selector},proposal),/stale_preparation/u);
+});
+test('Unavailable publication is not an absent head; private edit remains independently available',async()=>{
+  const f=privateCouponOriginalFixture();f.noPublication();const context=await f.source.read(actor,f.input);
+  assert(context.tools.some(tool=>tool.actionId==='AI-ACT-309'));
+  assert(!context.tools.some(tool=>tool.actionId==='AI-ACT-310'));
+  const unavailable=privateCouponOriginalFixture();unavailable.noDrafts();
+  const missing=await unavailable.source.read(actor,unavailable.input);
+  assert.equal(missing.modelContext!.couponSourceAvailable,false);
+  assert.deepEqual(missing.nativeTargets!.map(target=>[target.actionId,target.entityId]),[['AI-ACT-308',null],['AI-ACT-309',null]]);
+});
+test('Private coupon original rejects malformed scope, changed authority, cursor, future time and native campaign',async()=>{
+  for(const fault of ['actor','realm','version','cursor','future','campaign']){
+    const f=privateCouponOriginalFixture();f.change((operation,page)=>operation!=='listStoreCouponDrafts'?page:
+      fault==='actor'?{...page,accountId:'foreign'}:fault==='realm'?{...page,realm:'production'}:
+      fault==='version'?{...page,storeCouponDraftVersion:2}:fault==='cursor'?{...page,nextCursor:'f'.repeat(64)}:
+      fault==='future'?{...page,observedAt:'2026-10-29T08:00:00.000Z'}:
+      {...page,items:[{...f.rows[0]!,campaign:{...f.rows[0]!.campaign,storeId:'foreign'}}]});
+    await assert.rejects(f.source.read(actor,f.input),/context_unavailable/u,fault);
+  }
+  const changed=privateCouponOriginalFixture();changed.change((_,page)=>{changed.bump();return page;});
+  await assert.rejects(changed.source.read(actor,changed.input),/stale_preparation/u);
+  const slow=privateCouponOriginalFixture();slow.change((_,page)=>{slow.advance();return page;});
+  await assert.rejects(slow.source.read(actor,slow.input),/stale_preparation/u);
+  const denied=privateCouponOriginalFixture();denied.deny();await assert.rejects(denied.source.read(actor,denied.input),/workspace_access_unavailable/u);
+});
+
+const privateCouponContextInput=process.env.AGG09_PRIVATE_CONTEXT_INPUT_PATH??process.env.AGG09_BACKEND_COUPON_DRAFT_WIRE_EXPORT_PATH;
+test('Private coupon source proofs preserve actual SDK native originals across the model boundary',{
+  skip:!privateCouponContextInput?'Requires explicit actual SDK private originals':false},async()=>{
+  const wire=JSON.parse(readFileSync(privateCouponContextInput!,'utf8')),
+    rows=(wire.drafts as Array<{record:Record<string,unknown>}>).map(row=>row.record),
+    first=rows[0]!,store=first.storeId as string,originalActor={uid:first.accountId as string,projectId:actor.projectId};
+  assert.equal(wire.fixture,'ISOLATED HOST actual SDK private draft originals; never phone authority');
+  const calls:string[]=[],source=new OriginalStoreCouponPreparationContext({projectId:actor.projectId,realm:'evaluation',
+    couponReadsEnabled:true,draftReadsEnabled:true,now:()=>at,authority:{async read(){return {revision:'HOST-SDK-authority',
+      validUntil:'2026-10-28T08:01:00.000Z',modelContext:{audience:'workspace',current:{id:store}},tools:[{
+        name:'HOST-SDK-member',actionId:'AI-ACT-317',entityId:store,sourceRevision:'HOST-SDK-approved',description:'Host',parameters:{},validate:()=>true}]};}},
+    promotions:{async handleOperation(uid,operation,body){assert.equal(uid,originalActor.uid);calls.push(operation);
+      if(operation==='listStoreCouponDrafts')return {schemaVersion:1,storeCouponDraftVersion:1,accountId:uid,realm:'evaluation',
+        storeId:store,observedAt:at.toISOString(),publicationConfirmed:false,
+        items:[...rows].sort((a,b)=>digest([uid,a.couponId]).localeCompare(digest([uid,b.couponId]))),nextCursor:null};
+      assert.equal(operation,'readStoreCoupon');assert.equal(body.storeCouponTermsVersion,2);
+      return {schemaVersion:1,storeCouponTermsVersion:2,realm:'evaluation',storeId:store,orderingAvailable:false,
+        redemptionAvailable:false,publicationConfirmed:false,record:null};
+    }}}),context=await source.read(originalActor,{...request,scope:{audience:'workspace',storeId:store},actionId:null}),
+    results=rows.map(row=>{const selector='coupon-draft:'+digest(['evaluation',originalActor.uid,store,row.couponId]),
+      target=context.nativeTargets!.find(value=>value.actionId==='AI-ACT-309'&&value.entityId===selector)!;
+      assert(target);return {record:row,selector,proof:target.sourceRevision,
+        publishedAvailable:context.nativeTargets!.some(value=>value.actionId==='AI-ACT-310'&&value.entityId===selector)};});
+  assert(calls.every(operation=>['listStoreCouponDrafts','readStoreCoupon'].includes(operation)));
+  const output=process.env.AGG09_COUPON_PRIVATE_CONTEXT_EXPORT_PATH;
+  if(output)writeFileSync(output,JSON.stringify({fixture:'ISOLATED HOST actual SDK originals and backend context proofs; never phone authority',drafts:results}));
 });
 
 function orderBoardFixture(enabled=true){

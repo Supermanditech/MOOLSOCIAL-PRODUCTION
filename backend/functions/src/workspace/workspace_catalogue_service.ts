@@ -797,6 +797,10 @@ function discoveryBinding(value: unknown, realm: WorkspaceCatalogueRepository["r
     canonicalProductId: id(row.canonicalProductId), verifiedPackId: id(row.verifiedPackId),
     listingId: `listing-${cataloguePayloadHash([1, realm, storeId, skuId, channel]).toLowerCase()}`});
 }
+/** Verify a source-issued public binding without synthesizing a SKU record. */
+export function checkedPublicCatalogueListingBinding(value: unknown, realm: WorkspaceCatalogueRepository['realm']): PublicCatalogueListingBinding {
+  return discoveryBinding(value, realm);
+}
 export interface CatalogueIdentity {catalogueId: string; tenantId: string}
 export interface StoreProcurementContext {
   accountId: string; storeId: string;

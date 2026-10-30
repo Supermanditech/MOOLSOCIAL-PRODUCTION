@@ -9296,7 +9296,8 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
   ]))).toString();
   String _couponNativeSource(WorkSession source, String action, String? entity, {Map<String,String>? draft}) {
     final values=draft??source.workspaceAssistantCouponDraft;
-    final campaign = entity==null?null:decodeStoreCouponCampaigns(values['storeCouponCampaignsV1'],source.activeWorkspace?.id??'').where((value) => value.id == entity).singleOrNull;
+    final campaign = entity==null?null:decodeStoreCouponCampaigns(values['storeCouponCampaignsV1'],source.activeWorkspace?.id??'')
+      .where((value) => source.workspaceAssistantCouponEntityMatches(value,entity)).singleOrNull;
     final publisher = action == 'AI-ACT-310' ? source.workspaceAssistantLoadedCouponController : null;
     return assistant_hash.sha256.convert(utf8.encode(jsonEncode([
       action, entity, source.navigationScopeRevision, values,
@@ -9320,12 +9321,13 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       await source.readWorkspaceAssistantCouponDraft(expectedStoreId:store,inputCurrent:current);
     if (!current() || draft==null) return null;
     final campaigns=decodeStoreCouponCampaigns(draft['storeCouponCampaignsV1'],store);
-    if (entity != null && campaigns.where((value) => value.id == entity).length != 1 ||
+    if (entity != null && campaigns.where((value) => source.workspaceAssistantCouponEntityMatches(value,entity)).length != 1 ||
         action == 'AI-ACT-310' && entity == null) return null;
     if (action == 'AI-ACT-310') {
       final publisher = source.workspaceAssistantLoadedCouponController;
       if (publisher != null && (publisher.busy ||
-          publisher.pending != null && publisher.pending!.couponId != entity)) return null;
+          publisher.pending != null && publisher.pending!.couponId != campaigns
+            .where((value)=>source.workspaceAssistantCouponEntityMatches(value,entity)).singleOrNull?.id)) return null;
       // Peek only. Explicit native Review retains the original guarded reads
       // and exact pending recovery; capture never adopts another coupon head.
     }
@@ -9356,7 +9358,8 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       if(!await source.loadWorkspaceOfferDraft(expectedStoreId:store)||!owner()||
         proposal.sourceRevision!=_couponNativeSource(source,proposal.actionId,proposal.entityId))return MoolAssistantReviewResult.stale;
     }
-    final campaign = source.workspaceStoreCouponCampaigns.where((value) => value.id == proposal.entityId).singleOrNull;
+    final campaign = source.workspaceStoreCouponCampaigns
+      .where((value) => source.workspaceAssistantCouponEntityMatches(value,proposal.entityId)).singleOrNull;
     if (proposal.entityId != null && campaign == null || proposal.actionId == 'AI-ACT-310' && campaign == null) return MoolAssistantReviewResult.unavailable;
     final initial = proposal.actionId == 'AI-ACT-309' ? StoreCouponReviewInitial.fromFields(proposal.fields) : null;
     if (initial != null && !initial.referencesCurrent(source)) {

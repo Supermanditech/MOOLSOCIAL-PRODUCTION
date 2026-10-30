@@ -717,7 +717,11 @@ class BuyV2PublishedStoreCoupon {
       structuredTerms: BuyV2StoreOfferTerms.fromJson(raw['structuredTerms']),
       configuredTotalUses: number('configuredTotalUses'), configuredUsesPerCustomer: number('configuredUsesPerCustomer'),
       viewerAccountId: raw['viewerAccountId'] as String?);
-    if (!value.isCurrent(now)) bad(); return value;
+    bool issuedSku(BuyV2StoreOfferSku sku) => sku.listings.every((listing) => listing.listingId ==
+      'listing-${sha256.convert(utf8.encode(jsonEncode([1, listing.realm, listing.storeId, listing.skuId, listing.channel.name])))}');
+    if (!value.isCurrent(now) || !value.structuredTerms!.skus.every(issuedSku) ||
+        value.structuredTerms!.rewardSku != null && !issuedSku(value.structuredTerms!.rewardSku!)) bad();
+    return value;
   }
   bool appliesTo(BuyV2Product product, {String? accountId}) => structuredTerms == null ||
     structuredTerms!.appliesTo(product) &&
@@ -874,9 +878,10 @@ class BuyV2StoreCouponEligibility {
   }) {
     Never bad() =>
         throw const FormatException('Store coupon could not be checked.');
-    // This decoder only verifies the accepted v1 money-allocation protocol.
-    // Rich offers need their own eligibility, quote and order-original contract.
-    if (coupon.structuredTerms != null) bad();
+    final rich = coupon.structuredTerms;
+    if (rich != null && (!{BuyV2StoreOfferKind.billDiscount, BuyV2StoreOfferKind.productDiscount}.contains(rich.kind) ||
+        !coupon.isCurrent(now) || query['storeCouponTermsVersion'] != 2) ||
+        rich == null && query.containsKey('storeCouponTermsVersion')) bad();
     Map<String, dynamic> map(Object? value) {
       if (value is! Map || value.keys.any((key) => key is! String)) bad();
       return Map<String, dynamic>.from(value);
@@ -936,6 +941,7 @@ class BuyV2StoreCouponEligibility {
       'reservationCreated',
       'evaluation',
       'attribution',
+      if (rich != null) 'storeCouponTermsVersion',
       if (supplierQuote != null) 'supplierQuote',
     });
     if (data['schemaVersion'] is! int ||
@@ -951,6 +957,7 @@ class BuyV2StoreCouponEligibility {
         data['eligible'] is! bool ||
         data['orderingAvailable'] != false ||
         data['reservationCreated'] != false ||
+        rich != null && (data['storeCouponTermsVersion'] is! int || data['storeCouponTermsVersion'] != 2) ||
         lines.isEmpty ||
         lines.length > 100 ||
         lines.any(
@@ -1040,12 +1047,12 @@ class BuyV2StoreCouponEligibility {
         .where((l) => l['productId'] == line.product.id).firstOrNull?['merchandiseMinor'] as int? ?? line.totalMinor;
       final expected = {
         for (final line in lines)
-          if (lineSubtotal(line) > 0) line.product.id: line,
+          if (lineSubtotal(line) > 0 && (rich == null || coupon.appliesTo(line.product, accountId: accountId))) line.product.id: line,
       };
       final requestLines = query['lines'];
       if (requestLines is! List ||
           expected.length !=
-              lines.where((line) => lineSubtotal(line) > 0).length ||
+              lines.where((line) => lineSubtotal(line) > 0 && (rich == null || coupon.appliesTo(line.product, accountId: accountId))).length ||
           evaluation['allocations'] is! List) {
         bad();
       }

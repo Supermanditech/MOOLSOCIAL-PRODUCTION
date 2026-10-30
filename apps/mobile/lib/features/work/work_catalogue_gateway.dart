@@ -4231,7 +4231,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
   final _promotionPrices = <String, WorkspaceCatalogueContentResult>{};
   int _couponGeneration = 0;
   final _couponHeads = <String, ({int revision, String? copy})>{};
-  @override bool get storeCouponsActive => current() && gateway.storeCouponTermsSupported;
+  @override bool get storeCouponsActive => current() && (gateway.storeCouponTermsSupported || gateway.storeCouponTermsV2Supported);
   @override
   bool get storeCouponEligibilityActive =>
       storeCouponsActive && gateway.storeCouponEligibilitySupported;
@@ -4262,16 +4262,18 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
     if (requestedStore != storeId || !active()) throw const FormatException('Store coupons are not connected.');
     _id(storeId);
     final values = <BuyV2PublishedStoreCoupon>[], ids = <String>{};
+      final rich = gateway.storeCouponTermsV2Supported, version = rich ? 2 : 1;
       if (!active()) throw const FormatException();
       final response = await gateway._ownerRequest({'operation': 'readPublicStoreCouponSnapshot',
-        'storeId': storeId, 'storeCouponTermsVersion': 1, 'storeCouponSnapshotVersion': 1}, active, mutation: false);
+        'storeId': storeId, 'storeCouponTermsVersion': version, 'storeCouponSnapshotVersion': 1}, active, mutation: false);
       if (!active() || response?.statusCode != 200) throw const FormatException('Store coupons could not be checked.');
+      if (rich && utf8.encode(response!.body).length > 8 * 1024 * 1024) throw const FormatException('Store coupon response is too large.');
       final envelope = _map(jsonDecode(response!.body));
       if (envelope['ok'] != true) throw const FormatException();
       final data = _map(envelope['data']);
       _keys(data, ['schemaVersion', 'storeCouponTermsVersion', 'realm', 'storeId', 'orderingAvailable',
         'redemptionAvailable', 'state', 'coverage', 'observedAt', 'items', 'storeCouponSnapshotVersion', 'complete']);
-      _int(data['schemaVersion'], 1, 1); _int(data['storeCouponTermsVersion'], 1, 1);
+      _int(data['schemaVersion'], 1, 1); _int(data['storeCouponTermsVersion'], version, version);
       _int(data['storeCouponSnapshotVersion'], 1, 1);
       final observed = _time(data['observedAt']), now = gateway.now().toUtc();
       if (data['realm'] != gateway.realm || data['storeId'] != storeId || data['orderingAvailable'] != false ||
@@ -4282,6 +4284,15 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
       String? previous;
       for (final raw in items) {
         final row = _map(raw);
+        if (row['schemaVersion'] == 2) {
+          if (!rich) throw const FormatException('Structured Store offers are not connected.');
+          final value = BuyV2PublishedStoreCoupon.decodeOfferDisplay(row, now: now);
+          if (value.realm != gateway.realm || value.storeId != storeId || value.observedAt != observed ||
+              !ids.add(value.couponId) || previous != null && value.couponId.compareTo(previous) <= 0) {
+            throw const FormatException('Store offer identity changed.');
+          }
+          previous = value.couponId; values.add(value); continue;
+        }
         _keys(row, ['couponId', 'revision', 'scope', 'storeId', 'publisherType', 'publisherName', 'terms', 'sourceId']);
         final id = _id(row['couponId']), revision = _int(row['revision'], 1, 1000000000);
         if (!ids.add(id) || previous != null && id.compareTo(previous) <= 0 ||
@@ -4313,8 +4324,10 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
     }
     final copies = <String, ({int revision, String? copy})>{};
     for (final value in values) {
-      final copy = jsonEncode([value.name, value.terms!.toJson(), value.validFrom.toIso8601String(),
-        value.validUntil.toIso8601String(), value.configuredTotalUses, value.configuredUsesPerCustomer]);
+      final copy = value.structuredTerms == null ? jsonEncode([value.name, value.terms!.toJson(), value.validFrom.toIso8601String(),
+        value.validUntil.toIso8601String(), value.configuredTotalUses, value.configuredUsesPerCustomer]) :
+        jsonEncode([2, value.name, value.structuredTerms!.toJson(), value.validFrom.toIso8601String(),
+          value.validUntil.toIso8601String(), value.configuredTotalUses, value.configuredUsesPerCustomer, value.viewerAccountId]);
       final old = _couponHeads[value.couponId];
       if (old != null && (value.revision < old.revision || value.revision == old.revision && old.copy != copy)) {
         if (value.revision == old.revision) _couponHeads[value.couponId] = (revision: old.revision, copy: null);
@@ -5264,7 +5277,7 @@ class WorkspacePublicDiscoverySource extends ChangeNotifier
   }
   @override
   bool get storeOffersActive => active;
-  @override bool get storeCouponsActive => active && gateway.storeCouponTermsSupported;
+  @override bool get storeCouponsActive => active && (gateway.storeCouponTermsSupported || gateway.storeCouponTermsV2Supported);
   @override
   bool get storeCouponEligibilityActive =>
       storeCouponsActive && gateway.storeCouponEligibilitySupported;
@@ -5345,6 +5358,8 @@ WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required Str
     stockQuantityVisibilitySupported: const bool.fromEnvironment('MOOLSOCIAL_STOCK_QUANTITY_VISIBILITY_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
+    storeCouponTermsV2Supported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V2'),
+    storeCouponDraftsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_DRAFT_V1'),
     storeCouponEligibilitySupported: const bool.fromEnvironment(
       'MOOLSOCIAL_STORE_COUPON_ELIGIBILITY_V1',
     ),
@@ -5421,6 +5436,8 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     publicSupplierTypeFilterSupported: const bool.fromEnvironment('MOOLSOCIAL_PUBLIC_SUPPLIER_TYPE_FILTER_V1'),
     promotionTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PROMOTION_TERMS_V1'),
     storeCouponTermsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V1'),
+    storeCouponTermsV2Supported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_TERMS_V2'),
+    storeCouponDraftsSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_COUPON_DRAFT_V1'),
     storeCouponEligibilitySupported: const bool.fromEnvironment(
       'MOOLSOCIAL_STORE_COUPON_ELIGIBILITY_V1',
     ),
@@ -5659,6 +5676,8 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.promotionDiscoverySupported = false,
     this.promotionTermsSupported = false,
     this.storeCouponTermsSupported = false,
+    this.storeCouponTermsV2Supported = false,
+    this.storeCouponDraftsSupported = false,
     this.storeCouponEligibilitySupported = false,
     this.stockSnapshotsSupported = false,
     this.stockQuantityVisibilitySupported = false,
@@ -5776,6 +5795,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool storeCouponEligibilitySupported;
   final bool promotionTermsSupported;
   final bool storeCouponTermsSupported;
+  final bool storeCouponTermsV2Supported;
+  final bool storeCouponDraftsSupported;
   @override
   final bool stockSnapshotsSupported;
   @override
@@ -5870,6 +5891,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       promotionDiscoverySupported: promotionDiscoverySupported,
       promotionTermsSupported: promotionTermsSupported,
       storeCouponTermsSupported: storeCouponTermsSupported,
+      storeCouponTermsV2Supported: storeCouponTermsV2Supported,
+      storeCouponDraftsSupported: storeCouponDraftsSupported,
       storeCouponEligibilitySupported: storeCouponEligibilitySupported,
       stockSnapshotsSupported: stockSnapshotsSupported,
       stockQuantityVisibilitySupported: stockQuantityVisibilitySupported,
@@ -6725,10 +6748,12 @@ class AuthenticatedWorkspaceCatalogueGateway
     BuyV2SupplierQuoteSelection? supplierQuote,
   }) {
     var reading = true;
+    final rich = coupon.structuredTerms;
     bool valid() =>
         reading &&
         current() &&
-        storeCouponTermsSupported &&
+        (rich == null ? storeCouponTermsSupported : storeCouponTermsV2Supported &&
+          {BuyV2StoreOfferKind.billDiscount, BuyV2StoreOfferKind.productDiscount}.contains(rich.kind)) &&
         storeCouponEligibilitySupported;
     final captured = List<BuyV2CartLine>.unmodifiable(lines);
     return _evaluateStoreCoupon(
@@ -6818,6 +6843,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       'couponRevision': coupon.revision,
       'selectionPolicy': 'exclusive_store_basket',
       'lines': requested,
+      if (coupon.structuredTerms != null) 'storeCouponTermsVersion': 2,
       if (supplierQuote != null) 'supplierQuote': supplierQuote.couponReference,
       if (mixedPrices) 'commodityPriceReadbackVersion': 1,
     });

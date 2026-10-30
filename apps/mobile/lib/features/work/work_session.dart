@@ -673,6 +673,7 @@ class WorkSession extends ChangeNotifier {
     this.productPromotionNow,
     this.productPromotionPendingStoreFactory,
     this.storeCouponPendingStoreFactory,
+    this.storeCouponDraftPendingStoreFactory,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
@@ -745,6 +746,7 @@ class WorkSession extends ChangeNotifier {
     this.productPromotionNow,
     this.productPromotionPendingStoreFactory,
     this.storeCouponPendingStoreFactory,
+    this.storeCouponDraftPendingStoreFactory,
   }) : _productionSession = true,
        catalogueGateway = catalogueGateway ?? buildWorkspaceCatalogueGateway(),
        gateway = gateway ?? buildWorkGateway(),
@@ -1346,8 +1348,17 @@ class WorkSession extends ChangeNotifier {
   final String? productPromotionRealm;
   final StorePromotionPendingStore Function(StorePromotionScope scope)? productPromotionPendingStoreFactory;
   final StoreCouponPendingStore Function(StorePromotionScope scope)? storeCouponPendingStoreFactory;
+  final StoreCouponDraftPendingStore Function(StorePromotionScope scope)? storeCouponDraftPendingStoreFactory;
   final Map<StorePromotionScope, StorePromotionController> _productPromotions = {};
   final Map<StorePromotionScope, StoreCouponController> _storeCoupons = {};
+  final Map<StorePromotionScope, StoreCouponDraftSyncController> _couponDraftSync = {};
+  final Map<StorePromotionScope, Future<void>> _couponDraftSyncTails = {};
+  /// Observation only; it must not construct/restore a controller for AI capture.
+  StoreCouponDraftSyncController? get workspaceAssistantLoadedCouponDraftSync {
+    final actor = _contactAccountScope, store = activeWorkspace?.id;
+    final rows = _couponDraftSync.entries.where((row) => row.key.account == actor && row.key.store == store && row.value.active).toList();
+    return rows.length == 1 ? rows.single.value : null;
+  }
   /// Preparation may inspect an existing original controller, never construct,
   /// restore or refresh one to make a proposed action appear ready.
   StoreCouponController? get workspaceAssistantLoadedCouponController {
@@ -1363,16 +1374,104 @@ class WorkSession extends ChangeNotifier {
     return 'store-coupon-original:${record.scope.realm}:${crypto.sha256.convert(utf8.encode(jsonEncode(canonical([
       record.scope.realm,accountUserId,record.scope.store,record.couponId,record.revision,record.input.toJson()]))))}';
   }
+  static String workspaceAssistantCouponDraftSelector(StorePromotionScope scope, String couponId) =>
+    'coupon-draft:${crypto.sha256.convert(utf8.encode(jsonEncode([scope.realm,scope.account,scope.store,couponId])))}';
+  static String workspaceAssistantPrivateCouponSourceProof(StoreCouponDraftRecord draft,
+      {required bool publishedAvailable, required StoreCouponRecord? published}) {
+    Object? canonical(Object? value)=>value is List?value.map(canonical).toList():value is Map?
+      {for(final key in value.keys.cast<String>().toList()..sort())key:canonical(value[key])}:value;
+    final head=published==null?null:{'schemaVersion':published.input.structured?2:1,
+      'revision':published.revision,'coupon':published.input.toJson()};
+    return 'store-coupon-draft:${draft.scope.realm}:${crypto.sha256.convert(utf8.encode(jsonEncode(canonical([
+      draft.scope.realm,draft.scope.account,draft.scope.store,draft.couponId,draft.sourceRevision,
+      draft.campaign.toJson(),publishedAvailable,head]))))}';
+  }
+  bool workspaceAssistantCouponEntityMatches(StoreCouponCampaign campaign, String? entity) {
+    if(entity==null)return false;
+    final reader=workspaceCouponDraftConnection,account=_contactAccountScope,store=activeWorkspace?.id;
+    if(reader==null||!RegExp(r'^coupon-draft:[a-f0-9]{64}$').hasMatch(entity))return campaign.id==entity;
+    return account!=null&&store==campaign.storeId&&
+      workspaceAssistantCouponDraftSelector((account:account,store:store!,realm:reader.realm),campaign.id)==entity;
+  }
+  AuthenticatedStorePromotionGateway _workspaceCouponConnection(AuthenticatedWorkspaceCatalogueGateway source, String account) =>
+    source.storeCouponTermsV2Supported ? AuthenticatedStructuredStorePromotionGateway(endpoint: source.endpoint,
+      credentials: source.credentials, transport: source.transport, ownerAccountId: account,
+      realm: source.realm, storeCouponTermsSupported: true, storeCouponDraftsSupported: source.storeCouponDraftsSupported) :
+    AuthenticatedStorePromotionGateway(endpoint: source.endpoint, credentials: source.credentials,
+      transport: source.transport, ownerAccountId: account, realm: source.realm,
+      storeCouponTermsSupported: source.storeCouponTermsSupported, storeCouponDraftsSupported: source.storeCouponDraftsSupported);
+  AuthenticatedStorePromotionGateway? get workspaceCouponDraftConnection {
+    final actor = _contactAccountScope, source = catalogueGateway;
+    if (_disposed || actor == null || actor.isEmpty || activeWorkspace == null || !workspaceRequiresMembershipReadback ||
+        !workspaceStoreAuthoringAvailable || source is! AuthenticatedWorkspaceCatalogueGateway) return null;
+    StorePromotionGateway? connection = productPromotionGateway;
+    if (connection == null && source.storeCouponDraftsSupported) connection = _workspaceCouponConnection(source, actor);
+    if (connection is! AuthenticatedStorePromotionGateway || !connection.storeCouponDraftsSupported ||
+        connection.ownerAccountId != actor || connection.realm != source.realm ||
+        productPromotionRealm != null && productPromotionRealm != connection.realm) return null;
+    return connection;
+  }
+  /// Native manager/Save entry only. Preparing a task uses the observation above.
+  StoreCouponDraftSyncController? get workspaceCouponDraftSync {
+    final connection = workspaceCouponDraftConnection, actor = _contactAccountScope, store = activeWorkspace?.id;
+    if (connection == null || actor == null || store == null) return null;
+    final scope = (account: actor, store: store, realm: connection.realm), epoch = navigationScopeRevision;
+    final existing = _couponDraftSync[scope];
+    if (existing?.active == true) return existing;
+    existing?.removeListener(notifyListeners); existing?.dispose();
+    final controller = StoreCouponDraftSyncController(scope: scope, gateway: connection,
+      pendingStore: storeCouponDraftPendingStoreFactory?.call(scope) ?? SecureStoreCouponDraftPendingStore(),
+      context: () => _disposed || _contactAccountScope != actor || activeWorkspace?.id != store || navigationScopeRevision != epoch ||
+        !workspaceStoreAuthoringAvailable ? null : publicationPreferencesContext);
+    controller.addListener(notifyListeners);
+    return _couponDraftSync[scope] = controller;
+  }
+  Future<void> waitForWorkspaceCouponDraftSync() async {await Future.wait(_couponDraftSyncTails.values);}
+  void _queueSavedCouponDraftSync(StoreCouponCampaign campaign) {
+    try {
+      final connection = workspaceCouponDraftConnection, actor = _contactAccountScope, store = activeWorkspace?.id;
+      if (connection == null || actor == null || store == null) return;
+      final scope = (account: actor, store: store, realm: connection.realm), epoch = navigationScopeRevision, data = _storeData;
+      final frozen = jsonEncode(campaign.toJson());
+      bool current() {
+        if (_disposed || _contactAccountScope != actor || activeWorkspace?.id != store || !identical(data, _storeData) ||
+            navigationScopeRevision != epoch || !workspaceStoreAuthoringAvailable) return false;
+        try {
+          final rows = workspaceStoreCouponCampaigns.where((row) => row.id == campaign.id).toList();
+          return rows.length == 1 && jsonEncode(rows.single.toJson()) == frozen;
+        } on Object {return false;}
+      }
+      final operation = (_couponDraftSyncTails[scope] ?? Future<void>.value()).then((_) async {
+        if (!current()) return;
+        final controller = workspaceCouponDraftSync;
+        if (controller == null || !await controller.restore() || !current()) return;
+        if (controller.pending != null) {
+          await controller.reconcile();
+          if (controller.pending != null || !current()) return;
+        }
+        await controller.sync(campaign, inputCurrent: current);
+      });
+      final tail = operation.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+      _couponDraftSyncTails[scope] = tail;
+      unawaited(tail.then((_) {if (identical(_couponDraftSyncTails[scope], tail)) _couponDraftSyncTails.remove(scope);}));
+    } on Object {
+      // The confirmed device save is retained; no online or publication success
+      // is inferred from a missing/retired connection.
+    }
+  }
   Future<Set<(String,String)>> readWorkspaceAssistantOriginalCoupons(Map<(String,String),String> expected,
       {required String accountUserId,required bool Function() inputCurrent,required DateTime validUntil}) async {
     if(expected.isEmpty)return const {};
+    if(expected.values.any((proof)=>proof.startsWith('store-coupon-draft:'))){
+      if(expected.values.any((proof)=>!proof.startsWith('store-coupon-draft:')))return const {};
+      return _readWorkspaceAssistantPrivateCoupons(expected,accountUserId:accountUserId,inputCurrent:inputCurrent,validUntil:validUntil);
+    }
     final store=activeWorkspace?.id,account=_contactAccountScope,owner=publicationPreferencesContext;
     final navigation=navigationScopeRevision,catalogue=catalogueGateway;
     StorePromotionGateway? connection=productPromotionGateway;
     if(connection==null&&account!=null&&catalogue is AuthenticatedWorkspaceCatalogueGateway&&
-      gateway is! ReviewWorkGateway&&catalogue.storeCouponTermsSupported){
-      connection=AuthenticatedStorePromotionGateway(endpoint:catalogue.endpoint,credentials:catalogue.credentials,
-        transport:catalogue.transport,ownerAccountId:account,realm:catalogue.realm,storeCouponTermsSupported:true);
+      gateway is! ReviewWorkGateway&&(catalogue.storeCouponTermsSupported||catalogue.storeCouponTermsV2Supported)){
+      connection=_workspaceCouponConnection(catalogue,account);
     }
     if(store==null||account==null||accountUserId.isEmpty||connection is! AuthenticatedStorePromotionGateway||
       connection.ownerAccountId!=account||!connection.storeCouponTermsSupported||!workspaceRequiresMembershipReadback||
@@ -1412,13 +1511,54 @@ class WorkSession extends ChangeNotifier {
       return Set.unmodifiable(ready);
     }catch(_){return const {};}
   }
+  Future<Set<(String,String)>> _readWorkspaceAssistantPrivateCoupons(Map<(String,String),String> expected,
+      {required String accountUserId,required bool Function() inputCurrent,required DateTime validUntil}) async {
+    final reader=workspaceCouponDraftConnection,account=_contactAccountScope,store=activeWorkspace?.id,
+      owner=publicationPreferencesContext,navigation=navigationScopeRevision;
+    if(reader==null||account==null||account!=accountUserId||store==null||
+      expected.keys.any((key)=>!const {'AI-ACT-309','AI-ACT-310'}.contains(key.$1)))return const {};
+    final scope=(account:account,store:store,realm:reader.realm);
+    bool current()=>!_disposed&&inputCurrent()&&DateTime.now().isBefore(validUntil)&&
+      _contactAccountScope==account&&activeWorkspace?.id==store&&publicationPreferencesContext==owner&&
+      navigationScopeRevision==navigation&&_currentWorkspaceAccess(store,activeWorkspace?.profileId)&&
+      workspaceAssistantLoadedCouponController?.busy!=true&&workspaceAssistantLoadedCouponController?.pending==null&&
+      workspaceAssistantLoadedCouponDraftSync?.busy!=true&&workspaceAssistantLoadedCouponDraftSync?.pending==null;
+    if(!current())return const {};
+    final privatePending=storeCouponDraftPendingStoreFactory?.call(scope)??SecureStoreCouponDraftPendingStore(),
+      publicationPending=storeCouponPendingStoreFactory?.call(scope)??SecureStoreCouponPendingStore();
+    Future<bool> noPending() async=>await privatePending.read(scope).timeout(const Duration(seconds:25))==null&&
+      await publicationPending.read(scope).timeout(const Duration(seconds:25))==null&&current();
+    try {
+      final draft=await readWorkspaceAssistantCouponDraft(expectedStoreId:store,inputCurrent:current);
+      if(draft==null||!current()||!await noPending())return const {};
+      final campaigns=decodeStoreCouponCampaigns(draft[_couponCampaignField],store),ready=<(String,String)>{};
+      for(final entity in expected.keys.map((key)=>key.$2).toSet()){
+        final matches=campaigns.where((campaign)=>workspaceAssistantCouponDraftSelector(scope,campaign.id)==entity).toList();
+        if(matches.length!=1)continue;
+        final campaign=matches.single,original=await reader.readCouponDraft(scope,campaign.id,current).timeout(const Duration(seconds:25));
+        if(!current())return const {};
+        if(original==null||original.campaignFingerprint!=jsonEncode(campaign.toJson()))continue;
+        StoreCouponRecord? published;var publishedAvailable=false;
+        if(RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(campaign.id)){
+          final head=await reader.readCouponPreparationHead(scope,campaign.id,current).timeout(const Duration(seconds:25));
+          published=head.record;publishedAvailable=head.available;
+        }
+        final proof=workspaceAssistantPrivateCouponSourceProof(original,publishedAvailable:publishedAvailable,published:published);
+        for(final entry in expected.entries.where((entry)=>entry.key.$2==entity)){
+          if(entry.value==proof&&(entry.key.$1=='AI-ACT-309'||publishedAvailable))ready.add(entry.key);
+        }
+      }
+      final after=await readWorkspaceAssistantCouponDraft(expectedStoreId:store,inputCurrent:current);
+      if(!current()||after==null||jsonEncode(after)!=jsonEncode(draft)||!await noPending())return const {};
+      return Set.unmodifiable(ready);
+    }on Object{return const {};}
+  }
   StoreCouponController? get workspaceStoreCoupons {
     final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
     StorePromotionGateway? connection = productPromotionGateway;
     if (connection == null && account != null && source is AuthenticatedWorkspaceCatalogueGateway &&
-        gateway is! ReviewWorkGateway && source.storeCouponTermsSupported) {
-      connection = AuthenticatedStorePromotionGateway(endpoint: source.endpoint, credentials: source.credentials,
-        transport: source.transport, ownerAccountId: account, realm: source.realm, storeCouponTermsSupported: true);
+        gateway is! ReviewWorkGateway && (source.storeCouponTermsSupported || source.storeCouponTermsV2Supported)) {
+      connection = _workspaceCouponConnection(source, account);
     }
     final realm = productPromotionRealm ?? (connection is AuthenticatedStorePromotionGateway ? connection.realm : null);
     if (_disposed || account == null || account.isEmpty || store == null || !workspaceStoreAuthoringAvailable ||
@@ -16018,7 +16158,8 @@ class WorkSession extends ChangeNotifier {
   List<StoreCouponCampaign> get workspaceStoreCouponCampaigns =>
       decodeStoreCouponCampaigns(workspaceOfferDraft[_couponCampaignField], activeWorkspace?.id ?? '');
 
-  /// A private device save only. No campaign activation or monetary application.
+  /// Save the private device original, then queue its explicitly configured
+  /// backing copy. Neither save activates a campaign or applies money.
   Future<bool> saveWorkspaceStoreCouponCampaign(StoreCouponCampaign campaign,
       {required String expectedStoreId}) async {
     final recovery = _offerDraftRecovery;
@@ -16049,6 +16190,7 @@ class WorkSession extends ChangeNotifier {
       }
       if (identical(recovery, _offerDraftRecovery)) { notifyListeners(); }
     }
+    if (saved) _queueSavedCouponDraftSync(campaign);
     return saved;
   }
 
@@ -16801,6 +16943,8 @@ class WorkSession extends ChangeNotifier {
     _productPromotions.clear();
     for (final coupon in _storeCoupons.values) { coupon.dispose(); }
     _storeCoupons.clear();
+    for (final draft in _couponDraftSync.values) {draft.removeListener(notifyListeners); draft.dispose();}
+    _couponDraftSync.clear(); _couponDraftSyncTails.clear();
     for (final feedback in _customerFeedback.values) { feedback.dispose(); }
     _customerFeedback.clear();
     _counterDraftRecovery.clear();

@@ -2659,7 +2659,8 @@ function assistantOriginalContextSource(projectId: string) {
     ...(original&&storeProducts&&(couponRealm==='evaluation'||couponRealm==='production')?{
       storeCoupons:new OriginalStoreCouponPreparationContext({projectId,realm:couponRealm,authority:original,products:storeProducts,
         promotions:{handleOperation:(userId,operation,body)=>workspacePromotionService().handleOperation(userId,operation,body)},
-        couponReadsEnabled:process.env.MOOLSOCIAL_STORE_COUPON_TERMS_V1==='true'})}:{}),
+        couponReadsEnabled:process.env.MOOLSOCIAL_STORE_COUPON_TERMS_V1==='true'||process.env.MOOLSOCIAL_STORE_COUPON_TERMS_V2==='true',
+        draftReadsEnabled:process.env.MOOLSOCIAL_STORE_COUPON_DRAFT_V1==='true'})}:{}),
     ...(original && ['evaluation','production'].includes(process.env.MOOLSOCIAL_PURCHASE_REALM ?? '') ? {
       nativeOrderBoardEnabled: true,
       storeOrders: new OriginalStoreOrderPreparationContext({projectId,authority:original,purchases:workspacePurchaseProjectionService()}),
@@ -3168,7 +3169,8 @@ export const moolSocialWorkspace = onRequest(
       }
       const payloadOperation = request.body !== null && typeof request.body === 'object' && !Array.isArray(request.body) &&
         typeof request.body.operation === 'string' ? request.body.operation.trim() : '';
-      if (request.rawBody.byteLength > workspaceOriginalRequestBodyLimit(payloadOperation)) {
+      if (request.rawBody.byteLength > workspaceOriginalRequestBodyLimit(payloadOperation,
+          request.body?.storeCouponTermsVersion, request.body?.storeCouponDraftVersion)) {
         throw new WorkspaceProfileError(
           "payload_too_large",
           "The Workspace request is too large.",
@@ -3254,7 +3256,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "setRetailerAvailability" ||
         operation === "saveRetailerProduct" ||
         operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation || purchaseEntryAction === 'saveSupplier' || purchaseEntryAction === 'savePurchaseDraft' || purchaseEntryAction === 'saveOpeningEvidence' || ledgerAction === 'mutation' || customerAction === 'save' ||
-        operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === "saveStorePublicDetails" ||
+        operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === 'saveStoreCouponDraft' || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || privateProductDraftOperation === 'save' || stockOperation === "save" || stockVisibilityOperation === "save" || stockVisibilityOperation === "close" || catalogueProductionAction !== undefined ||
         ['request', 'offer', 'accept', 'withdraw'].includes(bulkQuoteAction ?? '') ||
         operation === "prepareStoreProductMedia" || operation === "confirmStoreProductMedia" || operation === 'recordPublicProductPresentation' || operation === 'recordPublicStorePresentation' || operation === 'recordPublicCartAddition' || operation === 'recordPublicCheckoutEntry';
@@ -3262,7 +3264,8 @@ export const moolSocialWorkspace = onRequest(
         "reconcileStoreSupplierPolicy"].includes(operation);
       const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
         "listStorePromotions", "readPublicStorePromotions", "readPublicPromotionDiscovery",
-        "saveStoreCoupon", "readStoreCoupon", "listStoreCoupons", "reconcileStoreCoupon", "readPublicStoreCoupons", "readPublicStoreCouponSnapshot", "evaluateStoreCouponEligibility"].includes(operation);
+        "saveStoreCoupon", "readStoreCoupon", "listStoreCoupons", "reconcileStoreCoupon", "readPublicStoreCoupons", "readPublicStoreCouponSnapshot", "evaluateStoreCouponEligibility",
+        'saveStoreCouponDraft', 'readStoreCouponDraft', 'listStoreCouponDrafts', 'reconcileStoreCouponDraft'].includes(operation);
       const catalogueOperation = storeProcurementRead || ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
         'confirmStoreCommodityPrice', 'readStoreCommodityPrice', 'reconcileStoreCommodityPrice',
         'requestPublicCommodityPriceRefresh',
@@ -3582,6 +3585,8 @@ function workspacePromotionService(): WorkspacePromotionService {
   return new WorkspacePromotionService(new FirestorePromotionRepository(getFirestore(), realm, () => new Date(), bulk), workspaceCatalogueService(),
     () => new Date(), {benefitTermsSupported: process.env.MOOLSOCIAL_STORE_PROMOTION_TERMS_V1 === "true",
       storeCouponTermsSupported: process.env.MOOLSOCIAL_STORE_COUPON_TERMS_V1 === "true",
+      storeCouponTermsV2Supported: process.env.MOOLSOCIAL_STORE_COUPON_TERMS_V2 === "true",
+      storeCouponDraftsSupported: process.env.MOOLSOCIAL_STORE_COUPON_DRAFT_V1 === "true",
       storeCouponEligibilitySupported: process.env.MOOLSOCIAL_STORE_COUPON_ELIGIBILITY_V1 === "true"});
 }
 

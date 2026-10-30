@@ -246,7 +246,8 @@ class _StoreCouponCampaignPanelState extends State<StoreCouponCampaignPanel> {
   late final String? _storeId;
   late final int? _epoch;
   late final Map<String, String> _original;
-  bool _loading = true, _ready = false;
+  bool _loading = true, _ready = false, _retryingDraft = false;
+  StoreCouponDraftSyncController? _draftSync;
   @override void dispose() { _search.dispose(); super.dispose(); }
   late final Listenable _owner = Listenable.merge([widget.session, if (widget.scopeOwner != null) widget.scopeOwner!]);
   bool get _current => mounted && _epoch != null && widget.session.activeWorkspace?.id == _storeId &&
@@ -265,7 +266,38 @@ class _StoreCouponCampaignPanelState extends State<StoreCouponCampaignPanel> {
     if (_storeId == null) return;
     setState(() => _loading = true);
     final ready = await widget.session.loadWorkspaceOfferDraft(expectedStoreId: _storeId);
+    if (_current && ready) {
+      _draftSync = widget.session.workspaceCouponDraftSync;
+      // Native manager entry may inspect the retained journal. It never sends
+      // a save, reconciles status or adopts an online campaign on opening.
+      await _draftSync?.restore();
+    }
     if (_current) setState(() { _loading = false; _ready = ready; });
+  }
+  Future<void> _checkDraftSave() async {
+    final sync = _draftSync;
+    if (!_current || sync == null || !sync.active || sync.busy || _retryingDraft) return;
+    if (!await sync.restore() || !_current || !sync.active) return;
+    if (sync.pending != null) await sync.reconcile();
+    if (_current) setState(() {});
+  }
+  Future<void> _retryDraftSave() async {
+    final sync = _draftSync, original = _draftSync?.pending;
+    if (!_current || sync == null || !sync.active || !sync.ready || sync.busy || original == null || _retryingDraft) return;
+    setState(() => _retryingDraft = true);
+    bool sameOriginal() => _current && sync.active && sync.ready && !sync.busy &&
+      sync.pending?.fingerprint == original.fingerprint;
+    try {
+      final confirmed = await showDialog<bool>(context: context, builder: (dialog) => AnimatedBuilder(
+        animation: _owner, builder: (_, _) => AlertDialog(scrollable: true, title: const Text('Retry saved draft?'),
+          content: Text(sameOriginal()
+            ? 'Retry the earlier saved copy of “${original.campaign.name}”? Later edits stay on this device. This does not publish it.'
+            : 'The saved draft or Store access changed. Reopen Coupons to continue.'),
+          actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')),
+            FilledButton(onPressed: sameOriginal() ? () => Navigator.pop(dialog, true) : null,
+              child: const Text('Retry original save'))])));
+      if (confirmed == true && sameOriginal()) await sync.retryOriginal(confirmedOriginal: true);
+    } finally {if (mounted) setState(() => _retryingDraft = false);}
   }
   Future<void> _edit([StoreCouponCampaign? campaign]) async {
     if (!_current || !_ready || widget.session.workspaceOfferDraftSaving) return;
@@ -309,6 +341,7 @@ class _StoreCouponCampaignPanelState extends State<StoreCouponCampaignPanel> {
         '${campaign.structuredTerms?.skus.map((sku) => '${sku.title} ${sku.skuId}').join(' ') ?? ''}'
           .toLowerCase().contains(query)).toList();
       final publisher = widget.session.workspaceStoreCoupons;
+      final draftSync = _draftSync;
       return Column(key: const Key('work-store-coupons'),
         crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _couponPair(context, Text(widget.showHeading ? 'Store coupons' : '${campaigns.length} saved',
@@ -319,6 +352,18 @@ class _StoreCouponCampaignPanelState extends State<StoreCouponCampaignPanel> {
           const SizedBox(height: 6),
           Text(publisher == null ? 'Private drafts · Publishing unavailable.' : 'Save your draft, then review publishing.',
             style: const TextStyle(fontSize: 12, height: 1.4, color: Color(0xff566572))),
+          if (draftSync?.active == true && (!draftSync!.ready || draftSync.pending != null)) ...[
+            const SizedBox(height: 6),
+            const Text('The earlier online draft save is unconfirmed. Your device draft is kept.',
+              key: Key('work-coupon-draft-save-status'), style: TextStyle(fontSize: 12, height: 1.4)),
+            Wrap(spacing: 8, children: [
+              TextButton.icon(onPressed: draftSync.busy || _retryingDraft ? null : _checkDraftSave,
+                icon: const Icon(Icons.refresh, size: 18), label: const Text('Check draft save')),
+              if (draftSync.pending != null) TextButton.icon(
+                onPressed: !draftSync.ready || draftSync.busy || _retryingDraft ? null : _retryDraftSave,
+                icon: const Icon(Icons.sync, size: 18), label: const Text('Retry original save')),
+            ]),
+          ],
           if (campaigns.length > 4 || _search.text.isNotEmpty) TextField(key: const Key('work-coupon-search'), controller: _search, onChanged: (_) => setState(() {}),
             style: const TextStyle(fontSize: 14), decoration: _couponDecoration(context, 'Search coupons', hint: 'Name or selected product')
               .copyWith(prefixIcon: const Icon(Icons.search, size: 20))),

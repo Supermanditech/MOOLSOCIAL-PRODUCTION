@@ -11770,6 +11770,11 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
       ),
     );
     final viewport = MediaQuery.sizeOf(context);
+    final bodyTextScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    // Let the header share the existing item scroll when enlarged text leaves
+    // too little room, retaining the original pinned checkout confirmation.
+    final headerScrolls = (lines.isNotEmpty || visibleLines.isNotEmpty) &&
+        bodyTextScale > 1 && viewport.height / bodyTextScale <= 480;
     if (viewport.height <= 480 &&
         (session.isStoreProcurement || viewport.width > viewport.height)) {
       final list = ListView(
@@ -11818,7 +11823,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
             _instructionsFocused && View.of(context).viewInsets.bottom > 0;
         return Column(
           children: [
-            if (!keyboardVisible) ...header,
+            if (!keyboardVisible && !headerScrolls) ...header,
             if (widget.notice != null) noticeViewport(constraints.maxHeight),
             Expanded(
               key: const ValueKey('buy-cart-scroll'),
@@ -11828,7 +11833,10 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                       controller: _scrollController,
                       key: PageStorageKey('buy-cart-${session.cartScope.name}'),
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 72),
-                      children: [...contents, ...discoveryContents, sponsored],
+                      children: [
+                        if (!keyboardVisible && headerScrolls) ...header,
+                        ...contents, ...discoveryContents, sponsored,
+                      ],
                     ),
             ),
             if (!keyboardVisible) footer,

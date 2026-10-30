@@ -457,7 +457,11 @@ const common = ['schemaVersion', 'purchaseEntryVersion', 'actorAccountId', 'real
 /** HTTP infrastructure bound only, not authority or a larger book allowance.
  * A draft and its reviewed data copy can both appear in one command. The
  * original persisted purchase book remains bounded at10MiB by its owner. */
-export function workspaceOriginalRequestBodyLimit(operation: string): number {
+export function workspaceOriginalRequestBodyLimit(operation: string, storeCouponTermsVersion?: unknown, storeCouponDraftVersion?: unknown): number {
+  if (storeCouponDraftVersion === 1 && ['saveStoreCouponDraft', 'readStoreCouponDraft',
+    'listStoreCouponDrafts', 'reconcileStoreCouponDraft'].includes(operation)) return 8 * 1024 * 1024;
+  if (storeCouponTermsVersion === 2 && ['saveStoreCoupon', 'readStoreCoupon',
+    'reconcileStoreCoupon', 'evaluateStoreCouponEligibility'].includes(operation)) return 8 * 1024 * 1024;
   if (['sharePurchasedUnits', 'reconcilePurchasedUnits', 'reportPurchasedUnitMismatch',
     'reconcilePurchasedUnitMismatch'].includes(operation)) return 4 * 1024 * 1024;
   return ['saveStorePurchaseDraft', 'saveStoreSupplierOpeningEvidence', 'confirmStoreSupplierOpening', 'confirmStoreSupplierBill', 'saveStoreCounterDraft'].includes(operation)

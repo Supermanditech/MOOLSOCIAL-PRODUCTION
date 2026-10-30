@@ -5263,7 +5263,8 @@ class BuyV2Session extends ChangeNotifier {
     if (_collectionDisposed || !procurementScopeCurrent || isStoreProcurement || _holdCartForPaymentResolution()) return false;
     final key = _couponStoreKey(coupon), lines = _couponStoreLines(coupon);
     if (lines.isEmpty) return false;
-    if (coupon.structuredTerms != null) {
+    final rich = coupon.structuredTerms;
+    if (rich != null && !{BuyV2StoreOfferKind.billDiscount, BuyV2StoreOfferKind.productDiscount}.contains(rich.kind)) {
       _storeCouponMessages[key] = 'Applying this offer is not connected yet. No saving or extra quantity has been added.';
       notifyListeners(); return false;
     }

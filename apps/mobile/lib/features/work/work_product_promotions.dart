@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import '../shared/social_content_gateway.dart';
 import '../buy/buy_v2_content_contracts.dart' show BuyV2AdvertisedBenefitTerms;
 import '../buy/buy_v2_models.dart' show BuyV2StoreOfferTerms, BuyV2StoreOfferKind;
@@ -133,6 +134,202 @@ String encodeStoreCouponCampaigns(List<StoreCouponCampaign> campaigns) => jsonEn
   'schemaVersion': campaigns.any((row) => row.structuredTerms != null) ? 2 : 1,
   'campaigns': campaigns.map((row) => row.toJson()).toList(),
 });
+
+/// The existing private campaign's durable backing command. Its source CAS is
+/// independent of the native campaign revision and publication CAS.
+@immutable
+class StoreCouponDraftIntent {
+  StoreCouponDraftIntent({required this.scope, required this.expectedSourceRevision,
+    required this.idempotencyKey, required StoreCouponCampaign campaign})
+      : couponId = _text(campaign.id, 128),
+        _campaign = jsonEncode(StoreCouponCampaign.fromJson(campaign.toJson(), scope.store).toJson()) {
+    _scope(scope); _id(idempotencyKey); _revision(expectedSourceRevision);
+    if (expectedSourceRevision >= 1000000000) throw const FormatException('Refresh the saved draft.');
+  }
+  final StorePromotionScope scope;
+  final int expectedSourceRevision;
+  final String couponId, idempotencyKey, _campaign;
+  StoreCouponCampaign get campaign => StoreCouponCampaign.fromJson(jsonDecode(_campaign), scope.store);
+  String get campaignFingerprint => _campaign;
+  Map<String, dynamic> get body => {'storeCouponDraftVersion': 1, 'storeId': scope.store,
+    'couponId': couponId, 'expectedSourceRevision': expectedSourceRevision,
+    'idempotencyKey': idempotencyKey, 'campaign': jsonDecode(_campaign)};
+  Map<String, dynamic> toJson() => {'schemaVersion': 1, 'accountId': scope.account, 'realm': scope.realm, ...body};
+  String get fingerprint => jsonEncode(toJson());
+  factory StoreCouponDraftIntent.fromJson(Object? raw) {
+    final row = _map(raw, ['schemaVersion', 'storeCouponDraftVersion', 'accountId', 'realm', 'storeId',
+      'couponId', 'expectedSourceRevision', 'idempotencyKey', 'campaign']);
+    if (row['schemaVersion'] is! int || row['schemaVersion'] != 1 || row['storeCouponDraftVersion'] is! int ||
+        row['storeCouponDraftVersion'] != 1) throw const FormatException('Check the saved draft request.');
+    final scope = (account: _id(row['accountId']), store: _id(row['storeId']), realm: _text(row['realm'], 16));
+    final campaign = StoreCouponCampaign.fromJson(row['campaign'], scope.store);
+    if (campaign.id != _text(row['couponId'], 128)) throw const FormatException('Wrong saved draft.');
+    return StoreCouponDraftIntent(scope: scope, expectedSourceRevision: _revision(row['expectedSourceRevision']),
+      idempotencyKey: _id(row['idempotencyKey']), campaign: campaign);
+  }
+}
+
+@immutable
+class StoreCouponDraftRecord {
+  const StoreCouponDraftRecord._(this.scope, this.couponId, this.sourceRevision, this.observedAt, this._campaign);
+  final StorePromotionScope scope;
+  final int sourceRevision;
+  final DateTime observedAt;
+  final String couponId, _campaign;
+  StoreCouponCampaign get campaign => StoreCouponCampaign.fromJson(jsonDecode(_campaign), scope.store);
+  String get campaignFingerprint => _campaign;
+  static StoreCouponDraftRecord decode(Object? raw, StorePromotionScope scope, DateTime now) {
+    _scope(scope);
+    final row = _map(raw, ['schemaVersion', 'storeCouponDraftVersion', 'accountId', 'realm', 'storeId',
+      'couponId', 'sourceRevision', 'observedAt', 'campaign']);
+    final campaign = StoreCouponCampaign.fromJson(row['campaign'], scope.store), observed = _time(row['observedAt']);
+    if (row['schemaVersion'] is! int || row['schemaVersion'] != 1 || row['storeCouponDraftVersion'] is! int ||
+        row['storeCouponDraftVersion'] != 1 || row['accountId'] != scope.account ||
+        row['realm'] != scope.realm || row['storeId'] != scope.store || campaign.id != _text(row['couponId'], 128) ||
+        observed.isAfter(now.toUtc())) throw const FormatException('Refresh the original saved draft.');
+    return StoreCouponDraftRecord._(scope, campaign.id, _revision(row['sourceRevision'], 1), observed, jsonEncode(campaign.toJson()));
+  }
+  bool acknowledges(StoreCouponDraftIntent intent) => scope == intent.scope && couponId == intent.couponId &&
+    sourceRevision == intent.expectedSourceRevision + 1 && campaignFingerprint == intent.campaignFingerprint;
+}
+
+class StoreCouponDraftResult {
+  const StoreCouponDraftResult(this.state, {this.record});
+  final StorePromotionResultState state;
+  final StoreCouponDraftRecord? record;
+}
+class StoreCouponDraftPage {
+  StoreCouponDraftPage(List<StoreCouponDraftRecord> records, this.nextCursor) : records = List.unmodifiable(records);
+  final List<StoreCouponDraftRecord> records;
+  final String? nextCursor;
+}
+abstract interface class StoreCouponDraftGateway {
+  bool get storeCouponDraftsSupported;
+  Future<StoreCouponDraftRecord?> readCouponDraft(StorePromotionScope scope, String couponId, bool Function() current);
+  Future<StoreCouponDraftPage> listCouponDrafts(StorePromotionScope scope, bool Function() current, {String? after, int limit = 20});
+  Future<StoreCouponDraftResult> saveCouponDraft(StoreCouponDraftIntent intent, bool Function() current);
+  Future<StoreCouponDraftResult> reconcileCouponDraft(StoreCouponDraftIntent intent, bool Function() current);
+}
+abstract interface class StoreCouponDraftPendingStore {
+  Future<StoreCouponDraftIntent?> read(StorePromotionScope scope);
+  Future<void> save(StoreCouponDraftIntent intent);
+  Future<void> clear(StoreCouponDraftIntent intent);
+}
+
+/// Synchronizes an explicitly saved native draft. It never edits the native
+/// book, publishes a coupon, or treats a historical receipt as the current head.
+class StoreCouponDraftSyncController extends ChangeNotifier {
+  StoreCouponDraftSyncController({required this.scope, required this.gateway, required this.pendingStore,
+    required this.context}) : _lifetime = context() {_scope(scope);}
+  final StorePromotionScope scope;
+  final StoreCouponDraftGateway gateway;
+  final StoreCouponDraftPendingStore pendingStore;
+  final Object? Function() context;
+  final Object? _lifetime;
+  bool _closed = false, ready = false, busy = false;
+  bool get active => !_closed && _lifetime != null && context() == _lifetime;
+  StoreCouponDraftIntent? pending;
+  StoreCouponDraftRecord? lastAcknowledged;
+  String? message;
+  Future<bool>? _restoring;
+  void _emit() {if (!_closed) notifyListeners();}
+  Future<bool> restore() {
+    if (!active) return Future.value(false);
+    if (ready) return Future.value(true);
+    return _restoring ??= _restore().whenComplete(() => _restoring = null);
+  }
+  Future<bool> _restore() async {
+    try {
+      final original = await pendingStore.read(scope).timeout(const Duration(seconds: 10));
+      if (!active) return false;
+      if (original != null && original.scope != scope) throw const FormatException();
+      pending = original; ready = true; message = null;
+      return true;
+    } on Object {
+      if (active) message = 'The original draft save needs checking. Your device draft is kept.';
+      return false;
+    } finally {if (active) _emit();}
+  }
+  Future<StoreCouponDraftResult> sync(StoreCouponCampaign campaign, {required bool Function() inputCurrent}) async {
+    const notSent = StoreCouponDraftResult(StorePromotionResultState.notSent);
+    if (!active || busy || !gateway.storeCouponDraftsSupported) return notSent;
+    busy = true; _emit();
+    bool current() => active && inputCurrent();
+    try {
+      if (!await restore() || !current()) return notSent;
+      if (pending != null) return const StoreCouponDraftResult(StorePromotionResultState.unknown);
+      final frozen = StoreCouponCampaign.fromJson(campaign.toJson(), scope.store);
+      final original = await gateway.readCouponDraft(scope, frozen.id, current).timeout(const Duration(seconds: 25));
+      if (!current()) return notSent;
+      if (original != null && (original.scope != scope || original.couponId != frozen.id)) throw const FormatException();
+      if (original != null && original.campaign.revision >= frozen.revision) {
+        message = original.campaignFingerprint == jsonEncode(frozen.toJson()) ?
+          'The device draft matches the online copy.' : 'The online copy changed. Your device draft is kept.';
+        return notSent;
+      }
+      final intent = StoreCouponDraftIntent(scope: scope, expectedSourceRevision: original?.sourceRevision ?? 0,
+        idempotencyKey: _key(), campaign: frozen);
+      pending = intent;
+      try {await pendingStore.save(intent).timeout(const Duration(seconds: 10));}
+      on Object {ready = false; rethrow;}
+      if (!active) return const StoreCouponDraftResult(StorePromotionResultState.unknown);
+      if (!current()) return await _finish(intent, notSent);
+      return await _finish(intent, await gateway.saveCouponDraft(intent, current).timeout(const Duration(seconds: 25)));
+    } on Object {
+      if (active) message = 'Draft saved on this device. The online copy is unconfirmed.';
+      return StoreCouponDraftResult(pending == null ? StorePromotionResultState.notSent : StorePromotionResultState.unknown);
+    } finally {busy = false; _emit();}
+  }
+  Future<StoreCouponDraftResult> reconcile() async {
+    const unknown = StoreCouponDraftResult(StorePromotionResultState.unknown);
+    if (!active || busy || !gateway.storeCouponDraftsSupported) return unknown;
+    busy = true; _emit();
+    try {
+      if (!await restore() || !active || pending == null) return unknown;
+      final original = pending!;
+      final result = await gateway.reconcileCouponDraft(original, () => active).timeout(const Duration(seconds: 25));
+      if (result.state != StorePromotionResultState.saved) return unknown;
+      return await _finish(original, result);
+    } on Object {
+      if (active) message = 'The original draft save is still unconfirmed.';
+      return unknown;
+    } finally {busy = false; _emit();}
+  }
+  Future<StoreCouponDraftResult> retryOriginal({required bool confirmedOriginal}) async {
+    const unknown = StoreCouponDraftResult(StorePromotionResultState.unknown);
+    if (!confirmedOriginal || !active || busy || !gateway.storeCouponDraftsSupported) return unknown;
+    busy = true; _emit();
+    try {
+      if (!await restore() || !active || pending == null) return unknown;
+      final original = pending!;
+      final result = await gateway.saveCouponDraft(original, () => active).timeout(const Duration(seconds: 25));
+      if (result.state != StorePromotionResultState.saved) return unknown;
+      return await _finish(original, result);
+    } on Object {return unknown;} finally {busy = false; _emit();}
+  }
+  Future<StoreCouponDraftResult> _finish(StoreCouponDraftIntent original, StoreCouponDraftResult result) async {
+    const unknown = StoreCouponDraftResult(StorePromotionResultState.unknown);
+    if (!active || pending?.fingerprint != original.fingerprint) return unknown;
+    if (result.state == StorePromotionResultState.unknown || result.state == StorePromotionResultState.saved &&
+        result.record?.acknowledges(original) != true) {
+      message = 'Check the original draft save before another online save.';
+      return unknown;
+    }
+    try {
+      await pendingStore.clear(original).timeout(const Duration(seconds: 10));
+      if (!active) return unknown;
+      pending = null;
+      if (result.state == StorePromotionResultState.saved) lastAcknowledged = result.record;
+      message = result.state == StorePromotionResultState.saved ? 'Draft saved. Not published.' :
+        'The online draft was not saved. Your device copy is kept.';
+      return result;
+    } on Object {
+      message = 'The original draft save still needs checking.';
+      return unknown;
+    }
+  }
+  @override void dispose() {_closed = true; super.dispose();}
+}
 
 const _couponKeys = ['name', 'percentage', 'discount', 'minimumSpendMinor',
   'maximumSavingMinor', 'startsAt', 'endsAt', 'totalUses', 'usesPerCustomer', 'active'];
@@ -758,7 +955,18 @@ abstract interface class StorePromotionTermsCapability {
   bool get benefitTermsSupported;
 }
 
-class AuthenticatedStorePromotionGateway implements StorePromotionGateway, StorePromotionTermsCapability, StoreCouponGateway {
+/// Explicit v2 transport capability. The ordinary v1 gateway never acquires
+/// structured support merely from receiving a structured server record.
+class AuthenticatedStructuredStorePromotionGateway extends AuthenticatedStorePromotionGateway
+    implements StoreStructuredCouponGateway {
+  AuthenticatedStructuredStorePromotionGateway({required super.endpoint, required super.credentials,
+    required super.transport, required super.ownerAccountId, required super.realm,
+    required super.storeCouponTermsSupported, super.storeCouponDraftsSupported, super.benefitTermsSupported, super.now});
+  @override int get _couponTermsVersion => 2;
+  @override bool get structuredCouponTermsSupported => storeCouponTermsSupported;
+}
+
+class AuthenticatedStorePromotionGateway implements StorePromotionGateway, StorePromotionTermsCapability, StoreCouponGateway, StoreCouponDraftGateway {
   AuthenticatedStorePromotionGateway({
     required this.endpoint,
     required this.credentials,
@@ -767,6 +975,7 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
     required this.realm,
     this.benefitTermsSupported = false,
     this.storeCouponTermsSupported = false,
+    this.storeCouponDraftsSupported = false,
     DateTime Function()? now,
   }) : now = now ?? DateTime.now {
     if (endpoint.scheme != 'https' ||
@@ -788,7 +997,9 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
   final String ownerAccountId, realm;
   @override final bool benefitTermsSupported;
   @override final bool storeCouponTermsSupported;
+  @override final bool storeCouponDraftsSupported;
   final DateTime Function() now;
+  int get _couponTermsVersion => 1;
   void _check(StorePromotionScope scope, bool Function() current) {
     _scope(scope);
     if (scope.account != ownerAccountId || scope.realm != realm || !current()) {
@@ -804,9 +1015,16 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
     required void Function() onSend,
     void Function()? beforeSend,
     bool storeCoupon = false,
+    bool couponDraft = false,
   }) async {
     _check(scope, current);
+    if (couponDraft && (!storeCouponDraftsSupported || storeCoupon ||
+        utf8.encode(jsonEncode(body)).length > 8 * 1024 * 1024)) throw _NotSent();
     if (storeCoupon && !storeCouponTermsSupported) throw _NotSent();
+    final couponVersion = body['storeCouponTermsVersion'] ?? _couponTermsVersion;
+    if (storeCoupon && (couponVersion != 1 && couponVersion != 2 ||
+        couponVersion == 2 && _couponTermsVersion != 2 ||
+        couponVersion == 2 && utf8.encode(jsonEncode(body)).length > 8 * 1024 * 1024)) throw _NotSent();
     if (!benefitTermsSupported && body['promotion'] is Map && (body['promotion'] as Map).containsKey('benefitTerms')) {
       throw _NotSent();
     }
@@ -830,30 +1048,35 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
             'x-firebase-appcheck': check,
             'x-request-id': _key(),
           },
-          body: {...body, if (storeCoupon) 'storeCouponTermsVersion': 1,
-            if (!storeCoupon && benefitTermsSupported) 'promotionTermsVersion': 1},
+          body: {...body, if (storeCoupon) 'storeCouponTermsVersion': couponVersion,
+            if (couponDraft) 'storeCouponDraftVersion': 1,
+            if (!storeCoupon && !couponDraft && benefitTermsSupported) 'promotionTermsVersion': 1},
         )
         .timeout(const Duration(seconds: 20));
   }
 
-  Map<String, dynamic> _couponEnvelope(SocialContentResponse response, StorePromotionScope scope, List<String> fields) {
+  Map<String, dynamic> _couponEnvelope(SocialContentResponse response, StorePromotionScope scope, List<String> fields, {int? termsVersion}) {
     if (response.statusCode != 200) throw const FormatException('Coupons could not be checked.');
+    final expectedVersion = termsVersion ?? _couponTermsVersion;
+    if (expectedVersion == 2 && utf8.encode(response.body).length > 8 * 1024 * 1024) {
+      throw const FormatException('Coupon response is too large.');
+    }
     final envelope = jsonDecode(response.body);
     if (envelope is! Map || envelope['ok'] != true) throw const FormatException('Coupons could not be checked.');
     final row = _map(envelope['data'], ['schemaVersion', 'storeCouponTermsVersion', 'realm', 'storeId',
       'orderingAvailable', 'redemptionAvailable', 'publicationConfirmed', ...fields]);
-    if (row['schemaVersion'] != 1 || row['storeCouponTermsVersion'] != 1 || row['realm'] != scope.realm ||
+    if (row['schemaVersion'] != 1 || row['storeCouponTermsVersion'] != expectedVersion || row['realm'] != scope.realm ||
         row['storeId'] != scope.store || row['orderingAvailable'] != false ||
         row['redemptionAvailable'] != false || row['publicationConfirmed'] != false) {
       throw const FormatException('Coupon response changed.');
     }
     return row;
   }
-  StoreCouponRecord? _couponRecord(SocialContentResponse response, StorePromotionScope scope, String couponId) {
-    final row = _couponEnvelope(response, scope, ['record']);
+  StoreCouponRecord? _couponRecord(SocialContentResponse response, StorePromotionScope scope, String couponId, {int? termsVersion}) {
+    final row = _couponEnvelope(response, scope, ['record'], termsVersion: termsVersion);
     if (row['record'] == null) return null;
     final value = StoreCouponRecord.decode(row['record'], scope, now());
-    if (value.couponId != couponId || value.input.structured) throw const FormatException('Wrong or unsupported coupon returned.');
+    if (value.couponId != couponId || value.input.structured && (termsVersion ?? _couponTermsVersion) != 2) throw const FormatException('Wrong or unsupported coupon returned.');
     return value;
   }
   @override
@@ -863,6 +1086,19 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
       current, mutation: false, onSend: () {}, storeCoupon: true);
     _check(scope, current);
     return _couponRecord(response, scope, couponId);
+  }
+  /// Exact observational head for private-draft preparation. Only an explicit
+  /// unavailable response differs from a successful original read returning null.
+  Future<({bool available, StoreCouponRecord? record})> readCouponPreparationHead(
+      StorePromotionScope scope, String couponId, bool Function() current) async {
+    _check(scope, current);
+    if (_couponTermsVersion != 2 || !storeCouponTermsSupported) return (available: false, record: null);
+    _id(couponId);
+    final response = await _request(scope, {'operation': 'readStoreCoupon', 'storeId': scope.store,
+      'couponId': couponId, 'storeCouponTermsVersion': 2}, current, mutation: false, onSend: () {}, storeCoupon: true);
+    _check(scope, current);
+    if (response.statusCode == 503) return (available: false, record: null);
+    return (available: true, record: _couponRecord(response, scope, couponId, termsVersion: 2));
   }
   @override
   Future<StoreCouponPage> listCoupons(StorePromotionScope scope, bool Function() current, {String? after, int limit = 20}) async {
@@ -877,12 +1113,13 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
     var previous = after;
     for (final item in items) {
       final value = StoreCouponRecord.decode(item, scope, now());
-      if (value.input.structured) throw const FormatException('This service does not support structured offers.');
+      if (value.input.structured && _couponTermsVersion != 2) throw const FormatException('This service does not support structured offers.');
       if (previous != null && value.couponId.compareTo(previous) <= 0) throw const FormatException('Coupon page order changed.');
       values.add(value); previous = value.couponId;
     }
     final next = row['nextCursor'] == null ? null : _id(row['nextCursor']);
-    if (next != (values.length == limit ? values.last.couponId : null)) throw const FormatException('Coupon cursor changed.');
+    if (_couponTermsVersion == 1 ? next != (values.length == limit ? values.last.couponId : null) :
+        next != null && (values.isEmpty || next != values.last.couponId)) throw const FormatException('Coupon cursor changed.');
     return StoreCouponPage(values, next);
   }
   @override
@@ -890,15 +1127,15 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
   @override
   Future<StoreCouponResult> reconcileCoupon(StoreCouponIntent original, bool Function() current) => _writeCoupon(original, current, recovery: true);
   Future<StoreCouponResult> _writeCoupon(StoreCouponIntent original, bool Function() current, {required bool recovery}) async {
-    if (original.input.structured) {
-      // This concrete transport negotiates terms v1 only. A future v2 adapter
-      // must explicitly implement StoreStructuredCouponGateway.
+    if (original.input.structured && _couponTermsVersion != 2) {
       return StoreCouponResult(recovery ? StorePromotionResultState.unknown : StorePromotionResultState.notSent);
     }
     var sent = false;
     try {
       if (!recovery) original.input.validateForSave(now());
-      final response = await _request(original.scope, {'operation': recovery ? 'reconcileStoreCoupon' : 'saveStoreCoupon', ...original.body},
+      final version = original.input.structured ? 2 : 1;
+      final response = await _request(original.scope, {'operation': recovery ? 'reconcileStoreCoupon' : 'saveStoreCoupon',
+        ...original.body, 'storeCouponTermsVersion': version},
         current, mutation: !recovery, onSend: () => sent = true, storeCoupon: true,
         beforeSend: recovery ? null : () => original.input.validateForSave(now()));
       _check(original.scope, current);
@@ -909,12 +1146,92 @@ class AuthenticatedStorePromotionGateway implements StorePromotionGateway, Store
           return const StoreCouponResult(StorePromotionResultState.rejected);
         }
       }
-      final record = _couponRecord(response, original.scope, original.couponId);
+      final record = _couponRecord(response, original.scope, original.couponId, termsVersion: version);
       return record?.acknowledges(original) == true
         ? StoreCouponResult(StorePromotionResultState.saved, record: record)
         : const StoreCouponResult(StorePromotionResultState.unknown);
     } on Object {
       return StoreCouponResult(sent || recovery ? StorePromotionResultState.unknown : StorePromotionResultState.notSent);
+    }
+  }
+
+  Map<String, dynamic> _couponDraftEnvelope(SocialContentResponse response, StorePromotionScope scope, List<String> fields) {
+    if (response.statusCode != 200 || utf8.encode(response.body).length > 8 * 1024 * 1024) {
+      throw const FormatException('The original draft could not be checked.');
+    }
+    final envelope = jsonDecode(response.body);
+    if (envelope is! Map || envelope['ok'] != true) throw const FormatException('Draft source unavailable.');
+    final row = _map(envelope['data'], ['schemaVersion', 'storeCouponDraftVersion', 'accountId',
+      'realm', 'storeId', 'observedAt', 'publicationConfirmed', ...fields]);
+    if (row['schemaVersion'] is! int || row['schemaVersion'] != 1 || row['storeCouponDraftVersion'] is! int ||
+        row['storeCouponDraftVersion'] != 1 || row['accountId'] != scope.account || row['realm'] != scope.realm ||
+        row['storeId'] != scope.store || row['publicationConfirmed'] != false || _time(row['observedAt']).isAfter(now().toUtc())) {
+      throw const FormatException('The original draft scope changed.');
+    }
+    return row;
+  }
+  StoreCouponDraftRecord? _couponDraftRecord(SocialContentResponse response, StorePromotionScope scope, String couponId) {
+    final row = _couponDraftEnvelope(response, scope, ['record']);
+    if (row['record'] == null) return null;
+    final record = StoreCouponDraftRecord.decode(row['record'], scope, now());
+    if (record.couponId != couponId || record.observedAt.isAfter(_time(row['observedAt']))) throw const FormatException('Wrong original draft.');
+    return record;
+  }
+  @override
+  Future<StoreCouponDraftRecord?> readCouponDraft(StorePromotionScope scope, String couponId, bool Function() current) async {
+    _text(couponId, 128);
+    final response = await _request(scope, {'operation': 'readStoreCouponDraft', 'storeId': scope.store, 'couponId': couponId},
+      current, mutation: false, onSend: () {}, couponDraft: true);
+    _check(scope, current);
+    return _couponDraftRecord(response, scope, couponId);
+  }
+  @override
+  Future<StoreCouponDraftPage> listCouponDrafts(StorePromotionScope scope, bool Function() current, {String? after, int limit = 20}) async {
+    if (limit < 1 || limit > 20 || after != null && !RegExp(r'^[a-f0-9]{64}$').hasMatch(after)) throw const FormatException('Check the draft page.');
+    final response = await _request(scope, {'operation': 'listStoreCouponDrafts', 'storeId': scope.store, 'limit': limit, 'after': ?after},
+      current, mutation: false, onSend: () {}, couponDraft: true);
+    _check(scope, current);
+    final row = _couponDraftEnvelope(response, scope, ['items', 'nextCursor']), items = row['items'];
+    if (items is! List || items.length > limit) throw const FormatException('Draft page changed.');
+    final records = <StoreCouponDraftRecord>[];
+    var previous = after;
+    for (final value in items) {
+      final record = StoreCouponDraftRecord.decode(value, scope, now());
+      final cursor = crypto.sha256.convert(utf8.encode(jsonEncode([scope.account, record.couponId]))).toString();
+      if (previous != null && cursor.compareTo(previous) <= 0 || record.observedAt.isAfter(_time(row['observedAt']))) {
+        throw const FormatException('Draft page order changed.');
+      }
+      records.add(record); previous = cursor;
+    }
+    final cursor = row['nextCursor'];
+    if (cursor != null && (cursor is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(cursor) || records.isEmpty || cursor != previous)) {
+      throw const FormatException('Draft continuation changed.');
+    }
+    return StoreCouponDraftPage(records, cursor as String?);
+  }
+  @override
+  Future<StoreCouponDraftResult> saveCouponDraft(StoreCouponDraftIntent intent, bool Function() current) => _writeCouponDraft(intent, current, recovery: false);
+  @override
+  Future<StoreCouponDraftResult> reconcileCouponDraft(StoreCouponDraftIntent intent, bool Function() current) => _writeCouponDraft(intent, current, recovery: true);
+  Future<StoreCouponDraftResult> _writeCouponDraft(StoreCouponDraftIntent intent, bool Function() current, {required bool recovery}) async {
+    var sent = false;
+    try {
+      StoreCouponDraftIntent.fromJson(intent.toJson());
+      final response = await _request(intent.scope, {'operation': recovery ? 'reconcileStoreCouponDraft' : 'saveStoreCouponDraft', ...intent.body},
+        current, mutation: !recovery, onSend: () => sent = true, couponDraft: true);
+      _check(intent.scope, current);
+      if (!recovery && response.statusCode >= 400 && response.statusCode < 500) {
+        final error = jsonDecode(response.body);
+        if (error is Map && error['ok'] == false && error['error'] is Map &&
+            {'invalid_input', 'conflict', 'not_found', 'invalid_state', 'forbidden', 'authentication_required'}.contains(error['error']['code'])) {
+          return const StoreCouponDraftResult(StorePromotionResultState.rejected);
+        }
+      }
+      final record = _couponDraftRecord(response, intent.scope, intent.couponId);
+      return record?.acknowledges(intent) == true ? StoreCouponDraftResult(StorePromotionResultState.saved, record: record) :
+        const StoreCouponDraftResult(StorePromotionResultState.unknown);
+    } on Object {
+      return StoreCouponDraftResult(sent || recovery ? StorePromotionResultState.unknown : StorePromotionResultState.notSent);
     }
   }
 

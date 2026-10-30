@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createHash, randomUUID} from "node:crypto";
+import {readFileSync, writeFileSync} from 'node:fs';
 import {WorkspacePurchaseProjectionService, type TrustedPlacementReceipt} from "./workspace_purchase_projection_service.js";
 import {initializeApp, deleteApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
@@ -12,6 +13,8 @@ import {FirestorePromotionRepository, WorkspacePromotionService, planPromotionSa
   type PromotionRepository} from "./workspace_promotion_service.js";
 import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
 import {cataloguePayloadHash} from "./workspace_catalogue_service.js";
+import {workspaceOriginalRequestBodyLimit} from './workspace_purchase_entry_service.js';
+import type {StoreCouponV2Record,StoreOfferV2Kind} from './workspace_coupon_v2_codec.js';
 
 // Isolated host/emulator records, never evaluation data injected into a phone.
 const at = "2026-10-17T01:00:00.000Z", until = "2026-10-18T01:00:00.000Z";
@@ -333,17 +336,26 @@ test('LF04-APPLIED uses exact intermediates and binds changes without mutating o
 });
 // Real isolated emulator transactions through the actual purchase materializer;
 // trusted-source fixtures only, never orders/payments injected into OPPO.
-async function couponPlacementScenario(firstLifetimeMs?: number) {
+async function couponPlacementScenario(firstLifetimeMs?: number, structured = false) {
   const suffix = randomUUID().replaceAll('-', ''), clock = new Date();
   const start = new Date(clock.getTime() - 60000).toISOString(), end = new Date(clock.getTime() + 3600000).toISOString();
   const app = initializeApp({projectId: 'demo-lf-store-coupon'}, `coupon-commit-${suffix}`), db = getFirestore(app);
   const storeIds = [`store-first-${suffix}`, `store-second-${suffix}`];
   const repository = () => new FirestorePromotionRepository(db, 'evaluation', () => clock);
-  const campaigns = new Map<string, StoreCouponRecord>();
+  const campaigns = new Map<string, StoreCouponRecord | StoreCouponV2Record>();
   for (const storeId of storeIds) {
     const caseId = `case-${storeId}`;
     await db.collection('workspaceProfiles').doc(caseId).create({...profile, workspaceId: storeId, caseId});
-    const result = await storeCouponService(repository(), () => clock.toISOString()).handleOperation('owner-one', 'saveStoreCoupon',
+    const rich=publicV2Fixture().record('billDiscount').coupon;
+    rich.name='Host Diwali savings';rich.startsAt=start;rich.endsAt=end;
+    rich.structuredTerms.storeId=storeId;rich.structuredTerms.channels=['retail','wholesale'];
+    rich.structuredTerms.discountValue=1050;rich.structuredTerms.maximumSavingMinor=1050;
+    const result = structured ? await new WorkspacePromotionService(repository(),
+      {publicCatalogue:async()=>{throw Error('HOST money scenario has no public display source');}},()=>clock,
+      {storeCouponTermsV2Supported:true}).handleOperation('owner-one','saveStoreCoupon',{
+        storeCouponTermsVersion:2,storeId,couponId:'coupon-one',expectedRevision:0,idempotencyKey:'host-v2-origin',
+        fundingAcknowledged:true,coupon:rich}) as any :
+      await storeCouponService(repository(), () => clock.toISOString()).handleOperation('owner-one', 'saveStoreCoupon',
       storeCouponBody({storeId, coupon: {...storeCouponBody().coupon, startsAt: start,
         endsAt: firstLifetimeMs && storeId === storeIds[0] ? new Date(clock.getTime() + firstLifetimeMs).toISOString() : end}})) as any;
     campaigns.set(storeId, result.record);
@@ -352,6 +364,7 @@ async function couponPlacementScenario(firstLifetimeMs?: number) {
     const baskets = ids.map(storeId => {
       const basket = appliedBasket(); Object.assign(basket, {storeId, buyerUserId: buyer, observedAt: start, validUntil: end});
       basket.lines = basket.lines.filter(line => line.storeId === 'store-one').map(line => ({...line, storeId,
+        lineId:structured?`listing-${cataloguePayloadHash([1,'evaluation',storeId,line.skuId,line.channel]).toLowerCase()}`:line.lineId,
         offerRevision: `offer-revision-${line.offerRevision}`}));
       return basket;
     });
@@ -419,6 +432,54 @@ test('LF04-ELIGIBILITY subpaise saving is ordinary ineligibility, not a source e
       .collection('storeCouponUsage').doc('coupon-one');
     assert.equal((await usage.get()).get('heldUses'), 0); assert.equal((await usage.collection('customers').get()).size, 0);
   } finally {await db.terminate(); await deleteApp(app);}
+});
+test('AGG09 actual SDK v2 paged origin holds once and recovers original lifecycle without rewriting configuration',async t=>{
+  if(!process.env.FIRESTORE_EMULATOR_HOST){t.skip('Explicit loopback emulator required');return;}
+  const {app,db,source,repository,materializer,storeIds,clock:sourceClock}=await couponPlacementScenario(undefined,true);
+  const root=db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc(storeIds[0]!),
+    usage=root.collection('storeCouponUsage').doc('coupon-one');
+  try{
+    const original=JSON.stringify((await root.collection('storeCoupons').doc('coupon-one').get()).data()),
+      input=source('host-v2-buyer','host-v2-placement'),store=input.stores[0]!,
+      page={schemaVersion:1,realm:'evaluation',storeId:store.storeId,observedAt:sourceClock.toISOString(),state:'ready',
+        coverage:'verified_public_only',listingReadbackVersion:1,listingCoverage:'complete',catalogueVersion:7,nextCursor:null,
+        items:store.lines.map(line=>({skuId:line.skuId,canonicalProductId:line.canonicalProductId,verifiedPackId:line.verifiedPackId,
+          revision:1,content:{title:line.name,variant:''},pack:{label:line.packLabel},listings:[line.publicListing],
+          channels:[{kind:line.publicListing!.channel,offerId:line.offerId,revision:line.offerRevision,validUntil:input.couponUseContext!.stores[0]!.holdUntil,
+            priceMinor:line.unitPriceMinor,minimumOrder:1,quantityStep:1,tiers:[]}]}))},
+      query={storeCouponEligibilityVersion:1,storeCouponTermsVersion:2,storeId:store.storeId,couponId:'coupon-one',couponRevision:1,
+        selectionPolicy:'exclusive_store_basket',lines:store.lines.map(line=>({lineId:line.sourceLineId,skuRevision:1,
+          listing:line.publicListing,offerId:line.offerId,offerRevision:line.offerRevision,quantity:line.quantityMilli/1000}))};
+    query.lines.sort((a,b)=>a.lineId<b.lineId?-1:a.lineId>b.lineId?1:0);
+    const clock=()=>new Date(page.observedAt),subject=new WorkspacePromotionService(repository(),
+      {publicCatalogue:async()=>page,couponPriceSnapshot:async()=>page.items.map(item=>({...page,items:[item]}))},clock,
+      {storeCouponTermsV2Supported:true,storeCouponEligibilitySupported:true});
+    const before=JSON.stringify((await usage.get()).data()),result=await subject.handleOperation(input.buyerUserId,'evaluateStoreCouponEligibility',query) as any;
+    assert.equal(result.storeCouponTermsVersion,2);assert.equal(result.eligible,true);assert.equal(result.evaluation.savingMinor,1050);
+    assert.equal(JSON.stringify((await usage.get()).data()),before);
+    assert.equal((await usage.collection('customers').get()).size,0,'Eligibility reads cannot reserve or initialize usage');
+    await assert.rejects(subject.handleOperation(input.buyerUserId,'evaluateStoreCouponEligibility',
+      {...query,storeCouponTermsVersion:undefined}));
+    const publicPage=await subject.handleOperation(input.buyerUserId,'readPublicStoreCouponSnapshot',{
+      storeId:store.storeId,storeCouponTermsVersion:2,storeCouponSnapshotVersion:1}) as any;
+    const wirePath=process.env.AGG09_MONEY_COUPON_WIRE_EXPORT_PATH;
+    if(wirePath)writeFileSync(wirePath,JSON.stringify({fixture:'ISOLATED HOST actual SDK v2 original coupon and usage with isolated original price port; never phone authority',
+      now:page.observedAt,buyer:input.buyerUserId,query,result,offer:publicPage.items[0],page}));
+    const created=await materializer(input).materialize('host-v2-reference');
+    assert.deepEqual(await materializer(input).materialize('host-v2-retry'),created);
+    assert.equal((await usage.get()).get('heldUses'),1);
+    const holds=await root.collection('storeCouponOrderUses').get();assert.equal(holds.size,1);
+    const held=holds.docs[0]!.get('current') as StoreCouponUse;
+    assert.equal(held.savingMinor,1050);
+    const event:StoreCouponUseEvent={...hostUseEvent(),realm:held.realm,storeId:held.storeId,buyerUserId:held.buyerUserId,
+      purchaseId:held.purchaseId,storeOrderId:held.storeOrderId,basketFingerprint:held.basketFingerprint,
+      sourceId:held.lifecycleSourceId,observedAt:held.heldAt};
+    const consumed=await repository().applyCouponUseEvent(event);
+    assert.deepEqual(await repository().applyCouponUseEvent(event),consumed);
+    assert.equal((await usage.get()).get('heldUses'),0);assert.equal((await usage.get()).get('redeemedUses'),1);
+    assert.equal(JSON.stringify((await root.collection('storeCoupons').doc('coupon-one').get()).data()),original);
+    assert.equal((await root.collection('storeCouponOrderUses').get()).size,1);
+  }finally{await db.terminate();await deleteApp(app);}
 });
 test('LF04-ATOMIC materialize holds once, respects capacity, maps lines and applies trusted events once', async t => {
   const host = process.env.FIRESTORE_EMULATOR_HOST;
@@ -1215,5 +1276,388 @@ test("Firestore emulator: restart, atomic CAS, original lookup and realm isolati
     await head.update({placementId: "promotion-one"});
     await db.collection("workspaceProfiles").doc(caseId).update({ownerUserId: "other-owner"});
     await assert.rejects(restarted.reconcile("owner-one", input));
+  } finally {await deleteApp(app);}
+});
+
+test('AGG09 actual SDK native v2 originals: seven kinds, large literal pages, CAS, restart and observational recovery', async t => {
+  const host = process.env.FIRESTORE_EMULATOR_HOST, path = process.env.AGG09_NATIVE_COUPON_WIRE_EXPORT_PATH;
+  if (!host || !path) {t.skip('Explicit loopback emulator and native-emitted host wire required'); return;}
+  assert.match(host, /^127\.0\.0\.1:\d+$/u);
+  const wire = JSON.parse(readFileSync(path, 'utf8'));
+  assert.equal(wire.fixture, 'ISOLATED HOST native serializers; never phone authority');
+  const app = initializeApp({projectId: 'demo-agg09-coupon'}, `coupon-v2-${randomUUID()}`), db = getFirestore(app);
+  const {account, store: storeId, realm} = wire.scope, now = () => new Date(wire.now);
+  const root = db.collection('workspaceCatalogues').doc(realm).collection('stores').doc(storeId);
+  const profileRef = db.collection('workspaceProfiles').doc('case-agg09-native');
+  await profileRef.create({...profile, ownerUserId: account, caseId: profileRef.id, workspaceId: storeId});
+  const make = (enabled = true, mode = realm) => new WorkspacePromotionService(new FirestorePromotionRepository(db, mode, now),
+    {publicCatalogue: async () => {throw Error('Not a fixture publication source');}}, now, {storeCouponTermsV2Supported: enabled, storeCouponTermsSupported: true});
+  try {
+    const originals = new Map<string, any>();
+    const initialBody = wire.intents[0].body;
+    await assert.rejects(make().handleOperation(account, 'saveStoreCoupon', {...initialBody,
+      couponId: 'coupon-inactive-first', idempotencyKey: 'inactive-first', coupon: {...initialBody.coupon, active: false}}));
+    for (const row of wire.intents) {
+      assert.equal(JSON.stringify({schemaVersion: 1, storeCouponTermsVersion: 2, accountId: account, realm, ...row.body}), row.nativeFingerprint);
+      const first = await make().handleOperation(account, 'saveStoreCoupon', row.body) as any;
+      assert.equal(first.storeCouponTermsVersion, 2); assert.equal(first.publicationConfirmed, false);
+      assert.equal(first.record.accountId, account); assert.equal(first.record.revision, 1);
+      assert.equal(JSON.stringify(first.record.coupon), JSON.stringify(row.input));
+      originals.set(row.body.couponId, first);
+      const read = await make().handleOperation(account, 'readStoreCoupon', {storeCouponTermsVersion: 2, storeId, couponId: row.body.couponId}) as any;
+      assert.deepEqual(read, first);
+      assert.deepEqual(await make().handleOperation(account, 'reconcileStoreCoupon', row.body), first);
+      assert.deepEqual(await make().handleOperation(account, 'saveStoreCoupon', row.body), first);
+      await assert.rejects(make(false).handleOperation(account, 'saveStoreCoupon', row.body));
+      await assert.rejects(make().handleOperation('other-owner', 'readStoreCoupon', {storeCouponTermsVersion: 2, storeId, couponId: row.body.couponId}));
+    }
+    const large = wire.intents.at(-1);
+    assert.ok(Buffer.byteLength(JSON.stringify(large.body), 'utf8') > 1024 * 1024);
+    assert.equal(workspaceOriginalRequestBodyLimit('saveStoreCoupon', 2), 8 * 1024 * 1024);
+    assert.equal(workspaceOriginalRequestBodyLimit('saveStoreCoupon'), 64 * 1024);
+    assert.equal(workspaceOriginalRequestBodyLimit('recordStoreExpense', 2), 64 * 1024);
+    const headRef = root.collection('storeCoupons').doc(large.body.couponId), head = await headRef.get();
+    assert.ok(head.get('pageCount') > 1); assert.equal(head.get('coupon'), undefined);
+    const pages = await headRef.collection('revisions').doc('1').collection('payloadPages').get();
+    assert.equal(pages.size, head.get('pageCount'));
+    for (const page of pages.docs) assert.ok(Buffer.byteLength(JSON.stringify(page.data()), 'utf8') < 1024 * 1024);
+    for (let i = 1; i <= 4; i++) await make().handleOperation(account, 'saveStoreCoupon',
+      {...large.body, couponId: `coupon-large-${i}`, idempotencyKey: `large-copy-${i}`});
+    await make().handleOperation(account, 'saveStoreCoupon', storeCouponBody({couponId: 'coupon-legacy'}));
+    let cursor: string | undefined, pageCount = 0;
+    const listed: string[] = [];
+    let byteBoundPage: any;
+    do {
+      const page = await make().handleOperation(account, 'listStoreCoupons',
+        {storeCouponTermsVersion: 2, storeId, limit: 20, ...(cursor ? {after: cursor} : {})}) as any;
+      assert.ok(Buffer.byteLength(JSON.stringify(page), 'utf8') <= 8 * 1024 * 1024);
+      if (pageCount === 0) {byteBoundPage = page; assert.ok(page.items.length < 20); assert.notEqual(page.nextCursor, null);}
+      listed.push(...page.items.map((r: any) => r.couponId));
+      cursor = page.nextCursor ?? undefined; pageCount++;
+      assert.ok(pageCount < 5, 'A byte-bounded continuation must advance');
+    } while (cursor);
+    assert.equal(listed.length, wire.intents.length + 5); assert.equal(new Set(listed).size, listed.length);
+    assert.deepEqual(listed, [...listed].sort());
+    await assert.rejects(make().handleOperation(account, 'listStoreCoupons', {storeCouponTermsVersion: 1, storeId, limit: 20}));
+    const first = wire.intents[0], altered = {...first.body, expectedRevision: 1,
+      coupon: {...first.body.coupon, name: 'HOST edited native original'}};
+    const race = await Promise.allSettled(['one', 'two'].map(idempotencyKey => make().handleOperation(account, 'saveStoreCoupon',
+      {...altered, idempotencyKey: `race-${idempotencyKey}`})));
+    assert.equal(race.filter(r => r.status === 'fulfilled').length, 1);
+    await assert.rejects(make().handleOperation(account, 'saveStoreCoupon', {...first.body, expectedRevision: 2,
+      idempotencyKey: 'changed-pause', coupon: {...first.body.coupon, active: false, name: 'HOST forbidden edit during pause'}}));
+    const current = await make().handleOperation(account, 'readStoreCoupon',
+      {storeCouponTermsVersion: 2, storeId, couponId: first.body.couponId}) as any;
+    const paused = await make().handleOperation(account, 'saveStoreCoupon', {...first.body, expectedRevision: 2,
+      idempotencyKey: 'exact-pause', coupon: {...current.record.coupon, active: false}}) as any;
+    assert.equal(paused.record.revision, 3); assert.equal(paused.record.coupon.active, false);
+    const {storeCouponTermsVersion: _, ...facts} = first.body;
+    const originalCommand = {...facts, ownerUserId: account, realm, observedAt: wire.now,
+      fingerprint: cataloguePayloadHash({operation: 'saveStoreCoupon', storeCouponTermsVersion: 2, ownerUserId: account, realm, ...facts})};
+    const repository = new FirestorePromotionRepository(db, realm, now);
+    assert.deepEqual(await repository.reconcileCouponV2(originalCommand), originals.get(first.body.couponId).record);
+    for (const tampering of [{fundingAcknowledged: false}, {fingerprint: 'forged-fingerprint'},
+      {idempotencyKey: 'tampered-direct'}, {couponId: 'tampered-coupon'}]) {
+      await assert.rejects(repository.saveCouponV2({...originalCommand, ...tampering}));
+      await assert.rejects(repository.reconcileCouponV2({...originalCommand, ...tampering}));
+    }
+    assert.deepEqual(await make().handleOperation(account, 'reconcileStoreCoupon', first.body), originals.get(first.body.couponId));
+    await assert.rejects(make().handleOperation(account, 'saveStoreCoupon', {...first.body, coupon: {...first.body.coupon, name: 'HOST changed retry'}}));
+    assert.equal((await make().handleOperation(account, 'reconcileStoreCoupon', {...first.body, idempotencyKey: 'never-sent'} ) as any).record, null);
+    const page = pages.docs[0]!, originalPage = page.data();
+    await page.ref.update({text: 'corrupted literal'});
+    await assert.rejects(make().handleOperation(account, 'readStoreCoupon', {storeCouponTermsVersion: 2, storeId, couponId: large.body.couponId}));
+    await assert.rejects(make().handleOperation(account, 'reconcileStoreCoupon', large.body));
+    await page.ref.set(originalPage);
+    assert.deepEqual(await make().handleOperation(account, 'reconcileStoreCoupon', large.body), originals.get(large.body.couponId));
+    await profileRef.update({ownerUserId: 'revoked-owner'});
+    await assert.rejects(make().handleOperation(account, 'reconcileStoreCoupon', first.body));
+    await profileRef.update({ownerUserId: account});
+    const otherRealm = await make(true, 'production').handleOperation(account, 'readStoreCoupon',
+      {storeCouponTermsVersion: 2, storeId, couponId: first.body.couponId}) as any;
+    assert.equal(otherRealm.record, null);
+    const expired = new WorkspacePromotionService(new FirestorePromotionRepository(db, realm, () => new Date('2026-11-30T00:00:00.000Z')),
+      {publicCatalogue: async () => ({})}, () => new Date('2026-11-30T00:00:00.000Z'), {storeCouponTermsV2Supported: true});
+    assert.deepEqual(await expired.handleOperation(account, 'reconcileStoreCoupon', first.body), originals.get(first.body.couponId));
+    await assert.rejects(expired.handleOperation(account, 'saveStoreCoupon', {...first.body, couponId: 'coupon-expired', idempotencyKey: 'expired-new'}));
+    const exportPath = process.env.AGG09_BACKEND_COUPON_WIRE_EXPORT_PATH;
+    if (exportPath) writeFileSync(exportPath, JSON.stringify({fixture: 'ISOLATED HOST actual SDK original responses; never phone authority',
+      now: wire.now, byteBoundPage, rows: wire.intents.map((row: any) => ({nativeFingerprint: row.nativeFingerprint, response: originals.get(row.body.couponId)}))}), 'utf8');
+  } finally {await deleteApp(app);}
+});
+
+/** Explicit isolated read ports; never a published phone/product provider. */
+function publicV2Fixture(){
+  const selected=(skuId='sku-one')=>({storeId:'store-one',skuId,title:skuId==='sku-one'?'Host item':'Host reward',sellUnit:'1 pack',listings:[]});
+  const record=(kind:StoreOfferV2Kind):StoreCouponV2Record=>({schemaVersion:2,storeCouponTermsVersion:2,accountId:'owner-one',
+    realm:'evaluation',storeId:'store-one',couponId:'public-'+kind,revision:1,observedAt:at,coupon:{schemaVersion:2,
+      name:'Host '+kind,structuredTerms:{schemaVersion:1,storeId:'store-one',kind,
+        skus:['productDiscount','quantityPrice','extraQuantity'].includes(kind)?[selected()]:[],channels:['retail'],
+        discountKind:kind==='quantityPrice'||kind==='extraQuantity'?null:'flat',
+        discountValue:kind==='quantityPrice'||kind==='extraQuantity'?null:100,minimumSpendMinor:0,
+        maximumSavingMinor:kind==='quantityPrice'||kind==='extraQuantity'?null:100,
+        tiers:kind==='quantityPrice'?[{minimumQuantity:10,priceMinor:90}]:[],
+        buyQuantity:kind==='extraQuantity'?10:null,rewardQuantity:kind==='extraQuantity'?1:null,
+        rewardSku:kind==='extraQuantity'?selected('sku-two'):null,nextPurchaseDays:kind==='nextPurchase'?30:null},
+      buyerReferences:kind==='buyerDiscount'?['HOST-private-customer-reference']:[],startsAt:at,endsAt:until,totalUses:100,usesPerCustomer:2,active:true}});
+  class PublicMemory extends CouponMemory {
+    rows:StoreCouponV2Record[]=[];snapshots=0;
+    change=(_snapshot:Record<string,any>,_read:number)=>{};
+    async publicCouponSnapshotV2(){
+      const value={profile:structuredClone(this.profile!),records:[...this.rows,...this.couponHeads.values()]
+        .sort((a,b)=>a.couponId.localeCompare(b.couponId)).map(row=>structuredClone(row)),observedAt:this.now,nextCursor:null};
+      this.change(value,++this.snapshots);return value;
+    }
+    override async publicCouponSnapshot(storeId:string,after:string|undefined,limit:number){
+      if(this.rows.length)throw Error('HOST v1 cannot read a mixed original collection');
+      return super.publicCouponSnapshot(storeId,after,limit);
+    }
+  }
+  const repository=new PublicMemory(),reads:string[]=[];
+  let clock=at,change=(_data:Record<string,any>,_read:number)=>{};
+  const catalogue={publicCatalogue:async(body:Readonly<Record<string,unknown>>)=>{
+    assert.equal(body.listingReadbackVersion,1);const skuId=String(body.skuId);reads.push(skuId);
+    const binding={schemaVersion:1,realm:'evaluation',storeId:'store-one',skuId,channel:'retail',
+      canonicalProductId:'canonical-'+skuId,verifiedPackId:'pack-'+skuId,
+      listingId:'listing-'+cataloguePayloadHash([1,'evaluation','store-one',skuId,'retail']).toLowerCase()};
+    const data={schemaVersion:1,realm:'evaluation',storeId:'store-one',state:'ready',coverage:'verified_public_only',
+      orderingAvailable:false,listingReadbackVersion:1,listingCoverage:'complete',observedAt:clock,nextCursor:null,
+      items:[{skuId,canonicalProductId:binding.canonicalProductId,verifiedPackId:binding.verifiedPackId,revision:1,
+        content:{title:skuId==='sku-one'?'Host item':'Host reward',variant:''},pack:{label:'1 pack'},
+        channels:[{kind:'retail',validUntil:until}],listings:[binding]}]};
+    change(data,reads.length);return data;
+  }};
+  const subject=new WorkspacePromotionService(repository,catalogue,()=>new Date(clock),{storeCouponTermsSupported:true,storeCouponTermsV2Supported:true}),
+    read=(version=2)=>subject.handleOperation('buyer-one','readPublicStoreCouponSnapshot',{
+      storeCouponTermsVersion:version,storeCouponSnapshotVersion:1,storeId:'store-one'}) as Promise<Record<string,any>>;
+  return {repository,record,subject,read,catalogue,reads,change:(value:typeof change)=>{change=value;},setClock:(value:string)=>{clock=value;}};
+}
+test('AGG09 v2 money preserves exact paise and excludes other channels, Stores and discounted lines',()=>{
+  const f=publicV2Fixture(),campaign=f.record('billDiscount'),basket=appliedBasket();
+  campaign.coupon.structuredTerms.channels=['retail','wholesale'];
+  campaign.coupon.structuredTerms.discountKind='percentage';
+  campaign.coupon.structuredTerms.discountValue=3333;
+  campaign.coupon.structuredTerms.maximumSavingMinor=10000;
+  const before=JSON.stringify({campaign,basket}),result=evaluateStoreCouponBasket(campaign,profile,basket,at);
+  assert.equal(result.eligibleSubtotalMinor,20003);assert.equal(result.savingMinor,6666);
+  assert.equal(result.allocations.reduce((sum,line)=>sum+line.savingMinor,0),6666);
+  assert.equal(JSON.stringify({campaign,basket}),before);
+  const reversed=structuredClone(basket);reversed.lines.reverse();
+  assert.deepEqual(evaluateStoreCouponBasket(campaign,profile,reversed,at),result);
+  campaign.coupon.structuredTerms.channels=['retail'];
+  const retail=evaluateStoreCouponBasket(campaign,profile,basket,at);
+  assert.equal(retail.eligibleSubtotalMinor,10001);assert.deepEqual(retail.allocations.map(line=>line.lineId),['line-retail']);
+  basket.lines[0]!.otherCouponApplied=true;
+  assert.throws(()=>evaluateStoreCouponBasket(campaign,profile,basket,at));
+});
+test('AGG09 v2 product discount binds selected SKU, configured cap and original full basket fingerprint',()=>{
+  const campaign=publicV2Fixture().record('productDiscount'),basket=appliedBasket();
+  const original=evaluateStoreCouponBasket(campaign,profile,basket,at);
+  assert.equal(original.eligibleSubtotalMinor,10001);assert.equal(original.savingMinor,100);
+  assert.deepEqual(original.allocations.map(line=>line.lineId),['line-retail']);
+  basket.lines[1]!.quantity++;
+  const changed=evaluateStoreCouponBasket(campaign,profile,basket,at);
+  assert.equal(changed.savingMinor,original.savingMinor);assert.notEqual(changed.basketFingerprint,original.basketFingerprint);
+  campaign.coupon.structuredTerms.discountKind='percentage';campaign.coupon.structuredTerms.discountValue=10000;
+  campaign.coupon.structuredTerms.maximumSavingMinor=50;
+  assert.equal(evaluateStoreCouponBasket(campaign,profile,basket,at).savingMinor,50);
+  campaign.coupon.structuredTerms.minimumSpendMinor=10002;
+  assert.throws(()=>evaluateStoreCouponBasket(campaign,profile,basket,at));
+});
+test('AGG09 v2 money uses microsecond configuration boundaries without rewriting original times',()=>{
+  const campaign=publicV2Fixture().record('billDiscount'),basket=appliedBasket();
+  campaign.coupon.startsAt='2026-10-17T00:59:59.999999Z';
+  campaign.coupon.endsAt='2026-10-17T01:00:00.000001Z';
+  assert.equal(evaluateStoreCouponBasket(campaign,profile,basket,at).savingMinor,100);
+  assert.equal(campaign.coupon.endsAt,'2026-10-17T01:00:00.000001Z');
+  campaign.coupon.startsAt='2026-10-17T01:00:00.000001Z';campaign.coupon.endsAt=until;
+  assert.throws(()=>evaluateStoreCouponBasket(campaign,profile,basket,at));
+});
+for(const kind of ['quantityPrice','nextPurchase','buyerDiscount','dealerIntro','extraQuantity'] as StoreOfferV2Kind[]){
+  test(`AGG09 ${kind} cannot manufacture a money discount without its original authority`,()=>{
+    assert.throws(()=>evaluateStoreCouponBasket(publicV2Fixture().record(kind),profile,appliedBasket(),at));
+  });
+}
+test('AGG09 public v2 joins original bindings for six non-targeted kinds without rewriting private configuration',async()=>{
+  const f=publicV2Fixture();f.repository.rows=['billDiscount','productDiscount','quantityPrice','nextPurchase','dealerIntro','extraQuantity'].map(kind=>f.record(kind as StoreOfferV2Kind));
+  const before=JSON.stringify(f.repository.rows),page=await f.read();
+  assert.equal(page.state,'ready');assert.equal(page.complete,true);assert.equal(page.items.length,6);
+  assert.equal(JSON.stringify(f.repository.rows),before);assert.equal(f.repository.writes,0);
+  for(const row of page.items){assert.equal(row.schemaVersion,2);assert.equal(row.viewerAccountId,null);
+    assert(!Object.hasOwn(row,'accountId'));assert(!JSON.stringify(row).includes('buyerReferences'));
+    for(const sku of row.structuredTerms.skus)assert.equal(sku.listings[0].listingId,
+      'listing-'+cataloguePayloadHash([1,'evaluation','store-one',sku.skuId,'retail']).toLowerCase());}
+  assert.equal(f.reads.filter(id=>id==='sku-one').length,2);assert.equal(f.reads.filter(id=>id==='sku-two').length,2);
+  const old=await f.read(1);assert.equal(old.state,'unavailable');assert.equal(old.complete,false);
+});
+test('AGG09 targeted customer references never become public buyer identities or silently omitted complete offers',async()=>{
+  const f=publicV2Fixture();f.repository.rows=[f.record('billDiscount'),f.record('buyerDiscount')];
+  const page=await f.read();assert.equal(page.state,'unavailable');assert.equal(page.complete,false);assert.deepEqual(page.items,[]);
+  assert(!JSON.stringify(page).includes('HOST-private-customer-reference'));assert.equal(f.repository.writes,0);
+});
+for(const fault of ['digest','foreign','pack','title','partial','version','expired','changed-source','changed-head','revoked-store']){
+  test('AGG09 public v2 refuses partial or stale original identity '+fault,async()=>{
+    const f=publicV2Fixture();f.repository.rows=[f.record('productDiscount')];
+    f.change((data,read)=>{
+      if(fault==='digest')data.items[0].listings[0].listingId='listing-'+'a'.repeat(64);
+      if(fault==='foreign')data.items[0].skuId='foreign-sku';
+      if(fault==='pack')data.items[0].pack.label='other pack';
+      if(fault==='title')data.items[0].content.title='Other title';
+      if(fault==='partial')data.listingCoverage='partial';
+      if(fault==='version')delete data.listingReadbackVersion;
+      if(fault==='expired')data.items[0].channels[0].validUntil=at;
+      if(fault==='changed-source'&&read===2)data.items[0].revision=2;
+    });
+    f.repository.change=(page,read)=>{if(read===2&&fault==='changed-head')page.records[0].revision++;
+      if(read===2&&fault==='revoked-store')page.profile.shopEnabled=false;};
+    const page=await f.read();assert.equal(page.state,'unavailable');assert.equal(page.complete,false);assert.deepEqual(page.items,[]);
+    assert.equal(f.repository.writes,0);
+  });
+}
+test('AGG09 public v2 preserves empty, inactive, future, expired, count and late-activation distinctions',async()=>{
+  const empty=publicV2Fixture();assert.deepEqual((await empty.read()).items,[]);assert.equal((await empty.read()).complete,true);
+  for(const state of ['inactive','future','expired']){
+    const f=publicV2Fixture(),row=f.record('billDiscount');
+    if(state==='inactive')row.coupon.active=false;
+    if(state==='future')row.coupon.startsAt='2026-10-17T02:00:00.000Z';
+    if(state==='expired'){row.coupon.startsAt='2026-10-16T00:00:00.000Z';row.coupon.endsAt=at;}
+    f.repository.rows=[row];const page=await f.read();assert.equal(page.complete,true);assert.deepEqual(page.items,[]);
+  }
+  const many=publicV2Fixture();many.repository.rows=Array.from({length:401},(_,i)=>({...many.record('billDiscount'),couponId:'public-'+String(i).padStart(4,'0')}));
+  assert.equal((await many.read()).complete,false);
+  const late=publicV2Fixture(),row=late.record('billDiscount');row.coupon.startsAt='2026-10-17T01:00:00.001Z';late.repository.rows=[row];
+  late.repository.change=(_page,read)=>{if(read===2)late.setClock('2026-10-17T01:00:00.002Z');};
+  assert.equal((await late.read()).complete,false);
+});
+
+test('AGG09 actual SDK public v2 snapshot reconstructs original pages and preserves native public wire',async t=>{
+  const host=process.env.FIRESTORE_EMULATOR_HOST;
+  if(!host){t.skip('Explicit isolated loopback emulator required');return;}
+  assert.match(host,/^127\.0\.0\.1:\d+$/u);
+  const app=initializeApp({projectId:'demo-agg09-coupon-public'},`coupon-public-${randomUUID()}`),db=getFirestore(app),
+    f=publicV2Fixture(),repository=new FirestorePromotionRepository(db,'evaluation',()=>new Date(at)),
+    subject=new WorkspacePromotionService(repository,f.catalogue,()=>new Date(at),{storeCouponTermsSupported:true,storeCouponTermsV2Supported:true}),
+    profileRef=db.collection('workspaceProfiles').doc('HOST-public-case'),
+    read=(version=2)=>subject.handleOperation('buyer-one','readPublicStoreCouponSnapshot',{
+      storeCouponTermsVersion:version,storeCouponSnapshotVersion:1,storeId:'store-one'}) as Promise<Record<string,any>>;
+  await profileRef.create({...profile,caseId:profileRef.id});
+  try{
+    const originals:Record<string,any>[]=[];
+    for(const kind of ['billDiscount','productDiscount','quantityPrice','nextPurchase','dealerIntro','extraQuantity']){
+      const original=f.record(kind as StoreOfferV2Kind),result=await subject.handleOperation('owner-one','saveStoreCoupon',{
+        storeCouponTermsVersion:2,storeId:'store-one',couponId:original.couponId,expectedRevision:0,
+        idempotencyKey:'HOST-public-save-'+kind,coupon:original.coupon,fundingAcknowledged:true}) as Record<string,any>;
+      originals.push(result.record);
+    }
+    await subject.handleOperation('owner-one','saveStoreCoupon',storeCouponBody({couponId:'legacy-public'}));
+    const page=await read();assert.equal(page.state,'ready');assert.equal(page.complete,true);assert.equal(page.items.length,7);
+    assert.equal(page.items.filter((row:any)=>row.schemaVersion===2).length,6);
+    assert(!JSON.stringify(page).includes('buyerReferences'));assert(!JSON.stringify(page).includes('owner-one'));
+    for(const original of originals){
+      const current=await repository.readCouponV2('store-one',original.couponId,'owner-one');
+      assert.deepEqual(current,original,'Public enrichment must not rewrite the configured private publication input');
+    }
+    assert.equal((await read(1)).state,'unavailable');
+    const output=process.env.AGG09_PUBLIC_COUPON_WIRE_EXPORT_PATH;
+    if(output)writeFileSync(output,JSON.stringify({fixture:'ISOLATED HOST actual SDK coupon originals with isolated original catalogue read ports; never phone authority',
+      now:at,scope:{account:'buyer-one',realm:'evaluation',store:'store-one'},response:page}));
+    const payload=db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc('store-one')
+      .collection('storeCoupons').doc('public-productDiscount').collection('revisions').doc('1').collection('payloadPages').doc('0');
+    await payload.delete();assert.equal((await read()).state,'unavailable');
+    await profileRef.update({shopEnabled:false});assert.equal((await read()).complete,false);
+  }finally{await deleteApp(app);}
+});
+
+test('AGG09 actual SDK native private drafts retain actor-owned originals without issuing publications', async t => {
+  const host = process.env.FIRESTORE_EMULATOR_HOST, path = process.env.AGG09_NATIVE_COUPON_WIRE_EXPORT_PATH;
+  if (!host || !path) {t.skip('Explicit loopback emulator and native campaign serializers required'); return;}
+  assert.match(host, /^127\.0\.0\.1:\d+$/u);
+  const wire = JSON.parse(readFileSync(path, 'utf8'));
+  assert.equal(wire.fixture, 'ISOLATED HOST native serializers; never phone authority');
+  assert.ok(wire.intents.every((row: any) => row.campaign)); assert.ok(wire.legacyCampaign);
+  const app = initializeApp({projectId: 'demo-agg09-coupon-private'}, `coupon-draft-${randomUUID()}`), db = getFirestore(app);
+  const {account, store: storeId, realm} = wire.scope, now = () => new Date(wire.now);
+  const root = db.collection('workspaceCatalogues').doc(realm).collection('stores').doc(storeId);
+  const profileRef = db.collection('workspaceProfiles').doc('case-agg09-native-private');
+  await profileRef.create({...profile, ownerUserId: account, workspaceId: storeId, caseId: profileRef.id});
+  const make = (enabled = true, mode = realm) => new WorkspacePromotionService(new FirestorePromotionRepository(db, mode, now),
+    {publicCatalogue: async () => {throw Error('No private-draft publication authority');}}, now,
+    {storeCouponDraftsSupported: enabled, storeCouponTermsV2Supported: true});
+  const savedRows: {body: Record<string, any>; record: any; response: any; nativeCampaignJson: string}[] = [];
+  try {
+    const campaigns = [...wire.intents.map((row: any) => row.campaign), wire.legacyCampaign];
+    for (const [index, campaign] of campaigns.entries()) {
+      const body = {storeCouponDraftVersion: 1, storeId, couponId: campaign.id,
+        expectedSourceRevision: 0, idempotencyKey: `draft-original-${index}`, campaign};
+      const first = await make().handleOperation(account, 'saveStoreCouponDraft', body) as any;
+      assert.equal(first.publicationConfirmed, false); assert.equal(first.storeCouponDraftVersion, 1);
+      assert.equal(first.record.accountId, account); assert.equal(first.record.sourceRevision, 1);
+      assert.equal(first.record.campaign.revision, campaign.revision);
+      assert.equal(JSON.stringify(first.record.campaign), JSON.stringify(campaign));
+      assert.deepEqual(await make().handleOperation(account, 'saveStoreCouponDraft', body), first);
+      assert.deepEqual(await make().handleOperation(account, 'reconcileStoreCouponDraft', body), first);
+      const read = await make().handleOperation(account, 'readStoreCouponDraft',
+        {storeCouponDraftVersion: 1, storeId, couponId: campaign.id}) as any;
+      assert.deepEqual(read.record, first.record);
+      await assert.rejects(make(false).handleOperation(account, 'readStoreCouponDraft',
+        {storeCouponDraftVersion: 1, storeId, couponId: campaign.id}));
+      await assert.rejects(make().handleOperation('foreign-owner', 'readStoreCouponDraft',
+        {storeCouponDraftVersion: 1, storeId, couponId: campaign.id}));
+      savedRows.push({body, record: first.record, response: first, nativeCampaignJson: JSON.stringify(campaign)});
+    }
+    assert.equal((await root.collection('storeCoupons').get()).size, 0, 'Draft backing must not invent a published head');
+    assert.equal((await root.collection('storeCouponUsage').get()).size, 0, 'Draft backing must not reserve or redeem usage');
+    assert.equal(savedRows.at(-1)!.record.sourceRevision, 1);
+    assert.equal(savedRows.at(-1)!.record.campaign.revision, 12, 'Native and source revisions remain separate');
+    const first = savedRows[0]!, changed = {...first.body, expectedSourceRevision: 1,
+      campaign: {...first.body.campaign, revision: first.body.campaign.revision + 1, name: 'HOST private edited draft'}};
+    const race = await Promise.allSettled(['one', 'two'].map(idempotencyKey => make().handleOperation(account, 'saveStoreCouponDraft',
+      {...changed, idempotencyKey: `private-race-${idempotencyKey}`})));
+    assert.equal(race.filter(row => row.status === 'fulfilled').length, 1);
+    assert.deepEqual((await make().handleOperation(account, 'reconcileStoreCouponDraft', first.body) as any).record, first.record);
+    await assert.rejects(make().handleOperation(account, 'saveStoreCouponDraft', {...first.body,
+      campaign: {...first.body.campaign, name: 'HOST changed original request'}}));
+    await assert.rejects(make().handleOperation(account, 'saveStoreCouponDraft', {...changed, expectedSourceRevision: 2, idempotencyKey: 'private-stale-native'}));
+    const absent = await make().handleOperation(account, 'reconcileStoreCouponDraft', {...first.body, idempotencyKey: 'private-never-sent'}) as any;
+    assert.equal(absent.record, null);
+    const bodies: any[] = []; let cursor: string | undefined;
+    do {
+      const response = await make().handleOperation(account, 'listStoreCouponDrafts',
+        {storeCouponDraftVersion: 1, storeId, limit: 2, ...(cursor ? {after: cursor} : {})}) as any;
+      bodies.push(...response.items); cursor = response.nextCursor ?? undefined;
+      if (cursor) assert.match(cursor, /^[a-f0-9]{64}$/u);
+      assert.ok(bodies.length <= savedRows.length);
+    } while (cursor);
+    assert.equal(bodies.length, savedRows.length); assert.equal(new Set(bodies.map(row => row.couponId)).size, savedRows.length);
+    await assert.rejects(make().handleOperation(account, 'listStoreCouponDrafts', {storeCouponDraftVersion: 1, storeId, limit: 2, after: 'raw-private-name'}));
+    const large = savedRows.find(row => Buffer.byteLength(row.nativeCampaignJson, 'utf8') > 1024 * 1024)!;
+    const ownerRoot = root.collection('storeCouponDraftOwners').doc(cataloguePayloadHash(account).toLowerCase());
+    const headRef = ownerRoot.collection('campaigns').doc(cataloguePayloadHash([account, large.body.couponId]).toLowerCase());
+    const head = await headRef.get(); assert.ok(head.get('pageCount') > 1);
+    const pageRef = headRef.collection('revisions').doc('1').collection('payloadPages').doc('0'), page = await pageRef.get();
+    await pageRef.update({text: 'broken private payload'});
+    await assert.rejects(make().handleOperation(account, 'reconcileStoreCouponDraft', large.body));
+    await pageRef.set(page.data()!);
+    assert.deepEqual((await make().handleOperation(account, 'reconcileStoreCouponDraft', large.body) as any).record, large.record);
+    const {storeCouponDraftVersion: _, ...facts} = first.body;
+    const command = {...facts, ownerUserId: account, realm, observedAt: wire.now,
+      fingerprint: cataloguePayloadHash({operation: 'saveStoreCouponDraft', storeCouponDraftVersion: 1, ownerUserId: account, realm, ...facts})};
+    const repository = new FirestorePromotionRepository(db, realm, now);
+    await assert.rejects(repository.saveCouponDraft({...command, fingerprint: 'forged'} as any));
+    await assert.rejects(repository.reconcileCouponDraft({...command, idempotencyKey: 'different-original'} as any));
+    await profileRef.update({ownerUserId: 'next-owner'});
+    await assert.rejects(make().handleOperation(account, 'reconcileStoreCouponDraft', first.body));
+    const nextOwner = await make().handleOperation('next-owner', 'readStoreCouponDraft',
+      {storeCouponDraftVersion: 1, storeId, couponId: first.body.couponId}) as any;
+    assert.equal(nextOwner.record, null, 'Store transfer must not adopt another actor private campaign');
+    await profileRef.update({ownerUserId: account});
+    assert.equal((await make(true, 'production').handleOperation(account, 'readStoreCouponDraft',
+      {storeCouponDraftVersion: 1, storeId, couponId: first.body.couponId}) as any).record, null);
+    assert.equal(workspaceOriginalRequestBodyLimit('saveStoreCouponDraft', undefined, 1), 8 * 1024 * 1024);
+    assert.equal(workspaceOriginalRequestBodyLimit('saveStoreCouponDraft'), 64 * 1024);
+    assert.equal(workspaceOriginalRequestBodyLimit('readPublicStoreCatalogue', undefined, 1), 64 * 1024);
+    const exportPath = process.env.AGG09_BACKEND_COUPON_DRAFT_WIRE_EXPORT_PATH;
+    if (exportPath) writeFileSync(exportPath, JSON.stringify({fixture: 'ISOLATED HOST actual SDK private draft originals; never phone authority',
+      now: wire.now, scope: wire.scope, drafts: savedRows}), 'utf8');
   } finally {await deleteApp(app);}
 });

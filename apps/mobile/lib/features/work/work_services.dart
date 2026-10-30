@@ -6454,6 +6454,63 @@ class SecureStoreCouponPendingStore implements StoreCouponPendingStore {
   });
 }
 
+/// Private draft synchronization has its own retained original. It must never
+/// consume or overwrite the publication/funding confirmation journal.
+class SecureStoreCouponDraftPendingStore implements StoreCouponDraftPendingStore {
+  SecureStoreCouponDraftPendingStore({FlutterSecureStorage? storage, String? Function()? currentAccount})
+    : _storage = storage ?? const FlutterSecureStorage(),
+      _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount;
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  static final Map<String, Future<void>> _tails = {};
+  String _key(StorePromotionScope scope) =>
+    'moolsocial.workspace.store-coupon-draft-command.v1.${base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.store, scope.realm])))}';
+  void _check(StorePromotionScope scope) {
+    if (_currentAccount() != scope.account || scope.account.isEmpty || scope.store.isEmpty ||
+        !{'evaluation', 'production'}.contains(scope.realm)) throw const WorkGatewayException('Sign in again to check this saved draft.');
+  }
+  Future<T> _serial<T>(StorePromotionScope scope, Future<T> Function() action) {
+    final key = _key(scope), result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) {if (identical(_tails[key], tail)) _tails.remove(key);}));
+    return result;
+  }
+  Future<StoreCouponDraftIntent?> _read(StorePromotionScope scope) async {
+    _check(scope);
+    final raw = await _storage.read(key: _key(scope));
+    _check(scope);
+    if (raw == null) return null;
+    final row = jsonDecode(raw);
+    if (row is! Map || row.length != 5 || row['schemaVersion'] is! int || row['schemaVersion'] != 1 ||
+        row['accountId'] != scope.account || row['storeId'] != scope.store || row['realm'] != scope.realm || !row.containsKey('original')) {
+      throw const FormatException('The original draft save needs checking.');
+    }
+    final intent = StoreCouponDraftIntent.fromJson(row['original']);
+    if (intent.scope != scope) throw const FormatException('Wrong saved draft owner.');
+    return intent;
+  }
+  @override Future<StoreCouponDraftIntent?> read(StorePromotionScope scope) => _serial(scope, () => _read(scope));
+  @override Future<void> save(StoreCouponDraftIntent intent) => _serial(intent.scope, () async {
+    StoreCouponDraftIntent.fromJson(intent.toJson());
+    final previous = await _read(intent.scope);
+    if (previous != null && previous.fingerprint != intent.fingerprint) throw const FormatException('Check the original draft save first.');
+    if (previous != null) return;
+    _check(intent.scope);
+    await _storage.write(key: _key(intent.scope), value: jsonEncode({'schemaVersion': 1, 'accountId': intent.scope.account,
+      'storeId': intent.scope.store, 'realm': intent.scope.realm, 'original': intent.toJson()}));
+    _check(intent.scope);
+  });
+  @override Future<void> clear(StoreCouponDraftIntent intent) => _serial(intent.scope, () async {
+    final previous = await _read(intent.scope);
+    if (previous == null) return;
+    if (previous.fingerprint != intent.fingerprint) throw const FormatException('Keep the original draft save.');
+    _check(intent.scope);
+    await _storage.delete(key: _key(intent.scope));
+    _check(intent.scope);
+  });
+}
+
 class SecureStorePromotionPendingStore implements StorePromotionPendingStore {
   SecureStorePromotionPendingStore({FlutterSecureStorage? storage, String? Function()? currentAccount})
     : _storage = storage ?? const FlutterSecureStorage(),
