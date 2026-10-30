@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 40,
+  "localMetadataCommits": 41,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -10810,5 +10810,64 @@
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
     "sourceCommit": "aeff73fb17da6fd8083cc7a639c425e35ed39c78"
+  },
+  "aggregate08SourceAdmission": {
+    "sequence": "08-existing-original-private-device-source-admission",
+    "baseline": "5bbd35c10690e082800d7f0027e5d7047a77b669",
+    "uiReferenceBaseline": "c9d03bb37b6115f7fe63f3f1dd819892dc037fc9",
+    "scope": "activated aggregate08 existing original purchased-unit sharing and buyer mismatch source only",
+    "authority": "founder standing exact necessary admission/contract reconciliation within AI-DOMAIN-REMAINING-6",
+    "contract": {
+      "sha256": "70788BD9052B063BD5D6CF5E5F6FEAB25C3263DFA6282195F0CB4FF6637799E0",
+      "text": "# AI-AGG-08: existing private purchased-device source contract\n\nScope: supply the already implemented purchased-line device reader, owner Share,\nbuyer mismatch report, exact original-command status and seller received-report\nreader. This is an existing after-sales capability, not new warranty, return,\nrefund, moderation, identity verification or case-creation policy.\n\nStarting source: clean, origin-exact 5bbd35c10690e082800d7f0027e5d7047a77b669 on\nwork/codex-backend/ai-domain-batch-20261028. Existing UI/reference baseline remains\nc9d03bb37b6115f7fe63f3f1dd819892dc037fc9. Founder standing narrow contract/owner\nreconciliation applies; it is not a separate exact-hash founder review.\n\nAuthority: use the existing immutable workspacePurchaseProjections purchase,\noriginal line, seller workspace profile and purchasing-Store membership checks.\nVerify current account, realm, role, buyingStoreId, full original reference and\nline on every read, write and status request. A client target binding is a\ncorrelation hash, never permission. Never read today's SKU to replace history.\n\nWire target contains role, realm, buyingStoreId, reference and lineFacts. Backend\nreconstructs the actor-specific native binding and rejects any mismatch. Rows\nuse the existing exact {id,serial,imei1,imei2} opaque printed string contract:\nat most 1000, unique IDs, trimmed identifiers, existing size/control bounds.\nDo not infer manufacturer verification or physical stock from supplied IDs.\n\nShare reuses WorkspacePurchasedUnitPublishCommand v1 exactly. Only the current\noriginal seller can explicitly share; expectedRevision is checked atomically.\nKeep the frozen operation ID, command fingerprint and outcome durably. Same ID\nand command returns its original result; changed command conflicts. Status never\nresends, creates a tombstone or closes an unknown command. Missing remains pending.\nThe accepted snapshot is separate from private local drafts and purchase facts.\n\nBuyer report reuses WorkspacePurchasedUnitMismatchCommand v1 exactly. Require\nthe current original buyer (and exact approved purchasing Store if applicable),\ncurrent published revision/fingerprint and a literal subset of its existing\nrows. Persist the observation and immutable command outcome once; never edit\nsupplier rows. Reporting is not an accepted claim, return, refund or replacement.\nSeller inbox is current-owner-only, paged at the existing maximum 50, with exact\nsource revision/cursor consistency. Do not manufacture linked support cases.\n\nClient uses the existing authenticated Workspace transport/App Check and lifetime.\nNo credentials, endpoint changes, phone fixture injection or provider activation.\nReview/private Save retains native semantics; only explicit Share/Report invokes\nthe original mutation. Old grants expire/retire; old account/Store responses and\npending commands cannot acquire a renewed grant. Preserve unknown-result recovery.\n\nMinimum additional existing owners: workspace_purchase_projection_service.ts,\nits test, work_order_identity_gateway.dart and its test. Reuse already admitted\nindex, context/native adapters and focused tests only where required.\n\nQualification: actual Firestore SDK loopback transaction tests, malformed/forged\nbinding, cross-account/Store/realm, revisions, duplicate IDs/requests, status after\nrestart, timeout/unknown, revoked membership and concurrent publish/report; native\ndecode/lifetime/draft/confirmation tests and existing after-sales regressions.\nCurrent-source OPPO reachable inspection preserves saved fingerprints. No authentic\npopulated device/live acceptance without an original authenticated source.\n\nStill unavailable: authentic final-placement producer, warranty/issued-document\nsources, public review/moderation/report contracts and return/replacement decisions.\nPrivate purchased-stars 055 is already qualified and must not be recreated.\n"
+    },
+    "additionalOwners": [
+      "backend/functions/src/workspace/workspace_purchase_projection_service.ts",
+      "backend/functions/src/workspace/workspace_purchase_projection_service.test.ts",
+      "apps/mobile/lib/features/work/work_order_identity_gateway.dart",
+      "apps/mobile/test/work_order_identity_gateway_test.dart"
+    ],
+    "metadataOwners": [
+      "docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json",
+      "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "config/codex-subagent-coordination-policy.json",
+      "scripts/ai-domain-batch-admission.ps1",
+      "scripts/test-ai-domain-batch-admission.ps1"
+    ],
+    "admissionCommitSubject": "coordination(ai-domain-batch-20261028): admit existing original device source owners",
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "newScope": false,
+    "productionAcceptance": false,
+    "deployment": false,
+    "paymentIntegration": false,
+    "liveFinancialActions": false,
+    "admin": false,
+    "mediaActivation": false,
+    "apk": false,
+    "policyDevelopment": false,
+    "legacyMigration": false,
+    "runtimeMembershipSourceAvailable": false,
+    "standaloneRegisterCreation": false,
+    "syntheticFinanceSnapshot": false,
+    "financialOutcomeFixtures": "isolated labelled host only",
+    "existingOwnerPreimages": [
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_projection_service.ts",
+        "sha256": "B9F058543CA7C41C1BCB74566D5FB22DD3867DF014D5FD7A936DC0F3212A3E4F"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_purchase_projection_service.test.ts",
+        "sha256": "AFBF93EE87F4E005B43A5EEF037E09030A8AD3AEBF4F77116A61EFF93C4339B6"
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_order_identity_gateway.dart",
+        "sha256": "26418518C87A771C58652642787B5CFDBDB7BCAE81F844CEB9D0A56822712BFB"
+      },
+      {
+        "path": "apps/mobile/test/work_order_identity_gateway_test.dart",
+        "sha256": "FF2B7F933916F5778CE16630EEC5F8A8C5BBB41306D4B4EC592FAF9D7BA1E8A7"
+      }
+    ]
   }
 }
