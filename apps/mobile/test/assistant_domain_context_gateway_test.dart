@@ -44,6 +44,30 @@ AssistantDomainContextGateway _source(_Wire wire, {_Credentials? credentials, bo
   AssistantDomainContextGateway(owner: _owner, isCurrent: current ?? () => true,
     credentials: credentials ?? _Credentials(), transport: wire, clock: () => _at,compactStoreSelection:compact);
 void main() {
+  const orderStatusExport=String.fromEnvironment('AI_DOMAIN_ORDER_STATUS_EXPORT_PATH');
+  test('AGG07 actual SDK original status metadata preserves typed order ownership and proof',()async{
+    final saved=jsonDecode(File(orderStatusExport).readAsStringSync()) as Map;
+    expect(saved['kind'],'isolated-host-original-order-status-contract');
+    final actor=saved['actor'] as Map,store=saved['storeId'] as String;
+    final owner=(environment:'firebase-service',projectId:actor['projectId'] as String,
+      tenantId:null as String?,userId:actor['uid'] as String);
+    final context=MoolAssistantContext(accountScope:owner,authenticationRevision:1).withWorkspace(
+      MoolAssistantWorkspace(id:store,name:'HOST SDK Store',profile:'retailer-grocery',revision:1,
+        isStore:true,approved:true,approvalAccountScope:owner));
+    final credentials=_Credentials();
+    final gateway=AssistantDomainContextGateway(owner:owner,isCurrent:()=>true,credentials:credentials,
+      transport:_CapacityWire(Map<String,dynamic>.from(saved['metadata'] as Map)),
+      clock:()=>DateTime.parse(saved['now'] as String),compactStoreSelection:true);
+    final result=await gateway.read(context,()=>true);
+    expect(result.revisions.keys.where((key)=>key.$1=='AI-ACT-286'),hasLength(13));
+    for(final raw in saved['originalTargets'] as List){
+      final target=raw as Map,order=target['entityId'] as String,proof=target['sourceRevision'];
+      expect(result.revisions[('AI-ACT-274',order)],proof);
+      expect(result.revisions[('AI-ACT-286',order)],proof);
+    }
+    expect(credentials.modes,[SocialAppCheckTokenMode.standard]);
+    expect(jsonEncode(saved['metadata']),isNot(contains('operationId')));
+  },skip:orderStatusExport.isEmpty?'Requires explicit current actual local SDK order-status capture':false);
   const surplusExport = String.fromEnvironment('AI_DOMAIN_SURPLUS_CONTEXT_EXPORT_PATH');
   for (final action in ['AI-ACT-262', 'AI-ACT-266', 'AI-ACT-267', 'AI-ACT-378']) {
     test('Actual SDK original bill-surplus metadata $action preserves original copy and source ownership', () async {
@@ -585,11 +609,11 @@ void main() {
     });
   }
   }
-  for(final compact in [false,true]) for (final action in ['AI-ACT-274','AI-ACT-243','AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285']) {
+  for(final compact in [false,true]) for (final action in ['AI-ACT-274','AI-ACT-286','AI-ACT-243','AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285']) {
     test('Original Store $action metadata requires exact owned order proof compact$compact',()async{
       final store=_context.withWorkspace(const MoolAssistantWorkspace(id:'store-one',name:'Host Store',profile:'retailer-grocery',
         revision:1,isStore:true,approved:true,approvalAccountScope:_owner));
-      final proof='${action == 'AI-ACT-274' ? 'store-order-original' : action == 'AI-ACT-243' ? 'store-receiving-original' : 'store-order-operational'}:evaluation:${'a'*64}';
+      final proof='${assistantStoreOrderOriginalContextActions.contains(action) ? 'store-order-original' : action == 'AI-ACT-243' ? 'store-receiving-original' : 'store-order-operational'}:evaluation:${'a'*64}';
       final data=<String,Object?>{..._data(),'ownerKey':sha256.convert(utf8.encode(jsonEncode([
         'fixture-project','domain-host-a','workspace','store-one']))).toString(),
         'scope':{'audience':'workspace','storeId':'store-one'},'revisions':compact?<Object?>[]:[

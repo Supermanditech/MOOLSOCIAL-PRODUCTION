@@ -9350,6 +9350,102 @@ class _OriginalFacts09Host {
 
 void main() {
 
+  for(final phase in ['before-open','before-check','complete-check'])
+  testWidgets('AGG07 original status $phase binds the retained uncertain command without a preparation write', (tester) async {
+    final h=_OriginalFacts09Host();
+    WorkOrderOperations? operations;
+    try {
+      await h.ready(tester);
+      final work=h.product.native.work,reference=h.references.first;
+      expect(await h.capture(),contains(reference.orderId));
+      expect(work.workspaceAssistantOriginalOrderRecoveryReady(reference.orderId),isFalse);
+      final raw=purchase_fixture.operationalResponse(role:'seller');
+      final saved=(h.originals[reference.orderId]!['orders'] as List).single as Map;
+      raw['viewerUserId']=work.contactDraftStore!.accountScope!;
+      raw['purchaseId']=reference.purchaseId;raw['storeId']=reference.storeId;raw['orderId']=reference.orderId;
+      raw['sourceRevision']=reference.sourceRevision;raw['originalFingerprint']=reference.originalFingerprint;
+      raw['original']=saved['original'];
+      final now=DateTime.fromMillisecondsSinceEpoch(DateTime.now().millisecondsSinceEpoch,isUtc:true);
+      raw['placedAt']=now.subtract(const Duration(minutes:1)).toIso8601String();
+      raw['acceptanceDeadline']=now.add(const Duration(minutes:5)).toIso8601String();
+      raw['fulfilmentDeadline']=now.add(const Duration(hours:1)).toIso8601String();
+      final wire=purchase_fixture.Transport()..data=raw;
+      final decoder=AuthenticatedWorkspaceOrderOperationsGateway(purchase_fixture.projectionGateway(wire,account:work.contactDraftStore!.accountScope!));
+      final snapshot=await decoder.read(role:WorkspaceOrderIdentityRole.seller,realm:'evaluation',reference:reference);
+      expect(snapshot,isNotNull);
+      final order=WorkspaceOrderRecord.fromOperational(snapshot!);
+      final gateway=_OrderEffectGateway(gateway:AuthenticatedWorkspaceOrderOperationsGateway(h.reader),
+        accountScope:work.contactDraftStore!.accountScope!,workspaceId:reference.storeId);
+      final journal=_OrderEffectJournal();
+      operations=WorkOrderOperations(accountScope:gateway.accountScope,workspaceId:reference.storeId,gateway:gateway,pendingStore:journal);
+      expect(await operations.restore(),isTrue);
+      expect(operations.observe(WorkOrderReply(accountScope:gateway.accountScope,workspaceId:reference.storeId,
+        orderId:reference.orderId,operationId:'snapshot',revision:snapshot.revision,state:WorkOrderReplyState.applied,order:order)),isTrue);
+      expect(work.bindWorkspaceOrderOperations(operations),isTrue);
+      final attempt=operations.act(reference.orderId,WorkOrderAction.accept);
+      await tester.pumpAndSettle();
+      expect(work.workspaceAssistantOriginalOrderRecoveryReady(reference.orderId),isFalse);
+      gateway.responses.single.completeError(StateError('HOST isolated lost reply'));
+      expect(await attempt,isFalse);await tester.pumpAndSettle();
+      final retained=operations.pending(reference.orderId),before=(h.wire.requests.length,journal.saves,journal.removes);
+      expect(work.workspaceAssistantOriginalOrderRecoveryReady(reference.orderId),isTrue);
+      expect(work.workspaceAssistantOriginalOrderRecoveryReady(reference.orderId),isTrue);
+      expect((h.wire.requests.length,journal.saves,journal.removes),before);
+      expect(gateway.reconciled,isEmpty);expect(gateway.submitted,hasLength(1));
+      expect(operations.pending(reference.orderId),same(retained));
+      final adapter=h.product.allAdapters.singleWhere((a)=>a.actionId=='AI-ACT-286'),context=h.product.native.readContext();
+      final captured=await adapter.snapshot(context,reference.orderId);
+      expect(captured,isNotNull);
+      final proposal=scope_contract.MoolAssistantProposal(id:'HOST-original-status',actionId:'AI-ACT-286',
+        entityId:reference.orderId,binding:context.binding,requestRevision:1,entitlementRevision:'HOST-paid-only',
+        sourceRevision:captured!.sourceRevision,validUntil:DateTime.now().add(const Duration(minutes:1)),
+        title:'Check original status',summary:'Isolated original source fixture',fields:const {});
+      if(phase=='before-open'){
+        h.active=false;
+        expect(work.workspaceAssistantOriginalOrderRecoveryReady(reference.orderId),isFalse);
+        expect(await adapter.snapshot(context,reference.orderId),isNull);
+        expect(await adapter.openReview(proposal,()=>true),MoolAssistantReviewResult.stale);
+        expect(gateway.reconciled,isEmpty);
+      }else{
+        final review=adapter.openReview(proposal,()=>true);await tester.pumpAndSettle();
+        final button=find.byKey(Key('work-order-operation-retry-${reference.orderId}'));
+        expect(button,findsOneWidget);
+        final nativeRoute=ModalRoute.of(tester.element(button))!,navigator=Navigator.of(tester.element(button),rootNavigator:true);
+        final callback=tester.widget<TextButton>(button).onPressed!;
+        if(phase=='before-check')h.active=false;
+        callback();callback();await tester.pumpAndSettle();
+        if(phase=='before-check'){
+          expect(gateway.reconciled,isEmpty);expect(journal.saves,before.$2);expect(journal.removes,before.$3);
+        }else{
+          expect(gateway.reconciled,hasLength(1));expect(gateway.reconciled.single,same(retained));
+          gateway.replies.single.complete(WorkOrderReply(accountScope:gateway.accountScope,workspaceId:reference.storeId,
+            orderId:reference.orderId,operationId:retained!.operationId,revision:snapshot.revision,
+            state:WorkOrderReplyState.pending,order:order));
+          await tester.pumpAndSettle();expect(gateway.submitted,hasLength(1));
+        }
+        if(nativeRoute.isCurrent)navigator.pop();await tester.pumpAndSettle();await review;
+      }
+      expect(operations.pending(reference.orderId),same(retained));
+    } finally {
+      await h.dispose(tester);
+      if(operations!=null&&!operations.isDisposed)operations.dispose();
+    }
+  });
+
+  testWidgets('AGG07 old recovered chat cannot select a newly retained order command', (tester) async {
+    final h=_OrderEffectHost();
+    try {
+      await h.ready(tester);
+      final adapter=h.native.adapters(tester).singleWhere((a)=>a.actionId=='AI-ACT-286');
+      final before=h.effects;
+      final result=await adapter.openReview(scope_contract.MoolAssistantProposal(id:'HOST-old-status',actionId:'AI-ACT-286',
+        entityId:h.original.id,binding:h.native.readContext().binding,requestRevision:1,entitlementRevision:'HOST-paid-only',
+        sourceRevision:'HOST-old-native-capture',validUntil:DateTime.now().add(const Duration(minutes:1)),
+        title:'Check status',summary:'Isolated host fixture',fields:const {},recovered:true),()=>true);
+      expect(result,MoolAssistantReviewResult.stale);expect(h.effects,before);
+    } finally {await h.dispose(tester);}
+  });
+
   testWidgets('FE-RESTOCK234 read hints retire on reader replacement and cannot cross account or Store', (tester) async {
     final f = _AuthenticatedNativeScopeFixture();
     try {

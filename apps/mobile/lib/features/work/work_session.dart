@@ -810,6 +810,30 @@ class WorkSession extends ChangeNotifier {
   WorkspacePurchaseReference? workspaceAssistantOriginalOrderReference(String orderId) =>
       _assistantOriginalReferencesCurrent?.call() == true ? _assistantOriginalReferences[orderId] : null;
 
+  /// Availability only. Never restores, reconciles, observes or dispatches a
+  /// command during AI capture; the existing native status control owns that.
+  bool workspaceAssistantOriginalOrderRecoveryReady(String orderId, {bool allowReconciling = false}) {
+    final reader = originalPurchaseReader, operations = _scopedOrderOperations,
+        store = activeWorkspace?.id, reference = workspaceAssistantOriginalOrderReference(orderId);
+    if (_disposed || reader == null || !reader.isCurrent || store == null || reference == null ||
+        !workspaceRequiresMembershipReadback || !_currentWorkspaceAccess(store, activeWorkspace?.profileId) ||
+        workspaceAccountRecoveryPending || workspaceAccountRecoveryFailed ||
+        operations == null || !operations.recoveryReady ||
+        operations.gateway is! WorkspaceOperationalOrderCommandGateway ||
+        (operations.state(orderId) != WorkOrderOperationState.uncertain &&
+          !(allowReconciling && operations.state(orderId) == WorkOrderOperationState.reconciling))) return false;
+    final bridge = operations.gateway as WorkspaceOperationalOrderCommandGateway;
+    final pending = operations.pending(orderId), original = pending?.purchaseReference;
+    return bridge.isCurrent && identical(bridge.gateway.identity, reader) &&
+        bridge.realm == originalPurchaseRealm && bridge.accountScope == _contactAccountScope && bridge.workspaceId == store &&
+        pending != null && pending.version == WorkOrderCommand.contractVersion &&
+        pending.accountScope == _contactAccountScope && pending.workspaceId == store && pending.orderId == orderId &&
+        pending.purchaseRealm == originalPurchaseRealm && original != null && original.valid &&
+        jsonEncode(original.toJson()) == jsonEncode(reference.toJson()) &&
+        pending.action != WorkOrderAction.requestTime && pending.additionalMinutes == null &&
+        pending.expectedAcceptanceDeadline == null && operations.order(orderId)?.order?.operational != null;
+  }
+
   /// Exact original operational proof; no controller restore/observe, journal
   /// recovery, persistence or command dispatch is performed during AI capture.
   static String workspaceAssistantOperationalSourceProof(WorkspaceOperationalOrderSnapshot source) {

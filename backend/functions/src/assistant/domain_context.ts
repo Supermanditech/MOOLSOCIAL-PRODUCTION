@@ -1454,14 +1454,17 @@ export class OriginalStoreOrderPreparationContext implements PreparationContextS
     return {realm, references};
   }
   async readPrepared(actor: AccountProfileActor, input: PreparationRequest, proposal: Extract<PreparationReply['outcome'], {kind: 'proposal'}>): Promise<PreparationContext> {
-    if (proposal.actionId !== 'AI-ACT-274' || input.actionId !== proposal.actionId || input.entityId !== proposal.entityId ||
+    if (!storeOrderOriginalActions.has(proposal.actionId) || input.actionId !== proposal.actionId || input.entityId !== proposal.entityId ||
         Object.keys(proposal.fields).length !== 0) return fail('stale_preparation', 409);
     return this.read(actor, input);
   }
   async read(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
     if (actor.projectId !== this.deps.projectId || !actor.uid || actor.tenantId !== undefined) return fail('account_scope_mismatch', 403);
-    if (input.scope.audience !== 'workspace' || !input.scope.storeId || input.actionId !== null && input.actionId !== 'AI-ACT-274' ||
-        input.entityId !== null && input.actionId !== 'AI-ACT-274' || input.catalogueListingIds?.length) return fail('context_unavailable');
+    if (input.scope.audience !== 'workspace' || !input.scope.storeId || input.actionId !== null && !storeOrderOriginalActions.has(input.actionId) ||
+        input.entityId !== null && !storeOrderOriginalActions.has(input.actionId ?? '') || input.catalogueListingIds?.length) return fail('context_unavailable');
+    // Explicit retained-status selection uses the same immutable owned index.
+    // Generic discovery keeps its original action count/capacity unchanged.
+    const action = input.actionId === 'AI-ACT-286' ? 'AI-ACT-286' : 'AI-ACT-274';
     const started = this.now(), before = await approvedWorkspacePreparationAuthority(this.deps.authority, actor, input, started);
     const deadline=Math.min(started+60_000,Date.parse(before.validUntil));
     const first = await this.snapshot(actor, input.scope.storeId, input.entityId, deadline);
@@ -1474,8 +1477,10 @@ export class OriginalStoreOrderPreparationContext implements PreparationContextS
       row.purchaseId,row.storeId,row.orderId,row.originalFingerprint,row.sourceRevision]);
     const revision = 'store-order-original-context:' + digest([actor.projectId,actor.uid,input.scope.storeId,after.revision,second]);
     const dynamic = input.entityId === null, tools: PreparationTool[] = [];
-    if (second.references.length) tools.push({name:'store_review_order_original',actionId:'AI-ACT-274',entityId:input.entityId,
-      sourceRevision: dynamic ? revision : proof(second.references[0]!),description:'View saved original purchase facts for this Store order; current payment and delivery status are separate.',
+    if (second.references.length) tools.push({name:action === 'AI-ACT-286' ? 'store_review_retained_order_status' : 'store_review_order_original',actionId:action,entityId:input.entityId,
+      sourceRevision: dynamic ? revision : proof(second.references[0]!),description:action === 'AI-ACT-286'
+        ? 'Review the existing interrupted original-order status screen. The device must retain the exact uncertain original command. Do not choose or create a request identity, retry, cancel, update an order, or claim an outcome. Only the existing native Check status control may read that original attempt.'
+        : 'View saved original purchase facts for this Store order; current payment and delivery status are separate.',
       parameters:{type:'object',properties:dynamic?{orderId:{type:'string',enum:second.references.map(row=>row.orderId)}}:{},
         required:dynamic?['orderId']:[],additionalProperties:false},validate:fields=>Object.keys(fields).length===0,
       ...(dynamic?{targetSelector:'orderId',resolveTarget:(args:Readonly<Record<string,unknown>>)=>{
@@ -1485,7 +1490,7 @@ export class OriginalStoreOrderPreparationContext implements PreparationContextS
         return {entityId:row.orderId,sourceRevision:proof(row),fields:{}};
       }}:{})});
     return {revision,validUntil:new Date(until).toISOString(),tools,
-      nativeTargets:second.references.map(row=>({actionId:'AI-ACT-274',entityId:row.orderId,sourceRevision:proof(row)})),
+      nativeTargets:second.references.map(row=>({actionId:action,entityId:row.orderId,sourceRevision:proof(row)})),
       modelContext:{sourceKind:'original-store-order-facts-v1',coverage:'indexed_original_facts',
         orders:second.references.map(row=>({orderId:row.orderId,sourceRevision:row.sourceRevision}))}};
   }
@@ -2830,6 +2835,7 @@ export class CompositePreparationContext implements PreparationContextSource {
       return this.deps.original.read(actor, input);
     }
     const values: PreparationContext[] = [];
+    let retainedOrderStatus: PreparationContext | undefined;
     if (this.deps.original) {
       const original = await this.deps.original.read(actor, input);
       values.push(original);
@@ -2903,6 +2909,16 @@ export class CompositePreparationContext implements PreparationContextSource {
         // protocol. Never return a prefix or let it disable established tools.
         canonicalContextProjection(actor,input.scope,candidate,1);
         values.push(orders);
+        // Reuse this exact qualified index; do not reread orders or a device
+        // journal. Append optional status metadata last so it cannot displace
+        // established tools when the existing protocol capacity is exhausted.
+        if(input.actionId===null&&orders.tools.length&&orders.nativeTargets?.length){
+          retainedOrderStatus={revision:'store-retained-order-status:'+digest(orders.revision),validUntil:orders.validUntil,
+            tools:orders.tools.map(tool=>({...tool,name:'store_review_retained_order_status',actionId:'AI-ACT-286',
+              description:'Review the retained original-order status screen only when the device has its exact uncertain command. Never supply operation identity, resubmit, cancel, or claim an outcome; use the original native Check status control.'})),
+            nativeTargets:orders.nativeTargets.map(target=>({...target,actionId:'AI-ACT-286'})),
+            modelContext:{sourceKind:'original-retained-order-status-v1',sourceRevision:orders.revision}};
+        }
       }
       catch(error){
         if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;
@@ -2934,6 +2950,10 @@ export class CompositePreparationContext implements PreparationContextSource {
       }catch(error){
         if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;
       }
+    }
+    if(retainedOrderStatus){
+      try{canonicalContextProjection(actor,input.scope,this.combine([...values,retainedOrderStatus]),1);values.push(retainedOrderStatus);}
+      catch(error){if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;}
     }
     if (!values.length) return fail("context_unavailable");
     return this.combine(values);

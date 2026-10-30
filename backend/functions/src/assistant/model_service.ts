@@ -2,7 +2,7 @@ import {randomUUID} from "node:crypto";
 import type {AccountProfileActor} from "../account/profile_service.js";
 import type {AccountPlansService, PlansScope} from "../account/plans_service.js";
 import {assertStrictSchema, canonical, digest, fail, id, text, object, nativeTargetSelection, nativeOriginalRequestActions, clarificationToolName, type AssistantCommand, type PreparationContext, type PreparationReply, type PreparationRequest} from "./model_contract.js";
-import {maskedNativeHints, storeProductActions} from "./domain_context_contract.js";
+import {maskedNativeHints, storeProductActions, storeOrderOriginalActions} from "./domain_context_contract.js";
 import type {PreparationModel} from "./responses_transport.js";
 
 export type PreparationState = {state: "pending" | "uncertain" | "cancelled" | "failed"} | {state: "ready"; reply: PreparationReply};
@@ -46,7 +46,7 @@ function contextBinding(c: PreparationContext): string {
 function selectedNativeModelReference(context: PreparationContext, tools: PreparationContext['tools'],
   targets: readonly {actionId: string; entityId: string | null}[],couponSkus?:ReadonlySet<string>): PreparationContext['modelContext'] {
   const skus = new Set<string>();
-  const orders = new Set(targets.filter(target=>target.actionId==='AI-ACT-274'&&target.entityId!==null).map(target=>target.entityId!));
+  const orders = new Set(targets.filter(target=>storeOrderOriginalActions.has(target.actionId)&&target.entityId!==null).map(target=>target.entityId!));
   const operationalOrders=new Set(targets.filter(target=>['AI-ACT-275','AI-ACT-280','AI-ACT-281','AI-ACT-285'].includes(target.actionId)&&target.entityId!==null).map(target=>target.entityId!));
   const receivingOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-243'&&target.entityId!==null).map(target=>target.entityId!));
   const privateStarsOrders = new Set(targets.filter(target=>target.actionId==='AI-ACT-055'&&target.entityId!==null).map(target=>target.entityId!));

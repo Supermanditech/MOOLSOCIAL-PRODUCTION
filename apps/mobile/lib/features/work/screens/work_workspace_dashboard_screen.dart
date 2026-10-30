@@ -335,8 +335,10 @@ class _StoreOrderFollowupAdapter implements MoolAssistantOwnerAwareNativeAdapter
       ?'Review the original order action and reason.':null;
   @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext ctx,String? entity)async=>read(ctx,entity);
   @override Future<MoolAssistantReviewResult> openReview(MoolAssistantProposal p,bool Function() current)=>
+    actionId=='AI-ACT-286'&&p.recovered?Future.value(MoolAssistantReviewResult.stale):
     p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,current,null);
   @override Future<MoolAssistantReviewResult> openOwnedReview(MoolAssistantProposal p,{required bool Function() isCurrent,required Listenable ownerChanges})=>
+    actionId=='AI-ACT-286'&&p.recovered?Future.value(MoolAssistantReviewResult.stale):
     p.actionId!=actionId||validateFields(p.fields)!=null?Future.value(MoolAssistantReviewResult.unavailable):open(p,isCurrent,ownerChanges);
 }
 
@@ -8868,13 +8870,17 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
     value.expectedRevision,value.action.name,value.reason,value.additionalMinutes,value.expectedAcceptanceDeadline?.toUtc().toIso8601String(),
     value.version,value.purchaseReference?.toJson(),value.purchaseRealm];
   WorkspaceOrderRecord? _repeatSource(WorkSession source,String customer)=>source.workspaceRepeatOrderSource(customerId:customer);
+  bool _orderRecoverySourceCurrent(WorkSession source,String orderId,{bool checking=false})=>
+    !source.workspaceRequiresMembershipReadback&&source.originalPurchaseReader==null||
+    source.workspaceAssistantOriginalOrderRecoveryReady(orderId,allowReconciling:checking);
   bool _orderFollowupAvailable(WorkSession source,String action,WorkspaceOrderRecord? order){
     if(order==null||source.busy||source.workspaceHandoverBusy||source.workspaceOperationsSyncing)return false;
     return switch(action){
       'AI-ACT-284'=>order.operational==null&&!source.hasScopedWorkspaceOrder(order.id)&&!order.isCustomerCollection&&order.stage=='Delivery requested',
       'AI-ACT-285'=>order.stage=='Confirmed'&&!order.isCustomerCollection&&!source.hasPendingOrderTime&&
         (order.operational==null||source.workspaceOrderCanAct(order.id,WorkOrderAction.reject)),
-      'AI-ACT-286'=>source.workspacePendingOrderCommand(order.id)!=null&&source.workspaceOrderOperationState(order.id)==WorkOrderOperationState.uncertain,
+      'AI-ACT-286'=>source.workspacePendingOrderCommand(order.id)!=null&&source.workspaceOrderOperationState(order.id)==WorkOrderOperationState.uncertain&&
+        _orderRecoverySourceCurrent(source,order.id),
       'AI-ACT-287'=>identical(_repeatSource(source,source.workspaceCustomerId(order.customer)),order)&&source.workspaceCatalogueItems.isNotEmpty,
       _=>false};
   }
@@ -8909,7 +8915,8 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       _financeAssistantContext(host)?.binding==ctx.binding&&_financePermitted(ctx)&&router.state.uri==uri&&router.state.pageKey==page;
     Future<void>? issued;bool repeated=false;
     bool inputCurrent(){final currentOrder=_orderEffectTarget(source,p.entityId);return owner()&&currentOrder!=null&&jsonEncode(_orderEffectFacts(currentOrder))==originalFacts&&
-      (p.actionId!='AI-ACT-286'||identical(source.workspacePendingOrderCommand(order.id),pending))&&
+      (p.actionId!='AI-ACT-286'||identical(source.workspacePendingOrderCommand(order.id),pending)&&
+        _orderRecoverySourceCurrent(source,order.id,checking:true))&&
       (p.actionId!='AI-ACT-284'||identical(source.workspaceDeliveryAssignmentForOrder(order.id),assignment)&&
         source.workspaceOrderAddress==order.address)&&
       (catalogue==null||catalogue==jsonEncode(source.workspaceCatalogueItems.map((item)=>item.toInventoryJson()).toList()));}

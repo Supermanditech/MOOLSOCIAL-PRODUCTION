@@ -477,6 +477,39 @@ test('Order originals preparation follows every original reference page and reso
   assert(!JSON.stringify(value.modelContext).includes('originalFingerprint'));
   assert.throws(()=>value.tools[0]!.resolveTarget!({orderId:'another-store-order'}),/invalid_model_result/u);
 });
+
+test('Interrupted original order status selects an owned reference without model command identity',async()=>{
+  const f=originalOrderFixture(),input:PreparationRequest={...f.input,actionId:'AI-ACT-286'};
+  const value=await f.source.read(actor,input);
+  assert.equal(value.tools.length,1);
+  const tool=value.tools[0]!;
+  assert.equal(tool.actionId,'AI-ACT-286');
+  assert.equal(tool.name,'store_review_retained_order_status');
+  assert.equal(value.nativeTargets!.length,f.rows.length);
+  assert(value.nativeTargets!.every(target=>target.actionId==='AI-ACT-286'));
+  const selected=tool.resolveTarget!({orderId:f.rows[11]!.orderId});
+  assert.deepEqual(selected.fields,{});
+  for(const extra of ['operationId','action','expectedRevision','reason','retry']){
+    assert.equal(tool.validate({[extra]:'HOST-untrusted'}),false);
+    assert.throws(()=>tool.resolveTarget!({orderId:f.rows[11]!.orderId,[extra]:'HOST-untrusted'}),/invalid_model_result/u);
+  }
+  const exact=await f.source.readPrepared(actor,{...input,entityId:selected.entityId},{kind:'proposal',
+    id:'host-retained-status',actionId:'AI-ACT-286',entityId:selected.entityId,sourceRevision:selected.sourceRevision,
+    title:'Check original status',summary:'Isolated host source; no command dispatched',fields:{}});
+  assert.equal(exact.tools[0]!.sourceRevision,selected.sourceRevision);
+  assert.equal(exact.tools[0]!.validate({}),true);
+  assert(f.calls.every(call=>Object.keys(call).sort().join('|')==='cursor|limit|storeId'));
+});
+
+test('Interrupted status does not broaden generic order discovery or bypass current source access',async()=>{
+  const f=originalOrderFixture();
+  const generic=await f.source.read(actor,{...f.input,actionId:null});
+  assert(generic.tools.every(tool=>tool.actionId==='AI-ACT-274'));
+  assert.equal(generic.nativeTargets!.length,f.rows.length);
+  await assert.rejects(f.source.read(actor,{...f.input,actionId:'AI-ACT-286',entityId:'HOST-absent'}),/context_unavailable/u);
+  f.deny();
+  await assert.rejects(f.source.read(actor,{...f.input,actionId:'AI-ACT-286'}),/workspace_access_unavailable/u);
+});
 test('Order originals exact recovery reads beyond first page and preserves the original proof',async()=>{
   const f=originalOrderFixture(),initial=await f.source.read(actor,f.input),target=initial.tools[0]!.resolveTarget!({orderId:f.rows[11]!.orderId});
   const prepared=await f.source.readPrepared(actor,{...f.input,entityId:target.entityId},{kind:'proposal',id:'host-prepared-order',
@@ -519,8 +552,8 @@ test('Order originals stop a slow original index at the existing capture deadlin
   await assert.rejects(f.source.read(actor,f.input),/stale_preparation/u);
   assert.equal(f.calls.length,2);
 });
-for(const [productCount,orderCount,accepted] of [[2500,2487,true],[2500,2488,false],[0,5000,true],[0,5001,false]] as const)
-test(`Complete optional order index respects shared protocol capacity: ${productCount} products, ${orderCount} orders`,async()=>{
+for(const [productCount,orderCount,accepted,recoveryAccepted,extraLegacy] of [[2500,2487,true,true,0],[2500,2488,false,false,0],[0,5000,true,true,0],[0,5001,false,false,0],[2500,2487,true,false,13]] as const)
+test(`Complete optional order index respects shared protocol capacity: ${productCount} products, ${orderCount} orders, ${extraLegacy} retained legacy targets`,async()=>{
   const f=originalOrderFixture(orderCount);
   const rootActions=['218','219','372','213','215','224','225','374','231','232','233','407','408'];
   const targets:Array<{actionId:string;entityId:string|null;sourceRevision:string}>=[];
@@ -534,14 +567,20 @@ test(`Complete optional order index respects shared protocol capacity: ${product
     for(const action of rootActions)targets.push({actionId:`AI-ACT-${action}`,entityId:null,sourceRevision:`host-root-${action}`});
     assert.equal(base.nativeTargets!.length,25014);
   }
+  for(let i=0;i<extraLegacy;i++)targets.push({actionId:'AI-ACT-317',entityId:`host-retained-legacy-${i}`,sourceRevision:'host-retained-proof'});
   const source=new CompositePreparationContext({original:{async read(){return base;}},storeOrders:f.source});
   const input={...f.input,actionId:null};
   const value=await source.read(actor,input),wire=canonicalContextProjection(actor,input.scope,value,1);
   const orders=value.nativeTargets!.filter(target=>target.actionId==='AI-ACT-274');
+  const status=value.nativeTargets!.filter(target=>target.actionId==='AI-ACT-286');
   assert.equal(orders.length,accepted?orderCount:0);
-  assert.equal(value.nativeTargets!.length,base.nativeTargets!.length+(accepted?orderCount:0));
+  assert.equal(status.length,recoveryAccepted?orderCount:0);
+  assert.deepEqual(status.map(target=>[target.entityId,target.sourceRevision]),(recoveryAccepted?orders:[]).map(target=>[target.entityId,target.sourceRevision]));
+  assert.equal(value.nativeTargets!.length,base.nativeTargets!.length+(accepted?orderCount:0)+(recoveryAccepted?orderCount:0));
   assert.equal(value.tools.some(tool=>tool.actionId==='AI-ACT-317'),true);
   assert.equal(value.tools.some(tool=>tool.actionId==='AI-ACT-274'),accepted);
+  assert.equal(value.tools.some(tool=>tool.actionId==='AI-ACT-286'),recoveryAccepted);
+  assert.equal(f.calls.length,Math.ceil(orderCount/5)*2); // Status reuses the qualified index, never another read/replay.
   assert(wire.nativeSelection!.groups.length<=5000);
   if(accepted)assert.equal(wire.nativeSelection!.groups.length,5000);
   else assert.deepEqual(value,base);

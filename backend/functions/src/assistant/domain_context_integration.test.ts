@@ -574,6 +574,18 @@ test('Order originals actual loopback SDK projection service to authorised AI me
     const prepared=await orders.read(owner,{scope:{audience:'workspace',storeId},requestId:'HOST-order-source',requestRevision:1,
       expectedEntitlementRevision:'HOST-read-only',message:'View original order',language:'English',history:[],actionId:'AI-ACT-274',entityId:null});
     assert.equal(prepared.nativeTargets!.length,13);
+    const statusGroups=reply.body.data.nativeSelection!.groups.filter(group=>group.actionIds.includes('AI-ACT-286'));
+    assert.equal(statusGroups.length,13);
+    for(const target of prepared.nativeTargets!){
+      const group=statusGroups.find(group=>group.entityId===target.entityId);
+      assert.equal(group?.sourceRevision,target.sourceRevision);
+      assert(group!.actionIds.includes('AI-ACT-274'));
+    }
+    if(process.env.AI_DOMAIN_ORDER_STATUS_EXPORT_PATH){
+      const path=process.env.AI_DOMAIN_ORDER_STATUS_EXPORT_PATH;assert(isAbsolute(path));
+      writeFileSync(path,JSON.stringify({kind:'isolated-host-original-order-status-contract',actor:owner,storeId,
+        now:at.toISOString(),metadata:reply.body,originalTargets:prepared.nativeTargets},null,2)+'\n',{flag:'wx'});
+    }
     const projections=[];
     for(const reference of references){
       const selected=prepared.tools[0]!.resolveTarget!({orderId:reference.orderId});
@@ -605,10 +617,11 @@ test('Order originals actual loopback SDK projection service to authorised AI me
         if(row.result.state!=='ready')row.result={state:'cancelled'};return row.result;
       },
     };
+    let selectedAction='AI-ACT-274';
     const preparation=new AssistantPreparationService({projectId:owner.projectId,plans,context,requests,now:()=>at,
       usage:{async reserve(){reservations++;return{id:'HOST-order-permit',validUntil:'2026-10-28T08:01:00.000Z'};},async settle(){}},
       model:{async prepare(_request,tools,_signal,modelContext){
-        modelCalls++;assert.equal(tools.length,1);assert.equal(tools[0]!.actionId,'AI-ACT-274');
+        modelCalls++;assert.equal(tools.length,1);assert.equal(tools[0]!.actionId,selectedAction);
         assert(JSON.stringify(modelContext).includes(chosen.orderId));
         for(const other of references.filter(row=>row.orderId!==chosen.orderId))assert(!JSON.stringify(modelContext).includes(other.orderId));
         return{kind:'tool' as const,name:tools[0]!.name,arguments:{orderId:chosen.orderId}};
@@ -627,6 +640,22 @@ test('Order originals actual loopback SDK projection service to authorised AI me
     }
     assert.deepEqual(await preparation.handle(owner,{operation:'prepare',payload}),preparedResult);
     assert.equal(modelCalls,1);assert.equal(reservations,1);
+    selectedAction='AI-ACT-286';
+    const statusPayload={...payload,requestId:'HOST-original-status-preparation',actionId:selectedAction,
+      nativeTargets:[{actionId:selectedAction,entityId:chosen.orderId}]};
+    const statusResult=await preparation.handle(owner,{operation:'prepare',payload:statusPayload});
+    assert.equal(statusResult.state,'ready');
+    if(statusResult.state==='ready'){
+      assert.equal(statusResult.reply.outcome.kind,'proposal');
+      if(statusResult.reply.outcome.kind==='proposal'){
+        assert.equal(statusResult.reply.outcome.actionId,'AI-ACT-286');
+        assert.equal(statusResult.reply.outcome.entityId,chosen.orderId);
+        assert.deepEqual(statusResult.reply.outcome.fields,{});
+        assert.equal(statusResult.reply.outcome.sourceRevision,prepared.nativeTargets!.find(target=>target.entityId===chosen.orderId)!.sourceRevision);
+      }
+    }
+    assert.deepEqual(await preparation.handle(owner,{operation:'prepare',payload:statusPayload}),statusResult);
+    assert.equal(modelCalls,2);assert.equal(reservations,2);
     const countBefore=(await db.collection('workspacePurchaseProjections').doc('evaluation').collection('purchases').get()).size;
     await assert.rejects(purchases.listStore('HOST-foreign-owner',{storeId,limit:5,cursor:null}));
     paid=false;await assert.rejects(orders.read(owner,{scope:{audience:'workspace',storeId},requestId:'HOST-order-source',requestRevision:1,
