@@ -842,6 +842,30 @@ Check (!(Test-AiDomainSupplierMoneyCheckpoint $bad)) 'reject changed qualified s
 $bad=($supplierMoneyCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendContextPassed=0
 Check (!(Test-AiDomainSupplierMoneyCheckpoint $bad)) 'reject changed original-supplier-money evidence'
 
+$counterCustomerCheckpoint=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate06CounterCustomerCheckpoint
+Check (Test-AiDomainCounterCustomerCheckpoint $counterCustomerCheckpoint) 'exact host-qualified original original-counter-customer source checkpoint'
+Check (!(Test-AiDomainCounterCustomerCheckpoint $null)) 'reject absent original original-counter-customer checkpoint'
+Check (@(Get-AiDomainCounterCustomerStageOwners 0 $counterCustomerCheckpoint).Count -eq 3) 'three exact existing original-counter-customer checkpoint metadata owners'
+Check (@(Get-AiDomainCounterCustomerStageOwners 1 $counterCustomerCheckpoint).Count -eq 13) 'thirteen exact qualified source owners'
+Check (@(Get-AiDomainCounterCustomerStageOwners 2 $counterCustomerCheckpoint).Count -eq 1) 'one sanitized evidence owner'
+Check (@(Get-AiDomainCounterCustomerStageOwners 3 $counterCustomerCheckpoint).Count -eq 0) 'no extra checkpoint stage'
+foreach($property in @('sequence','baseline')) {
+ $bad=($counterCustomerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.$property='foreign'
+ Check (!(Test-AiDomainCounterCustomerCheckpoint $bad)) "reject changed original-counter-customer $property"
+}
+$bad=($counterCustomerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.productionAcceptance=$true
+Check (!(Test-AiDomainCounterCustomerCheckpoint $bad)) 'host qualification is not production acceptance'
+foreach($property in @('wholeAggregateComplete','populatedStoreDeviceQualified','originalRuntimeAuthorityAvailable','legacyMigrationAvailable','standaloneRegisterCreation','syntheticFinanceSnapshot','cloudActivation','financialLivePosting','founderApprovalClaimed','productionAcceptance')) {
+ $bad=($counterCustomerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.disposition.$property=$true
+ Check (!(Test-AiDomainCounterCustomerCheckpoint $bad)) "reject invented original-counter-customer qualification $property"
+}
+$bad=($counterCustomerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.changedOwners+=@('foreign')
+Check (!(Test-AiDomainCounterCustomerCheckpoint $bad)) 'reject expanded original-counter-customer owners'
+$bad=($counterCustomerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.manifest.owners[0].sha256='foreign'
+Check (!(Test-AiDomainCounterCustomerCheckpoint $bad)) 'reject changed qualified source hash'
+$bad=($counterCustomerCheckpoint|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.evidence.backendContextPassed=0
+Check (!(Test-AiDomainCounterCustomerCheckpoint $bad)) 'reject changed original-counter-customer evidence'
+
 $creditAdmission=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).aggregate05CreditDocumentAdmission
 Check (Test-AiDomainCreditDocumentAdmission $creditAdmission) 'exact existing credit model admission under standing authority'
 Check (!(Test-AiDomainCreditDocumentAdmission $null)) 'reject absent credit model admission'

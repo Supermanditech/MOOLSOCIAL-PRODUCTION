@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 38,
+  "localMetadataCommits": 39,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -9586,5 +9586,627 @@
     "standaloneRegisterCreation": false,
     "syntheticFinanceSnapshot": false,
     "financialOutcomeFixtures": "isolated labelled host only"
+  },
+  "aggregate06CounterCustomerCheckpoint": {
+    "sequence": "06-original-counter-customer-recovery",
+    "baseline": "f9abd477528b23355935fe5caef643ac73618bac",
+    "manifest": {
+      "scope": "06-original-counter-customer-recovery",
+      "baseline": "f9abd477528b23355935fe5caef643ac73618bac",
+      "branch": "work/codex-backend/ai-domain-batch-20261028",
+      "changedOwners": [
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+        "apps/mobile/lib/features/work/work_customer_gateway.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/test/work_customer_gateway_test.dart",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "backend/functions/src/index.ts",
+        "backend/functions/src/workspace/workspace_customer_repository.ts",
+        "backend/functions/src/workspace/workspace_customer_service.test.ts",
+        "backend/functions/src/workspace/workspace_customer_service.ts",
+        "backend/functions/src/workspace/workspace_purchase_entry_service.ts"
+      ],
+      "owners": [
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.ts",
+          "bytes": 11535,
+          "sha256": "5C1D0BE40D045C52F140416B00626E7FE555CBC976400BC0C58A47168E11AD23",
+          "gitBlobOid": "12a59d21a1958ee33bc70e0c53b3742d47743ad1"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_contract.test.ts",
+          "bytes": 10479,
+          "sha256": "58517BA82EA4F68437C7011D7F109F09E073A33CF3E2CC4832671117EC7D8152",
+          "gitBlobOid": "8fa120c7a73697d966f2a09a30685b872bf45e37"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.ts",
+          "bytes": 270913,
+          "sha256": "2F34AB4DE4EE80D863C62A181C0D9AA675C7A6FEBB2CFF3E8779B8AC6A9F32F9",
+          "gitBlobOid": "a5bf4cec5170244c8ddc18a0fc2bef04b81db1a4"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context.test.ts",
+          "bytes": 78634,
+          "sha256": "DDE6F1856B797EAAB1C7B0573088A712383D3262CE8A651A5EF6780C0FA7BE21",
+          "gitBlobOid": "36b70180c3fd0ff6bf412c2bb4771598065892e6"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.ts",
+          "bytes": 3373,
+          "sha256": "6F1FCAFAC94D0A8FDC35BD8C2E878B2D55418D8284A5DC710EB3BEE92855B07B",
+          "gitBlobOid": "9ca060984db51c54a93d3069d9ed96e7936cb435"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_http.test.ts",
+          "bytes": 5373,
+          "sha256": "CD77B75EF8E7EE01980DB7CC200233944C5CA60C88A454BF7F4E4B4242A25598",
+          "gitBlobOid": "aaec24000807da73e92fa7563fefa7a897ccfd57"
+        },
+        {
+          "path": "backend/functions/src/assistant/domain_context_integration.test.ts",
+          "bytes": 111069,
+          "sha256": "02460EEE4C4284EDFBAA761F52DB2BCC309E353343F5D9DDB3AF19336424360D",
+          "gitBlobOid": "aa9b6cf667983f23150a9433f4f4cc833d621a7a"
+        },
+        {
+          "path": "backend/functions/src/index.ts",
+          "bytes": 159286,
+          "sha256": "54CD6D81F825697BBC6B44CB12E11321A9B71B33E774E329905DEB4F4F6ABAE6",
+          "gitBlobOid": "8fac326787b23e41caddd9aa9443a2c31d04fcde"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/domain_context_gateway.dart",
+          "bytes": 18903,
+          "sha256": "FFBF332AD14CB4862AAF3833B86657ACF363F5AF4E0D738C2D57B399F98EC443",
+          "gitBlobOid": "5bf0ef8fbd5acfdce2b447fcc71aa9ffddf24279"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/profile_context.dart",
+          "bytes": 18946,
+          "sha256": "C61DAA145A9EDF785897069D217E54CC2CF8FE2F4600925200AFC14FAF0D1E41",
+          "gitBlobOid": "4b27303aa0a19f4078f89f73a3f170a8b2f562c6"
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/journey_session.dart",
+          "bytes": 91081,
+          "sha256": "F8ABB359ADF4714C9DD330AD17D34DAD5D441D6763D2902B9F0A177F5E4DD6A8",
+          "gitBlobOid": "0a1b8f3f814fbf517e8cd43e9b29563acdd99215"
+        },
+        {
+          "path": "apps/mobile/lib/features/journey01/review_journey_services.dart",
+          "bytes": 79399,
+          "sha256": "2570BB48BDFA8F9E9EA0D61348A0F1B3CD778105565FB8784C6FE156F5928342",
+          "gitBlobOid": "624089b250cb5cee594dbc7377302ed72ab6ecf3"
+        },
+        {
+          "path": "apps/mobile/lib/app/moolsocial_app.dart",
+          "bytes": 24302,
+          "sha256": "82EEADE801CB2A7C04AF8C95819FA6EC30B138357753F426EB95741EDA101FD6",
+          "gitBlobOid": "48928f20d1f30bfe9c417c037e3a13d334806a7d"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/assistant/profile_context_adapter.dart",
+          "bytes": 23682,
+          "sha256": "4DEDA735C5EDD84D830155B31F5E9E133E143EC5D897E820B46478DA3034C3B3",
+          "gitBlobOid": "6ef85365af9ee52511d3f8f32822957493897b56"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "bytes": 1286333,
+          "sha256": "9A3D5F14C5DE7BAC9853FCB847B6B41172E9406ED5B51786CB312B7F60C23F47",
+          "gitBlobOid": "9cc105b977dceccf75b1653744bcd31db33869cc"
+        },
+        {
+          "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+          "bytes": 208676,
+          "sha256": "5D3AAF88764035306EA953C003A3E8FD9CF97AD368C9F759ABB81F81FDEB5C89",
+          "gitBlobOid": "4bcecc4240109fd15eb3792e83a8b42bd44d75f8"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+          "bytes": 3128101,
+          "sha256": "CB354E230B55D164B2998533D0C492CFBE71D795D3800FE7C4555B78A4932E84",
+          "gitBlobOid": "ac98b1e55025c20b121bc8b2bdb29eab660046a0"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_gateway_test.dart",
+          "bytes": 73248,
+          "sha256": "D6F95CF378691C78A1A941038F5F1BBF0D4BC15A6EAEB46E00E768E8F1779163",
+          "gitBlobOid": "7595d9625de9c5f49d42eacc7717d00b2a61f3dd"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_guard_test.dart",
+          "bytes": 23093,
+          "sha256": "07FF247E0BD3D5723684EB9D2D964256FF412E8485563F2E86CC93B08018882A",
+          "gitBlobOid": "ba6eefe5ce1cd7ca1e4a258da52129ccd3cdb0bf"
+        },
+        {
+          "path": "apps/mobile/test/assistant_domain_context_integration_test.dart",
+          "bytes": 28689,
+          "sha256": "62622ECDD2943569A447BBF67A97112238815D82D26A8D6BA41884F0D5BE1542",
+          "gitBlobOid": "ab63ef38408936a2af290c3aebc9e71d53fcb7da"
+        },
+        {
+          "path": "apps/mobile/test/assistant_profile_context_test.dart",
+          "bytes": 42768,
+          "sha256": "1ECF64F5F5616593D77A9F08056780AF1D2A9A4AFDFD1C9A4456E628E843FD8E",
+          "gitBlobOid": "c92a9cfd087af7007bcfdf64330dd2b586ab3f42"
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_flow_test.dart",
+          "bytes": 21891,
+          "sha256": "B28A93CB0D149BDE6D5F9626FB16A1735CAAFA7A92A85FCF54D2D95ED71DD045",
+          "gitBlobOid": "f10032c3246ec403981fa5e08caa9b406de4ba29"
+        },
+        {
+          "path": "apps/mobile/test/mool_assistant_test.dart",
+          "bytes": 209745,
+          "sha256": "243464A4A4BC28DF08880001EB54DD1305F4AB363359A7589AFF1292641A5F8B",
+          "gitBlobOid": "047997523bc4f1b5d1eb29be01791301ed527980"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.ts",
+          "bytes": 12863,
+          "sha256": "7EC95DF6BE7D93D97BC97E27282302244EB0C42581919125B979571ECDB007DE",
+          "gitBlobOid": "f5bdac2c5b88f765fd6a26fa4dcced6508f14119"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_contract.test.ts",
+          "bytes": 8615,
+          "sha256": "18D92CB9E196D1F501B2F85A60875A4C48548EA4135F5952889EC60518EACC44",
+          "gitBlobOid": "cb55eec4c1059396702bc35740cb7de543668229"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.ts",
+          "bytes": 29625,
+          "sha256": "C60DE03603C933AC100E5983328BC49C065083A00285F3F311FBB52230D24031",
+          "gitBlobOid": "e0779ffb57b440cc5e20090d6385c1fb3d50cbef"
+        },
+        {
+          "path": "backend/functions/src/assistant/model_service.test.ts",
+          "bytes": 37545,
+          "sha256": "CFE0386B8FFB2072089381FA5EF5AFD0933516C21B228CD35B172C3069F10F97",
+          "gitBlobOid": "cf09fe0a6095a6bb17cd2477dd39db97c1179fbf"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/model_gateway.dart",
+          "bytes": 24008,
+          "sha256": "4A9CD24EF2E358A4E0B0F448E102C1E9FAAFE6B0CBD96B354A169D8AC3A4D8BA",
+          "gitBlobOid": "aa3d4a5348f5a138bf0a6aa15f252142d032cb35"
+        },
+        {
+          "path": "apps/mobile/test/assistant_model_gateway_test.dart",
+          "bytes": 16649,
+          "sha256": "EF8151C941E70B1309E1C3EADCFDE811D16213B44A380DF91DEDC8DC1D36A7C0",
+          "gitBlobOid": "ae8cb1b4359d2f159356f3b7b3374b7d72e1d17b"
+        },
+        {
+          "path": "apps/mobile/lib/features/assistant/mool_assistant.dart",
+          "bytes": 109322,
+          "sha256": "19D16C732CD0393893DEBFCDAF3EBF3B3A9F8E89FF397E343D1C156E23A37D32",
+          "gitBlobOid": "bb133d828d23fb78a32496f8bb74bc39fd950e71"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_catalogue_service.test.ts",
+          "bytes": 578215,
+          "sha256": "A0768A986E677D4B6A65B656D6BF17D89A659F2E7C28301EE51724E575765600",
+          "gitBlobOid": "51c5b3a9fa0b15b49850304cd4c423a402cee2eb"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_session.dart",
+          "bytes": 943777,
+          "sha256": "E15ADFF55099F7295DC41462CD2BE859498BF8F1770272538F57DAB96549638C",
+          "gitBlobOid": "d0a7e97e78da98bca089429a6055d71cdb6dbc71"
+        },
+        {
+          "path": "apps/mobile/test/work_workspace_layout_safety_test.dart",
+          "bytes": 4762596,
+          "sha256": "19585F65BEBC56258CF82BC7F1B9711C90BD3BFFB74A7D59F545F93538F2EACA",
+          "gitBlobOid": "8620f5584873e7282687acad69e2dae29e3782be"
+        },
+        {
+          "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "bytes": 875192,
+          "sha256": "57368C6E8B9E715CA3FA3383AE487FAE01F4113597695F0BD2F7BFC9E0AEAE18",
+          "gitBlobOid": "73c8a55421143413b70b9c6a827d34fc87eb7df0"
+        },
+        {
+          "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+          "bytes": 950105,
+          "sha256": "A8FBA26E9357025C951F6CF5904EA8F671AF5D2C19B8BE16F89DE323C1D90567",
+          "gitBlobOid": "00a2a79d20ba56c4d016af575c53aed838e7ab9d"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_catalogue_service.ts",
+          "bytes": 378735,
+          "sha256": "07F137C8FD2C0003AFC172972F74FBB72CB658EB7DB91913084FADE94127BCD3",
+          "gitBlobOid": "9ce8dae60885d4bd775cb198dbd1aeca7eab047b"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_catalogue_gateway.dart",
+          "bytes": 493415,
+          "sha256": "E52A2DAD74A903B24898E356D795762CE412FF5E9DF345A14AC01B3A8533F1B8",
+          "gitBlobOid": "4b81c2b8df7e296a3e6dd0650e18e5dbb734eefc"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_services.dart",
+          "bytes": 468645,
+          "sha256": "E9A1C7286055B3508FC0842D09F1729A94DD52F56ED5850C5C4F36361F43DAB2",
+          "gitBlobOid": "06ee459d2efc4cc52d97bf228d335e3e5f06c05f"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/screens/store_add_product_sheet.dart",
+          "bytes": 130055,
+          "sha256": "84BE1755B4E2A2BCE00B31B4EE7B39E70A67A0CB73D2CA577DF41E76AAB785B3",
+          "gitBlobOid": "9f1c8ca8e01404bd9247d845ff0ef0cfa121e26e"
+        },
+        {
+          "path": "apps/mobile/test/work_catalogue_gateway_test.dart",
+          "bytes": 1212240,
+          "sha256": "D47442FFD100048BFA85FB01B2F92168A2F230958DCF2366A23EB72FC19F4D6A",
+          "gitBlobOid": "19da0eefa892b15793fb58e9c0d153d396e66342"
+        },
+        {
+          "path": "apps/mobile/test/store_add_product_sheet_test.dart",
+          "bytes": 15577,
+          "sha256": "68B2513FCC87FD68E70939D657701898AC95C1793440B19CB553858F4FD370DE",
+          "gitBlobOid": "89bd95cf1cbe62396c14bb2086c35c55d52bd386"
+        },
+        {
+          "path": "apps/mobile/test/work_saved_product_draft_test.dart",
+          "bytes": 29988,
+          "sha256": "1186C9D39107776FD88B4253C61F114C7C4050AB32DD0A5C67C6330D82BABA58",
+          "gitBlobOid": "7eaf0a479beac2f23be9d2240b28ef9afaae2922"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_service.ts",
+          "bytes": 45020,
+          "sha256": "501E24A54E881458B397FE8D3810B3C376DA05D594D8644E933748DE1A6D8BE3",
+          "gitBlobOid": "dd97a6ca97c405d148a786cdbc5d61dfbc0d5ffe"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_repository.ts",
+          "bytes": 19418,
+          "sha256": "41224490B2B8C15760878AB0316B9E305BAA7E7FE8FB5E0B43449D7139A1C473",
+          "gitBlobOid": "f859d6e3e4cc17deb386d03d5c46abd64ae7c9d1"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_purchase_entry_service.test.ts",
+          "bytes": 40256,
+          "sha256": "997DC49C43F9D7402F4FD30BEFC1FA20E6CF5D3BC33C4ED86E72B933E39A11F7",
+          "gitBlobOid": "88c1e4a2f01c62d2955e6d439f438dc1b7c91395"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_purchase_entry_gateway.dart",
+          "bytes": 41467,
+          "sha256": "A4F538F09F46C63625453ABEEF6C2E5C25BE35F20AC2A6148EF267A93D35E033",
+          "gitBlobOid": "13966bf7f0930f5769b8aa796af7c85c11d3eb48"
+        },
+        {
+          "path": "apps/mobile/test/work_purchase_entry_gateway_test.dart",
+          "bytes": 35352,
+          "sha256": "5B3866CA06A1CC53AFB64680224604EC6525D67E4A8D441009C4E35196B1A3E6",
+          "gitBlobOid": "9d10cb6a844ad8cd616456e00b3fd18d6e784a45"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_ledger_service.ts",
+          "bytes": 116606,
+          "sha256": "104FF6F5B16C8434500AF519D346B6DA4A71D09C452C3A6CBD1FD50DB3BCC556",
+          "gitBlobOid": "1edca9a4efcc95be07c18752866a3f573083809f"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_ledger_repository.ts",
+          "bytes": 58937,
+          "sha256": "C8CC64065187B0FD272C574D1F288EB697F609F6BECAA66E42C39EA8FC284CD8",
+          "gitBlobOid": "2c69448fe52599aa63df69e359ee9541a86cc8aa"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_ledger_service.test.ts",
+          "bytes": 254322,
+          "sha256": "94B4D5D7D58F2DB5E10D6C65B95A427CB25B93A9A73233D51D44F187A95F0C9C",
+          "gitBlobOid": "70621aab33ad7b2ec96bba63ebce8fa247f6d6ae"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_ledger_gateway.dart",
+          "bytes": 50487,
+          "sha256": "93AFA5BA18AE9B395A1EC3A7AF0CE7EA39D702C7059D88BC633A02C16C33A835",
+          "gitBlobOid": "add8d7107f0ba4814d12b6a2934fd4f1f5f4531e"
+        },
+        {
+          "path": "apps/mobile/test/work_ledger_gateway_test.dart",
+          "bytes": 136623,
+          "sha256": "01841ACF92815AC7A3ABB4CEDA76AFE28015154CE7B63FCB1F33EE7929CF60E6",
+          "gitBlobOid": "3b7a049d70eb9d6a823eebf414e41a318f34b019"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_models.dart",
+          "bytes": 651841,
+          "sha256": "63A1252AD940E5B6400C98C4AF10ADF826B04FF804D838C389921F5F64A440E7",
+          "gitBlobOid": "be88c0651ead3e8508e21d7071466b34294d2786"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_customer_service.ts",
+          "bytes": 30561,
+          "sha256": "67C8F506F58854EDC101DDD2F0F5F845411A240B5EE406ED6EB1A0682FA50EB8",
+          "gitBlobOid": "dacb11574d29fdc26a6e87d8f3020a9574c3f962"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_customer_repository.ts",
+          "bytes": 13419,
+          "sha256": "79278A56B0D07AF2A0FF0159643B113F5E872D7EDB35C29677C49E0A4046208B",
+          "gitBlobOid": "5e882a9040c9a3ac7d07ad2f245b3ddc7af53a73"
+        },
+        {
+          "path": "backend/functions/src/workspace/workspace_customer_service.test.ts",
+          "bytes": 41398,
+          "sha256": "C52888B0134C1C2DC195210674F9C852BB5C70A4E64B76864FF0D9F69ABC0A8E",
+          "gitBlobOid": "bed5fd44a98baeb4878223f750b3b19ec6a53374"
+        },
+        {
+          "path": "apps/mobile/lib/features/work/work_customer_gateway.dart",
+          "bytes": 23046,
+          "sha256": "F9F3DE7C56B4AF8FDA41636894C7D15D6661A45E583260FD3698B1200DD62044",
+          "gitBlobOid": "e914abe22f1e7f07c6587861ba27cfd8db60eb65"
+        },
+        {
+          "path": "apps/mobile/test/work_customer_gateway_test.dart",
+          "bytes": 52150,
+          "sha256": "10C5C0045EF29CBE4ECA4A25ECBDA26C0190DAB15007BEB0398E61B112C3E65C",
+          "gitBlobOid": "ee202818a1d6bef391b6f654c7e54912a08db6c5"
+        }
+      ]
+    },
+    "disposition": {
+      "wholeAggregateComplete": false,
+      "oppoCurrentSourceQualified": true,
+      "populatedStoreDeviceQualified": false,
+      "originalRuntimeAuthorityAvailable": false,
+      "legacyMigrationAvailable": false,
+      "standaloneRegisterCreation": false,
+      "syntheticFinanceSnapshot": false,
+      "cloudActivation": false,
+      "financialLivePosting": false,
+      "founderApprovalClaimed": false,
+      "productionAcceptance": false,
+      "implemented": [
+        "Shared retained customer event/ledger codecs; pure existing invoice/receipt/credit validations",
+        "Lossless native Counter int64 wire, exact save-transition planner and original private SDK draft repository",
+        "Authenticated typed Counter draft read/save/status receiver and original HTTP routing; missing authority fails closed",
+        "Native remote source, frozen pending journal, explicit retry and guarded pristine binding using existing Counter store interface",
+        "Negotiated existing Store connector and scoped native session integration; original mode cannot run legacy local sale/Stock completion",
+        "Demonstrated unchanged Counter navigation save now re-reads the exact source and does not increment/rewrite a no-op",
+        "Duplicate Collect dues body title removed while retaining source date/balance; three narrow/enlarged-layout cases pass",
+        "Source acknowledgement rejects different input at the same saved revision; later current revisions remain separate from immutable historical receipts",
+        "Counter refresh-on-open remains read-only; only the explicit native Retry checks status and may resend the same frozen request",
+        "Native int64 acknowledgement comparison uses the retained serializer rather than finance-only numeric limits",
+        "Corrected input after a definitive refusal gets a distinct native content-bound identity; unknown pending input cannot be replaced by that identity"
+      ],
+      "checks": [
+        {
+          "path": "aggregate06-counter-native-final-v2.jsonl",
+          "passedCases": 39,
+          "skippedCases": 0,
+          "failedCases": 0,
+          "completedSuccessfully": true,
+          "sha256": "d998e5e62c2c094b2ade2241e450d5af904e3dac83953e1fb79b943f38c1e513"
+        },
+        {
+          "path": "aggregate06-existing-native-final-v1.jsonl",
+          "passedCases": 82,
+          "skippedCases": 0,
+          "failedCases": 0,
+          "completedSuccessfully": true,
+          "sha256": "c975568da6e545ea410e7f3bab94da13378a17de609b3ea237c6ce955d1e1870"
+        },
+        {
+          "path": "aggregate06-dues-layout-v1.jsonl",
+          "passedCases": 3,
+          "skippedCases": 0,
+          "failedCases": 0,
+          "completedSuccessfully": true,
+          "sha256": "2c4910237aa0ddec719d09ee3eaf28a84b87bb642e1d8a7c3515f337697a0eca"
+        }
+      ],
+      "backendSdk": {
+        "path": "aggregate06-counter-final-sdk-v1/tests.log",
+        "passed": 49,
+        "failed": 0,
+        "skipped": 0,
+        "loopbackOnly": true,
+        "stopped": "aggregate06-counter-final-sdk-v1/STOPPED.json",
+        "runtimeAuthorityIssued": false
+      },
+      "countsOverlap": true,
+      "analysis": {
+        "fullPath": "aggregate06-final-analyze-v1.log",
+        "fullExit": 0,
+        "informational": 514,
+        "latestIdentityPath": "aggregate06-final-identity-analyze-v1.log",
+        "latestIdentityExit": 0,
+        "latestIdentityInformational": 20,
+        "errors": 0,
+        "warnings": 0,
+        "typescript": "aggregate06-counter-final-compile-v1.log",
+        "typescriptExit": 0
+      },
+      "oppo": {
+        "scope": "AI-AGG-06 final-source reachable Counter/customer UI; retained frontend evaluation only",
+        "vmSourceOwnersVerified": 20,
+        "admittedSourceOwners": 58,
+        "exactFourDefineRestartGatePassed": true,
+        "currentSourceRestarted": true,
+        "reachable": [
+          "Store Sales",
+          "retained unchanged Counter open/close",
+          "Manage sales",
+          "Collect dues with single route heading"
+        ],
+        "visualAssessment": "Counter list, controls and fixed total remain readable. The settled dues capture shows all right-aligned values inside the viewport and one screen title. No additional persistent visual defect demonstrated in this final repeat.",
+        "finalVisualCapture": "11-dues-settled.png",
+        "transientCaptureRetained": "10-dues-corrected.png was captured during settling; exported amount bounds were inside the viewport and the later image confirms visible amounts. No unsupported clipping fix was made.",
+        "financialActionSubmitted": false,
+        "inputValuesEdited": false,
+        "quantitiesChanged": false,
+        "phoneRecordsOrAuthorityInjected": false,
+        "protectedDataCheckPassedAfterFullNavigation": true,
+        "protectedEntriesBefore": 108,
+        "protectedEntriesAfter": 108,
+        "all108UnchangedWithinFinalRun": true,
+        "sourceOwnersUnchangedWithinFinalRun": true,
+        "earlierFailedInspectionRemainsRecorded": "../oppo-agg06-counter-ui-v1/ASSESSMENT.json",
+        "earlierCounterRewriteNotRolledBackOrHidden": true,
+        "originalCounterStoreDeviceQualified": false,
+        "authenticFinancialOutcomeDeviceQualified": false,
+        "limits": [
+          "The retained Store is explicitly frontend evaluation. It does not enable the negotiated original Counter source, authentic membership, Stock/sale source or complete original customer payment/history.",
+          "The original adapter's large-integer, acknowledgement, explicit-retry and corrected-after-refusal paths are host qualified; no synthetic source was injected to claim populated device qualification.",
+          "Payment-summary and customer-statement source linkage remains unqualified. No balance was recalculated or overwritten.",
+          "Keyboard/scroll inspection and Android XML accessibility observation are retained in the first inspection. This is not complete TalkBack, scanner/camera, APK or cross-device qualification."
+        ],
+        "selfAssessment": "Current-source reachable UI and corrected no-op preservation verified within these limits. Whole aggregate remains partial with named original-source dependencies.",
+        "founderApprovalClaimed": false,
+        "productionAcceptance": false
+      },
+      "remainingIndependentCodeCorrectionDemonstrated": false,
+      "limits": [
+        "Original sale/Stock and original customer opening/history/payment producer contracts remain unavailable; original financial receivers/native/AI joins are not declared implemented.",
+        "PurchaseEntryTransactionAuthority remains an unconnected runtime original membership boundary; host SDK grants are not a production issuer.",
+        "The initial OPPO inspection changed one Counter draft fingerprint through a reproduced unchanged-save revision rewrite. The fix and failing evidence are retained; no rollback was attempted. Final corrected-source navigation preserves all108 fingerprints.",
+        "Source payment-summary dues and statement balances differ in retained evaluation data; coverage/credit semantics remain unqualified and no amount was inferred or rewritten.",
+        "Legacy review-define fixture failures reproduce on the sealed baseline; default82 selected cases pass. Failed configuration is not waived or relabelled green.",
+        "Populated authentic Counter/customer financial OPPO, TalkBack/native hardware, connected model/Google/payment and APK qualification remain deferred."
+      ]
+    },
+    "evidence": {
+      "backendContextPassed": 49,
+      "nativePassed": 39,
+      "existingNativePassed": 82,
+      "layoutPassed": 3,
+      "records": [
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG06-IMPLEMENTATION-PROGRESS-v4.json",
+          "sha256": "9CC385E052BF2C0AD5B0DF25222AE4CC63741219DA122A91D7CE12A0F8CAB1C6"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG06-REMAINING-ORIGINAL-DEPENDENCIES-v1.json",
+          "sha256": "F61BBA859E007D33467C0CC84D0BA774E1DEA294E76A6C0F756A790B8EC1006B"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG06-EXISTING-REGRESSION-CONFIGURATION-v1.json",
+          "sha256": "0C387387A93AD7696F46EA9274567786490841B409F02BE618BFCD0DE7A40CB3"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\AGG06-LOCAL-OPERATIONS-INCIDENTS-v1.json",
+          "sha256": "48F725F7F6466D538564A96900F560DECA2D327C93294ECA023AB6752966E029"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-customer-baseline-v1\\RESULT.json",
+          "sha256": "837853FA91575E4EADE571102D7B6438B6FBA0009262BF9849F830FA1035F84F"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-counter-native-final-v2.jsonl",
+          "sha256": "D998E5E62C2C094B2ADE2241E450D5AF904E3DAC83953E1FB79B943F38C1E513"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-existing-native-final-v1.jsonl",
+          "sha256": "C975568DA6E545EA410E7F3BAB94DA13378A17DE609B3EA237C6CE955D1E1870"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-dues-layout-v1.jsonl",
+          "sha256": "2C4910237AA0DDEC719D09EE3EAF28A84B87BB642E1D8A7C3515F337697A0ECA"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-counter-final-sdk-v1\\tests.log",
+          "sha256": "6F89612C56B9951C4B8DDB94D31E9806478C126A1F3C6264E6098B0DC285AE0F"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-counter-final-sdk-v1\\STOPPED.json",
+          "sha256": "82DBC871412CED07F25811C011987674AC2315E7A7FEB4A54AE9242C5EC3301C"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-counter-final-compile-v1.log",
+          "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-final-analyze-v1.log",
+          "sha256": "79355A441833B9945649E9A3E1D7D48070202844E89CA4F4BC84A6D307590A4C"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-final-identity-analyze-v1.log",
+          "sha256": "572FF14302E3134D59A8F36C51E7F3E695C447D41BF2ECAA33EA94CAF1D681B7"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-noop-counter-before-v1.jsonl",
+          "sha256": "2AAFB43B15BB9B637124875B830EB2F2F3578E8CAA71C67C494A14EED0871072"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-noop-counter-after-v1.jsonl",
+          "sha256": "60E9C2C7726321489A1DD2A5CD4A982A975820098D964E6729130B60BDA3E45F"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-int64-store-before-v1.jsonl",
+          "sha256": "05D8030A251D1D48CB90687AC2C15C8E4A13D000B7FD25F14E95658A2FB29CA3"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-int64-store-after-v1.jsonl",
+          "sha256": "4009076AEA2300E007C72B3A9AFB45038C9B1BADE04CCF3188B87508FD5BE256"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-refresh-retry-before-v1.jsonl",
+          "sha256": "78AEB7D2DABD70DD9A985507C4086C415CD63FEED928A1084AC9178CA91C1B13"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-refresh-retry-after-v1.jsonl",
+          "sha256": "16521D073D11CC8B903378CA9D947A7238DBE8BC82F1955D1F7D1EF03681A3F8"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-corrected-counter-before-v1.jsonl",
+          "sha256": "3B48F677198C2441A62A2688104DF9B174C4C4D0224A494E30615658BD1D8F15"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\aggregate06-corrected-counter-after-v1.jsonl",
+          "sha256": "DADAF9A5F1BBC5251639F509D5BD35EFE911381FCC27386EC64CB97F70CC2E8E"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg06-counter-ui-v1\\ASSESSMENT.json",
+          "sha256": "F51F081682BA540D089172DA016987BFA776587B32C1A4C23A0C38811DF425B5"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg06-counter-ui-v1\\PRESERVATION.json",
+          "sha256": "081CD2A1892B0CBFDA4E36731B51769AD53D2FBB0137EC8F9E485DE6657702A5"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg06-counter-ui-v2\\FINAL-PRESERVATION.json",
+          "sha256": "4EDCC757F6BE779F1D74F0816386DACBFACEC105F910B7320E84D55630DB9AE0"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg06-final-source-v2\\ASSESSMENT.json",
+          "sha256": "DC026D73ABBC098E89C91702427FF8F176957E50714147E98D787D27529A9841"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg06-final-source-v2\\PRESERVATION.json",
+          "sha256": "3C89A09ECD854E766BACD38D1B94380A99D37A7844070777810316D4A4906528"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg06-final-source-v2\\VM-SOURCE-VERIFICATION.json",
+          "sha256": "2FEFD98931CBFCF8B60A28655644FE6EF1EA7B3ACD1BC326418FFCBE0EAC30DD"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg06-final-source-v2\\oppo-restart-gate.log",
+          "sha256": "51AB2F5D56C0F8D03DF17FCE39A63B6BEDF5ED43A7C42AB8EF322BEC679E1B6B"
+        },
+        {
+          "path": "C:\\Users\\jisal\\Documents\\Codex\\2026-09-19\\restock-testing-in-store\\outputs\\ai-domain-remaining-6-20261029-v1\\oppo-agg06-final-source-v2\\SOURCE-RESTART.json",
+          "sha256": "5A5EB670E9C02C5D9CCB8A5487C2547607ADE18F3E82D7BE4D766B20ABD04063"
+        }
+      ]
+    },
+    "namedBranchPushAuthorized": true,
+    "productionAcceptance": false,
+    "sourceCommit": null
   }
 }
