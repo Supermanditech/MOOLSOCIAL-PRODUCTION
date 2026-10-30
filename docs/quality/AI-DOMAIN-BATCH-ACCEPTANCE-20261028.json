@@ -7,7 +7,7 @@
   "founderDecision": "AI-DOMAIN-BATCH-20 activated by EXECUTE; standing exact admissions, qualified source checkpoints and named branch pushes; all recorded qualification limits retained.",
   "founderAnswer": "EXECUTE",
   "standingAuthorisation": "keep this standing authorisation or approval if needed while i am away",
-  "localMetadataCommits": 43,
+  "localMetadataCommits": 44,
   "sourceFeatureCommits": false,
   "backendBranchPush": false,
   "deployment": false,
@@ -12070,5 +12070,100 @@
     "namedBranchPushAuthorized": true,
     "productionAcceptance": false,
     "sourceCommit": "ee275f3b0c6c775b775b7391457cb237006ef2e3"
+  },
+  "aggregate09SourceAdmission": {
+    "sequence": "09-existing-original-coupon-v2-source-admission",
+    "baseline": "a665d21f8fbef116a58b967df4bea243a8fc0a6e",
+    "uiReferenceBaseline": "c9d03bb37b6115f7fe63f3f1dd819892dc037fc9",
+    "scope": "activated aggregate09 original private coupon draft and structured terms/Cart source joins only",
+    "authority": "founder standing exact necessary admission/contract reconciliation within AI-DOMAIN-REMAINING-6",
+    "contract": {
+      "sha256": "042752759CC1EB2E3BD52761EABCFD7CE7651DD1079F789A44D74E27C18C642F",
+      "text": "# AI-AGG-09 — existing private coupon, versioned terms and Cart source joins\n\nStarting checkpoint: clean and independently origin-exact\na665d21f8fbef116a58b967df4bea243a8fc0a6e on\nwork/codex-backend/ai-domain-batch-20261028. Existing approved UI reference remains\nc9d03bb37b6115f7fe63f3f1dd819892dc037fc9. Standing founder authority covers narrow\ncontract/owner reconciliation for this existing ticket; this is not a claim of\na new founder review of this exact document/hash.\n\nThe linked Scope18 and Scope06 evidence hashes have been checked. Preserve the\nqualified v1 manager/editor/publication review308-310, pending-command recovery,\npersonal Cart/non-stacking and Clear Cart. No redesign or new offer scheme.\n\n## Original input and source\n\nUse the already implemented StoreCouponCampaign v2, StoreCouponInput v2,\nStoreCouponIntent and StoreCouponRecord v2, BuyV2StoreOfferTerms v1 and public\noffer projection. The seven existing kinds are billDiscount, productDiscount,\nquantityPrice, nextPurchase, buyerDiscount, dealerIntro and extraQuantity.\nNative validators, selected SKU/selling-unit/listing/channel identities, dates,\ninteger minor-unit/quantity limits and private buyer-reference semantics are the\ninput contract; do not invent prices, thresholds, buyers, dates or terms.\n\nThe v2 input retains its exact native keys: schemaVersion, name, structuredTerms,\nbuyerReferences, startsAt, endsAt, totalUses, usesPerCustomer and active. The\nprivate publication record is the native v2 envelope with accountId, realm,\nstoreId, couponId, revision, observedAt and coupon, not a flattened v1 record.\nRecord accountId is the authenticated read scope. It is not permission and must\nnot be used to invent owner-transfer rules or adopt another account's drafts.\n\nPreserve literal nested ordering/strings where native pending fingerprints\ndepend on them. Keep semantic source hashes distinct from raw native intent\nfingerprints and from native campaign/server CAS revisions. Preserve canonical\nnative UTC timestamp precision without rewriting incoming v2 terms. Keep the\nexisting stricter v1 serialization unchanged. A pure backend codec may reuse the\nexisting canonical catalogue payload hash; it does not become a second master.\n\nExtend the existing save/read/list/reconcileStoreCoupon and public terms readers\nthrough explicit storeCouponTermsVersion2 negotiation. Keep legacy v1 requests,\nstored records, exact receipts and status semantics supported. Mixed-version\ndata must never silently lose structured records or downgrade them to v1.\nPrivate source reads/writes require current account/realm/Store authority. Public\nprojections expose allowlisted terms only, excluding account and buyer references.\nConfigured/published terms never prove buyer eligibility, reserved Stock, an order,\nredemption, remaining uses or confirmed Checkout savings.\n\nUse the existing original Store promotion repository/collections and native\ngateway/controller. Store/SKU/pack/listing/channel joins use original catalogue\nidentities and current permissions, rather than titles or today's guessed data.\nDo not replace original pending results when current terms subsequently change.\nSame retained operation and command returns the immutable original result; a\nchanged command conflicts. Status is observational and never resubmits.\n\nNative bounds include up to1000 selected SKUs and buyer references. Valid large\nterms must not be squeezed into one Firestore document or the legacy60KB wire\nlimit. Use bounded immutable version pages/literal payload storage under the\nsame original owner, with hashes/counts and exact reconstruction. Limit negotiated\ncoupon operations to8MiB request/response frames; keep unrelated/v1 limits.\nBound list pages by rows and bytes with truthful continuation. Complete public\nsnapshots preserve their existing completeness/unsupported contract, rather\nthan returning a truncated complete result or an invented empty catalogue.\n\n## Existing unpublished private draft\n\nThe existing actor/Store-owned native coupon book remains the editable source.\nAn authenticated durable backing record may retain that same campaign ID,\nnative revision and literal campaign, separately from the publication record.\nIt is not a new coupon master, publication or adoption of a remote-only draft.\n\nUse explicit save/read/list/reconcileStoreCouponDraft operations, negotiated by\nstoreCouponDraftVersion1. Save/reconcile carries storeId, couponId,\nexpectedSourceRevision, idempotencyKey and the existing campaign. Reads carry\nstoreId/couponId; lists use the existing bounded after/limit convention. The\nresponse binds accountId, realm, storeId, observation time and source revision,\nwith a null or exact campaign record and publicationConfirmed:false. Keep\nnative revision, server source revision, canonical source fingerprint and the\ncurrent published CAS head separate. Never invent a published head for a draft.\n\nOnly the existing explicit native Save may persist/synchronise a private draft.\nRetain its original unknown-result command before dispatch and recover by exact\nstatus. Preserve the local saved book and later edits on timeout, restart,\naccount/Store change or remote conflict. A read, model preparation, Review or\nopening the manager cannot save/synchronise/adopt a campaign, consume pending\nrecovery or clear publication status. Missing private backing means unavailable\nselection, not a made-up canonical ID. Opaque model selectors map only to original\nactor/Store-bound private IDs; do not broaden global ID validation.\n\nAI309 may prepare edits to an exact saved private original; AI310 may review its\nfirst publication when the original publication head is absent. Match original\nprivate bytes/revision and current published head before/after preparation and\nagain at native Review. Native final Save, funding acknowledgement and\nPublish/update/Pause remain explicit. Do not overwrite private edits from remote\nterms or construct a fake published record to open the existing form.\n\n## Cart, eligibility and usage\n\nExtend the existing authenticated eligibility/selection and original purchase\nusage-hold owners; do not create another Cart, pricing engine or usage ledger.\nBind the buyer and exact current Store, SKU, pack, listing, channel, quantities,\ncoupon/source revisions, price/quote and selection policy. Coupon/price/quantity/\naccount/source changes retire stale selections. Keep one exclusive offer per\nStore in a mixed-supplier Cart and the approved non-stacking behaviour.\n\nConfigured terms alone do not establish buyerDiscount identity, dealerIntro\nbusiness/first-order eligibility, nextPurchase qualifying completion/time/window,\nusage or redemption. Use an accepted original fact source or return an explicit\nunavailable result. Do not infer dealer status from a Store-type label or GSTIN,\ninvent purchase history, promise a future reward or equate an advertised limit\nwith remaining uses. Quantity prices and extra quantities must retain their\nexisting meaning; never represent a free physical reward as a made-up money\nrefund or force an unsupported reward through the legacy money-only allocation.\n\nEligibility is a candidate, not a reservation or final quote. The existing\noriginal purchase transaction must revalidate terms, allocations, usage and any\nreward Stock before a confirmed outcome. Existing internal hold/use events remain\nthe only authority for held/consumed/released usage; client reads do not create\nevents or release a hold. Unavailable Checkout/payment sources remain explicit.\nPayment integration and live redemption stay excluded.\n\n## Qualification and owners\n\nCompare actual native-emitted wire/intent fingerprints with the backend codec\nand actual Firestore SDK round trips, including all seven kinds, Unicode,\ncanonical date precision, nested ordering, native limits and paged large records.\nTest ownership/realm/Store and SKU/channel separation; private/public projection;\nstale private/public revisions; duplicate/change/conflict; expiry/cancel;\ntimeout/restart/original-status recovery; pending draft preservation; revocation\nand late responses; mixed-Store eligibility and original hold revalidation.\nRun relevant v1 regressions unchanged. Host fixtures are labelled and never\ninjected into OPPO. Inspect reachable current-source OPPO and preserve saved-data\nfingerprints; report missing authentic records/services as unverified.\n\nNecessary additional owners: existing workspace_promotion_service.ts and test;\nnew pure workspace_coupon_v2_codec.ts and test; existing work_product_promotions.dart\nand test; existing buy_v2_content_contracts.dart and its test. The separately\nreserved buy_v2_benefit_selection_continuity_test.dart stays unchanged and may\nrun read-only; new integration cases use already owned tests. Reuse the already admitted index,\nrequest-bound helper/tests, domain/model sources/tests, WorkSession, catalogue\ngateway/tests, native dashboard/layout tests and assistant adapters only where\nrequired. No unrelated owner or dependency admission.\n\nSeal tested source/evidence, clean state and exact named-branch remote readback\nbefore ticket10. No Google activation/deployment, payment/provider connection,\nlive model/media, admin, APK, live publication/transactions, new commercial rules\nor policy/governance development. This contract does not claim full agent,\npopulated device or production acceptance.\n\nAdmission reconciliation v2: eight necessary additional owners. A different\nrecorded task owns the existing benefit-continuity test; no takeover or edit is\nauthorised. This is a narrower owner list, not a feature/scope change.\n\nContinuation v3: source08 native text parity correction is separately sealed\nand origin-exact at this starting checkpoint. Preserve its source/evidence;\nresume only the same eight necessary09 owners. No new feature/scope authority.\n"
+    },
+    "additionalOwners": [
+      "backend/functions/src/workspace/workspace_promotion_service.ts",
+      "backend/functions/src/workspace/workspace_promotion_service.test.ts",
+      "backend/functions/src/workspace/workspace_coupon_v2_codec.ts",
+      "backend/functions/src/workspace/workspace_coupon_v2_codec.test.ts",
+      "apps/mobile/lib/features/work/work_product_promotions.dart",
+      "apps/mobile/test/work_product_promotions_test.dart",
+      "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+      "apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart"
+    ],
+    "metadataOwners": [
+      "docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json",
+      "docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json",
+      "config/codex-subagent-coordination-policy.json",
+      "scripts/ai-domain-batch-admission.ps1",
+      "scripts/test-ai-domain-batch-admission.ps1"
+    ],
+    "admissionCommitSubject": "coordination(ai-domain-batch-20261028): admit original coupon v2 source owners",
+    "sourceFeatureCommitsAuthorized": false,
+    "backendBranchPushAuthorized": false,
+    "newScope": false,
+    "productionAcceptance": false,
+    "deployment": false,
+    "paymentIntegration": false,
+    "liveFinancialActions": false,
+    "admin": false,
+    "mediaActivation": false,
+    "apk": false,
+    "policyDevelopment": false,
+    "legacyMigration": false,
+    "runtimeMembershipSourceAvailable": false,
+    "standaloneRegisterCreation": false,
+    "syntheticFinanceSnapshot": false,
+    "financialOutcomeFixtures": "isolated labelled host only",
+    "existingOwnerPreimages": [
+      {
+        "path": "backend/functions/src/workspace/workspace_promotion_service.ts",
+        "exists": true,
+        "sha256": "4A778F2EFC4F6C6EE20AA915EFE15F6DDEFEB12338252E5C92E6AD38109480D1"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_promotion_service.test.ts",
+        "exists": true,
+        "sha256": "7F7ABA95DE47C3B51B9133042BDFBE2F2B6425FAAB312D3234F9170FB7A26BDD"
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_coupon_v2_codec.ts",
+        "exists": false,
+        "sha256": null
+      },
+      {
+        "path": "backend/functions/src/workspace/workspace_coupon_v2_codec.test.ts",
+        "exists": false,
+        "sha256": null
+      },
+      {
+        "path": "apps/mobile/lib/features/work/work_product_promotions.dart",
+        "exists": true,
+        "sha256": "71917D50424D08910FBC9CA3936B7D7A24546E312975B097F5F73567FFE803A7"
+      },
+      {
+        "path": "apps/mobile/test/work_product_promotions_test.dart",
+        "exists": true,
+        "sha256": "43984AEAA08D5444C0EDC42C3D25EDAB2D1725E7C357AA6898FA9E701983323A"
+      },
+      {
+        "path": "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "exists": true,
+        "sha256": "D17A3601C900A4929179E781B50228B018AB5F80EDAD47E2D402C061AFBDE5F6"
+      },
+      {
+        "path": "apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart",
+        "exists": true,
+        "sha256": "B6C63D443A91AA2097D88B3FD734E7771E6C9723492EACD9F3C6F64DE14F31C5"
+      }
+    ],
+    "admissionReconciliation": {
+      "revision": 3,
+      "excludedReservedOwner": "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",
+      "reason": "Repin the same narrowed admission after the separately qualified08 native text correction.",
+      "previousAdmission": "AGG09-COUPON-SOURCE-ADMISSION-v2.json",
+      "preparedMetadataPreserved": "aggregate09-preserved-admission-v2/MANIFEST.json",
+      "applicationEditsBeforeAdmission": false
+    }
   }
 }

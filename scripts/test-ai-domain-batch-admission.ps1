@@ -771,6 +771,29 @@ foreach($property in @('legacyMigration','runtimeMembershipSourceAvailable','sta
  Check (!(Test-AiDomainAggregateEightSourceAdmission $bad)) "reject invented ledger dependency $property"
 }
 
+$aggregateNineSourceAdmission=$approval.aggregate09SourceAdmission
+Check (Test-AiDomainAggregateNineSourceAdmission $aggregateNineSourceAdmission) 'exact original coupon v2 source admission'
+Check (@($aggregateNineSourceAdmission.additionalOwners).Count -eq 8) 'only eight necessary original runtime/test owners'
+Check (@($aggregateNineSourceAdmission.metadataOwners).Count -eq 5) 'only five existing metadata admission owners'
+foreach($property in @('sequence','baseline','uiReferenceBaseline','scope','authority','admissionCommitSubject','sourceFeatureCommitsAuthorized','backendBranchPushAuthorized','newScope','productionAcceptance','deployment','paymentIntegration','admin','mediaActivation','apk','policyDevelopment')){
+ $bad=($aggregateNineSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json
+ $bad.$property=if($property -eq 'standingNarrowApproval'){$false}elseif($bad.$property -is [bool]){$true}else{'foreign'}
+ Check (!(Test-AiDomainAggregateNineSourceAdmission $bad)) "reject changed original coupon v2 source admission $property"
+}
+foreach($property in @('additionalOwners','metadataOwners')){
+ $bad=($aggregateNineSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.$property+=@('backend/functions/src/foreign.ts')
+ Check (!(Test-AiDomainAggregateNineSourceAdmission $bad)) "reject expanded original coupon v2 source $property"
+}
+foreach($property in @('sha256','text')){
+ $bad=($aggregateNineSourceAdmission|ConvertTo-Json -Depth 60)|ConvertFrom-Json;$bad.contract.$property='foreign'
+ Check (!(Test-AiDomainAggregateNineSourceAdmission $bad)) "reject changed original interaction contract $property"
+}
+
+foreach($property in @('legacyMigration','runtimeMembershipSourceAvailable','standaloneRegisterCreation','syntheticFinanceSnapshot')) {
+ $bad=($aggregateNineSourceAdmission|ConvertTo-Json -Depth 70)|ConvertFrom-Json;$bad.$property=$true
+ Check (!(Test-AiDomainAggregateNineSourceAdmission $bad)) "reject invented ledger dependency $property"
+}
+
 $quoteRecurrence=(Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-ACCEPTANCE-20261028.json')|ConvertFrom-Json).quoteImplementationRecurrence20261029
 Check (Test-AiDomainQuoteRecurrenceAdmission $quoteRecurrence) 'exact registered quote implementation recurrence'
 Check (!(Test-AiDomainQuoteRecurrenceAdmission $null)) 'reject absent quote recurrence'
@@ -986,5 +1009,5 @@ Check (!(Test-AiDomainCreditDocumentAdmission $bad)) 'reject changed credit cont
 $bad=($creditAdmission|ConvertTo-Json -Depth 30)|ConvertFrom-Json;$bad|Add-Member -NotePropertyName unrelatedScope -NotePropertyValue $true
 Check (!(Test-AiDomainCreditDocumentAdmission $bad)) 'reject unrelated credit admission property'
 $creditRecord=Get-Content -Raw (Join-Path $root 'docs/quality/AI-DOMAIN-BATCH-BACKEND-20261028.json')|ConvertFrom-Json
-Check (@($creditRecord.backendAdmission.runtimeOwners).Count -eq $(if($null -ne $approval.aggregate08SourceAdmission){62}elseif($null -ne $approval.aggregate06SourceAdmission){58}else{53})) 'exact original credit owners plus only admitted Counter/customer owners'
+Check (@($creditRecord.backendAdmission.runtimeOwners).Count -eq $(if($null -ne $approval.aggregate09SourceAdmission){70}elseif($null -ne $approval.aggregate08SourceAdmission){62}elseif($null -ne $approval.aggregate06SourceAdmission){58}else{53})) 'exact original credit owners plus only admitted Counter/customer owners'
 Write-Output "AI domain batch admission checks passed: $n."
