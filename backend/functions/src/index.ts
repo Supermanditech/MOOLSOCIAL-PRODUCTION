@@ -170,6 +170,8 @@ import {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, Wor
   from "./workspace/workspace_purchase_projection_service.js";
 import {WorkspacePurchaseEntryService, purchaseEntryOperation, workspaceOriginalRequestBodyLimit} from './workspace/workspace_purchase_entry_service.js';
 import {WorkspaceCustomerService, workspaceCustomerOperation} from './workspace/workspace_customer_service.js';
+import {WorkspaceStorePrivatePreferenceService, FirestoreStorePrivatePreferenceRepository,
+  storePrivatePreferenceOperation, storePrivatePreferenceRequestBodyLimit} from './workspace/workspace_store_preferences_service.js';
 import {FirestoreCustomerCounterDraftRepository} from './workspace/workspace_customer_repository.js';
 import {FirestorePurchaseEntryRepository} from './workspace/workspace_purchase_entry_repository.js';
 import {WorkspaceLedgerService, workspaceLedgerOperation} from './workspace/workspace_ledger_service.js';
@@ -2652,6 +2654,10 @@ function assistantOriginalContextSource(projectId: string) {
       process.env.MOOLSOCIAL_PURCHASE_REALM===couponRealm&&process.env.MOOLSOCIAL_BULK_SUPPLIER_QUOTES_V1==='true'?{
       retainedQuotes:{realm:couponRealm,source:{read:(userId,body)=>workspaceBulkQuoteService().read(userId,body)}}}:{}),
     ...(storeProducts?{storeProducts}:{}),
+    ...(original && catalogue && process.env.MOOLSOCIAL_STORE_PRIVATE_PREFERENCES_V1 === 'true' &&
+      (purchaseEntryRealm === 'evaluation' || purchaseEntryRealm === 'production') ? {
+      storePrivatePreferences: {realm: purchaseEntryRealm, source: {
+        handle: (actor, operation, body) => workspaceStorePrivatePreferenceService().handle(actor, operation, body)}}} : {}),
     ...(original&&catalogue&&(couponRealm==='evaluation'||couponRealm==='production')?{
       storePublicDetails:{realm:couponRealm,catalogue:workspaceCatalogueService()}}:{}),
     ...(original&&catalogue&&(couponRealm==='evaluation'||couponRealm==='production')&&(reportPublic||reportJourney)?{
@@ -3169,8 +3175,8 @@ export const moolSocialWorkspace = onRequest(
       }
       const payloadOperation = request.body !== null && typeof request.body === 'object' && !Array.isArray(request.body) &&
         typeof request.body.operation === 'string' ? request.body.operation.trim() : '';
-      if (request.rawBody.byteLength > workspaceOriginalRequestBodyLimit(payloadOperation,
-          request.body?.storeCouponTermsVersion, request.body?.storeCouponDraftVersion)) {
+      if (request.rawBody.byteLength > (storePrivatePreferenceRequestBodyLimit(payloadOperation, request.body?.storePrivatePreferencesVersion) ??
+          workspaceOriginalRequestBodyLimit(payloadOperation, request.body?.storeCouponTermsVersion, request.body?.storeCouponDraftVersion))) {
         throw new WorkspaceProfileError(
           "payload_too_large",
           "The Workspace request is too large.",
@@ -3202,6 +3208,7 @@ export const moolSocialWorkspace = onRequest(
       const storeProcurementRead = operation === 'readStoreProcurementCatalogue';
       const purchaseEntryAction = purchaseEntryOperation(operation);
       const customerAction = workspaceCustomerOperation(operation);
+      const privatePreferenceAction = storePrivatePreferenceOperation(operation);
       const ledgerAction = workspaceLedgerOperation(operation);
       if (storeProcurementRead && process.env.MOOLSOCIAL_STORE_PROCUREMENT_V1 !== 'true') {
         throw new WorkspaceProfileError('service_unavailable', 'Store purchasing is not connected.', 503);
@@ -3255,7 +3262,7 @@ export const moolSocialWorkspace = onRequest(
         operation === "finishRetailerSetup" ||
         operation === "setRetailerAvailability" ||
         operation === "saveRetailerProduct" ||
-        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation || purchaseEntryAction === 'saveSupplier' || purchaseEntryAction === 'savePurchaseDraft' || purchaseEntryAction === 'saveOpeningEvidence' || ledgerAction === 'mutation' || customerAction === 'save' ||
+        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" || commodityPriceMutation || purchaseEntryAction === 'saveSupplier' || purchaseEntryAction === 'savePurchaseDraft' || purchaseEntryAction === 'saveOpeningEvidence' || ledgerAction === 'mutation' || customerAction === 'save' || privatePreferenceAction === 'save' ||
         operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStoreCoupon" || operation === 'saveStoreCouponDraft' || operation === "saveStorePublicDetails" ||
         variantFamilyOperation === "submit" || productSubmissionOperation === "submit" || privateProductDraftOperation === 'save' || stockOperation === "save" || stockVisibilityOperation === "save" || stockVisibilityOperation === "close" || catalogueProductionAction !== undefined ||
         ['request', 'offer', 'accept', 'withdraw'].includes(bulkQuoteAction ?? '') ||
@@ -3299,7 +3306,7 @@ export const moolSocialWorkspace = onRequest(
             ),
           verifyIdToken: async (token) => {
             const verified = await getAuth().verifyIdToken(token);
-            if (["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation) || purchaseEntryAction !== undefined || customerAction !== undefined || ledgerAction !== undefined || purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || purchasedDeviceOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
+            if (["listWorkspaces", "reviewStatus", "submitProfile"].includes(operation) || purchaseEntryAction !== undefined || customerAction !== undefined || privatePreferenceAction !== undefined || ledgerAction !== undefined || purchaseProjectionRead || operationalRead || completionRead || productFeedbackTargetRead || productStarsOperation || operationalCommand || operationalReconcile || goodsArrivalOperation || purchasedDeviceOperation || catalogueOperation || supplierPolicyOperation || promotionOperation || productPresentationOperation || storePresentationOperation || cartAdditionOperation || checkoutEntryOperation || bulkQuoteOperation) {
               requireDefaultPurchaseTenant(verified.firebase?.tenant);
             }
             return verified;
@@ -3332,7 +3339,9 @@ export const moolSocialWorkspace = onRequest(
         });
         return;
       }
-      const result = ledgerAction !== undefined
+      const result = privatePreferenceAction !== undefined
+        ? await workspaceStorePrivatePreferenceService().handle({uid: ownerUserId, projectId: publicAuthProjectId()}, operation, catalogueBody)
+        : ledgerAction !== undefined
         ? await workspaceLedgerService().handle({uid: ownerUserId, projectId: publicAuthProjectId()}, operation, {operation, ...catalogueBody})
         : customerAction !== undefined
         ? await workspaceCustomerService().handle({uid: ownerUserId, projectId: publicAuthProjectId()}, operation, catalogueBody)
@@ -3553,6 +3562,16 @@ function workspacePurchaseEntryService(): WorkspacePurchaseEntryService {
   // repository deliberately refuses private IO without it; approved application
   // status, paid entitlement and caller echoes cannot substitute for membership.
   return new WorkspacePurchaseEntryService(new FirestorePurchaseEntryRepository(getFirestore(), realm, publicAuthProjectId()));
+}
+
+function workspaceStorePrivatePreferenceService(): WorkspaceStorePrivatePreferenceService {
+  const realm = process.env.MOOLSOCIAL_PURCHASE_REALM;
+  if (process.env.MOOLSOCIAL_STORE_PRIVATE_PREFERENCES_V1 !== 'true' ||
+      realm !== 'evaluation' && realm !== 'production') return new WorkspaceStorePrivatePreferenceService();
+  // The same original B03 transaction membership reader is required. It remains
+  // unavailable here; this repository cannot replace it with application/plan flags.
+  return new WorkspaceStorePrivatePreferenceService(new FirestoreStorePrivatePreferenceRepository(
+    getFirestore(), realm, publicAuthProjectId()), true);
 }
 
 function workspaceCustomerService(): WorkspaceCustomerService {

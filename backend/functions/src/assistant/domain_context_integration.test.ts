@@ -6,6 +6,8 @@ import {ProfileWorkspacePreparationContext} from "./profile_context.js";
 import {WorkspaceCatalogueService, type WorkspaceCatalogueRepository, type StorePublicDetailsRecord} from "../workspace/workspace_catalogue_service.js";
 import {CompositePreparationContext, OriginalCataloguePreparationContext, OriginalStoreOrderPreparationContext,OriginalStoreDevicePreparationContext,OriginalStoreOperationalPreparationContext,OriginalPurchasedStarsPreparationContext,OriginalStoreReceivingPreparationContext,OriginalStoreCouponPreparationContext} from "./domain_context.js";
 import {digest,assertStrictSchema} from './model_contract.js';
+import {WorkspaceStorePrivatePreferenceService, storePrivatePreferenceActions, storePrivatePreferenceProposalKeys,
+  type StorePrivatePreferenceRecord, type StorePrivatePreferenceKind} from '../workspace/workspace_store_preferences_service.js';
 import {FirestorePromotionRepository,WorkspacePromotionService} from '../workspace/workspace_promotion_service.js';
 import {initializeApp, deleteApp} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
@@ -1258,4 +1260,163 @@ test('Store Restock canonical metadata exports exact original selected product a
   const path = process.env.AI_DOMAIN_RESTOCK_SELECTION_EXPORT_PATH;
   if (path) {assert(isAbsolute(path)); writeFileSync(path, JSON.stringify({hostOnly: true, actor, scope: f.input.scope,
     metadata: metadata.body, nativeProduct: f.native(f.ids[0]!)}, null, 2) + '\n', {flag: 'wx'});}
+});
+
+// HOST original-service ports only: no phone data, deployed membership or model API.
+function privatePreferenceFixture() {
+  const authority = supplierDraftFixture(), store = authority.input.scope.storeId;
+  let reads = 0, writes = 0, unavailable = false, onRead = (_read: number) => {};
+  const records = new Map<StorePrivatePreferenceKind, StorePrivatePreferenceRecord | null>();
+  const fields: Record<StorePrivatePreferenceKind, StorePrivatePreferenceRecord['fields']> = {
+    status: {acceptingOrders: false, visibleToCustomers: false, fulfilmentMode: 'Pickup only', busyMinutes: '9007199254740993',
+      reopensAt: 'HOST original literal', openingTime: '09:00', closingTime: '18:00', maximumActiveOrders: '0', alertSound: true, alertVibration: false},
+    pickup: {city: 'HOST original city', area: 'HOST original area', pincode: '560001', pickupEnabled: true},
+    invoice: {mode: 'off'}, staff: {staffAccessEnabled: false, counterCount: '2'},
+  };
+  for (const kind of ['status','pickup','invoice','staff'] as const) records.set(kind, {version: 1, projectId: actor.projectId,
+    scope: {account: actor.uid, store, realm: 'evaluation'}, kind, revision: '1', fields: fields[kind]});
+  const service = new WorkspaceStorePrivatePreferenceService({projectId: actor.projectId, realm: 'evaluation',
+    async read(who, scope, kind) {
+      reads++; assert.equal(who.uid, actor.uid); assert.equal(who.projectId, actor.projectId);
+      assert.deepEqual(scope, {account: actor.uid, store, realm: 'evaluation'}); onRead(reads);
+      if (unavailable) throw Error('HOST original dependency absent');
+      return structuredClone(records.get(kind)!);
+    },
+    async save() {writes++; throw Error('No Save while preparing or reviewing');},
+    async status() {writes++; throw Error('No recovery operation while preparing or reviewing');},
+  }, true);
+  const source = new CompositePreparationContext({original: authority.original,
+    storePrivatePreferences: {realm: 'evaluation', source: service}, now: () => at});
+  return {source, service, authority, input: {...authority.input, actionId: 'AI-ACT-318'},
+    counts: () => ({reads, writes}), records, onRead: (fn: typeof onRead) => {onRead = fn;},
+    unavailable: () => {unavailable = true;}};
+}
+for (const action of storePrivatePreferenceActions.keys()) {
+  test('AGG10 original private preference ' + action + ' has exact partial fields, native target and read-only Review', async () => {
+    const f = privatePreferenceFixture(), input = {...f.input, actionId: action};
+    const context = await f.source.read(actor, input), tool = context.tools[0]!;
+    assert.equal(tool.actionId, action); assertStrictSchema(tool.parameters);
+    assert.deepEqual(context.nativeTargets, [{actionId: action, entityId: null, sourceRevision: tool.sourceRevision}]);
+    const names = storePrivatePreferenceProposalKeys(action), key = names[0]!;
+    const values: Record<string, unknown> = {acceptingOrders: false, openingTime: '08:00', visibleToCustomers: false,
+      city: 'HOST supplied city', mode: 'off', staffAccessEnabled: true};
+    const args = Object.fromEntries(names.map(name => [name, values[name] ?? '']));
+    const target = tool.resolveTarget!({apply: [key], ...args});
+    assert.deepEqual(target.fields, {[key]: values[key]});
+    assert.equal(tool.validate({...target.fields, permissionApproved: true}), false);
+    assert.equal(tool.validate({}), false);
+    const proposal = {kind: 'proposal' as const, id: 'HOST-private-' + action, title: 'HOST original preference', summary: 'HOST review',
+      actionId: action, entityId: null, sourceRevision: tool.sourceRevision, fields: target.fields};
+    await f.source.readPrepared(actor, input, proposal);
+    assert.equal(f.counts().writes, 0); assert.equal(f.counts().reads, 4);
+    assert.equal(JSON.stringify(context.modelContext).includes('HOST original literal'), false);
+    const kind = storePrivatePreferenceActions.get(action)!, record = f.records.get(kind)!;
+    f.records.set(kind, {...record, revision: '2'});
+    await assert.rejects(f.source.readPrepared(actor, input, proposal), /stale_preparation/u);
+    assert.equal(f.counts().writes, 0);
+  });
+}
+test('AGG10 exact int64 proposal is supplied-only and rejects unsafe number/coercion/default fields', async () => {
+  const f = privatePreferenceFixture(), input = {...f.input, actionId: 'AI-ACT-319'};
+  const tool = (await f.source.read(actor, input)).tools[0]!;
+  const args = {apply: ['preparationMinutes'], openingTime: '', closingTime: '', maximumActiveOrders: '',
+    alertSound: false, alertVibration: false, preparationMinutes: '9223372036854775807', fulfilmentPreference: ''};
+  assert.deepEqual(tool.resolveTarget!(args).fields, {preparationMinutes: '9223372036854775807'});
+  for (const value of [9223372036854775807, '9223372036854775808', ' 1', '-1', '1e3']) {
+    assert.equal(tool.validate({preparationMinutes: value}), false);
+    assert.throws(() => tool.resolveTarget!({...args, preparationMinutes: value}), /invalid_model_result/u);
+  }
+  assert.equal(f.counts().writes, 0);
+});
+test('AGG10 confirmed absence keeps only supplied inputs; unavailable/corrupt original never becomes empty', async () => {
+  const f = privatePreferenceFixture(); f.records.set('status', null);
+  const context = await f.source.read(actor, f.input);
+  assert.equal((context.modelContext as {originals: Array<{saved: boolean}>}).originals[0]!.saved, false);
+  assert.equal(context.tools[0]!.validate({busyMinutes: '2'}), true);
+  f.unavailable(); await assert.rejects(f.source.read(actor, f.input), /context_unavailable/u);
+  const corrupt = privatePreferenceFixture(); corrupt.records.set('status', {...corrupt.records.get('status')!, scope: {account: 'HOST-foreign', store: corrupt.input.scope.storeId, realm: 'evaluation'}});
+  await assert.rejects(corrupt.source.read(actor, corrupt.input), /context_unavailable/u);
+  assert.equal(f.counts().writes + corrupt.counts().writes, 0);
+});
+for (const fault of ['unpaid','pending','revoked','foreignActor','foreignProject','tenant','buyer','foreignStore','unknownEntity']) {
+  test('AGG10 private preference rejects ' + fault + ' before original-source access', async () => {
+    const f = privatePreferenceFixture();
+    if (fault === 'unpaid') f.authority.paid(false);
+    if (fault === 'pending') f.authority.approved(false);
+    if (fault === 'revoked') f.authority.member(false);
+    const who = {...actor, ...(fault === 'foreignActor' ? {uid: 'HOST-foreign'} : {}),
+      ...(fault === 'foreignProject' ? {projectId: 'HOST-other-project'} : {}), ...(fault === 'tenant' ? {tenantId: 'HOST-tenant'} : {})};
+    const input = {...f.input, ...(fault === 'buyer' ? {scope: {audience: 'personal' as const, storeId: null}} : {}),
+      ...(fault === 'foreignStore' ? {scope: {audience: 'workspace' as const, storeId: 'WK-510002'}} : {}),
+      ...(fault === 'unknownEntity' ? {entityId: 'HOST-extra'} : {})};
+    await assert.rejects(f.source.read(who, input)); assert.equal(f.counts().reads, 0); assert.equal(f.counts().writes, 0);
+  });
+}
+for (const fault of ['recordChange','approvalChange','revocation','expiry']) {
+  test('AGG10 private source detects ' + fault + ' during its original reads', async () => {
+    const f = privatePreferenceFixture();
+    f.onRead(count => {if (count !== 2) return;
+      if (fault === 'recordChange') f.records.set('status', {...f.records.get('status')!, revision: '2'});
+      if (fault === 'approvalChange') f.authority.bump();
+      if (fault === 'revocation') f.authority.member(false);
+      if (fault === 'expiry') f.authority.advance();
+    });
+    await assert.rejects(f.source.read(actor, f.input)); assert.equal(f.counts().writes, 0);
+  });
+}
+test('AGG10 general discovery and direct Review retain identical original-kind target; no unqualified alerts', async () => {
+  const f = privatePreferenceFixture(), input = {...f.input, actionId: null};
+  const context = await f.source.read(actor, input);
+  const tools = context.tools.filter(tool => storePrivatePreferenceActions.has(tool.actionId));
+  assert.equal(tools.length, 6); assert.equal(context.tools.some(tool => tool.actionId === 'AI-ACT-328'), false);
+  for (const tool of tools) {
+    const direct = await f.source.read(actor, {...input, actionId: tool.actionId});
+    assert.equal(tool.sourceRevision, direct.tools[0]!.sourceRevision);
+  }
+  const tool = tools.find(tool => tool.actionId === 'AI-ACT-326')!;
+  await f.source.readPrepared(actor, input, {kind: 'proposal', id: 'HOST-general-private', actionId: tool.actionId,
+    entityId: null, sourceRevision: tool.sourceRevision, title: 'HOST original staff', summary: 'HOST review', fields: {counterCount: '3'}});
+  assert.equal(f.counts().writes, 0);
+});
+
+for (const action of storePrivatePreferenceActions.keys()) {
+  test('AGG10 actual preparation ' + action + ' preserves native supplied fields and restart/status uses no second usage', async () => {
+    const f = privatePreferenceFixture(), requests = new HostRequests(); let models = 0, reservations = 0;
+    const supplied: Record<string, Record<string, unknown>> = {
+      'AI-ACT-318': {busyMinutes: '7'}, 'AI-ACT-319': {preparationMinutes: '9223372036854775807'},
+      'AI-ACT-322': {city: 'HOST requested city'}, 'AI-ACT-323': {mode: 'off'},
+      'AI-ACT-326': {counterCount: '3'}, 'AI-ACT-327': {visibleToCustomers: false},
+    };
+    const service = () => new AssistantPreparationService({projectId: actor.projectId, plans: f.authority.plans,
+      context: f.source, requests, now: () => at,
+      usage: {async reserve() {reservations++; return {id: 'HOST-private-permit', validUntil: '2026-10-28T08:01:00.000Z'};}, async settle() {}},
+      model: {async prepare(_request, tools) {
+        models++; assert.equal(tools.length, 1); assert.equal(tools[0]!.actionId, action);
+        const fields = supplied[action]!, properties = tools[0]!.parameters.properties as Record<string, {type: string; enum?: string[]}>;
+        const args = Object.fromEntries(storePrivatePreferenceProposalKeys(action).map(key => [key, properties[key]!.enum?.[0] ??
+          (properties[key]!.type === 'boolean' ? false : ['openingTime','closingTime'].includes(key) ? '09:00' : '0')]));
+        return {kind: 'tool', name: tools[0]!.name, arguments: {apply: Object.keys(fields), ...args, ...fields}};
+      }}});
+    const input = {...f.input, requestId: 'HOST-private-prepare-' + action, actionId: null, nativeTargets: [{actionId: action, entityId: null}]};
+    const result = await service().handle(actor, {operation: 'prepare', payload: input});
+    if (result.state !== 'ready' || result.reply.outcome.kind !== 'proposal') assert.fail('Expected real preparation-service typed proposal');
+    assert.equal(result.reply.outcome.actionId, action); assert.deepEqual(result.reply.outcome.fields, supplied[action]);
+    assert.deepEqual(await service().handle(actor, {operation: 'status', payload: {scope: input.scope, requestId: input.requestId}}), result);
+    assert.deepEqual(await service().handle(actor, {operation: 'prepare', payload: input}), result);
+    assert.equal(models, 1); assert.equal(reservations, 1); assert.equal(f.counts().writes, 0);
+    f.authority.member(false);
+    await assert.rejects(service().handle(actor, {operation: 'status', payload: {scope: input.scope, requestId: input.requestId}}));
+    assert.equal(f.counts().writes, 0);
+  });
+}
+
+test('AGG10 large original text stays outside model context and literal change at the same revision retires capture', async () => {
+  const f = privatePreferenceFixture();
+  const original = {...f.records.get('status')!, fields: {...f.records.get('status')!.fields, reopensAt: 'HOST-' + 'x'.repeat(1024 * 1024)}};
+  f.records.set('status', original);
+  const context = await f.source.read(actor, f.input);
+  assert(JSON.stringify(context.modelContext).length < 2000); assert.equal(f.counts().writes, 0);
+  f.onRead(count => {if (count === 4) f.records.set('status', {...original, fields: {...original.fields, alertSound: false}});});
+  await assert.rejects(f.source.read(actor, f.input), /stale_preparation/u);
+  assert.equal(f.counts().writes, 0);
 });

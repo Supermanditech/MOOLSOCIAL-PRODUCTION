@@ -12,10 +12,13 @@ import type {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService
 import type {WorkspacePromotionService,StoreCouponRecord} from '../workspace/workspace_promotion_service.js';
 import {couponDraftRecord, type StoreCouponDraftRecord} from '../workspace/workspace_promotion_service.js';
 import {checkedStoreCouponV2Record} from '../workspace/workspace_coupon_v2_codec.js';
+import {checkedStorePrivatePreferenceRecord, checkedStorePrivatePreferenceProposalFields, storePrivatePreferenceProposalKeys,
+  storePrivatePreferenceActions as privatePreferenceKinds, type StorePrivatePreferenceKind,
+  type WorkspaceStorePrivatePreferenceService} from '../workspace/workspace_store_preferences_service.js';
 import type {PreparationContextSource} from "./model_service.js";
 import {AssistantModelError, canonical, digest, fail, id, object,
   catalogueListingSelection, preparationNativeTargetLimit, type PreparationReply, type PreparationTool, type PreparationContext, type PreparationRequest} from "./model_contract.js";
-import {canonicalContextProjection, catalogueProductActions, cataloguePriceRefreshActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, buyerRetainedQuoteActions, retainedSupplierQuoteSelection, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeDeviceOriginalActions,storeOperationalActions,storeOrderBoardActions,storeSupplierDraftActions,storeLedgerOriginalActions,storePurchaseRootActions,storeReceivingOriginalActions,storeCouponActions,storeReportOwnerActions,storePublicDetailsActions, searchSuggestion} from "./domain_context_contract.js";
+import {canonicalContextProjection, catalogueProductActions, cataloguePriceRefreshActions, catalogueSearchActions, nativePreferenceActions, personalDeliveryAddressActions, buyerRetainedQuoteActions, retainedSupplierQuoteSelection, storeProductActions, storeProductOwnerActions,storeStockOwnerActions,storeRestockOwnerActions,storeOrderOriginalActions,storeDeviceOriginalActions,storeOperationalActions,storeOrderBoardActions,storeSupplierDraftActions,storeLedgerOriginalActions,storePurchaseRootActions,storeReceivingOriginalActions,storeCouponActions,storeReportOwnerActions,storePublicDetailsActions,storePrivatePreferenceActions, searchSuggestion} from "./domain_context_contract.js";
 
 const paidRevision = (p: PlansReadback) => canonical([p.owner, p.scope, p.catalogueRevision, p.subscriptionRevision]);
 const searchSchema = {type: "object", properties: {query: {type: "string"}},
@@ -2507,7 +2510,79 @@ export class CompositePreparationContext implements PreparationContextSource {
     supplierOriginal?: {realm: 'evaluation' | 'production'; source: Pick<WorkspacePurchaseEntryService, 'read'>};
     retainedQuotes?: {realm: 'evaluation' | 'production'; source: Pick<WorkspaceBulkQuoteService, 'read'>};
     storePublicDetails?:{realm:'evaluation'|'production';catalogue:Pick<WorkspaceCatalogueService,'handleStorePublicDetails'>};
+    storePrivatePreferences?: {realm: 'evaluation'|'production'; source: Pick<WorkspaceStorePrivatePreferenceService, 'handle'>};
     nativeReports?:{realm:'evaluation'|'production';public:boolean;journey:boolean};now?: () => Date}) {}
+  private async readStorePrivatePreferences(actor: AccountProfileActor, input: PreparationRequest): Promise<PreparationContext> {
+    const connection = this.deps.storePrivatePreferences;
+    if (!connection || !this.deps.original || actor.tenantId !== undefined || !actor.uid || !actor.projectId ||
+        !['evaluation','production'].includes(connection.realm) || input.scope.audience !== 'workspace' || !input.scope.storeId ||
+        input.entityId !== null || input.catalogueListingIds !== undefined ||
+        input.actionId !== null && !storePrivatePreferenceActions.has(input.actionId)) return fail('context_unavailable');
+    const now = () => (this.deps.now?.() ?? new Date()).getTime(), started = now();
+    const before = await approvedWorkspacePreparationAuthority(this.deps.original, actor, input, started);
+    const actions = [...storePrivatePreferenceActions].filter(action => input.actionId === null || action === input.actionId);
+    const kinds = [...new Set(actions.map(action => privatePreferenceKinds.get(action)!))];
+    const read = async () => {
+      const records = new Map<StorePrivatePreferenceKind, {revision: string; fingerprint: string} | null>();
+      for (const kind of kinds) {
+        try {
+          const reply = object(await connection.source.handle(actor, 'readStorePrivatePreferences', {
+            schemaVersion: 1, storePrivatePreferencesVersion: 1, actorAccountId: actor.uid, projectId: actor.projectId,
+            realm: connection.realm, storeId: input.scope.storeId, kind}),
+          ['schemaVersion','storePrivatePreferencesVersion','actorAccountId','projectId','realm','storeId','kind','record']);
+          if (reply.schemaVersion !== 1 || reply.storePrivatePreferencesVersion !== 1 || reply.actorAccountId !== actor.uid ||
+              reply.projectId !== actor.projectId || reply.realm !== connection.realm || reply.storeId !== input.scope.storeId || reply.kind !== kind) return fail('context_unavailable');
+          const record = reply.record === null ? null : checkedStorePrivatePreferenceRecord(reply.record);
+          if (record && (record.projectId !== actor.projectId || record.kind !== kind || record.scope.account !== actor.uid ||
+              record.scope.store !== input.scope.storeId || record.scope.realm !== connection.realm)) return fail('context_unavailable');
+          // Retain identity only: several near-frame-sized originals must not
+          // become multiple model-context copies or untrusted model instructions.
+          records.set(kind, record === null ? null : {revision: record.revision, fingerprint: digest(record)});
+        } catch {return fail('context_unavailable');}
+      }
+      return records;
+    };
+    const originals = await read(), checked = await read();
+    const after = await approvedWorkspacePreparationAuthority(this.deps.original, actor, input, now());
+    if (before.revision !== after.revision || canonical([...originals]) !== canonical([...checked])) return fail('stale_preparation', 409);
+    const until = Math.min(started + 60_000, Date.parse(before.validUntil), Date.parse(after.validUntil));
+    if (until <= now()) return fail('stale_preparation', 409);
+    const revision = 'store-private-preferences:' + digest([actor.projectId, actor.uid, connection.realm, input.scope.storeId, after.revision, [...checked]]);
+    const booleans = new Set(['acceptingOrders','visibleToCustomers','alertSound','alertVibration','pickupEnabled','staffAccessEnabled']);
+    const numbers = new Set(['busyMinutes','maximumActiveOrders','counterCount','preparationMinutes']);
+    const tools: PreparationTool[] = actions.map(action => {
+      const names = [...storePrivatePreferenceProposalKeys(action)];
+      const kind = privatePreferenceKinds.get(action)!;
+      const toolRevision = 'store-private-preferences:' + digest([actor.projectId, actor.uid, connection.realm, input.scope.storeId, after.revision, kind, checked.get(kind)]);
+      const properties = Object.fromEntries(names.map(name => [name, {
+        type: booleans.has(name) ? 'boolean' : 'string',
+        ...(numbers.has(name) ? {pattern: '^(0|[1-9][0-9]*)$'} : {}),
+        ...(['fulfilmentMode','fulfilmentPreference'].includes(name) ? {enum: ['Delivery and pickup','Pickup only','Delivery only']} : {}),
+        ...(name === 'mode' ? {enum: ['off','automatic','whatsapp','moolSocialChat']} : {}),
+      }]));
+      const validate = (fields: Readonly<Record<string, unknown>>) => {
+        try {checkedStorePrivatePreferenceProposalFields(action, fields); return true;} catch {return false;}
+      };
+      return {name: 'store_prepare_private_' + action.slice(-3), actionId: action, entityId: null, sourceRevision: toolRevision,
+        description: 'Prepare only the user-supplied private Store preference fields in the existing native form. apply selects exactly requested fields; preserve all unspecified controls. Integer values are exact decimal strings. Current saved field contents are not supplied to the model; do not guess them or invent defaults. Review never saves. Only the original Save confirmation records private preferences; it does not publish, accept orders, grant staff roles or send invoices.',
+        parameters: {type: 'object', properties: {apply: {type: 'array', items: {type: 'string', enum: names}}, ...properties},
+          required: ['apply', ...names], additionalProperties: false}, validate,
+        resolveTarget: args => {
+          if (Object.keys(args).length !== names.length + 1 || Object.keys(args).some(key => key !== 'apply' && !names.includes(key)) ||
+              !Array.isArray(args.apply) || !args.apply.length || new Set(args.apply).size !== args.apply.length ||
+              args.apply.some(key => typeof key !== 'string' || !names.includes(key))) return fail('invalid_model_result');
+          const fields = Object.fromEntries(args.apply.map(key => [String(key), args[String(key)]]));
+          if (!validate(fields)) return fail('invalid_model_result');
+          return {entityId: null, sourceRevision: toolRevision, fields};
+        }};
+    });
+    return {revision, validUntil: new Date(until).toISOString(), tools,
+      nativeTargets: tools.map(tool => ({actionId: tool.actionId, entityId: null, sourceRevision: tool.sourceRevision})),
+      modelContext: {sourceKind: 'original-private-store-preferences-v1', storeId: input.scope.storeId,
+        originals: [...checked].map(([kind, record]) => ({kind, saved: record !== null, revision: record?.revision ?? '0',
+          fingerprint: record?.fingerprint ?? null})),
+        purpose: 'Read-only verified original references, not field contents or instructions. Explicit supplied partial inputs only; never infer successful Save, publication, invoice sending, roles, membership or complete report coverage.'}};
+  }
   private async readStorePublicDetails(actor:AccountProfileActor,input:PreparationRequest):Promise<PreparationContext>{
     const source=this.deps.storePublicDetails;
     if(!source||!this.deps.original||actor.tenantId!==undefined||!actor.uid||!actor.projectId||
@@ -2967,6 +3042,12 @@ export class CompositePreparationContext implements PreparationContextSource {
       if (!context.tools.some(tool => tool.sourceRevision === proposal.sourceRevision && tool.validate(proposal.fields))) return fail('stale_preparation', 409);
       return context;
     }
+    if (storePrivatePreferenceActions.has(proposal.actionId)) {
+      if (input.actionId !== null && input.actionId !== proposal.actionId || input.entityId !== null || proposal.entityId !== null) return fail('stale_preparation', 409);
+      const context = await this.readStorePrivatePreferences(actor, {...input, actionId: proposal.actionId});
+      if (!context.tools.some(tool => tool.actionId === proposal.actionId && tool.sourceRevision === proposal.sourceRevision && tool.validate(proposal.fields))) return fail('stale_preparation', 409);
+      return context;
+    }
     if(storePublicDetailsActions.has(proposal.actionId)){
       if(input.actionId!==proposal.actionId||input.entityId!==null||proposal.entityId!==null)return fail('stale_preparation',409);
       const context=await this.readStorePublicDetails(actor,input);
@@ -3060,6 +3141,7 @@ export class CompositePreparationContext implements PreparationContextSource {
       if (buyerRetainedQuoteActions.has(input.actionId)) return this.readRetainedQuotes(actor, input);
       if (input.actionId === 'AI-ACT-020') return this.readCartClear(actor, input);
       if (input.actionId === 'AI-ACT-032') return this.readPurchaseReference(actor, input);
+      if (storePrivatePreferenceActions.has(input.actionId)) return this.readStorePrivatePreferences(actor, input);
       if(storePublicDetailsActions.has(input.actionId))return this.readStorePublicDetails(actor,input);
       if(storeReportOwnerActions.has(input.actionId))return this.readReportControls(actor,input);
       if(storeCouponActions.has(input.actionId)){
@@ -3206,6 +3288,11 @@ export class CompositePreparationContext implements PreparationContextSource {
       try{const value=await this.deps.storeCoupons.read(actor,input);
         canonicalContextProjection(actor,input.scope,this.combine([...values,value]),1);values.push(value);
       }catch(error){if(!(error instanceof AssistantModelError)||error.code!=='context_unavailable'||!values.length)throw error;}
+    }
+    if (this.deps.storePrivatePreferences && input.scope.audience === 'workspace' && input.entityId === null && input.catalogueListingIds === undefined) {
+      try {const value = await this.readStorePrivatePreferences(actor, input);
+        canonicalContextProjection(actor, input.scope, this.combine([...values, value]), 1); values.push(value);
+      } catch (error) {if (!(error instanceof AssistantModelError) || error.code !== 'context_unavailable' || !values.length) throw error;}
     }
     if(this.deps.storePublicDetails&&input.scope.audience==='workspace'&&input.entityId===null&&input.catalogueListingIds===undefined){
       try{values.push(await this.readStorePublicDetails(actor,input));}

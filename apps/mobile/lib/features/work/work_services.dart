@@ -26,6 +26,7 @@ import 'work_models.dart';
 import 'work_purchase_entry_gateway.dart';
 import 'work_ledger_gateway.dart';
 import 'work_customer_gateway.dart';
+import 'work_store_preferences.dart';
 import 'work_document_preview.dart';
 import 'work_customer_feedback.dart';
 import 'work_catalogue_gateway.dart';
@@ -4218,6 +4219,15 @@ abstract interface class WorkCounterDraftStore {
 
 abstract interface class WorkCounterDraftOriginalGuard {
   Future<T> withPristineCounterOriginal<T>(String account, String store, Future<T> Function() action);
+}
+
+/// Existing encrypted device storage for one exact private preference journal.
+/// No deletion, key migration, remote source or membership fallback is exposed.
+class SecureWorkPrivatePreferenceJournalStorage implements WorkspacePrivatePreferenceJournalStorage {
+  const SecureWorkPrivatePreferenceJournalStorage({FlutterSecureStorage storage = const FlutterSecureStorage()}) : _storage = storage;
+  final FlutterSecureStorage _storage;
+  @override Future<String?> read(String key) => _storage.read(key: key);
+  @override Future<void> write(String key, String value) => _storage.write(key: key, value: value);
 }
 
 /// The same native Counter draft interface backed by original read/save/status.

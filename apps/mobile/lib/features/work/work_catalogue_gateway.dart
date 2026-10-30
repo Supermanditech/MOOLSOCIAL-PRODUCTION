@@ -14,6 +14,7 @@ import 'work_publication_data.dart';
 import 'work_purchase_entry_gateway.dart';
 import 'work_ledger_gateway.dart';
 import 'work_customer_gateway.dart';
+import 'work_store_preferences.dart';
 import 'work_models.dart' show WorkspaceVariantFamily, WorkspaceVariantMembership, WorkspaceCatalogueItem,
   WorkspaceProductCompliance,
   WorkspaceSavedInventory, WorkspaceStockMode,
@@ -5420,6 +5421,10 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway({SocialContentCredentia
     realm: _localWorkspaceEndpoint(endpoint) ? 'evaluation' : 'production',
     trustedReadClockSupported: true,
     policyReadbackRequired: true,
+    // Explicit new version negotiation; approved review launches leave this off.
+    // These are the same project/endpoint bindings checked by the connection owner.
+    privatePreferencesSupported: const bool.fromEnvironment('MOOLSOCIAL_STORE_PRIVATE_PREFERENCES_V1'),
+    privatePreferencesProjectId: _localWorkspaceEndpoint(endpoint) ? 'demo-moolsocial-local' : 'moolsocial-dev-503018',
     productFactsReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_FACTS_V1'),
     unbrandedProduceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_UNBRANDED_PRODUCE_V1'),
     reviewedFamilyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_REVIEWED_FAMILIES_V1'),
@@ -5664,6 +5669,8 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.purchaseOpeningEvidenceSupported = false,
     this.ledgerSourceSupported = false,
     this.counterOriginalSupported = false,
+    this.privatePreferencesSupported = false,
+    this.privatePreferencesProjectId,
     this.productMediaSupported = false,
     WorkspaceProductMediaUploadTransport? productMediaTransport,
     this.reviewedProductSubmissionSupported = false,
@@ -5708,7 +5715,8 @@ class AuthenticatedWorkspaceCatalogueGateway
     'saveStoreSupplierProfile', 'saveStorePurchaseDraft', 'saveStoreSupplierOpeningEvidence',
     'readStoreLedgerSource', 'readStoreLedgerAttempt', 'recordStoreExpense',
     'confirmStoreSupplierOpening', 'recordStoreMoneyRegisterEntry', 'recordStoreSupplierMoney', 'confirmStoreSupplierBill', 'recordStoreSupplierMoneyAllocation', 'recordStoreSupplierRefund', 'recordStoreSupplierCreditNote',
-    'readStoreCounterDraft', 'saveStoreCounterDraft', 'readStoreCounterDraftAttempt'};
+    'readStoreCounterDraft', 'saveStoreCounterDraft', 'readStoreCounterDraftAttempt',
+    'readStorePrivatePreferences', 'saveStorePrivatePreferences', 'checkStorePrivatePreferencesSave'};
   SocialContentTransport get _privateOriginalTransport {
     if (_privateOriginalTransportOverride case final configured?) return configured;
     final base = transport;
@@ -5776,6 +5784,9 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool ledgerSourceSupported;
   /// Matching Counter recovery contract only; never Store/Stock/sale authority.
   final bool counterOriginalSupported;
+  /// Explicit matching private-preference contract; no Store/plan authority.
+  final bool privatePreferencesSupported;
+  final String? privatePreferencesProjectId;
   @override
   final bool productMediaSupported;
   final WorkspaceProductMediaUploadTransport? _productMediaTransportOverride;
@@ -5879,6 +5890,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       purchaseOpeningEvidenceSupported: purchaseOpeningEvidenceSupported,
       ledgerSourceSupported: ledgerSourceSupported,
       counterOriginalSupported: counterOriginalSupported,
+      privatePreferencesSupported: privatePreferencesSupported,
+      privatePreferencesProjectId: privatePreferencesProjectId,
       productMediaSupported: productMediaSupported,
       productMediaTransport: _productMediaTransportOverride,
       reviewedProductSubmissionSupported: reviewedProductSubmissionSupported,
@@ -6027,6 +6040,23 @@ class AuthenticatedWorkspaceCatalogueGateway
     return WorkspaceCounterOriginalRemoteSource(scope: (account: accountId, store: storeId, realm: realm),
       connectionId: _bulkHash([endpoint.toString(), realm, accountId, storeId]),
       request: owner._ownerRequest, current: active, now: owner.now);
+  }
+
+  WorkspacePrivatePreferenceRemoteSource? originalPrivatePreferenceSource({
+    required String accountId, required String storeId, required WorkspacePrivatePreferenceKind kind,
+    required bool Function() current,
+  }) {
+    _id(accountId); _id(storeId);
+    final project = privatePreferencesProjectId;
+    if (!privatePreferencesSupported || project == null || procurementContext != null || _publicRestockCatalogue || !current()) return null;
+    _id(project);
+    final owner = forOwnerAccount(accountId);
+    bool active() => current() && owner.privatePreferencesSupported && owner.privatePreferencesProjectId == project &&
+      owner.ownerAccountId == accountId && owner._procurementScopeCurrent;
+    return WorkspacePrivatePreferenceRemoteSource(projectId: project,
+      scope: (account: accountId, store: storeId, realm: realm), kind: kind,
+      connectionId: _bulkHash([endpoint.toString(), project, realm, accountId, storeId, kind.name]),
+      request: owner._ownerRequest, current: active);
   }
 
   WorkspaceLedgerRemoteSource? originalLedgerSource({

@@ -62,6 +62,7 @@ import '../work_catalogue_gateway.dart';
 import '../work_purchase_entry_gateway.dart' show WorkspacePurchaseDraftSaveIntent, WorkspaceSupplierOpeningSaveIntent;
 import '../work_ledger_gateway.dart' show WorkspaceLedgerIntent, WorkspaceLedgerReadback, workspaceLedgerCanonical;
 import '../work_session.dart';
+import '../work_store_preferences.dart';
 
 class _StoreRestockNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter {
   const _StoreRestockNativeAdapter({required this.read,required this.open});
@@ -561,16 +562,102 @@ class _StoreReportNativeAdapter implements MoolAssistantOwnerAwareNativeAdapter 
     {required bool Function() isCurrent, required Listenable ownerChanges}) => proposal.actionId != actionId || validateFields(proposal.fields) != null ? Future.value(MoolAssistantReviewResult.unavailable) : open(proposal, isCurrent, ownerChanges);
 }
 
+final _privatePreferenceReviewProofs = Expando<bool Function(String, String)>('original private preference Review');
+
+bool _privatePreferenceCanSave(WorkSession session, WorkspacePrivatePreferenceKind kind, String? proof) =>
+  !session.workspaceOriginalPrivatePreferencesConfigured || session.workspacePrivatePreferenceReady(kind) &&
+    proof != null && proof == session.workspacePrivatePreferenceSourceProof(kind);
+
+Future<bool> _saveStorePrivatePreference(WorkSession session, WorkspacePrivatePreferenceKind kind,
+    Map<String, Object?> fields, {required String? originalProof, required bool Function() current,
+    StoreSettingsReviewScope? reviewScope}) async {
+  if (!session.workspaceOriginalPrivatePreferencesConfigured) return true;
+  if (!current() || reviewScope?.mayApply == false || reviewScope != null && _privatePreferenceReviewProofs[reviewScope] == null) return false;
+  final saved = await session.saveWorkspacePrivatePreferences(kind, fields, expectedSourceProof: originalProof,
+    current: () => current() && reviewScope?.mayApply != false,
+    admitOriginal: reviewScope?.admitOriginal,
+    admitCurrentRecord: reviewScope == null ? null : _privatePreferenceReviewProofs[reviewScope],
+    onOriginalResolved: reviewScope?.admitOriginalResolution);
+  if (!current()) return false;
+  if (saved) {reviewScope?.completeOriginal(); reviewScope?.completeAttempt(); session.showNotice('Store preferences saved.');}
+  else {session.showError(session.workspacePrivatePreferenceError(kind) ?? 'Saved preferences changed. Your entries are kept. Reopen this form.');}
+  return saved;
+}
+
+class _StorePrivatePreferenceRecovery extends StatelessWidget {
+  const _StorePrivatePreferenceRecovery({required this.session, required this.kind, required this.current,
+    this.reviewScope, this.onRecovered, this.onReload});
+  final WorkSession session;
+  final WorkspacePrivatePreferenceKind kind;
+  final bool Function() current;
+  final StoreSettingsReviewScope? reviewScope;
+  final VoidCallback? onRecovered;
+  final Future<void> Function()? onReload;
+  @override Widget build(BuildContext context) {
+    if (!session.workspaceOriginalPrivatePreferencesConfigured) return const SizedBox.shrink();
+    return AnimatedBuilder(animation: session, builder: (context, _) {
+      final pending = session.workspacePrivatePreferencePending(kind), error = session.workspacePrivatePreferenceError(kind),
+        busy = session.workspacePrivatePreferenceBusy(kind);
+      if (pending == null && error == null && !busy) return const SizedBox.shrink();
+      Future<void> check(bool retry) async {
+        if (!context.mounted || !current() || reviewScope?.mayApply == false) return;
+        final saved = await session.checkWorkspacePrivatePreferenceSave(kind, retry: retry,
+          current: () => context.mounted && current() && reviewScope?.mayApply != false,
+          admitCurrentRecord: reviewScope == null ? null : _privatePreferenceReviewProofs[reviewScope!],
+          onOriginalResolved: reviewScope?.admitOriginalResolution);
+        if (!context.mounted || !current()) return;
+        if (saved) {
+          reviewScope?.completeOriginal(); reviewScope?.completeAttempt();
+          session.showNotice('Store preferences saved.'); onRecovered?.call();
+        } else {session.showError(session.workspacePrivatePreferenceError(kind) ?? 'The earlier Save is still unconfirmed.');}
+      }
+      return StoreSettingsCard(key: Key('work-private-preference-recovery-${kind.name}'), tonal: true,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(busy ? 'Checking saved preferences…' : error ?? 'Check the earlier Save before making another change.',
+            style: const TextStyle(fontSize: 13)),
+          Wrap(spacing: 8, children: [
+            if (pending != null) ...[
+              TextButton.icon(key: Key('work-private-preference-${kind.name}-check-save'), onPressed: busy ? null : () => check(false),
+                icon: const Icon(Icons.refresh, size: 18), label: const Text('Check Save')),
+              TextButton(key: Key('work-private-preference-${kind.name}-retry-save'), onPressed: busy ? null : () => check(true),
+                child: const Text('Retry Save')),
+            ] else if (onReload != null)
+              TextButton(key: Key('work-private-preference-${kind.name}-reload'), onPressed: busy ? null : () => onReload!(),
+                child: const Text('Reload saved values')),
+          ]),
+        ]));
+    });
+  }
+}
+
+class _StorePrivatePreferenceReviewFrame extends StatelessWidget {
+  const _StorePrivatePreferenceReviewFrame({required this.session, required this.scope, required this.child});
+  final WorkSession session;
+  final StoreSettingsReviewScope scope;
+  final Widget child;
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: Listenable.merge([session, scope.changes, scope.sourceChanges]),
+    builder: (context, _) {
+      final active = scope.current();
+      // Match the shared native frame's preservation: retirement hides private
+      // input and removes focus, but never disposes the actual editor draft.
+      return Stack(fit: StackFit.expand, children: [
+        Offstage(offstage: !active, child: ExcludeFocus(excluding: !active, child: child)),
+        if (!active) const Center(child: Text('Your account, Store or saved preferences changed. Your entries are kept. Reopen this task.')),
+      ]);
+    });
+}
+
 class _StoreSettingsNativeAdapter implements MoolAssistantNativeAdapter {
   const _StoreSettingsNativeAdapter({required this.actionId, required this.readContext,
-    required this.readSnapshot, required this.open});
+    required this.readSnapshot, required this.open, this.decodeFields});
   @override final String actionId;
   final MoolAssistantContext? Function() readContext;
   final Future<MoolAssistantNativeSnapshot?> Function(MoolAssistantContext, String?) readSnapshot;
   final Future<MoolAssistantReviewResult> Function(MoolAssistantProposal, bool Function()) open;
+  final Map<String, Object?> Function(Map<String, Object?>)? decodeFields;
   @override Set<String> get allowedFields => StoreSettingsInitialData.keys(actionId);
   @override String? validateFields(Map<String, Object?> fields) {
-    try { StoreSettingsInitialData.fromFields(actionId, fields); return null; }
+    try { StoreSettingsInitialData.fromFields(actionId, decodeFields?.call(fields) ?? fields); return null; }
     on FormatException catch (error) { return error.message; }
   }
   @override Future<MoolAssistantNativeSnapshot?> snapshot(MoolAssistantContext context, String? entityId) => readSnapshot(context, entityId);
@@ -3481,6 +3568,7 @@ class _WorkWorkspaceDashboardScreenState
   bool _draftOrderAlertSound = true;
   bool _draftOrderAlertVibration = true;
   String? _settingsStoreId;
+  String? _settingsPrivateSourceProof;
   int? _settingsScopeRevision;
   bool _settingsOpening = false, _settingsSaving = false;
   _WorkspaceOperation _operation = _WorkspaceOperation.orders;
@@ -3750,6 +3838,8 @@ class _WorkWorkspaceDashboardScreenState
             'AI-ACT-321', 'AI-ACT-322', 'AI-ACT-323', 'AI-ACT-324', 'AI-ACT-326', 'AI-ACT-327', 'AI-ACT-328'])
             if (trusted != null && _financePermitted(trusted) && !existing.any((adapter) => adapter.actionId == id))
               _StoreSettingsNativeAdapter(actionId: id,
+                decodeFields: (fields) => supplierSource.workspaceOriginalPrivatePreferencesConfigured && workspacePrivatePreferenceKindForAction(id) != null
+                  ? workspacePrivatePreferenceNativeProposalFields(id, fields) : fields,
                 readContext: () => _financeAssistantContext(hostContext),
                 readSnapshot: (ctx, entity) => _settingsAssistantSnapshot(hostContext, supplierSource, id, ctx, entity),
                 open: (proposal, current) => _showSettingsAssistant(hostContext, supplierSource, proposal, current)),
@@ -4209,8 +4299,9 @@ class _WorkWorkspaceDashboardScreenState
         ]),
       _WorkspaceControlView.status => WorkPrimaryButton(
         keyName: 'work-status-save',
-        label: _settingsSaving || session.workspaceTradingPreferencesSaving ? 'Saving…' : 'Apply settings',
-        busy: _settingsSaving || session.workspaceTradingPreferencesSaving,
+        label: _settingsSaving || session.workspaceTradingPreferencesSaving || session.workspacePrivatePreferenceBusy(WorkspacePrivatePreferenceKind.status)
+          ? 'Saving…' : session.workspaceOriginalPrivatePreferencesConfigured ? 'Save preferences' : 'Apply settings',
+        busy: _settingsSaving || session.workspaceTradingPreferencesSaving || session.workspacePrivatePreferenceBusy(WorkspacePrivatePreferenceKind.status),
         icon: Icons.check_circle_outline_rounded,
         onPressed: () => statusCurrent() ? _saveAvailability(reviewScope: statusReview, current: statusCurrent) : Future<void>.value(),
       ),
@@ -4885,14 +4976,20 @@ class _WorkWorkspaceDashboardScreenState
             ),
           ),
           _WorkspaceControlView.status => _settingsReviewScope?.current() == false
-              ? const Center(child: Text('Your Store or account changed. Your entries are kept. Reopen settings.'))
+              ? Center(child: Text(session.workspaceOriginalPrivatePreferencesConfigured
+                ? 'Your account, Store or saved preferences changed. Your entries are kept. Reopen settings.'
+                : 'Your Store or account changed. Your entries are kept. Reopen settings.'))
               : AbsorbPointer(
-            absorbing: _settingsSaving,
+            absorbing: _settingsSaving || session.workspacePrivatePreferenceBusy(WorkspacePrivatePreferenceKind.status),
             child: Form(
             key: _settingsForm,
             child: _WorkspaceStatusSurface(
               scrollController: _settingsScroll,
               session: session,
+              recovery: session.workspaceOriginalPrivatePreferencesConfigured ? _StorePrivatePreferenceRecovery(
+                session: session, kind: WorkspacePrivatePreferenceKind.status, current: statusCurrent, reviewScope: statusReview,
+                onRecovered: () {if (mounted) setState(() { _settingsPrivateSourceProof = session.workspacePrivatePreferenceSourceProof(WorkspacePrivatePreferenceKind.status); });},
+                onReload: () async {await _showStatus(reloadOriginal: true);}) : null,
               acceptingOrders: _draftAcceptingOrders,
               visibleToCustomers: _draftVisibleToCustomers,
               fulfilmentMode: _draftFulfilmentMode,
@@ -5953,8 +6050,12 @@ class _WorkWorkspaceDashboardScreenState
       identical(principal, widget.accountIdentity) && source.navigationScopeRevision == navigation &&
       source.publicationPreferencesContext == owner && _financePermitted(ctx) &&
       _financeAssistantContext(hostContext)?.binding == ctx.binding;
+    final privateKind = source.workspaceOriginalPrivatePreferencesConfigured ? workspacePrivatePreferenceKindForAction(action) : null;
+    bool privateInputsPristine() => current() && !(_view == _WorkspaceControlView.status && _settingsDirty) &&
+      !(privateKind == WorkspacePrivatePreferenceKind.pickup && _deliverySettingsEditors.any((editor) => identical(editor.widget.session, source) && editor.mounted && editor._pickupInputsChanged)) &&
+      !(privateKind == WorkspacePrivatePreferenceKind.staff && _staffSettingsEditors.any((editor) => identical(editor.widget.session, source) && editor.mounted && editor._dirty));
     if (!current() || _settingsAssistantOpen || _settingsSaving || _settingsOpening ||
-        _view == _WorkspaceControlView.status && _settingsDirty) return null;
+        _view == _WorkspaceControlView.status && _settingsDirty || privateKind != null && !privateInputsPristine()) return null;
     if (action == 'AI-ACT-317') {
       if (entity == null || ![if (source.activeWorkspace != null) source.activeWorkspace!, ...source.otherWorkspaces].any((store) => store.id == entity)) return null;
     } else if (action == 'AI-ACT-328') {
@@ -5998,13 +6099,22 @@ class _WorkWorkspaceDashboardScreenState
         invoice = (await source.loadInvoiceDeliveryPreference(scope)).mode.name;
       }
     } on Object { return null; }
+    if (privateKind != null) {
+      final loaded = privateKind == WorkspacePrivatePreferenceKind.invoice ? source.workspacePrivatePreferenceReady(privateKind) :
+        await source.loadWorkspacePrivatePreferences(privateKind, inputPristine: privateInputsPristine, refresh: true);
+      if (!loaded || !source.workspacePrivatePreferenceReady(privateKind) || !privateInputsPristine()) return null;
+      if (privateKind == WorkspacePrivatePreferenceKind.invoice) {
+        invoice = source.workspacePrivatePreferenceOriginalFields(privateKind)?['mode'] as String? ?? invoice;
+      }
+    }
     if (!current()) return null;
     if (action == 'AI-ACT-324' && storeUpiDestinationHasDraft(source)) return null;
     final key = (source, principal, navigation, owner, ctx.binding, action, entity);
     final signature = jsonEncode([_settingsAssistantData(source, action), destination, invoice]);
     final previous = _settingsAssistantVersions[key];
     if (previous == null || previous.$1 != signature) _settingsAssistantVersions[key] = (signature, ++_settingsAssistantVersion);
-    final revision = 'store-settings:${_settingsAssistantVersions[key]!.$2}';
+    final revision = privateKind == null ? 'store-settings:${_settingsAssistantVersions[key]!.$2}' : source.workspacePrivatePreferenceSourceProof(privateKind);
+    if (revision == null) return null;
     if (destination != null) _settingsAssistantDestinations[revision] = destination;
     if (invoice != null) _settingsAssistantInvoiceModes[revision] = invoice;
     return MoolAssistantNativeSnapshot(binding: ctx.binding, sourceRevision: revision, permitted: true, entityId: entity);
@@ -6016,7 +6126,13 @@ class _WorkWorkspaceDashboardScreenState
     if (ctx == null || !reviewCurrent() || ctx.binding != proposal.binding || !_financePermitted(ctx) || _settingsAssistantOpen) {
       return MoolAssistantReviewResult.stale;
     }
-    final initial = StoreSettingsInitialData.fromFields(proposal.actionId, proposal.fields);
+    final privateKind = source.workspaceOriginalPrivatePreferencesConfigured ? workspacePrivatePreferenceKindForAction(proposal.actionId) : null;
+    var acceptedPrivateProof = privateKind == null ? null : source.workspacePrivatePreferenceSourceProof(privateKind);
+    if (privateKind != null && (acceptedPrivateProof == null || proposal.sourceRevision != acceptedPrivateProof || !source.workspacePrivatePreferenceReady(privateKind))) {
+      return MoolAssistantReviewResult.stale;
+    }
+    final initial = StoreSettingsInitialData.fromFields(proposal.actionId, privateKind == null ? proposal.fields :
+      workspacePrivatePreferenceNativeProposalFields(proposal.actionId, proposal.fields));
     final action = proposal.actionId, fields = initial.fields;
     if (action == 'AI-ACT-317' && fields['workspaceId'] != proposal.entityId ||
         action == 'AI-ACT-328' && fields['alertId'] != proposal.entityId) return MoolAssistantReviewResult.unavailable;
@@ -6039,16 +6155,25 @@ class _WorkWorkspaceDashboardScreenState
       identical(principal, widget.accountIdentity) && source.navigationScopeRevision == navigation &&
       source.publicationPreferencesContext == owner && _financePermitted(ctx) &&
       (!const {'AI-ACT-320', 'AI-ACT-321'}.contains(action) || identical(settingsPublisher, source.workspacePublicDetailsPublisher)) &&
+      (privateKind == null || source.workspacePrivatePreferenceSourceProof(privateKind) == acceptedPrivateProof) &&
       _financeAssistantContext(hostContext)?.binding == ctx.binding;
     final scope = StoreSettingsReviewScope(current: current,
       sourceCurrent: () => current() && _settingsAssistantData(source, action) == fingerprint,
       changes: _financeOwner,
       sourceChanges: Listenable.merge([source, settingsPublisher]),
       readSource: _settingsAssistantFields(source, action) == null ? null : () => _settingsAssistantFields(source, action)!,
-      readOperation: const {'AI-ACT-320', 'AI-ACT-321'}.contains(action)
-        ? () => source.workspacePublicDetailsPublisher?.pending?.fingerprint : null,
+      readOperation: privateKind != null ? () => source.workspacePrivatePreferenceOperation(privateKind)
+        : const {'AI-ACT-320', 'AI-ACT-321'}.contains(action) ? () => source.workspacePublicDetailsPublisher?.pending?.fingerprint : null,
       destinationFingerprint: _settingsAssistantDestinations[proposal.sourceRevision],
       invoiceMode: _settingsAssistantInvoiceModes[proposal.sourceRevision]);
+    if (privateKind != null) {
+      _privatePreferenceReviewProofs[scope] = (before, after) {
+        final prefix = 'store-private-preferences:${privateKind.name}:';
+        if (!current() || !scope.mayApply || acceptedPrivateProof != before || source.workspacePrivatePreferenceSourceProof(privateKind) != before ||
+            !after.startsWith(prefix) || !RegExp(r'^[a-f0-9]{64}$').hasMatch(after.substring(prefix.length))) return false;
+        acceptedPrivateProof = after; return true;
+      };
+    }
     if (!scope.mayApply || !reviewCurrent()) { scope.dispose(); return MoolAssistantReviewResult.stale; }
     if (_view == _WorkspaceControlView.status && _settingsDirty) { scope.dispose(); return MoolAssistantReviewResult.returnToOwner; }
     if (const {'AI-ACT-318', 'AI-ACT-319', 'AI-ACT-327'}.contains(action)) {
@@ -6089,7 +6214,8 @@ class _WorkWorkspaceDashboardScreenState
         } else { return MoolAssistantReviewResult.unavailable; }
         await Navigator.of(context, rootNavigator: true).push<void>(MaterialPageRoute(builder: (_) => Scaffold(
           appBar: AppBar(title: const Text('Review Store settings')),
-          body: StoreSettingsReviewFrame(session: source, scope: scope, child: child))));
+          body: privateKind == null ? StoreSettingsReviewFrame(session: source, scope: scope, child: child)
+            : _StorePrivatePreferenceReviewFrame(session: source, scope: scope, child: child))));
       }
       if (action == 'AI-ACT-317' && mounted && identical(principal, widget.accountIdentity) &&
           identical(source, session) && source.activeWorkspace?.id == proposal.entityId) return MoolAssistantReviewResult.opened;
@@ -6097,12 +6223,13 @@ class _WorkWorkspaceDashboardScreenState
     } finally { scope.dispose(); _settingsAssistantOpen = false; }
   }
 
-  Future<void> _showStatus({StoreSettingsInitialData? initialData, StoreSettingsReviewScope? reviewScope}) async {
+  Future<void> _showStatus({StoreSettingsInitialData? initialData, StoreSettingsReviewScope? reviewScope, bool reloadOriginal = false}) async {
     if (reviewScope?.mayApply == false || initialData != null && _view == _WorkspaceControlView.status && _settingsDirty) return;
     if (_settingsOpening || _settingsSaving) return;
     final owner = session, scope = session.tradingPreferencesContext;
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
     final originView = _view, originOperation = _operation;
+    final openingSignature = _settingsInputSignature;
     if (session.tradingPreferencesPersistenceAvailable) {
       _settingsOpening = true;
       const opening = 'Opening saved Store hours and alerts…';
@@ -6119,8 +6246,18 @@ class _WorkWorkspaceDashboardScreenState
       }
       if (session.noticeMessage == opening) { session.clearMessages(); }
     }
+    if (session.workspaceOriginalPrivatePreferencesConfigured) {
+      final loaded = await session.loadWorkspacePrivatePreferences(WorkspacePrivatePreferenceKind.status, refresh: true,
+        inputPristine: () => mounted && identical(owner, session) && scope == session.tradingPreferencesContext &&
+          _view == originView && _operation == originOperation && (originView != _WorkspaceControlView.status || reloadOriginal || !_settingsDirty) && _settingsInputSignature == openingSignature);
+      if (!mounted || !identical(owner, session) || reviewScope?.mayApply == false || _view != originView || _operation != originOperation) return;
+      if (!loaded && session.workspacePrivatePreferencePending(WorkspacePrivatePreferenceKind.status) == null) {
+        session.showError(session.workspacePrivatePreferenceError(WorkspacePrivatePreferenceKind.status) ?? 'Saved Store preferences could not be opened.'); return;
+      }
+    }
     _searchFocus.unfocus();
     setState(() {
+      _settingsPrivateSourceProof = session.workspacePrivatePreferenceSourceProof(WorkspacePrivatePreferenceKind.status);
       _settingsStoreId = session.activeWorkspace?.id ?? session.workspaceId;
       _settingsScopeRevision = session.navigationScopeRevision;
       _draftAcceptingOrders = session.workspaceAcceptingOrders;
@@ -9849,7 +9986,11 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
 
   Future<void> _saveAvailability({StoreSettingsReviewScope? reviewScope, bool Function()? current}) async {
     if (current?.call() == false || reviewScope?.mayApply == false) { session.showError('These settings changed. Your entries are kept. Reopen this task.'); return; }
-    if (_settingsSaving || session.workspaceTradingPreferencesSaving) return;
+    if (_settingsSaving || session.workspaceTradingPreferencesSaving || session.workspacePrivatePreferenceBusy(WorkspacePrivatePreferenceKind.status)) return;
+    if (!_privatePreferenceCanSave(session, WorkspacePrivatePreferenceKind.status, _settingsPrivateSourceProof)) {
+      session.showError('Check the saved preferences before making another Save. Your entries are kept.'); return;
+    }
+    final inputSignature = _settingsInputSignature;
     final owner = session, scope = session.tradingPreferencesContext;
     final expectedStore = _settingsStoreId, expectedNavigation = _settingsScopeRevision;
     if (_settingsStoreId != (session.activeWorkspace?.id ?? session.workspaceId) ||
@@ -9939,11 +10080,25 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       }
     }
     if (durableTrading && !applyOtherPreferences()) return;
+    if (session.workspaceOriginalPrivatePreferencesConfigured) {
+      if (!mounted || current?.call() == false || _settingsInputSignature != inputSignature) return;
+      FocusScope.of(context).unfocus();
+      reviewScope?.completeAttempt();
+      final confirmed = await _saveStorePrivatePreference(session, WorkspacePrivatePreferenceKind.status, desired,
+        originalProof: _settingsPrivateSourceProof, reviewScope: reviewScope,
+        current: () => mounted && identical(owner, session) && current?.call() != false && _settingsInputSignature == inputSignature);
+      if (!confirmed || !mounted || current?.call() == false) return;
+      _settingsPrivateSourceProof = session.workspacePrivatePreferenceSourceProof(WorkspacePrivatePreferenceKind.status);
+    }
     reviewScope?.completeAttempt();
     if (current?.call() == false) return;
     reviewScope?.dispose();
     setState(() => _view = _WorkspaceControlView.dashboard);
   }
+
+  String get _settingsInputSignature => jsonEncode([_draftAcceptingOrders, _draftVisibleToCustomers, _draftFulfilmentMode,
+    _draftBusyMinutes, _draftReopensAt, _draftOpeningTime, _draftClosingTime, _draftMaximumActiveOrders,
+    _draftOrderAlertSound, _draftOrderAlertVibration]);
 
   bool get _availabilityDirty =>
       _draftAcceptingOrders != session.workspaceAcceptingOrders ||
@@ -9961,6 +10116,8 @@ Future<MoolAssistantReviewResult> _showProductPriceAttention(BuildContext hostCo
       _draftOrderAlertVibration != session.workspaceOrderAlertVibration;
 
   bool get _settingsDirty =>
+      session.workspaceOriginalPrivatePreferencesConfigured &&
+        (session.workspacePrivatePreferencePending(WorkspacePrivatePreferenceKind.status) != null || session.workspacePrivatePreferenceError(WorkspacePrivatePreferenceKind.status) != null) ||
       _availabilityDirty ||
       _draftVisibleToCustomers != session.workspaceVisibleToCustomers ||
       _tradingControlsDirty;
@@ -51982,6 +52139,11 @@ class _WorkspaceDeliverySettingsSurfaceState
   }
   late final TextEditingController _city, _area, _pincode;
   late bool _pickupEnabled;
+  String? _privateSourceProof;
+  String get _pickupInputSignature => jsonEncode([_city.text, _area.text, _pincode.text, _pickupEnabled]);
+  bool get _currentPickup => mounted && widget.reviewScope?.current() != false &&
+    _pickupContext == widget.session.pickupPreferencesContext && _scopeRevision == widget.session.navigationScopeRevision &&
+    _storeId == (widget.session.activeWorkspace?.id ?? widget.session.workspaceId);
 
   bool get _pickupInputsChanged =>
       _city.text.trim() != widget.session.workspaceDeliveryCity ||
@@ -51990,8 +52152,17 @@ class _WorkspaceDeliverySettingsSurfaceState
       _pickupEnabled != widget.session.workspacePickupEnabled;
 
   Future<bool> _loadPickupPreferences() async {
-    final loaded = await widget.session.loadWorkspacePickupPreferences(expectedStoreId: _storeId ?? '');
+    final inputSignature = _pickupInputSignature;
+    var loaded = await widget.session.loadWorkspacePickupPreferences(expectedStoreId: _storeId ?? '');
     if (!mounted || widget.reviewScope?.mayApply == false || _pickupContext != widget.session.pickupPreferencesContext) return false;
+    if (loaded && widget.session.workspaceOriginalPrivatePreferencesConfigured) {
+      loaded = await widget.session.loadWorkspacePrivatePreferences(WorkspacePrivatePreferenceKind.pickup, refresh: true,
+        inputPristine: () => _currentPickup && _pickupInputSignature == inputSignature);
+      if (!_currentPickup) return false;
+      if (!loaded && widget.session.workspacePrivatePreferencePending(WorkspacePrivatePreferenceKind.pickup) == null) return false;
+      loaded = true;
+      _privateSourceProof = widget.session.workspacePrivatePreferenceSourceProof(WorkspacePrivatePreferenceKind.pickup);
+    }
     if (loaded) {
       _city.text = widget.session.workspaceDeliveryCity;
       _area.text = widget.session.workspaceDeliveryArea;
@@ -52004,6 +52175,26 @@ class _WorkspaceDeliverySettingsSurfaceState
       _pickupEnabled = fields['pickupEnabled'] as bool? ?? _pickupEnabled;
     }
     return loaded;
+  }
+
+  Future<void> _savePickupOriginal() async {
+    const kind = WorkspacePrivatePreferenceKind.pickup;
+    if (!_currentPickup || widget.reviewScope?.mayApply == false || !_privatePreferenceCanSave(widget.session, kind, _privateSourceProof)) {
+      widget.session.showError('Check the saved pickup preferences before another Save. Your entries are kept.'); return;
+    }
+    final signature = _pickupInputSignature;
+    final fields = <String, Object?>{'city': _city.text.trim(), 'area': _area.text.trim(),
+      'pincode': _pincode.text.trim(), 'pickupEnabled': _pickupEnabled};
+    if (widget.reviewScope?.beginAttempt(fields) == false) return;
+    final accepted = widget.session.saveWorkspaceDeliverySettings(city: _city.text, area: _area.text, pincode: _pincode.text,
+      pickupEnabled: _pickupEnabled, expectedStoreId: _storeId, expectedNavigationRevision: _scopeRevision);
+    if (!accepted) return;
+    if (widget.session.pickupPreferencesPersistenceAvailable && !await widget.session.workspacePickupPreferencesWrite) return;
+    if (!_currentPickup || _pickupInputSignature != signature) return;
+    widget.reviewScope?.completeAttempt();
+    final saved = await _saveStorePrivatePreference(widget.session, kind, fields, originalProof: _privateSourceProof,
+      reviewScope: widget.reviewScope, current: () => _currentPickup && _pickupInputSignature == signature);
+    if (saved && _currentPickup) setState(() { _privateSourceProof = widget.session.workspacePrivatePreferenceSourceProof(kind); });
   }
 
   @override
@@ -52027,7 +52218,7 @@ class _WorkspaceDeliverySettingsSurfaceState
       if (snapshot.data != true) {
         return Center(child: Padding(padding: const EdgeInsets.all(16), child: Column(
           mainAxisSize: MainAxisSize.min, children: [
-            Text(widget.session.workspacePickupPreferencesError ?? 'Saved pickup preferences could not be opened.'),
+            Text(widget.session.workspacePrivatePreferenceError(WorkspacePrivatePreferenceKind.pickup) ?? widget.session.workspacePickupPreferencesError ?? 'Saved pickup preferences could not be opened.'),
             OutlinedButton(onPressed: () => setState(() { _pickupLoad = _loadPickupPreferences(); }),
               child: const Text('Try again')),
           ],
@@ -52038,7 +52229,9 @@ class _WorkspaceDeliverySettingsSurfaceState
       ]), builder: (context, _) => StoreSettingsForm(
       key: const Key('work-delivery-settings-screen'),
       title: 'Delivery & pickup',
-      detail: widget.session.pickupPreferencesPersistenceAvailable
+      detail: widget.session.workspaceOriginalPrivatePreferencesConfigured
+          ? widget.session.workspacePrivatePreferenceError(WorkspacePrivatePreferenceKind.pickup) ?? 'Set the pickup location and whether customers can collect.'
+          : widget.session.pickupPreferencesPersistenceAvailable
           ? widget.session.workspacePickupPreferencesError ??
               (widget.session.workspacePickupPreferencesSaving ? 'Saving pickup preferences on this device…' :
                _pickupInputsChanged ? 'Unsaved changes. Save on this device to keep them. Public sync and collection confirmation are pending.' :
@@ -52090,6 +52283,10 @@ class _WorkspaceDeliverySettingsSurfaceState
       trailing: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (widget.session.workspaceOriginalPrivatePreferencesConfigured) _StorePrivatePreferenceRecovery(
+            session: widget.session, kind: WorkspacePrivatePreferenceKind.pickup, current: () => _currentPickup, reviewScope: widget.reviewScope,
+            onRecovered: () {if (_currentPickup) setState(() { _privateSourceProof = widget.session.workspacePrivatePreferenceSourceProof(WorkspacePrivatePreferenceKind.pickup); });},
+            onReload: () async {if (_currentPickup) setState(() { _pickupLoad = _loadPickupPreferences(); });}),
           const Padding(
             padding: EdgeInsets.only(bottom: 6),
             child: Text(
@@ -52109,10 +52306,13 @@ class _WorkspaceDeliverySettingsSurfaceState
         ],
       ),
       saveKey: 'work-delivery-settings-save',
-      saveLabel: widget.session.workspacePickupPreferencesSaving ? 'Saving…' :
+      saveLabel: widget.session.workspaceOriginalPrivatePreferencesConfigured
+          ? widget.session.workspacePrivatePreferenceBusy(WorkspacePrivatePreferenceKind.pickup) ? 'Saving…' : 'Save preferences'
+          : widget.session.workspacePickupPreferencesSaving ? 'Saving…' :
           widget.session.pickupPreferencesPersistenceAvailable ? 'Save on this device' : 'Apply pickup preferences',
-      saveEnabled: !widget.session.workspacePickupPreferencesSaving,
+      saveEnabled: !widget.session.workspacePickupPreferencesSaving && (!widget.session.workspaceOriginalPrivatePreferencesConfigured || widget.session.workspacePrivatePreferenceReady(WorkspacePrivatePreferenceKind.pickup)),
       onSave: () {
+        if (widget.session.workspaceOriginalPrivatePreferencesConfigured) {unawaited(_savePickupOriginal()); return;}
         if (widget.reviewScope?.mayApply == false || _pickupContext != widget.session.pickupPreferencesContext) {
           widget.session.showError('Your Store or account changed. Your entries are kept.');
           return;
@@ -52167,6 +52367,13 @@ class _WorkspaceStaffSettingsSurfaceState
 
   late final _store = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
   late final _navigation = widget.session.navigationScopeRevision;
+  late final _ownerContext = widget.session.publicationPreferencesContext;
+  String? _privateSourceProof;
+  bool _originalOpening = false, _originalAvailable = false;
+  String get _staffInputSignature => jsonEncode([_enabled, _counters.text]);
+  bool get _currentStaff => mounted && widget.reviewScope?.current() != false &&
+    _store == (widget.session.activeWorkspace?.id ?? widget.session.workspaceId) && _navigation == widget.session.navigationScopeRevision &&
+    _ownerContext == widget.session.publicationPreferencesContext;
   bool get _dirty => _enabled != widget.session.workspaceStaffAccessEnabled ||
     _counters.text != '${widget.session.workspaceCounterCount}';
   @override void initState() {
@@ -52174,7 +52381,42 @@ class _WorkspaceStaffSettingsSurfaceState
     final fields = widget.initialData?.fields ?? const <String, Object?>{};
     _enabled = fields['staffAccessEnabled'] as bool? ?? _enabled;
     if (fields['counterCount'] != null) _counters.text = '${fields['counterCount']}';
+    if (widget.session.workspaceOriginalPrivatePreferencesConfigured) unawaited(_loadOriginalStaff());
   }
+  Future<void> _loadOriginalStaff() async {
+    if (!_currentStaff) return;
+    final signature = _staffInputSignature;
+    setState(() => _originalOpening = true);
+    final loaded = await widget.session.loadWorkspacePrivatePreferences(WorkspacePrivatePreferenceKind.staff, refresh: true,
+      inputPristine: () => _currentStaff && _staffInputSignature == signature);
+    if (!mounted) return;
+    setState(() {
+      _originalOpening = false;
+      _originalAvailable = _currentStaff && (loaded || widget.session.workspacePrivatePreferencePending(WorkspacePrivatePreferenceKind.staff) != null);
+      if (!_originalAvailable) return;
+      _privateSourceProof = widget.session.workspacePrivatePreferenceSourceProof(WorkspacePrivatePreferenceKind.staff);
+      _enabled = widget.session.workspaceStaffAccessEnabled; _counters.text = '${widget.session.workspaceCounterCount}';
+      final fields = widget.initialData?.fields ?? const <String, Object?>{};
+      _enabled = fields['staffAccessEnabled'] as bool? ?? _enabled;
+      if (fields['counterCount'] != null) _counters.text = '${fields['counterCount']}';
+    });
+  }
+  Future<void> _saveOriginalStaff() async {
+    const kind = WorkspacePrivatePreferenceKind.staff;
+    if (!_currentStaff || widget.reviewScope?.mayApply == false || !_privatePreferenceCanSave(widget.session, kind, _privateSourceProof)) {
+      widget.session.showError('Check the saved staff preferences before another Save. Your entries are kept.'); return;
+    }
+    final count = int.tryParse(_counters.text.trim()), signature = _staffInputSignature;
+    if (count == null || count < 1 || count > 20) {widget.session.showError('Enter a whole counter count from 1 to 20.'); return;}
+    final fields = <String, Object?>{'staffAccessEnabled': _enabled, 'counterCount': count};
+    if (widget.reviewScope?.beginAttempt(fields) == false) return;
+    widget.session.saveWorkspaceStaffSettings(staffAccessEnabled: _enabled, counterCount: count);
+    widget.reviewScope?.completeAttempt();
+    final saved = await _saveStorePrivatePreference(widget.session, kind, fields, originalProof: _privateSourceProof,
+      reviewScope: widget.reviewScope, current: () => _currentStaff && _staffInputSignature == signature);
+    if (saved && _currentStaff) setState(() { _privateSourceProof = widget.session.workspacePrivatePreferenceSourceProof(kind); });
+  }
+
   @override
   void dispose() {
     _staffSettingsEditors.remove(this);
@@ -52184,6 +52426,16 @@ class _WorkspaceStaffSettingsSurfaceState
 
   @override
   Widget build(BuildContext context) {
+    if (!_currentStaff) return const Center(child: Text('Your Store or account changed. Your entries are kept. Reopen staff settings.'));
+    if (!widget.session.workspaceOriginalPrivatePreferencesConfigured) return _buildForm(context);
+    if (_originalOpening) return const Center(child: CircularProgressIndicator(semanticsLabel: 'Opening saved staff preferences'));
+    if (!_originalAvailable) return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Text(widget.session.workspacePrivatePreferenceError(WorkspacePrivatePreferenceKind.staff) ?? 'Saved staff preferences could not be opened.'),
+      TextButton(onPressed: _loadOriginalStaff, child: const Text('Try again')),
+    ]));
+    return AnimatedBuilder(animation: widget.session, builder: (context, _) => _buildForm(context));
+  }
+  Widget _buildForm(BuildContext context) {
     return StoreSettingsForm(
       key: const Key('work-staff-settings-screen'),
       embedded: widget.embedded,
@@ -52209,10 +52461,18 @@ class _WorkspaceStaffSettingsSurfaceState
           validate: (value) => StoreSettingsInput.whole(value, 1, 20),
         ),
       ],
-      trailing: const Text('Does not grant staff account access.'),
+      trailing: widget.session.workspaceOriginalPrivatePreferencesConfigured ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Does not grant staff account access.'),
+        _StorePrivatePreferenceRecovery(session: widget.session, kind: WorkspacePrivatePreferenceKind.staff, current: () => _currentStaff,
+          reviewScope: widget.reviewScope, onRecovered: () {if (_currentStaff) setState(() { _privateSourceProof = widget.session.workspacePrivatePreferenceSourceProof(WorkspacePrivatePreferenceKind.staff); });},
+          onReload: _loadOriginalStaff),
+      ]) : const Text('Does not grant staff account access.'),
       saveKey: 'work-staff-settings-save',
-      saveLabel: 'Save staff controls',
+      saveLabel: widget.session.workspacePrivatePreferenceBusy(WorkspacePrivatePreferenceKind.staff) ? 'Saving…' : 'Save staff controls',
+      saveEnabled: !widget.session.workspaceOriginalPrivatePreferencesConfigured || widget.session.workspacePrivatePreferenceReady(WorkspacePrivatePreferenceKind.staff),
       onSave: () {
+        if (!_currentStaff) return;
+        if (widget.session.workspaceOriginalPrivatePreferencesConfigured) {unawaited(_saveOriginalStaff()); return;}
         if (widget.reviewScope != null && (!widget.reviewScope!.mayApply ||
             _store != (widget.session.activeWorkspace?.id ?? widget.session.workspaceId) ||
             _navigation != widget.session.navigationScopeRevision)) return;
@@ -58648,6 +58908,7 @@ class _WorkspaceStatusSurface extends StatelessWidget {
   const _WorkspaceStatusSurface({
     required this.scrollController,
     required this.session,
+    this.recovery,
     required this.acceptingOrders,
     required this.visibleToCustomers,
     required this.fulfilmentMode,
@@ -58673,6 +58934,7 @@ class _WorkspaceStatusSurface extends StatelessWidget {
   });
 
   final WorkSession session;
+  final Widget? recovery;
   final ScrollController scrollController;
   final bool acceptingOrders;
   final bool visibleToCustomers;
@@ -58723,6 +58985,7 @@ class _WorkspaceStatusSurface extends StatelessWidget {
           MoolSpacing.xl,
         ),
         children: [
+          if (recovery != null) recovery!,
           const SizedBox(height: 4),
           SegmentedButton<WorkspaceStoreState>(
             key: const Key('work-status-store-state'),
@@ -59027,6 +59290,7 @@ class _StoreInvoiceDeliveryPreferenceViewState
   WorkspaceInvoiceDeliveryPreference? _preference;
   WorkspaceInvoiceDeliveryMode? _proposedMode;
   bool _busy = true;
+  String? _privateSourceProof;
   String? _error;
   bool get _current =>
       mounted && widget.reviewScope?.current() != false &&
@@ -59049,6 +59313,8 @@ class _StoreInvoiceDeliveryPreferenceViewState
       final value = await widget.session.loadInvoiceDeliveryPreference(
         widget.scope!,
       );
+      if (!_current) return;
+      _privateSourceProof = widget.session.workspacePrivatePreferenceSourceProof(WorkspacePrivatePreferenceKind.invoice);
       if (widget.reviewScope?.invoiceMode != null && _preference == null && value.mode.name != widget.reviewScope!.invoiceMode) {
         if (_current) setState(() => _error = 'Saved invoice preference changed. Reopen this task.');
         return;
@@ -59058,7 +59324,8 @@ class _StoreInvoiceDeliveryPreferenceViewState
       if (_current) {
         setState(() {
           _preference = null;
-          _error = 'Could not load your invoice delivery preference.';
+          _error = widget.session.workspacePrivatePreferencePending(WorkspacePrivatePreferenceKind.invoice) != null
+            ? 'Check the earlier Save in Invoice delivery settings.' : 'Could not load your invoice delivery preference.';
         });
       }
     } finally {
@@ -59072,8 +59339,13 @@ class _StoreInvoiceDeliveryPreferenceViewState
       _busy = true;
       _error = null;
     });
+    var originalConfirmed = false;
     try {
       final scope = widget.scope!;
+      final privateOriginal = widget.session.workspaceOriginalPrivatePreferencesConfigured;
+      if (!_privatePreferenceCanSave(widget.session, WorkspacePrivatePreferenceKind.invoice, _privateSourceProof)) {
+        if (_current) setState(() => _error = 'Saved invoice preferences changed. Your choice is kept. Reload before saving.'); return;
+      }
       if (widget.reviewScope != null) {
         final latest = await widget.session.loadInvoiceDeliveryPreference(scope);
         if (!_current || !widget.reviewScope!.mayApply) return;
@@ -59082,6 +59354,15 @@ class _StoreInvoiceDeliveryPreferenceViewState
           return;
         }
       }
+      if (privateOriginal) {
+        final saved = await _saveStorePrivatePreference(widget.session, WorkspacePrivatePreferenceKind.invoice, {'mode': mode.name},
+          originalProof: _privateSourceProof, reviewScope: widget.reviewScope, current: () => _current);
+        if (!saved || !_current) {
+          if (_current) setState(() => _error = widget.session.workspacePrivatePreferenceError(WorkspacePrivatePreferenceKind.invoice) ?? 'Check the earlier Save. Your choice is kept.'); return;
+        }
+        originalConfirmed = true;
+        _privateSourceProof = widget.session.workspacePrivatePreferenceSourceProof(WorkspacePrivatePreferenceKind.invoice);
+      }
       await widget.session.saveInvoiceDeliveryPreference(
         WorkspaceInvoiceDeliveryPreference(
           account: scope.account,
@@ -59089,7 +59370,7 @@ class _StoreInvoiceDeliveryPreferenceViewState
           mode: mode,
         ),
         current: widget.reviewScope == null ? null : () => _current && widget.reviewScope!.mayApply,
-        expectedOriginalMode: widget.reviewScope == null ? null : _preference!.mode,
+        expectedOriginalMode: privateOriginal || widget.reviewScope == null ? null : _preference!.mode,
       );
       // Read back the actual persisted choice, including after leaving/reopening.
       if (_current) await _load();
@@ -59097,8 +59378,8 @@ class _StoreInvoiceDeliveryPreferenceViewState
       if (_current) {
         setState(() {
           _preference = null;
-          _error =
-              'Could not confirm the save. Reload to check your saved preference.';
+          _error = originalConfirmed ? 'Preference saved. Reload to refresh this view.'
+              : 'Could not confirm the save. Reload to check your saved preference.';
         });
       }
     } finally {
@@ -59125,6 +59406,9 @@ class _StoreInvoiceDeliveryPreferenceViewState
     final feedback = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (widget.settings && widget.session.workspaceOriginalPrivatePreferencesConfigured) _StorePrivatePreferenceRecovery(
+          session: widget.session, kind: WorkspacePrivatePreferenceKind.invoice, current: () => _current, reviewScope: widget.reviewScope,
+          onRecovered: () {if (_current) unawaited(_load());}, onReload: _load),
         if (_busy) const Text('Loading invoice delivery…'),
         if (_error != null) ...[
           Semantics(
@@ -59170,7 +59454,7 @@ class _StoreInvoiceDeliveryPreferenceViewState
         FilledButton(key: const Key('work-invoice-apply-proposal'),
           onPressed: _busy || _preference == null || _error != null ? null : () => _save(_proposedMode),
           child: const Text('Apply preference')),
-        const Text('Saved on this device. Invoice sending is separate.'),
+        Text(widget.session.workspaceOriginalPrivatePreferencesConfigured ? 'Invoice sending is separate from this preference.' : 'Saved on this device. Invoice sending is separate.'),
       ]);
     }
     return Column(
@@ -59202,9 +59486,9 @@ class _StoreInvoiceDeliveryPreferenceViewState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               feedback,
-              const Text(
-                'Auto-saved on this device. Sending unavailable.',
-                style: TextStyle(color: MoolColors.muted, fontSize: 12),
+              Text(
+                widget.session.workspaceOriginalPrivatePreferencesConfigured ? 'This saves your preference. Invoice sending is separate.' : 'Auto-saved on this device. Sending unavailable.',
+                style: const TextStyle(color: MoolColors.muted, fontSize: 12),
               ),
               if (mode == WorkspaceInvoiceDeliveryMode.automatic)
                 const Text(

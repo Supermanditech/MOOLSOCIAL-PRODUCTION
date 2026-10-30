@@ -15,6 +15,7 @@ import 'work_ledger_gateway.dart';
 import 'work_purchase_entry_gateway.dart' show WorkspaceSupplierSaveIntent, WorkspacePurchaseDraftSaveIntent, WorkspaceSupplierOpeningSaveIntent;
 import 'work_customer_feedback.dart';
 import 'work_catalogue_gateway.dart';
+import 'work_store_preferences.dart';
 import 'work_supplier_policy.dart';
 import 'work_product_promotions.dart';
 import 'work_order_identity_gateway.dart';
@@ -326,6 +327,21 @@ class StoreCollectionController extends ChangeNotifier {
   }
 }
 
+class _StorePrivatePreferenceState {
+  _StorePrivatePreferenceState(this.source, this.journal)
+    : controller = WorkspacePrivatePreferenceController(projectId: source.projectId, scope: source.scope,
+        kind: source.kind, source: source, journal: journal);
+  final WorkspacePrivatePreferenceRemoteSource source;
+  final StoredWorkspacePrivatePreferenceJournal journal;
+  final WorkspacePrivatePreferenceController controller;
+  WorkspacePrivatePreferenceRecord? record;
+  WorkspacePrivatePreferenceIntent? pending;
+  bool loaded = false, busy = false;
+  String? error;
+  Future<bool>? loading;
+  void retire() {source.retire(); controller.retire();}
+}
+
 /// Existing Store fields partitioned by workspace, within this signed-in session.
 /// This cache is not authoritative persistence or backend membership validation.
 class _StoreOperationalData {
@@ -355,6 +371,7 @@ class _StoreOperationalData {
   String? originalLedgerError;
   RemoteWorkCounterDraftStore? originalCounterDraft;
   Future<bool>? originalCounterDraftLoad;
+  final privatePreferences = <WorkspacePrivatePreferenceKind, _StorePrivatePreferenceState>{};
   bool originalLedgerSelected = false;
   bool originalLedgerCommandBusy = false;
   int? ledgerCheckpointRevision;
@@ -5674,6 +5691,16 @@ class WorkSession extends ChangeNotifier {
         'Return to your Store to view invoice delivery.',
       );
     }
+    if (workspaceOriginalPrivatePreferencesConfigured) {
+      final loaded = await loadWorkspacePrivatePreferences(WorkspacePrivatePreferenceKind.invoice, refresh: true,
+        inputPristine: () => !_disposed && scope == storeInvoiceDeliveryScope);
+      if (!loaded || scope != storeInvoiceDeliveryScope) {
+        throw const WorkGatewayException('Saved invoice preferences could not be confirmed. Your entries are kept.');
+      }
+      final original = workspacePrivatePreferenceOriginalFields(WorkspacePrivatePreferenceKind.invoice);
+      if (original != null) return WorkspaceInvoiceDeliveryPreference(account: scope.account, store: scope.store,
+        mode: WorkspaceInvoiceDeliveryMode.values.singleWhere((mode) => mode.name == original['mode']));
+    }
     final saved = await _invoiceDeliveryStorage.read(
       scope.account,
       scope.store,
@@ -6085,6 +6112,195 @@ class WorkSession extends ChangeNotifier {
     if (!_ledgerFormScopeCurrent(draft.key)) {
       throw StateError('Invoice changed during draft save.');
     }
+  }
+
+  bool get workspaceOriginalPrivatePreferencesConfigured => gateway is! ReviewWorkGateway &&
+    catalogueGateway is AuthenticatedWorkspaceCatalogueGateway &&
+    (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).privatePreferencesSupported &&
+    (catalogueGateway as AuthenticatedWorkspaceCatalogueGateway).privatePreferencesProjectId != null;
+
+  _StorePrivatePreferenceState? _privatePreferenceState(WorkspacePrivatePreferenceKind kind, {bool create = false}) {
+    final old = _storeData.privatePreferences[kind];
+    if (old?.source.current == true) return old;
+    if (!create || !workspaceOriginalPrivatePreferencesConfigured || !hasVerifiedWorkspace ||
+        !workspaceRequiresMembershipReadback) return null;
+    final connection = catalogueGateway as AuthenticatedWorkspaceCatalogueGateway,
+      data = _storeData, account = _contactAccountScope, store = activeWorkspace?.id,
+      profile = activeWorkspace?.profileId, navigation = navigationScopeRevision,
+      principal = publicationPreferencesContext;
+    if (account == null || store == null || !_currentWorkspaceAccess(store, profile)) return null;
+    bool current() => !_disposed && identical(data, _storeData) && identical(connection, catalogueGateway) &&
+      _contactAccountScope == account && activeWorkspace?.id == store && publicationPreferencesContext == principal &&
+      navigationScopeRevision == navigation && hasVerifiedWorkspace && _currentWorkspaceAccess(store, profile);
+    final source = connection.originalPrivatePreferenceSource(accountId: account, storeId: store, kind: kind, current: current);
+    if (source == null) return null;
+    old?.retire();
+    final journal = StoredWorkspacePrivatePreferenceJournal(projectId: source.projectId, scope: source.scope, kind: kind,
+      connectionId: source.connectionId, storage: const SecureWorkPrivatePreferenceJournalStorage(), current: () => source.current);
+    final next = _StorePrivatePreferenceState(source, journal);
+    data.privatePreferences[kind] = next; return next;
+  }
+  bool workspacePrivatePreferenceReady(WorkspacePrivatePreferenceKind kind) {
+    final state = _privatePreferenceState(kind);
+    return state != null && state.loaded && state.pending == null && !state.busy && state.loading == null;
+  }
+  bool workspacePrivatePreferenceBusy(WorkspacePrivatePreferenceKind kind) {
+    final state = _privatePreferenceState(kind); return state?.busy == true || state?.loading != null;
+  }
+  WorkspacePrivatePreferenceIntent? workspacePrivatePreferencePending(WorkspacePrivatePreferenceKind kind) => _privatePreferenceState(kind)?.pending;
+  String? workspacePrivatePreferenceError(WorkspacePrivatePreferenceKind kind) => _privatePreferenceState(kind)?.error;
+  Map<String, Object?>? workspacePrivatePreferenceOriginalFields(WorkspacePrivatePreferenceKind kind) {
+    final state = _privatePreferenceState(kind); return state?.loaded == true ? state!.record?.fields : null;
+  }
+  static String _privatePreferenceProof(WorkspacePrivatePreferenceRemoteSource source, WorkspacePrivatePreferenceRecord? record) =>
+    'store-private-preferences:${source.kind.name}:${workspaceLedgerFingerprint({'projectId': source.projectId,
+      'scope': workspacePrivatePreferenceScopeJson(source.scope), 'kind': source.kind.name, 'record': record?.toJson()})}';
+  String? workspacePrivatePreferenceSourceProof(WorkspacePrivatePreferenceKind kind) {
+    final state = _privatePreferenceState(kind);
+    return state?.loaded == true ? _privatePreferenceProof(state!.source, state.record) : null;
+  }
+  String? workspacePrivatePreferenceOperation(WorkspacePrivatePreferenceKind kind) => _privatePreferenceState(kind)?.pending?.fingerprint;
+  void _applyPrivatePreferenceInputs(WorkspacePrivatePreferenceKind kind, Map<String, Object?> f) {
+    // A same-actor original/private recovery input cache only. No device Save,
+    // publication, staffing permission, message dispatch or order operation.
+    switch (kind) {
+      case WorkspacePrivatePreferenceKind.status:
+        workspaceAcceptingOrders = f['acceptingOrders'] as bool;
+        workspaceVisibleToCustomers = f['visibleToCustomers'] as bool;
+        workspaceFulfilmentMode = f['fulfilmentMode'] as String;
+        workspaceBusyMinutes = f['busyMinutes'] as int;
+        workspaceReopensAt = f['reopensAt'] as String;
+        workspaceOpeningTime = f['openingTime'] as String;
+        workspaceClosingTime = f['closingTime'] as String;
+        workspaceMaximumActiveOrders = f['maximumActiveOrders'] as int;
+        workspaceOrderAlertSound = f['alertSound'] as bool;
+        workspaceOrderAlertVibration = f['alertVibration'] as bool;
+      case WorkspacePrivatePreferenceKind.pickup:
+        workspaceDeliveryCity = f['city'] as String; workspaceDeliveryArea = f['area'] as String;
+        workspaceDeliveryPincode = f['pincode'] as String; workspacePickupEnabled = f['pickupEnabled'] as bool;
+      case WorkspacePrivatePreferenceKind.staff:
+        workspaceStaffAccessEnabled = f['staffAccessEnabled'] as bool; workspaceCounterCount = f['counterCount'] as int;
+      case WorkspacePrivatePreferenceKind.invoice:
+        break;
+    }
+  }
+  Future<bool> loadWorkspacePrivatePreferences(WorkspacePrivatePreferenceKind kind,
+      {required bool Function() inputPristine, bool refresh = false}) {
+    if (!workspaceOriginalPrivatePreferencesConfigured) return Future.value(true);
+    if (!inputPristine()) return Future.value(false);
+    final state = _privatePreferenceState(kind, create: true);
+    if (state == null || state.busy) return Future.value(false);
+    if (state.pending != null) return Future.value(false);
+    if (state.loading case final loading?) return loading;
+    if (state.loaded && !refresh && state.error == null) return Future.value(true);
+    final operation = Future<bool>.microtask(() async {
+      try {
+        state.error = null;
+        final bound = await state.journal.bound;
+        if (!state.source.current || !inputPristine()) return false;
+        final pending = bound ? await state.journal.pending() : null;
+        if (!state.source.current || !inputPristine()) return false;
+        if (pending != null) {
+          state.pending = pending; state.loaded = false;
+          _applyPrivatePreferenceInputs(kind, pending.fields);
+          state.error = 'Check the earlier Save. Entered details are kept.';
+          notifyListeners(); return false;
+        }
+        final record = await state.source.read();
+        if (!state.source.current || !inputPristine()) return false;
+        state.record = record; state.loaded = true;
+        if (record != null) _applyPrivatePreferenceInputs(kind, record.fields);
+        notifyListeners(); return true;
+      } on Object {
+        if (state.source.current) {state.loaded = false; state.error = 'Saved Store preferences could not be opened. Your entries are kept.'; notifyListeners();}
+        return false;
+      } finally {state.loading = null;}
+    });
+    state.loading = operation; return operation;
+  }
+  Future<bool> _finishPrivatePreference(_StorePrivatePreferenceState state, WorkspacePrivatePreferenceResult result,
+      {required bool Function() current, bool Function(String, String)? admitCurrentRecord, void Function(String)? onOriginalResolved}) async {
+    final original = state.pending;
+    if (!state.source.current || !current() || original == null || result.intent.fingerprint != original.fingerprint) {
+      state.error = 'Check the earlier Save in its original Store. Entered details are kept.'; return false;
+    }
+    if (!result.confirmed) {state.error = 'The earlier Save is still unconfirmed. Check again or retry the same request.'; return false;}
+    final oldProof = _privatePreferenceProof(state.source, state.record);
+    if (!result.saved || result.current?.fingerprint != result.original?.fingerprint) {
+      onOriginalResolved?.call(original.fingerprint);
+      state.pending = null; state.loaded = false;
+      state.error = result.saved ? 'Your Save completed, then Store preferences changed again. Your entries are kept. Reopen this form.'
+        : 'Store preferences changed before this Save. Your entries are kept. Reopen this form.';
+      return false;
+    }
+    final next = result.current!, newProof = _privatePreferenceProof(state.source, next);
+    if (!state.source.current || !current()) return false;
+    onOriginalResolved?.call(original.fingerprint);
+    // Admit only this exact known result, with no asynchronous gap before installation.
+    if (admitCurrentRecord?.call(oldProof, newProof) == false) {
+      state.error = 'The original Save needs checking. Entered details are kept.'; return false;
+    }
+    state.record = next; state.loaded = true; state.pending = null; state.error = null;
+    return true;
+  }
+  Future<bool> saveWorkspacePrivatePreferences(WorkspacePrivatePreferenceKind kind, Map<String, Object?> fields,
+      {required bool Function() current, String? expectedSourceProof, bool Function(String)? admitOriginal,
+       bool Function(String, String)? admitCurrentRecord, void Function(String)? onOriginalResolved}) async {
+    if (!workspaceOriginalPrivatePreferencesConfigured) return true;
+    final state = _privatePreferenceState(kind);
+    if (state == null || !state.loaded || state.busy || state.loading != null || state.pending != null || !current()) return false;
+    if (expectedSourceProof == null || _privatePreferenceProof(state.source, state.record) != expectedSourceProof) {
+      state.error = 'Saved Store preferences changed. Your entries are kept. Reopen this form.';
+      notifyListeners(); return false;
+    }
+    late final WorkspacePrivatePreferenceIntent original;
+    try {
+      original = WorkspacePrivatePreferenceIntent(projectId: state.source.projectId, scope: state.source.scope, kind: kind,
+        expectedRevision: state.record?.revision ?? 0, idempotencyKey: 'private-pref-${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}', fields: fields);
+    } on Object {
+      state.error = 'Check the entered Store preferences. Your entries are kept.'; notifyListeners(); return false;
+    }
+    if (admitOriginal?.call(original.fingerprint) == false || !current()) return false;
+    state.busy = true; state.pending = original; state.error = null; notifyListeners();
+    try {
+      await state.journal.bindConfirmedOriginal(state.record);
+      if (!state.source.current || !current()) return false;
+      final result = await state.controller.save(original);
+      return await _finishPrivatePreference(state, result, current: current, admitCurrentRecord: admitCurrentRecord, onOriginalResolved: onOriginalResolved);
+    } on Object {
+      // Another same-scope editor may have retained an earlier original before
+      // this journal operation. Keep that durable identity, never replace it.
+      if (state.source.current) {
+        try {
+          final durable = await state.journal.pending();
+          if (durable != null && durable.fingerprint != original.fingerprint) {state.pending = durable; state.loaded = false;}
+        } on Object { /* Preserve the cached original if storage is unavailable. */ }
+      }
+      state.error = 'The Save could not be confirmed. Check the earlier request. Entered details are kept.'; return false;
+    }
+    finally {state.busy = false; if (!_disposed) notifyListeners();}
+  }
+  Future<bool> checkWorkspacePrivatePreferenceSave(WorkspacePrivatePreferenceKind kind, {bool retry = false,
+      required bool Function() current, bool Function(String, String)? admitCurrentRecord, void Function(String)? onOriginalResolved}) async {
+    final state = _privatePreferenceState(kind), original = _privatePreferenceState(kind)?.pending;
+    if (state == null || original == null || state.busy || !current()) return false;
+    state.busy = true; notifyListeners();
+    try {
+      final durable = await state.journal.pending();
+      if (!state.source.current || !current()) return false;
+      WorkspacePrivatePreferenceResult result;
+      if (durable != null) {
+        if (durable.fingerprint != original.fingerprint) throw const FormatException();
+        result = await state.controller.check(retry: retry);
+      } else {
+        // A failed retention or an acknowledged clear may leave only this cached
+        // exact identity. Explicit status never creates/replays a command.
+        result = await state.source.status(original);
+        if (!result.confirmed && retry && state.source.current && current()) result = await state.controller.save(original);
+      }
+      return await _finishPrivatePreference(state, result, current: current, admitCurrentRecord: admitCurrentRecord, onOriginalResolved: onOriginalResolved);
+    } on Object {state.error = 'The original Save is still unconfirmed. Entered details are kept.'; return false;}
+    finally {state.busy = false; if (!_disposed) notifyListeners();}
   }
 
   late final WorkCounterDraftStore _retainedCounterDraftStorage =
@@ -16953,6 +17169,7 @@ class WorkSession extends ChangeNotifier {
     for (final data in {..._storeDataById.values, _storeData}) {
       data.originalLedger?.retire();
       data.originalCounterDraft?.retire();
+      for (final preference in data.privatePreferences.values) {preference.retire();}
       final operations = data.orderOperations;
       if (operations != null && !operations.isDisposed) operations.dispose();
     }
